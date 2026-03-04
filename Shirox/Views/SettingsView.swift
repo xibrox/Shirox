@@ -16,7 +16,7 @@ struct SettingsView: View {
             #endif
         }
         .onAppear {
-            OrientationManager.lockOrientation(.portrait)
+            PlayerPresenter.shared.updateOrientationLock(.portrait)
         }
     }
 }

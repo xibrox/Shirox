@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 final class DetailViewModel: ObservableObject {
@@ -62,9 +63,8 @@ final class DetailViewModel: ObservableObject {
         }
     }
 
-    func selectStream(_ stream: StreamResult) {
+    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
         selectedStream = stream
-        showStreamPicker = false
-        showPlayer = true
+        PlayerPresenter.shared.presentPlayer(stream: stream, from: sourceView)
     }
 }

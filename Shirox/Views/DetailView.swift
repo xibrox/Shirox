@@ -21,7 +21,7 @@ struct DetailView: View {
             }
         }
         .onAppear {
-            OrientationManager.lockOrientation(.portrait)
+            PlayerPresenter.shared.updateOrientationLock(.portrait)
         }
         .ignoresSafeArea(edges: .top)
         .navigationTitle("")
@@ -33,22 +33,9 @@ struct DetailView: View {
         .sheet(isPresented: $vm.showStreamPicker) {
             StreamPickerView(vm: vm)
         }
-#if os(iOS)
-        .fullScreenCover(isPresented: $vm.showPlayer) {
-            if let stream = vm.selectedStream {
-                PlayerContainer(stream: stream)
-            }
+        .sheet(isPresented: $vm.showStreamPicker) {
+            StreamPickerView(vm: vm)
         }
-#else
-        .sheet(isPresented: $vm.showPlayer) {
-            if let stream = vm.selectedStream {
-                NavigationStack {
-                    PlayerView(stream: stream)
-                }
-                .frame(minWidth: 800, minHeight: 500)
-            }
-        }
-#endif
     }
 
     // MARK: - Hero

@@ -16,6 +16,8 @@ struct StreamPickerView: View {
         .presentationBackground(.ultraThinMaterial)
     }
 
+    @State private var buttonViews: [URL: UIView] = [:]
+
     @ViewBuilder
     private var content: some View {
         if vm.isLoadingStreams {
@@ -48,7 +50,7 @@ struct StreamPickerView: View {
 
     private func streamCard(_ stream: StreamResult) -> some View {
         Button {
-            vm.selectStream(stream)
+            vm.selectStream(stream, from: buttonViews[stream.url])
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "play.rectangle.fill")
@@ -73,6 +75,9 @@ struct StreamPickerView: View {
             .contentShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+        .captureView { view in
+            buttonViews[stream.url] = view
+        }
     }
 
     private var episodeTitle: String {

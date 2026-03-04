@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 final class AniListDetailViewModel: ObservableObject {
@@ -41,9 +42,8 @@ final class AniListDetailViewModel: ObservableObject {
         showFinalStreamPicker = true
     }
 
-    func selectStream(_ stream: StreamResult) {
+    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
         selectedStream = stream
-        showFinalStreamPicker = false
-        showPlayer = true
+        PlayerPresenter.shared.presentPlayer(stream: stream, from: sourceView)
     }
 }

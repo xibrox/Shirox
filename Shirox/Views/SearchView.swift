@@ -109,7 +109,7 @@ struct SearchView: View {
             }
         }
         .onAppear {
-            OrientationManager.lockOrientation(.portrait)
+            PlayerPresenter.shared.updateOrientationLock(.portrait)
         }
     }
 

@@ -37,7 +37,7 @@ struct AniListDetailView: View {
             }
         }
         .onAppear {
-            OrientationManager.lockOrientation(.portrait)
+            PlayerPresenter.shared.updateOrientationLock(.portrait)
         }
         .frame(maxWidth: .infinity)
         #if os(iOS)
@@ -62,25 +62,10 @@ struct AniListDetailView: View {
             AniListStreamResultSheet(
                 episodeNumber: vm.selectedEpisodeNumber ?? 0,
                 streams: vm.pendingStreams
-            ) { stream in
-                vm.selectStream(stream)
+            ) { stream, sourceView in
+                vm.selectStream(stream, from: sourceView)
             }
         }
-        // Player
-        #if os(iOS)
-        .fullScreenCover(isPresented: $vm.showPlayer) {
-            if let stream = vm.selectedStream {
-                PlayerContainer(stream: stream)
-            }
-        }
-        #else
-        .sheet(isPresented: $vm.showPlayer) {
-            if let stream = vm.selectedStream {
-                NavigationStack { PlayerView(stream: stream) }
-                    .frame(minWidth: 800, minHeight: 500)
-            }
-        }
-        #endif
     }
 
     // MARK: - Content
@@ -328,7 +313,9 @@ private struct AniListEpisodePressStyle: ButtonStyle {
 struct AniListStreamResultSheet: View {
     let episodeNumber: Int
     let streams: [StreamResult]
-    let onSelect: (StreamResult) -> Void
+    let onSelect: (StreamResult, UIView?) -> Void
+    
+    @State private var buttonViews: [URL: UIView] = [:]
 
     var body: some View {
         NavigationStack {
@@ -343,7 +330,7 @@ struct AniListStreamResultSheet: View {
                     ScrollView {
                         VStack(spacing: 10) {
                             ForEach(streams) { stream in
-                                Button { onSelect(stream) } label: {
+                                Button { onSelect(stream, buttonViews[stream.url]) } label: {
                                     HStack(spacing: 14) {
                                         Image(systemName: "play.rectangle.fill")
                                             .font(.title2)
@@ -363,6 +350,9 @@ struct AniListStreamResultSheet: View {
                                     .contentShape(RoundedRectangle(cornerRadius: 14))
                                 }
                                 .buttonStyle(.plain)
+                                .captureView { view in
+                                    buttonViews[stream.url] = view
+                                }
                             }
                         }
                         .padding(.horizontal, 16)

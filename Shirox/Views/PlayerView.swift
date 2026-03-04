@@ -50,8 +50,24 @@ struct PlayerView: View {
                 #endif
 
                 if showControls {
-                    controlsOverlay
-                        .transition(.opacity)
+                    VStack(spacing: 0) {
+                        topBar
+                        Spacer()
+                        Button {
+                            togglePlayPause()
+                            scheduleHide()
+                        } label: {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 40))
+                                .foregroundStyle(.white)
+                                .frame(width: 72, height: 72)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        bottomBar
+                    }
+                    .transition(.opacity)
                 }
             } else {
                 loadingView
@@ -79,27 +95,7 @@ struct PlayerView: View {
         #endif
     }
 
-    // MARK: - Controls (unchanged)
-    private var controlsOverlay: some View {
-        VStack(spacing: 0) {
-            topBar
-            Spacer()
-            Button {
-                togglePlayPause()
-                scheduleHide()
-            } label: {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.white)
-                    .frame(width: 72, height: 72)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
-            Spacer()
-            bottomBar
-        }
-        .ignoresSafeArea()
-    }
+    // MARK: - Top Bar
 
     private var topBar: some View {
         HStack(alignment: .center) {
@@ -137,6 +133,7 @@ struct PlayerView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .ignoresSafeArea()
         )
     }
 
@@ -174,6 +171,7 @@ struct PlayerView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .ignoresSafeArea()
         )
     }
 
@@ -255,60 +253,23 @@ struct PlayerView: View {
     }
 }
 
-// MARK: - PlayerContainer (orientation depends on Force Landscape setting)
 #if os(iOS)
-struct PlayerContainer: UIViewControllerRepresentable {
-    let stream: StreamResult
-    @Environment(\.dismiss) private var dismiss
-
-    func makeUIViewController(context: Context) -> UIViewController {
-        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
-        let orientationMask: UIInterfaceOrientationMask = forceLandscape ? .landscape : .allButUpsideDown
-        OrientationManager.lockOrientation(orientationMask)
-
-        let controller = PlayerHostingController(
-            rootView: PlayerView(stream: stream, customDismiss: {
-                context.coordinator.dismissPlayer()
-            })
-        )
-        controller.allowedOrientations = orientationMask
-        controller.preferredOrientation = forceLandscape ? .landscapeRight : nil
-        controller.view.backgroundColor = .black
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(dismiss: dismiss)
-    }
-
-    class Coordinator {
-        var dismiss: DismissAction
-        init(dismiss: DismissAction) {
-            self.dismiss = dismiss
-        }
-        func dismissPlayer() {
-            OrientationManager.lockOrientation(.portrait)
-            OrientationManager.requestRotation(to: .portrait)
-            dismiss()
-        }
-    }
-}
-
 class PlayerHostingController<Content: View>: UIHostingController<Content> {
-    var allowedOrientations: UIInterfaceOrientationMask = .allButUpsideDown
-    var preferredOrientation: UIInterfaceOrientationMask? = nil
-
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { allowedOrientations }
-    override var shouldAutorotate: Bool { true }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        setNeedsUpdateOfSupportedInterfaceOrientations()
-        if let preferred = preferredOrientation, let scene = view.window?.windowScene {
-            scene.requestGeometryUpdate(.iOS(interfaceOrientations: preferred)) { _ in }
-        }
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
     }
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        return .landscape
+    }
+
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        return .landscapeRight
+    }
+
+    override var shouldAutorotate: Bool { true }
+    
+    override var prefersStatusBarHidden: Bool { true }
 }
 #endif

@@ -51,7 +51,7 @@ struct HomeView: View {
         }
         .task { await vm.load() }
         .onAppear {
-            OrientationManager.lockOrientation(.portrait)
+            PlayerPresenter.shared.updateOrientationLock(.portrait)
         }
     }
 }
