@@ -1,0 +1,73 @@
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - force_cast
+  - force_try
+  - cyclomatic_complexity
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - fatal_error_message
+  - file_header
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - last_where
+  - marker_comment
+  - nimble_operator
+  - no_extension_access_modifier
+  - no_grouping_extension
+  - number_separator
+  - object_literal
+  - operator_usage_whitespace
+  - overridden_super_call
+  - private_action
+  - private_outlet
+  - prohibited_super_call
+  - quick_discouraged_call
+  - quick_discouraged_focused_test
+  - quick_discouraged_pending_test
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - sorted_imports
+  - unneeded_parentheses_in_closure_argument
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+
+included:
+  - Shirox
+
+excluded:
+  - Pods
+  - Carthage
+  - build
+  - .build
+
+# Rule configurations
+force_unwrapping: error
+force_cast: error
+force_try: error
+
+sorted_imports:
+  severity: warning
+
+file_length:
+  warning: 500
+  error: 1000
+
+function_body_length:
+  warning: 50
+  error: 100
+
+type_body_length:
+  warning: 200
+  error: 400
+
+naming_convention:
+  variable_name:
+    min_length: 2
+    max_length: 40
+  type_name:
+    min_length: 3
+    max_length: 40
