@@ -1,8 +1,14 @@
 import SwiftUI
 #if os(iOS)
 import UIKit
+import AVFoundation
 
 class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        configureAudioSession()
+        return true
+    }
+
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         #if os(iOS)
         if UIDevice.current.userInterfaceIdiom == .pad {
@@ -12,6 +18,17 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         #else
         return .all
         #endif
+    }
+
+    private func configureAudioSession() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            // Use playback category so audio plays regardless of mute switch
+            try audioSession.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
     }
 }
 #endif
