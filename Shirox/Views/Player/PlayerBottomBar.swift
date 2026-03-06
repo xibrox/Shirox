@@ -73,14 +73,11 @@ struct PlayerBottomBar: View {
     // MARK: - Helpers
 
     private var speedLabel: String {
-        if playbackSpeed == 1.0 {
-            return "1×"
-        }
-        let remainder = playbackSpeed.truncatingRemainder(dividingBy: 1)
-        let valueString = remainder == 0
-            ? String(Int(playbackSpeed))
-            : String(format: "%.2g", playbackSpeed)
-        return "\(valueString)×"
+        let value = Double(playbackSpeed)
+        let formatted = value.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(value))
+            : String(format: "%.2g", value)
+        return "\(formatted)×"
     }
 }
 
