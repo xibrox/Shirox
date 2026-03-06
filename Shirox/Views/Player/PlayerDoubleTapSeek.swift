@@ -8,15 +8,17 @@ struct PlayerDoubleTapSeek: View {
 
     @State private var showLeftFeedback = false
     @State private var showRightFeedback = false
+    @State private var leftTask: Task<Void, Never>?
+    @State private var rightTask: Task<Void, Never>?
+    // Debounce flag: suppress single-tap when a double-tap just fired
+    @State private var didDoubleTap = false
 
     var body: some View {
-        GeometryReader { _ in
-            HStack(spacing: 0) {
-                halfView(isLeft: true)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                halfView(isLeft: false)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+        HStack(spacing: 0) {
+            halfView(isLeft: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            halfView(isLeft: false)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -30,6 +32,7 @@ struct PlayerDoubleTapSeek: View {
                 .gesture(
                     SimultaneousGesture(
                         TapGesture(count: 2).onEnded {
+                            didDoubleTap = true
                             if isLeft {
                                 onSeekBackward()
                                 showFeedback(left: true)
@@ -37,8 +40,14 @@ struct PlayerDoubleTapSeek: View {
                                 onSeekForward()
                                 showFeedback(left: false)
                             }
+                            // Reset flag after a brief moment
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(350))
+                                didDoubleTap = false
+                            }
                         },
                         TapGesture(count: 1).onEnded {
+                            guard !didDoubleTap else { return }
                             onSingleTap()
                         }
                     )
@@ -64,15 +73,21 @@ struct PlayerDoubleTapSeek: View {
     }
 
     private func showFeedback(left: Bool) {
-        withAnimation(.easeOut(duration: 0.15)) {
-            if left { showLeftFeedback = true }
-            else { showRightFeedback = true }
-        }
-        Task {
-            try? await Task.sleep(for: .seconds(0.6))
-            withAnimation(.easeOut(duration: 0.25)) {
-                if left { showLeftFeedback = false }
-                else { showRightFeedback = false }
+        if left {
+            leftTask?.cancel()
+            withAnimation(.easeOut(duration: 0.15)) { showLeftFeedback = true }
+            leftTask = Task {
+                try? await Task.sleep(for: .seconds(0.6))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.25)) { showLeftFeedback = false }
+            }
+        } else {
+            rightTask?.cancel()
+            withAnimation(.easeOut(duration: 0.15)) { showRightFeedback = true }
+            rightTask = Task {
+                try? await Task.sleep(for: .seconds(0.6))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.25)) { showRightFeedback = false }
             }
         }
     }
