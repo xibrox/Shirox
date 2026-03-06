@@ -1,6 +1,22 @@
 import SwiftUI
 import AVKit
 
+// MARK: - Circular Button Style (uniform size & appearance)
+
+struct CircularButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(.white)
+            .frame(width: 44, height: 44)
+            .background(
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(configuration.isPressed ? 0.7 : 1)
+            )
+    }
+}
+
 // MARK: - VideoLayerView (iOS only)
 
 #if os(iOS)
@@ -172,11 +188,11 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Controls Overlay
+    // MARK: - Controls Overlay (final version)
 
     private var controlsOverlay: some View {
         ZStack {
-            // Gradient overlays (not interactive)
+            // Gradient overlays (restored)
             VStack {
                 Color.clear.frame(height: 120)
                     .background(
@@ -200,6 +216,7 @@ struct PlayerView: View {
             }
             .allowsHitTesting(false)
 
+            // Main vertical layout with top and bottom bars pinned to edges
             VStack(spacing: 0) {
                 PlayerTopBar(
                     title: stream.title,
@@ -211,22 +228,9 @@ struct PlayerView: View {
                         #endif
                     }
                 )
+                .buttonStyle(CircularButtonStyle())
 
-                Spacer()
-
-                PlayerCenterControls(
-                    isPlaying: $isPlaying,
-                    skipAmount: 10,
-                    onBackward: { skip(by: -10); scheduleHide() },
-                    onPlayPause: { togglePlayPause() },
-                    onForward: { skip(by: 10); scheduleHide() }
-                )
-
-                Spacer()
-
-                PlayerVolumeSlider(volume: $volume)
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 8)
+                Spacer() // Pushes bottom bar down
 
                 PlayerBottomBar(
                     currentTime: $currentTime,
@@ -237,6 +241,23 @@ struct PlayerView: View {
                     onSubtitleSettingsTap: { showSubtitleSettings = true },
                     hasSubtitles: stream.subtitle != nil
                 )
+                .buttonStyle(CircularButtonStyle())
+                // No extra bottom padding – sits directly at the bottom edge
+            }
+            .padding(.horizontal, 16)
+
+            // Center controls as an overlay – guarantees exact vertical centering
+            HStack {
+                Spacer(minLength: 0)
+                PlayerCenterControls(
+                    isPlaying: $isPlaying,
+                    skipAmount: 10,
+                    onBackward: { skip(by: -10); scheduleHide() },
+                    onPlayPause: { togglePlayPause() },
+                    onForward: { skip(by: 10); scheduleHide() }
+                )
+                .buttonStyle(CircularButtonStyle())
+                Spacer(minLength: 0)
             }
         }
         .transition(.opacity)
@@ -282,7 +303,7 @@ struct PlayerView: View {
                         loadingOpacity = 0.2
                     }
                 }
-            Text("Loading\u{2026}")
+            Text("Loading…")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.5))
         }
@@ -347,6 +368,7 @@ struct PlayerView: View {
         }
         let item = AVPlayerItem(asset: asset)
         let p = AVPlayer(playerItem: item)
+        p.volume = volume
         p.rate = playbackSpeed
         isPlaying = true
         player = p
