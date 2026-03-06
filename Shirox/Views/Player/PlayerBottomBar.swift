@@ -10,7 +10,7 @@ struct PlayerBottomBar: View {
     var hasSubtitles: Bool = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             // Action buttons row
             HStack(spacing: 8) {
                 speedButton
@@ -31,7 +31,7 @@ struct PlayerBottomBar: View {
             )
             .padding(.horizontal, 20)
         }
-        .padding(.bottom, 32)
+        .padding(.bottom, 24)        // matches top bar's padding
         .background(bottomGradient)
     }
 
@@ -82,7 +82,6 @@ struct PlayerBottomBar: View {
 }
 
 // MARK: - Preview
-
 #Preview("Default") {
     ZStack {
         Color.black.ignoresSafeArea()

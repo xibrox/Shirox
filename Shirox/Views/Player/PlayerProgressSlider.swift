@@ -18,7 +18,7 @@ struct PlayerProgressSlider: View {
     }
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {                     // minimal spacing
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     // Background track
@@ -39,7 +39,7 @@ struct PlayerProgressSlider: View {
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
                                     if !isDragging {
-                                        dragTime = currentTime   // seed from current position
+                                        dragTime = currentTime
                                         isDragging = true
                                     }
                                     let rawProgress = value.location.x / geo.size.width
@@ -52,7 +52,7 @@ struct PlayerProgressSlider: View {
                         )
                 }
             }
-            .frame(height: 44)
+            .frame(height: 28)                   // reduced from 40 → minimal empty space
 
             // Time labels
             HStack {
@@ -62,7 +62,7 @@ struct PlayerProgressSlider: View {
                 Text(duration.playerTimeString)
                     .foregroundStyle(.white.opacity(0.6))
             }
-            .font(.caption)
+            .font(.caption2)
             .monospacedDigit()
         }
         .scaleEffect(x: isDragging ? 1.04 : 1.0, y: isDragging ? 1.25 : 1.0, anchor: .center)
@@ -70,6 +70,7 @@ struct PlayerProgressSlider: View {
     }
 }
 
+// MARK: - Preview
 #Preview {
     ZStack {
         Color.black.ignoresSafeArea()
