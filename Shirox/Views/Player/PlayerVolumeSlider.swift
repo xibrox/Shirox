@@ -7,9 +7,9 @@ struct PlayerVolumeSlider: View {
 
     private var speakerIcon: String {
         switch volume {
-        case 0: return "speaker.slash.fill"
-        case 0..<0.34: return "speaker.fill"
-        case 0.34..<0.67: return "speaker.wave.1.fill"
+        case ..<Float.ulpOfOne: return "speaker.slash.fill"
+        case ..<(1.0 / 3.0): return "speaker.fill"
+        case ..<(2.0 / 3.0): return "speaker.wave.1.fill"
         default: return "speaker.wave.3.fill"
         }
     }
@@ -17,7 +17,7 @@ struct PlayerVolumeSlider: View {
     var body: some View {
         HStack(spacing: 10) {
             Button {
-                if volume == 0 {
+                if volume <= .ulpOfOne {
                     volume = preMuteVolume
                 } else {
                     preMuteVolume = volume
