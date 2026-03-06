@@ -38,7 +38,10 @@ struct PlayerProgressSlider: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
-                                    if !isDragging { isDragging = true }
+                                    if !isDragging {
+                                        dragTime = currentTime   // seed from current position
+                                        isDragging = true
+                                    }
                                     let rawProgress = value.location.x / geo.size.width
                                     dragTime = min(max(rawProgress * duration, 0), duration)
                                 }
@@ -48,7 +51,6 @@ struct PlayerProgressSlider: View {
                                 }
                         )
                 }
-                .frame(height: 44)
             }
             .frame(height: 44)
 
