@@ -25,7 +25,12 @@ struct PlayerSubtitleSettingsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Shadow")
+                        HStack {
+                            Text("Shadow")
+                            Spacer()
+                            Text(String(format: "%.1f", settings.shadowRadius))
+                                .foregroundStyle(.secondary)
+                        }
                         Slider(value: $settings.shadowRadius, in: 0...8, step: 0.5)
                     }
 
@@ -34,7 +39,12 @@ struct PlayerSubtitleSettingsView: View {
 
                 Section("Position") {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Bottom Padding")
+                        HStack {
+                            Text("Bottom Padding")
+                            Spacer()
+                            Text("\(Int(settings.bottomPadding))pt")
+                                .foregroundStyle(.secondary)
+                        }
                         Slider(value: $settings.bottomPadding, in: 20...200, step: 5)
                     }
                 }
@@ -58,7 +68,7 @@ struct PlayerSubtitleSettingsView: View {
             }
             .navigationTitle("Subtitle Settings")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }

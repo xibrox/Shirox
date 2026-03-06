@@ -6,8 +6,9 @@ struct PlayerSubtitleOverlay: View {
     @ObservedObject var settings: SubtitleSettingsManager
 
     private var activeCue: SubtitleCue? {
+        guard !cues.isEmpty else { return nil }
         let adjustedTime = currentTime + settings.delaySeconds
-        return cues.first { (($0.start)...($0.end)).contains(adjustedTime) }
+        return cues.first { ($0.start...$0.end).contains(adjustedTime) }
     }
 
     var body: some View {
@@ -29,8 +30,9 @@ struct PlayerSubtitleOverlay: View {
                     )
                     .padding(.bottom, settings.bottomPadding)
                     .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.15), value: activeCue?.id)
             }
         }
+        // Animation on the stable VStack parent so transition fires on insertion/removal
+        .animation(.easeInOut(duration: 0.15), value: activeCue?.id)
     }
 }
