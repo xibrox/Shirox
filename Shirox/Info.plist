@@ -27,6 +27,12 @@
     <key>UILaunchScreen</key>
     <dict/>
 
+    <!-- Background modes for PiP and audio playback -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
+
     <!-- Orientation support -->
     <key>UISupportedInterfaceOrientations~iphone</key>
     <array>
