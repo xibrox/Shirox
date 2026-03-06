@@ -6,4 +6,6 @@ struct StreamResult: Identifiable, Equatable {
     let url: URL
     let headers: [String: String]
     let subtitle: String?
+
+    var subtitleURL: URL? { subtitle.flatMap { URL(string: $0) } }
 }
