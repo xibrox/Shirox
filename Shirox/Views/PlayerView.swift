@@ -314,8 +314,13 @@ struct PlayerView: View {
     }
 
     private func seekTo(_ time: Double) {
-        player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        isScrubbing = true
         currentTime = time
+        player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            isScrubbing = false
+        }
         if isPlaying { scheduleHide() }
     }
 
@@ -330,6 +335,9 @@ struct PlayerView: View {
     }
 
     private func setupPlayer() {
+        // Clean up previous observer to prevent leak on re-entry
+        if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
+
         let asset: AVURLAsset
         if !stream.headers.isEmpty {
             let opts: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": stream.headers]
@@ -349,6 +357,19 @@ struct PlayerView: View {
             currentTime = time.seconds
             if let d = item?.duration, d.isNumeric { duration = d.seconds }
         }
+
+        // Observe playback end to sync isPlaying state
+        NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification,
+            object: item,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                isPlaying = false
+                withAnimation { showControls = true }
+            }
+        }
+
         scheduleHide()
     }
 
