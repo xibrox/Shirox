@@ -77,6 +77,32 @@
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FEA73D829CE9CD5C2259248F /* JSEngine+Details.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECAACC04670C75AE2C8303A /* JSEngine+Details.swift */; };
 		FFEA54B867C75F75B46DD67F /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */; };
+		AA000001000000000000AA01 /* SubtitleSettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB01 /* SubtitleSettingsManager.swift */; };
+		AA000001000000000000AA02 /* SubtitleSettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB01 /* SubtitleSettingsManager.swift */; };
+		AA000001000000000000AA03 /* VTTSubtitlesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */; };
+		AA000001000000000000AA04 /* VTTSubtitlesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */; };
+		AA000001000000000000AA05 /* AirPlayButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB03 /* AirPlayButton.swift */; };
+		AA000001000000000000AA06 /* AirPlayButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB03 /* AirPlayButton.swift */; };
+		AA000001000000000000AA07 /* PlayerBottomBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB04 /* PlayerBottomBar.swift */; };
+		AA000001000000000000AA08 /* PlayerBottomBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB04 /* PlayerBottomBar.swift */; };
+		AA000001000000000000AA09 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB05 /* PlayerCenterControls.swift */; };
+		AA000001000000000000AA10 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB05 /* PlayerCenterControls.swift */; };
+		AA000001000000000000AA11 /* PlayerDoubleTapSeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB06 /* PlayerDoubleTapSeek.swift */; };
+		AA000001000000000000AA12 /* PlayerDoubleTapSeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB06 /* PlayerDoubleTapSeek.swift */; };
+		AA000001000000000000AA13 /* PlayerProgressSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB07 /* PlayerProgressSlider.swift */; };
+		AA000001000000000000AA14 /* PlayerProgressSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB07 /* PlayerProgressSlider.swift */; };
+		AA000001000000000000AA15 /* PlayerSpeedPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB08 /* PlayerSpeedPicker.swift */; };
+		AA000001000000000000AA16 /* PlayerSpeedPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB08 /* PlayerSpeedPicker.swift */; };
+		AA000001000000000000AA17 /* PlayerSubtitleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB09 /* PlayerSubtitleOverlay.swift */; };
+		AA000001000000000000AA18 /* PlayerSubtitleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB09 /* PlayerSubtitleOverlay.swift */; };
+		AA000001000000000000AA19 /* PlayerSubtitleSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB10 /* PlayerSubtitleSettingsView.swift */; };
+		AA000001000000000000AA20 /* PlayerSubtitleSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB10 /* PlayerSubtitleSettingsView.swift */; };
+		AA000001000000000000AA21 /* PlayerTimeFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB11 /* PlayerTimeFormat.swift */; };
+		AA000001000000000000AA22 /* PlayerTimeFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB11 /* PlayerTimeFormat.swift */; };
+		AA000001000000000000AA23 /* PlayerTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB12 /* PlayerTopBar.swift */; };
+		AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB12 /* PlayerTopBar.swift */; };
+		AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
+		AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -118,6 +144,19 @@
 		F8CB72824DE1085225EDAB47 /* MediaDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetail.swift; sourceTree = "<group>"; };
 		FA54E15EA936A28D42B73886 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
 		FD942143248855B7D74F9E0C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB01 /* SubtitleSettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleSettingsManager.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VTTSubtitlesLoader.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB03 /* AirPlayButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayButton.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB04 /* PlayerBottomBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBottomBar.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB05 /* PlayerCenterControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCenterControls.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB06 /* PlayerDoubleTapSeek.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerDoubleTapSeek.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB07 /* PlayerProgressSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProgressSlider.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB08 /* PlayerSpeedPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSpeedPicker.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB09 /* PlayerSubtitleOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSubtitleOverlay.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB10 /* PlayerSubtitleSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSubtitleSettingsView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB11 /* PlayerTimeFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTimeFormat.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB12 /* PlayerTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTopBar.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB13 /* PlayerVolumeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerVolumeSlider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,6 +181,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		AA000001000000000000CC01 /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000BB03 /* AirPlayButton.swift */,
+				AA000001000000000000BB04 /* PlayerBottomBar.swift */,
+				AA000001000000000000BB05 /* PlayerCenterControls.swift */,
+				AA000001000000000000BB06 /* PlayerDoubleTapSeek.swift */,
+				AA000001000000000000BB07 /* PlayerProgressSlider.swift */,
+				AA000001000000000000BB08 /* PlayerSpeedPicker.swift */,
+				AA000001000000000000BB09 /* PlayerSubtitleOverlay.swift */,
+				AA000001000000000000BB10 /* PlayerSubtitleSettingsView.swift */,
+				AA000001000000000000BB11 /* PlayerTimeFormat.swift */,
+				AA000001000000000000BB12 /* PlayerTopBar.swift */,
+				AA000001000000000000BB13 /* PlayerVolumeSlider.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
 		001361E1E34759C14A461D84 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -153,6 +210,7 @@
 				F6221F81B7112850281B7187 /* HomeView.swift */,
 				330313A7F7AB1EF362097130 /* ModuleListView.swift */,
 				11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */,
+				AA000001000000000000CC01 /* Player */,
 				E06843969693AE9C1AEB7FAD /* PlayerView.swift */,
 				ECEA5105668982AD0021041F /* SearchView.swift */,
 				FD942143248855B7D74F9E0C /* SettingsView.swift */,
@@ -195,6 +253,8 @@
 				2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */,
 				FA54E15EA936A28D42B73886 /* ModuleManager.swift */,
 				5E45F91C732C2601421713C8 /* NetworkFetch.swift */,
+				AA000001000000000000BB01 /* SubtitleSettingsManager.swift */,
+				AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */,
 				6DDFD568A3E8F21EA674244C /* WatchHistoryService.swift */,
 			);
 			path = Services;
@@ -357,6 +417,19 @@
 				5E26E175DA01C9A81ADEDDCB /* StreamPickerView.swift in Sources */,
 				FFEA54B867C75F75B46DD67F /* StreamResult.swift in Sources */,
 				1C2F1DA4C30DB8F46405C768 /* WatchHistoryService.swift in Sources */,
+				AA000001000000000000AA02 /* SubtitleSettingsManager.swift in Sources */,
+				AA000001000000000000AA04 /* VTTSubtitlesLoader.swift in Sources */,
+				AA000001000000000000AA06 /* AirPlayButton.swift in Sources */,
+				AA000001000000000000AA08 /* PlayerBottomBar.swift in Sources */,
+				AA000001000000000000AA10 /* PlayerCenterControls.swift in Sources */,
+				AA000001000000000000AA12 /* PlayerDoubleTapSeek.swift in Sources */,
+				AA000001000000000000AA14 /* PlayerProgressSlider.swift in Sources */,
+				AA000001000000000000AA16 /* PlayerSpeedPicker.swift in Sources */,
+				AA000001000000000000AA18 /* PlayerSubtitleOverlay.swift in Sources */,
+				AA000001000000000000AA20 /* PlayerSubtitleSettingsView.swift in Sources */,
+				AA000001000000000000AA22 /* PlayerTimeFormat.swift in Sources */,
+				AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */,
+				AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -397,6 +470,19 @@
 				F971C44DD8C1F3918A3CE985 /* StreamPickerView.swift in Sources */,
 				25CE71961C1EBBEE80BEDB25 /* StreamResult.swift in Sources */,
 				EADD7BDDF8A641980A2CFE35 /* WatchHistoryService.swift in Sources */,
+				AA000001000000000000AA01 /* SubtitleSettingsManager.swift in Sources */,
+				AA000001000000000000AA03 /* VTTSubtitlesLoader.swift in Sources */,
+				AA000001000000000000AA05 /* AirPlayButton.swift in Sources */,
+				AA000001000000000000AA07 /* PlayerBottomBar.swift in Sources */,
+				AA000001000000000000AA09 /* PlayerCenterControls.swift in Sources */,
+				AA000001000000000000AA11 /* PlayerDoubleTapSeek.swift in Sources */,
+				AA000001000000000000AA13 /* PlayerProgressSlider.swift in Sources */,
+				AA000001000000000000AA15 /* PlayerSpeedPicker.swift in Sources */,
+				AA000001000000000000AA17 /* PlayerSubtitleOverlay.swift in Sources */,
+				AA000001000000000000AA19 /* PlayerSubtitleSettingsView.swift in Sources */,
+				AA000001000000000000AA21 /* PlayerTimeFormat.swift in Sources */,
+				AA000001000000000000AA23 /* PlayerTopBar.swift in Sources */,
+				AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

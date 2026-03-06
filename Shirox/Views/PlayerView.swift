@@ -1,179 +1,272 @@
 import SwiftUI
 import AVKit
 
-// MARK: - VideoLayerView (unchanged)
+// MARK: - VideoLayerView (iOS only)
+
 #if os(iOS)
 private struct VideoLayerView: UIViewControllerRepresentable {
     let player: AVPlayer
+    var pipRequested: Bool = false
+
+    class Coordinator: NSObject, AVPictureInPictureControllerDelegate {
+        var pipController: AVPictureInPictureController?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let vc = AVPlayerViewController()
         vc.player = player
         vc.showsPlaybackControls = false
         vc.videoGravity = .resizeAspect
+        vc.allowsPictureInPicturePlayback = true
         return vc
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
         uiViewController.player = player
+        if pipRequested {
+            if context.coordinator.pipController == nil,
+               let playerLayer = uiViewController.view.layer.sublayers?
+                   .compactMap({ $0 as? AVPlayerLayer }).first {
+                let pip = AVPictureInPictureController(playerLayer: playerLayer)
+                pip?.delegate = context.coordinator
+                context.coordinator.pipController = pip
+            }
+            context.coordinator.pipController?.startPictureInPicture()
+        }
     }
 }
 #endif
 
-// MARK: - PlayerView (orientation‑agnostic)
+// MARK: - PlayerView
+
 struct PlayerView: View {
     let stream: StreamResult
     var customDismiss: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
+    // Video
     @State private var player: AVPlayer?
     @State private var isPlaying = false
     @State private var currentTime: Double = 0
     @State private var duration: Double = 0
     @State private var isScrubbing = false
-    @State private var showControls = true
-    @State private var hideTask: Task<Void, Never>?
     @State private var timeObserver: Any?
     @State private var loadingOpacity: Double = 1.0
+
+    // Volume & Speed
+    @State private var volume: Float = 1.0
+    @State private var playbackSpeed: Float = 1.0
+
+    // UI
+    @State private var showControls = true
+    @State private var isLocked = false
+    @State private var hideTask: Task<Void, Never>?
+
+    // Sheets
+    @State private var showSpeedPicker = false
+    @State private var showSubtitleSettings = false
+
+    // Subtitles
+    @State private var subtitleCues: [SubtitleCue] = []
+    @ObservedObject var subtitleSettings = SubtitleSettingsManager.shared
+
+    // PiP (iOS only)
+    #if os(iOS)
+    @State private var pipRequested = false
+    #endif
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
+            // [1] VideoLayer (always present when player != nil)
             if let player {
                 #if os(iOS)
-                VideoLayerView(player: player)
+                VideoLayerView(player: player, pipRequested: pipRequested)
                     .ignoresSafeArea()
                 #else
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
                 #endif
 
-                if showControls {
-                    VStack(spacing: 0) {
-                        topBar
-                        Spacer()
-                        Button {
-                            togglePlayPause()
-                            scheduleHide()
-                        } label: {
-                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 40))
-                                .foregroundStyle(.white)
-                                .frame(width: 72, height: 72)
-                                .background(.ultraThinMaterial, in: Circle())
+                // [2] PlayerSubtitleOverlay (always visible, not behind lock/control hide)
+                PlayerSubtitleOverlay(
+                    cues: subtitleCues,
+                    currentTime: currentTime,
+                    settings: subtitleSettings
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
+                // [3] PlayerDoubleTapSeek (full-screen, transparent, owns ALL tap logic)
+                PlayerDoubleTapSeek(
+                    onSingleTap: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showControls.toggle()
                         }
-                        .buttonStyle(.plain)
-                        Spacer()
-                        bottomBar
-                    }
-                    .transition(.opacity)
+                        if showControls { scheduleHide() }
+                    },
+                    onSeekBackward: {
+                        skip(by: -10)
+                        scheduleHide()
+                    },
+                    onSeekForward: {
+                        skip(by: 10)
+                        scheduleHide()
+                    },
+                    seekAmount: 10
+                )
+                .ignoresSafeArea()
+
+                // [4] Controls overlay (visible when showControls && !isLocked)
+                if showControls && !isLocked {
+                    controlsOverlay
                 }
+
+                // [5] Lock overlay (visible when isLocked)
+                if isLocked {
+                    lockOverlay
+                }
+
             } else {
+                // [6] Loading view (shown when player == nil)
                 loadingView
             }
         }
         .onAppear {
             setupPlayer()
+            loadSubtitles()
         }
         .onDisappear {
             hideTask?.cancel()
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
             player?.pause()
         }
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showControls.toggle()
-                }
-                if showControls { scheduleHide() }
-            }
-        )
+        .onChange(of: volume) { _, newVolume in
+            player?.volume = newVolume
+        }
+        .onChange(of: playbackSpeed) { _, newSpeed in
+            if isPlaying { player?.rate = newSpeed }
+        }
         #if os(iOS)
+        .onChange(of: pipRequested) { _, requested in
+            if requested {
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    pipRequested = false
+                }
+            }
+        }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         #endif
-    }
-
-    // MARK: - Top Bar
-
-    private var topBar: some View {
-        HStack(alignment: .center) {
-            Button {
-                if let customDismiss {
-                    customDismiss()
-                } else {
-                    dismiss()
-                }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-            Text(stream.title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-            Spacer()
-            Color.clear.frame(width: 44, height: 44)
+        .sheet(isPresented: $showSpeedPicker) {
+            PlayerSpeedPicker(selectedSpeed: $playbackSpeed)
+                .presentationDetents([.height(320)])
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 24)
-        .background(
-            LinearGradient(
-                colors: [.black.opacity(0.7), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
+        .sheet(isPresented: $showSubtitleSettings) {
+            PlayerSubtitleSettingsView(settings: subtitleSettings)
+                .presentationDetents([.medium, .large])
+        }
     }
 
-    private var bottomBar: some View {
-        VStack(spacing: 6) {
-            Slider(value: $currentTime, in: 0...max(duration, 1)) { editing in
-                isScrubbing = editing
-                if !editing {
-                    player?.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600))
-                    if isPlaying { scheduleHide() }
-                }
-            }
-            .tint(.white)
-            .padding(.horizontal, 20)
+    // MARK: - Controls Overlay
 
-            HStack {
-                Text(formatTime(currentTime))
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .monospacedDigit()
+    private var controlsOverlay: some View {
+        ZStack {
+            // Gradient overlays (not interactive)
+            VStack {
+                Color.clear.frame(height: 120)
+                    .background(
+                        LinearGradient(
+                            colors: [.black.opacity(0.6), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .ignoresSafeArea()
+                    )
                 Spacer()
-                Text(formatTime(duration))
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .monospacedDigit()
+                Color.clear.frame(height: 160)
+                    .background(
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.6)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .ignoresSafeArea()
+                    )
             }
-            .padding(.horizontal, 24)
+            .allowsHitTesting(false)
+
+            VStack(spacing: 0) {
+                PlayerTopBar(
+                    title: stream.title,
+                    onDismiss: handleDismiss,
+                    isLocked: $isLocked,
+                    onPiP: {
+                        #if os(iOS)
+                        pipRequested = true
+                        #endif
+                    }
+                )
+
+                Spacer()
+
+                PlayerCenterControls(
+                    isPlaying: $isPlaying,
+                    skipAmount: 10,
+                    onBackward: { skip(by: -10); scheduleHide() },
+                    onPlayPause: { togglePlayPause() },
+                    onForward: { skip(by: 10); scheduleHide() }
+                )
+
+                Spacer()
+
+                PlayerVolumeSlider(volume: $volume)
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, 8)
+
+                PlayerBottomBar(
+                    currentTime: $currentTime,
+                    duration: duration,
+                    playbackSpeed: $playbackSpeed,
+                    onSeek: { time in seekTo(time) },
+                    onSpeedTap: { showSpeedPicker = true },
+                    onSubtitleSettingsTap: { showSubtitleSettings = true },
+                    hasSubtitles: stream.subtitle != nil
+                )
+            }
         }
-        .padding(.bottom, 32)
-        .background(
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.7)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: showControls)
     }
+
+    // MARK: - Lock Overlay
+
+    private var lockOverlay: some View {
+        VStack {
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isLocked = false }
+                } label: {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 20)
+                .padding(.top, 20)
+                Spacer()
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Loading View
 
     private var loadingView: some View {
         VStack(spacing: 20) {
@@ -189,10 +282,16 @@ struct PlayerView: View {
                         loadingOpacity = 0.2
                     }
                 }
-            Text("Loading…")
+            Text("Loading\u{2026}")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.5))
         }
+    }
+
+    // MARK: - Player Actions
+
+    private func handleDismiss() {
+        if let customDismiss { customDismiss() } else { dismiss() }
     }
 
     private func togglePlayPause() {
@@ -201,9 +300,23 @@ struct PlayerView: View {
             player.pause()
             isPlaying = false
         } else {
-            player.play()
+            player.rate = playbackSpeed
             isPlaying = true
         }
+        scheduleHide()
+    }
+
+    private func skip(by seconds: Double) {
+        guard let player, duration > 0 else { return }
+        let newTime = min(max(currentTime + seconds, 0), duration)
+        player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+        currentTime = newTime
+    }
+
+    private func seekTo(_ time: Double) {
+        player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        currentTime = time
+        if isPlaying { scheduleHide() }
     }
 
     private func scheduleHide() {
@@ -212,46 +325,46 @@ struct PlayerView: View {
         hideTask = Task {
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showControls = false
-            }
+            withAnimation(.easeInOut(duration: 0.3)) { showControls = false }
         }
     }
 
     private func setupPlayer() {
         let asset: AVURLAsset
         if !stream.headers.isEmpty {
-            let headerDict: [String: Any] = Dictionary(uniqueKeysWithValues: stream.headers.map { ($0.key, $0.value as Any) })
-            asset = AVURLAsset(url: stream.url, options: ["AVURLAssetHTTPHeaderFieldsKey": headerDict])
+            let opts: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": stream.headers]
+            asset = AVURLAsset(url: stream.url, options: opts)
         } else {
             asset = AVURLAsset(url: stream.url)
         }
         let item = AVPlayerItem(asset: asset)
         let p = AVPlayer(playerItem: item)
-        p.play()
+        p.rate = playbackSpeed
         isPlaying = true
         player = p
 
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-        timeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+        timeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak item] time in
             guard !isScrubbing else { return }
             currentTime = time.seconds
-            if let d = p.currentItem?.duration, d.isNumeric {
-                duration = d.seconds
-            }
+            if let d = item?.duration, d.isNumeric { duration = d.seconds }
         }
         scheduleHide()
     }
 
-    private func formatTime(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "0:00" }
-        let s = Int(seconds)
-        let h = s / 3600
-        let m = (s % 3600) / 60
-        let sec = s % 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%d:%02d", m, sec)
+    private func loadSubtitles() {
+        guard let urlString = stream.subtitle, !urlString.isEmpty else { return }
+        Task {
+            do {
+                subtitleCues = try await VTTSubtitlesLoader.load(from: urlString)
+            } catch {
+                print("[Subtitles] Failed to load: \(error)")
+            }
+        }
     }
 }
+
+// MARK: - PlayerHostingController (iOS only)
 
 #if os(iOS)
 class PlayerHostingController<Content: View>: UIHostingController<Content> {
@@ -269,7 +382,7 @@ class PlayerHostingController<Content: View>: UIHostingController<Content> {
     }
 
     override var shouldAutorotate: Bool { true }
-    
+
     override var prefersStatusBarHidden: Bool { true }
 }
 #endif
