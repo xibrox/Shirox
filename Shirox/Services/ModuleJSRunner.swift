@@ -78,13 +78,15 @@ final class ModuleJSRunner {
         let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let url = URL(string: trimmed), url.scheme != nil, !trimmed.hasPrefix("{") {
-            return [StreamResult(title: "Play", url: url, headers: [:])]
+            return [StreamResult(title: "Play", url: url, headers: [:], subtitle: nil)]
         }
 
         guard let data = trimmed.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw JSEngineError.parseError("Could not parse stream result")
         }
+
+        let subtitleUrl = obj["subtitle"] as? String
 
         var results: [StreamResult] = []
 
@@ -94,20 +96,20 @@ final class ModuleJSRunner {
                       let url = URL(string: urlStr) else { continue }
                 let title = stream["title"] as? String ?? "Stream"
                 let headers = stream["headers"] as? [String: String] ?? [:]
-                results.append(StreamResult(title: title, url: url, headers: headers))
+                results.append(StreamResult(title: title, url: url, headers: headers, subtitle: subtitleUrl))
             }
         } else if let streams = obj["streams"] as? [String] {
             for (i, urlStr) in streams.enumerated() {
                 guard let url = URL(string: urlStr) else { continue }
-                results.append(StreamResult(title: "Stream \(i + 1)", url: url, headers: [:]))
+                results.append(StreamResult(title: "Stream \(i + 1)", url: url, headers: [:], subtitle: subtitleUrl))
             }
         } else if let stream = obj["stream"] as? String, let url = URL(string: stream) {
-            results.append(StreamResult(title: "Stream", url: url, headers: [:]))
+            results.append(StreamResult(title: "Stream", url: url, headers: [:], subtitle: subtitleUrl))
         } else if let stream = obj["stream"] as? [String: Any],
                   let urlStr = stream["url"] as? String,
                   let url = URL(string: urlStr) {
             let headers = stream["headers"] as? [String: String] ?? [:]
-            results.append(StreamResult(title: "Stream", url: url, headers: headers))
+            results.append(StreamResult(title: "Stream", url: url, headers: headers, subtitle: subtitleUrl))
         }
 
         return results
