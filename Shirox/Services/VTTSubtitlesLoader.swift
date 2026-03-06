@@ -17,14 +17,12 @@ enum VTTSubtitlesLoader {
         case invalidURL
         case decodingFailed
         case unknownFormat
-        case malformedTimestamp(String)
 
         var errorDescription: String? {
             switch self {
-            case .invalidURL:          return "The subtitle URL is invalid."
-            case .decodingFailed:      return "Could not decode subtitle data as UTF-8."
-            case .unknownFormat:       return "Subtitle format is not recognised (expected VTT or SRT)."
-            case .malformedTimestamp(let s): return "Could not parse timestamp: \(s)"
+            case .invalidURL:     return "The subtitle URL is invalid."
+            case .decodingFailed: return "Could not decode subtitle data as UTF-8."
+            case .unknownFormat:  return "Subtitle format is not recognised (expected VTT or SRT)."
             }
         }
     }
@@ -58,8 +56,8 @@ enum VTTSubtitlesLoader {
     // MARK: Format detection
 
     private static func isVTT(_ content: String) -> Bool {
-        let prefix = String(content.prefix(20))
-        return content.hasPrefix("WEBVTT") || prefix.contains("WEBVTT")
+        let stripped = content.hasPrefix("\u{FEFF}") ? String(content.dropFirst()) : content
+        return stripped.hasPrefix("WEBVTT")
     }
 
     private static func isSRT(_ content: String) -> Bool {
@@ -73,7 +71,7 @@ enum VTTSubtitlesLoader {
 
     // MARK: VTT parser
 
-    static func parseVTT(_ content: String) -> [SubtitleCue] {
+    private static func parseVTT(_ content: String) -> [SubtitleCue] {
         // Normalise line endings then split into blocks
         let normalised = content.replacingOccurrences(of: "\r\n", with: "\n")
                                 .replacingOccurrences(of: "\r", with: "\n")
@@ -110,7 +108,7 @@ enum VTTSubtitlesLoader {
 
     // MARK: SRT parser
 
-    static func parseSRT(_ content: String) -> [SubtitleCue] {
+    private static func parseSRT(_ content: String) -> [SubtitleCue] {
         let normalised = content.replacingOccurrences(of: "\r\n", with: "\n")
                                 .replacingOccurrences(of: "\r", with: "\n")
         let blocks = normalised.components(separatedBy: "\n\n")
@@ -173,7 +171,7 @@ enum VTTSubtitlesLoader {
     ///   - `HH:MM:SS,mmm`   (SRT, 3 components, comma separator for ms)
     ///   - `MM:SS.mmm`      (VTT short, 2 components)
     ///   - `MM:SS,mmm`      (short with comma)
-    static func parseTimestamp(_ s: String) -> Double? {
+    private static func parseTimestamp(_ s: String) -> Double? {
         // Normalise comma → dot so we handle SRT and VTT uniformly
         let normalised = s.replacingOccurrences(of: ",", with: ".")
 
@@ -201,7 +199,7 @@ enum VTTSubtitlesLoader {
     // MARK: Tag stripping
 
     /// Removes HTML tags (`<...>`) and VTT positioning tags (`{...}`) from cue text.
-    static func stripTags(_ input: String) -> String {
+    private static func stripTags(_ input: String) -> String {
         var result = input
 
         // Remove VTT curly-brace positioning/style tags first
