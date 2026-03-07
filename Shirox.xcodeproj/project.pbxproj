@@ -103,6 +103,14 @@
 		AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB12 /* PlayerTopBar.swift */; };
 		AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
 		AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
+		1C6D1244BDD3462C8E0CBCD4 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FDEB48E6D33442D88E5028D /* ContinueWatchingItem.swift */; };
+		1C7242C86CDC40F6956D4F05 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FDEB48E6D33442D88E5028D /* ContinueWatchingItem.swift */; };
+		92E2BEB6562E4B97802F53BC /* PlayerContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314F4DA7D4564AA9B47E4BC2 /* PlayerContext.swift */; };
+		3DA0FE0FBD304EC4814AD384 /* PlayerContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314F4DA7D4564AA9B47E4BC2 /* PlayerContext.swift */; };
+		E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */; };
+		3F944857548C49EB979DFFAA /* ContinueWatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */; };
+		7A2F29854EAC49CBBA429793 /* ContinueWatchingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */; };
+		C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -157,6 +165,10 @@
 		AA000001000000000000BB11 /* PlayerTimeFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTimeFormat.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB12 /* PlayerTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTopBar.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB13 /* PlayerVolumeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerVolumeSlider.swift; sourceTree = "<group>"; };
+		9FDEB48E6D33442D88E5028D /* ContinueWatchingItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingItem.swift; sourceTree = "<group>"; };
+		314F4DA7D4564AA9B47E4BC2 /* PlayerContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerContext.swift; sourceTree = "<group>"; };
+		0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingManager.swift; sourceTree = "<group>"; };
+		4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -205,6 +217,7 @@
 				142A89C42F58E804008652D9 /* ViewTracker.swift */,
 				AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */,
 				D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */,
+				4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */,
 				B371AE47E8FD36A0C11174AC /* DetailView.swift */,
 				DAD914ABCC5C7C316F115FB6 /* EpisodeRowView.swift */,
 				F6221F81B7112850281B7187 /* HomeView.swift */,
@@ -246,6 +259,7 @@
 			children = (
 				142A89C12F58E5FD008652D9 /* PlayerPresenter.swift */,
 				DB3FBB9F1A9B237743F4808C /* AniListService.swift */,
+				0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */,
 				DCADDEA3748C5AE8D3C1A3CD /* JSEngine.swift */,
 				3ECAACC04670C75AE2C8303A /* JSEngine+Details.swift */,
 				A60FE2CBD595A40B9E50E4D1 /* JSEngine+Search.swift */,
@@ -264,9 +278,11 @@
 			isa = PBXGroup;
 			children = (
 				5C20E69AFCB9F0507E969ECF /* AniListMedia.swift */,
+				9FDEB48E6D33442D88E5028D /* ContinueWatchingItem.swift */,
 				1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */,
 				F8CB72824DE1085225EDAB47 /* MediaDetail.swift */,
 				EA29B2619FC97EF54B854F95 /* ModuleDefinition.swift */,
+				314F4DA7D4564AA9B47E4BC2 /* PlayerContext.swift */,
 				1AAE3976E02954E212D46BD4 /* SearchItem.swift */,
 				B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */,
 			);
@@ -430,6 +446,10 @@
 				AA000001000000000000AA22 /* PlayerTimeFormat.swift in Sources */,
 				AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */,
 				AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */,
+				1C6D1244BDD3462C8E0CBCD4 /* ContinueWatchingItem.swift in Sources */,
+				92E2BEB6562E4B97802F53BC /* PlayerContext.swift in Sources */,
+				E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */,
+				7A2F29854EAC49CBBA429793 /* ContinueWatchingCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -483,6 +503,10 @@
 				AA000001000000000000AA21 /* PlayerTimeFormat.swift in Sources */,
 				AA000001000000000000AA23 /* PlayerTopBar.swift in Sources */,
 				AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */,
+				1C7242C86CDC40F6956D4F05 /* ContinueWatchingItem.swift in Sources */,
+				3DA0FE0FBD304EC4814AD384 /* PlayerContext.swift in Sources */,
+				3F944857548C49EB979DFFAA /* ContinueWatchingManager.swift in Sources */,
+				C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
