@@ -1,3 +1,5 @@
+import Foundation
+
 struct ContinueWatchingItem: Identifiable, Codable {
     let id: UUID
     let mediaTitle: String
