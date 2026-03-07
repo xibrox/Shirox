@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
+    @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     var body: some View {
         NavigationStack {
@@ -25,6 +26,9 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 24) {
                             if !vm.trending.isEmpty {
                                 FeaturedCarousel(items: vm.trending)
+                            }
+                            if !continueWatching.items.isEmpty {
+                                ContinueWatchingSection(items: continueWatching.items)
                             }
                             if !vm.trending.isEmpty {
                                 AnimeSection(title: "Trending Now", items: vm.trending)
