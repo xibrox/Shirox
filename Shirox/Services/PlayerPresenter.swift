@@ -44,11 +44,11 @@ final class PlayerPresenter: ObservableObject {
         return root
     }
 
-    func presentPlayer(stream: StreamResult, from sourceView: UIView? = nil) {
+    func presentPlayer(stream: StreamResult, context: PlayerContext? = nil, from sourceView: UIView? = nil) {
         guard let topVC = Self.findTopViewController() else { return }
         self.sourceView = sourceView
 
-        let playerView = PlayerView(stream: stream) { [weak self] in
+        let playerView = PlayerView(stream: stream, context: context) { [weak self] in
             self?.dismissPlayer()
         }
         .ignoresSafeArea()
