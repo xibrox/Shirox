@@ -60,6 +60,7 @@ private struct VideoLayerView: UIViewControllerRepresentable {
 struct PlayerView: View {
     let stream: StreamResult
     var customDismiss: (() -> Void)? = nil
+    var context: PlayerContext? = nil
     @Environment(\.dismiss) private var dismiss
 
     // Video
@@ -69,6 +70,7 @@ struct PlayerView: View {
     @State private var duration: Double = 0
     @State private var isScrubbing = false
     @State private var timeObserver: Any?
+    @State private var didSeekToResume = false
     @State private var loadingOpacity: Double = 1.0
 
     // Volume & Speed
@@ -159,6 +161,7 @@ struct PlayerView: View {
             hideTask?.cancel()
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
             player?.pause()
+            saveProgress()
         }
         .onChange(of: volume) { _, newVolume in
             player?.volume = newVolume
@@ -311,6 +314,27 @@ struct PlayerView: View {
 
     // MARK: - Player Actions
 
+    private func saveProgress() {
+        guard let context, duration > 0 else { return }
+        let item = ContinueWatchingItem(
+            id: UUID(),
+            mediaTitle: context.mediaTitle,
+            episodeNumber: context.episodeNumber,
+            episodeTitle: context.episodeTitle,
+            imageUrl: context.imageUrl,
+            streamUrl: stream.url.absoluteString,
+            headers: stream.headers.isEmpty ? nil : stream.headers,
+            subtitle: stream.subtitle,
+            aniListID: context.aniListID,
+            moduleId: context.moduleId,
+            watchedSeconds: currentTime,
+            totalSeconds: duration,
+            totalEpisodes: context.totalEpisodes,
+            lastWatchedAt: .now
+        )
+        ContinueWatchingManager.shared.save(item)
+    }
+
     private func handleDismiss() {
         if let customDismiss { customDismiss() } else { dismiss() }
     }
@@ -318,6 +342,7 @@ struct PlayerView: View {
     private func togglePlayPause() {
         guard let player else { return }
         if isPlaying {
+            saveProgress()
             player.pause()
             isPlaying = false
         } else {
@@ -378,6 +403,11 @@ struct PlayerView: View {
             guard !isScrubbing else { return }
             currentTime = time.seconds
             if let d = item?.duration, d.isNumeric { duration = d.seconds }
+            // Resume-seek: seek once to saved position when duration is first known
+            if let resumeFrom = context?.resumeFrom, !didSeekToResume, duration > 0 {
+                didSeekToResume = true
+                p.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600))
+            }
         }
 
         // Observe playback end to sync isPlaying state
