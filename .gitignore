@@ -19,3 +19,6 @@ buildServer.json
 
 # Build folder
 build/
+
+# Claude Code
+.claude/

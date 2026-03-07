@@ -3,6 +3,7 @@ import SwiftUI
 struct DetailView: View {
     let item: SearchItem
     @StateObject private var vm = DetailViewModel()
+    @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var synopsisExpanded = false
 
     private var platformBackground: Color {
@@ -37,6 +38,76 @@ struct DetailView: View {
             StreamPickerView(vm: vm)
         }
     }
+
+    // MARK: - Continue Watching Helpers
+
+    private func continueWatchingItem(for detail: MediaDetail) -> ContinueWatchingItem? {
+        let moduleId = ModuleManager.shared.activeModule?.id
+        return continueWatching.items
+            .filter { $0.moduleId == moduleId && $0.mediaTitle == detail.title }
+            .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
+            .first
+    }
+
+    private func episodeProgress(_ episode: EpisodeLink, detail: MediaDetail) -> Double? {
+        let moduleId = ModuleManager.shared.activeModule?.id
+        guard let item = continueWatching.items.first(where: {
+                  $0.moduleId == moduleId
+                  && $0.mediaTitle == detail.title
+                  && $0.episodeNumber == Int(episode.number)
+              }),
+              item.totalSeconds > 0
+        else { return nil }
+        return min(item.watchedSeconds / item.totalSeconds, 1.0)
+    }
+
+    #if os(iOS)
+    @ViewBuilder
+    private func watchButton(detail: MediaDetail) -> some View {
+        let item = continueWatchingItem(for: detail)
+        let label = item.map { "Continue Watching Ep \($0.episodeNumber)" } ?? "Start Watching"
+        Button {
+            if let item {
+                resumeWatching(item: item)
+            } else if let first = detail.episodes.first {
+                vm.loadStreams(for: first)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "play.fill")
+                Text(label)
+                    .font(.system(size: 16, weight: .bold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 25))
+            .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+        .disabled(detail.episodes.isEmpty && item == nil)
+    }
+
+    private func resumeWatching(item: ContinueWatchingItem) {
+        guard let url = URL(string: item.streamUrl) else { return }
+        let stream = StreamResult(
+            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            url: url,
+            headers: item.headers ?? [:],
+            subtitle: item.subtitle
+        )
+        let context = PlayerContext(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            episodeTitle: item.episodeTitle,
+            imageUrl: item.imageUrl,
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            totalEpisodes: item.totalEpisodes,
+            resumeFrom: item.watchedSeconds
+        )
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+    }
+    #endif
 
     // MARK: - Hero
 
@@ -198,6 +269,10 @@ struct DetailView: View {
                 Spacer()
             }
 
+            #if os(iOS)
+            watchButton(detail: detail)
+            #endif
+
             if detail.episodes.isEmpty && !vm.isLoadingEpisodes {
                 Text("No episodes found.")
                     .font(.subheadline)
@@ -205,7 +280,7 @@ struct DetailView: View {
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(detail.episodes) { episode in
-                        EpisodeRowView(episode: episode) {
+                        EpisodeRowView(episode: episode, progress: episodeProgress(episode, detail: detail)) {
                             vm.loadStreams(for: episode)
                         }
                     }

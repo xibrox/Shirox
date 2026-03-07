@@ -7,6 +7,7 @@ struct AniListDetailView: View {
 
     @StateObject private var vm = AniListDetailViewModel()
     @EnvironmentObject private var moduleManager: ModuleManager
+    @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -84,6 +85,11 @@ struct AniListDetailView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
                 }
+                #if os(iOS)
+                watchButton(media: media)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                #endif
                 episodesSection(media: media)
                     .frame(maxWidth: .infinity)
             }
@@ -91,6 +97,71 @@ struct AniListDetailView: View {
         }
         .frame(maxWidth: .infinity)
     }
+
+// MARK: - Continue Watching Helpers
+
+    private func continueWatchingItem(for media: AniListMedia) -> ContinueWatchingItem? {
+        continueWatching.items
+            .filter { $0.aniListID == media.id }
+            .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
+            .first
+    }
+
+    private func episodeProgress(_ ep: Int, media: AniListMedia) -> Double? {
+        guard let item = continueWatching.items
+            .first(where: { $0.aniListID == media.id && $0.episodeNumber == ep }),
+              item.totalSeconds > 0
+        else { return nil }
+        return min(item.watchedSeconds / item.totalSeconds, 1.0)
+    }
+
+    #if os(iOS)
+    @ViewBuilder
+    private func watchButton(media: AniListMedia) -> some View {
+        let item = continueWatchingItem(for: media)
+        let label = item.map { "Continue Watching Ep \($0.episodeNumber)" } ?? "Start Watching"
+        Button {
+            if let item {
+                resumeWatching(item: item)
+            } else {
+                vm.watchEpisode(1)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "play.fill")
+                Text(label)
+                    .font(.system(size: 16, weight: .bold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 25))
+            .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+        .disabled(media.episodes == nil || media.episodes == 0)
+    }
+
+    private func resumeWatching(item: ContinueWatchingItem) {
+        guard let url = URL(string: item.streamUrl) else { return }
+        let stream = StreamResult(
+            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            url: url,
+            headers: item.headers ?? [:],
+            subtitle: item.subtitle
+        )
+        let context = PlayerContext(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            episodeTitle: item.episodeTitle,
+            imageUrl: item.imageUrl,
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            totalEpisodes: item.totalEpisodes,
+            resumeFrom: item.watchedSeconds
+        )
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+    }
+    #endif
 
 // MARK: - Hero (Fixed with Color.clear overlay)
 
@@ -225,7 +296,7 @@ private func heroSection(media: AniListMedia) -> some View {
             } else if let count = media.episodes, count > 0 {
                 LazyVStack(spacing: 8) {
                     ForEach(1...count, id: \.self) { ep in
-                        AniListEpisodeRow(number: ep) {
+                        AniListEpisodeRow(number: ep, progress: episodeProgress(ep, media: media)) {
                             vm.watchEpisode(ep)
                         }
                     }
@@ -270,30 +341,61 @@ private struct SynopsisSection: View {
 
 private struct AniListEpisodeRow: View {
     let number: Int
+    var progress: Double? = nil
     let onTap: () -> Void
+
+    private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                Text("\(number)")
-                    .font(.caption).fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .frame(width: 42, height: 32)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        if isComplete {
+                            Image(systemName: "checkmark")
+                                .font(.caption).fontWeight(.bold)
+                                .foregroundStyle(.white)
+                                .frame(width: 42, height: 32)
+                                .background(Color.green, in: RoundedRectangle(cornerRadius: 8))
+                        } else {
+                            Text("\(number)")
+                                .font(.caption).fontWeight(.bold)
+                                .foregroundStyle(.white)
+                                .frame(width: 42, height: 32)
+                                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
 
-                Text("Episode \(number)")
-                    .font(.subheadline)
+                    Text("Episode \(number)")
+                        .font(.subheadline)
 
-                Spacer()
+                    Spacer()
 
-                Image(systemName: "play.fill")
-                    .font(.caption)
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(Color.accentColor, in: Circle())
+                    Image(systemName: "play.fill")
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(Color.accentColor, in: Circle())
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 10)
+
+                if let p = progress, p > 0, !isComplete {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.secondary.opacity(0.2))
+                            Capsule()
+                                .fill(Color.accentColor)
+                                .frame(width: geo.size.width * p)
+                        }
+                        .frame(height: 3)
+                    }
+                    .frame(height: 3)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
             .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(AniListEpisodePressStyle())
