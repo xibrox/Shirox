@@ -48,9 +48,11 @@ final class PlayerPresenter: ObservableObject {
         guard let topVC = Self.findTopViewController() else { return }
         self.sourceView = sourceView
 
-        let playerView = PlayerView(stream: stream, context: context) { [weak self] in
-            self?.dismissPlayer()
-        }
+        let playerView = PlayerView(
+            stream: stream,
+            customDismiss: { [weak self] in self?.dismissPlayer() },
+            context: context
+        )
         .ignoresSafeArea()
         
         let hostingController = PlayerHostingController(rootView: playerView)
