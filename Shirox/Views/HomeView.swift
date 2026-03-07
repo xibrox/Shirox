@@ -27,9 +27,11 @@ struct HomeView: View {
                             if !vm.trending.isEmpty {
                                 FeaturedCarousel(items: vm.trending)
                             }
+                            #if os(iOS)
                             if !continueWatching.items.isEmpty {
                                 ContinueWatchingSection(items: continueWatching.items)
                             }
+                            #endif
                             if !vm.trending.isEmpty {
                                 AnimeSection(title: "Trending Now", items: vm.trending)
                             }

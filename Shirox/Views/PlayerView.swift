@@ -316,8 +316,13 @@ struct PlayerView: View {
 
     private func saveProgress() {
         guard let context, duration > 0 else { return }
+        let urlString = stream.url.absoluteString
+        let episodeNumber = context.episodeNumber
+        // Reuse existing id to keep stable identity across repeated saves for the same episode
+        let existingId = ContinueWatchingManager.shared.items
+            .first { $0.streamUrl == urlString && $0.episodeNumber == episodeNumber }?.id
         let item = ContinueWatchingItem(
-            id: UUID(),
+            id: existingId ?? UUID(),
             mediaTitle: context.mediaTitle,
             episodeNumber: context.episodeNumber,
             episodeTitle: context.episodeTitle,
