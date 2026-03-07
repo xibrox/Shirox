@@ -65,6 +65,16 @@ final class DetailViewModel: ObservableObject {
 
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
         selectedStream = stream
-        PlayerPresenter.shared.presentPlayer(stream: stream, from: sourceView)
+        let context = PlayerContext(
+            mediaTitle: detail?.title ?? "",
+            episodeNumber: Int(selectedEpisode?.number ?? 1),
+            episodeTitle: nil,
+            imageUrl: detail?.image ?? "",
+            aniListID: nil,
+            moduleId: ModuleManager.shared.activeModule?.id,
+            totalEpisodes: detail?.episodes.count,
+            resumeFrom: nil
+        )
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, from: sourceView)
     }
 }
