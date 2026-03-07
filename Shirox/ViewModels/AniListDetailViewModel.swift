@@ -44,6 +44,17 @@ final class AniListDetailViewModel: ObservableObject {
 
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
         selectedStream = stream
-        PlayerPresenter.shared.presentPlayer(stream: stream, from: sourceView)
+        guard let media else { return }
+        let context = PlayerContext(
+            mediaTitle: media.title.english ?? media.title.romaji ?? "",
+            episodeNumber: selectedEpisodeNumber ?? 1,
+            episodeTitle: nil,
+            imageUrl: media.coverImage.extraLarge ?? media.coverImage.large ?? "",
+            aniListID: media.id,
+            moduleId: nil,
+            totalEpisodes: media.episodes,
+            resumeFrom: nil
+        )
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, from: sourceView)
     }
 }
