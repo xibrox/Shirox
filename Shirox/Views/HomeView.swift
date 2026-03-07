@@ -67,48 +67,33 @@ struct HomeView: View {
 private struct FeaturedCarousel: View {
     let items: [AniListMedia]
     @State private var selectedTab = 0
-    @State private var containerWidth: CGFloat = 0
-
-    private var aspectRatio: CGFloat {
-        #if os(iOS)
-        return 2.0 / 3.0
-        #else
-        return 16.0 / 9.0
-        #endif
-    }
-
-    private var horizontalPadding: CGFloat {
-        return 16
-    }
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         VStack(spacing: 12) {
             #if os(iOS)
-            let screenWidth = UIScreen.main.bounds.width
-            let paddedWidth = screenWidth - 32 // 16pt leading + 16pt trailing
+            let isIPad = sizeClass == .regular
+            let paddedWidth = UIScreen.main.bounds.width - 32
 
-            TabView(selection: $selectedTab) {
-                ForEach(Array(items.prefix(8).enumerated()), id: \.element.id) { index, media in
-                    NavigationLink {
-                        AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                    } label: {
-                        FeaturedCard(media: media)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .tag(index)
-                }
+            if isIPad {
+                TabView(selection: $selectedTab) { carouselPages(isWide: true) }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .padding(.horizontal, 16)
+            } else {
+                TabView(selection: $selectedTab) { carouselPages(isWide: false) }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(width: paddedWidth)
+                    .aspectRatio(2/3, contentMode: .fit)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(width: paddedWidth)
-            .aspectRatio(2/3, contentMode: .fit)
 
             #else
             // macOS: use GeometryReader to get available width, then size TabView accordingly
             GeometryReader { geometry in
                 let availableWidth = geometry.size.width
-                let cardWidth = max(0, availableWidth - (horizontalPadding * 2))
-                let cardHeight = cardWidth * aspectRatio
+                let cardWidth = max(0, availableWidth - 32)
+                let cardHeight = cardWidth * (9.0 / 16.0)
 
                 TabView(selection: $selectedTab) {
                     ForEach(Array(items.prefix(8).enumerated()), id: \.element.id) { index, media in
@@ -126,7 +111,7 @@ private struct FeaturedCarousel: View {
                 .frame(width: availableWidth, height: cardHeight)
                 .position(x: availableWidth / 2, y: cardHeight / 2)
             }
-            .frame(height: (NSScreen.main?.frame.width ?? 800) * aspectRatio) // fallback height
+            .frame(height: (NSScreen.main?.frame.width ?? 800) * (9.0 / 16.0)) // fallback height
             #endif
 
             PageIndicator(
@@ -135,6 +120,21 @@ private struct FeaturedCarousel: View {
             )
         }
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func carouselPages(isWide: Bool) -> some View {
+        ForEach(Array(items.prefix(8).enumerated()), id: \.element.id) { index, media in
+            NavigationLink {
+                AniListDetailView(mediaId: media.id, preloadedMedia: media)
+            } label: {
+                FeaturedCard(media: media, isWide: isWide)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .tag(index)
+        }
     }
 }
 
@@ -163,6 +163,7 @@ private struct PageIndicator: View {
 
 private struct FeaturedCard: View {
     let media: AniListMedia
+    var isWide: Bool = false
 
     private var aspectRatio: CGFloat {
         #if os(iOS)
@@ -175,46 +176,96 @@ private struct FeaturedCard: View {
     var body: some View {
         Group {
             #if os(iOS)
-            // iOS: fill the parent TabView cell completely
-            Color.clear
-                .overlay(
-                    ZStack(alignment: .bottomLeading) {
-                        // Cover image as background (fills the fixed frame)
-                        AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                            switch phase {
-                            case .success(let img):
-                                img.resizable().scaledToFill()
-                            default:
-                                Rectangle().fill(Color.gray.opacity(0.3))
-                                    .overlay(
-                                        Image(systemName: "photo")
-                                            .font(.largeTitle)
-                                            .foregroundStyle(.tertiary)
-                                    )
+            if isWide {
+                // iPad: banner background (blurred cover fallback) + poster card + text
+                Color.clear
+                    .overlay(
+                        ZStack {
+                            Group {
+                                if let banner = media.bannerImage, let url = URL(string: banner) {
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .success(let img): img.resizable().scaledToFill()
+                                        default: blurredCoverBackground
+                                        }
+                                    }
+                                } else {
+                                    blurredCoverBackground
+                                }
                             }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .clear, location: 0),
+                                    .init(color: .black.opacity(0.4), location: 0.5),
+                                    .init(color: .black.opacity(0.92), location: 1)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
+                    )
+                    .overlay(alignment: .bottomLeading) {
+                        HStack(alignment: .bottom, spacing: 12) {
+                            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                                switch phase {
+                                case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
+                                default: Rectangle().fill(Color.gray.opacity(0.3))
+                                }
+                            }
+                            .frame(width: 80, height: 120)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .shadow(radius: 4)
 
-                        // Gradient overlay for text contrast
-                        LinearGradient(
-                            stops: [
-                                .init(color: .clear, location: 0),
-                                .init(color: .black.opacity(0.35), location: 0.5),
-                                .init(color: .black.opacity(0.92), location: 1)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            textContent
+                        }
+                        .padding(16)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // iPhone: portrait cover image
+                Color.clear
+                    .overlay(
+                        ZStack {
+                            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                                switch phase {
+                                case .success(let img):
+                                    img.resizable().scaledToFill()
+                                default:
+                                    Rectangle().fill(Color.gray.opacity(0.3))
+                                        .overlay(
+                                            Image(systemName: "photo")
+                                                .font(.largeTitle)
+                                                .foregroundStyle(.tertiary)
+                                        )
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
 
-                        // Text content – always 16pt from bottom and left
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .clear, location: 0),
+                                    .init(color: .black.opacity(0.35), location: 0.5),
+                                    .init(color: .black.opacity(0.92), location: 1)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    )
+                    .overlay(alignment: .bottomLeading) {
                         textContent
                             .padding(16)
                     }
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .frame(maxWidth: .infinity, maxHeight: .infinity) // expands to fill TabView cell
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
 
             #else
             // macOS: banner background + poster overlay
@@ -323,8 +374,18 @@ private struct FeaturedCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 32)
-        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var blurredCoverBackground: some View {
+        AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+            switch phase {
+            case .success(let img):
+                img.resizable().scaledToFill().blur(radius: 20).brightness(-0.1)
+            default:
+                Rectangle().fill(Color.gray.opacity(0.3))
+            }
+        }
     }
 
     private var gradientPlaceholder: some View {
@@ -341,6 +402,15 @@ private struct FeaturedCard: View {
 private struct AnimeSection: View {
     let title: String
     let items: [AniListMedia]
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var cardWidth: CGFloat {
+        #if os(iOS)
+        return sizeClass == .regular ? 190 : 155
+        #else
+        return 190
+        #endif
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -349,7 +419,7 @@ private struct AnimeSection: View {
                 .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
+                LazyHStack(spacing: 16) {
                     ForEach(items) { media in
                         NavigationLink {
                             AniListDetailView(mediaId: media.id, preloadedMedia: media)
@@ -357,7 +427,7 @@ private struct AnimeSection: View {
                             AniListCardView(media: media)
                         }
                         .buttonStyle(HomePressStyle())
-                        .frame(width: 120)
+                        .frame(width: cardWidth)
                     }
                 }
                 .padding(.horizontal, 16)

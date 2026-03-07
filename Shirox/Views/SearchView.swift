@@ -4,12 +4,21 @@ struct SearchView: View {
     @StateObject private var vm = SearchViewModel()
     @EnvironmentObject private var moduleManager: ModuleManager
     @State private var showModuleList = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var isLandscape = false
 
-    // Two flexible columns for a 2‑column layout
-    private var columns: [GridItem] = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
-    ]
+    private var columnCount: Int {
+        #if os(iOS)
+        guard sizeClass == .regular else { return 2 }
+        return isLandscape ? 5 : 4
+        #else
+        return 4
+        #endif
+    }
+
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+    }
 
     private var usingModule: Bool { moduleManager.activeModule != nil }
 
@@ -43,7 +52,7 @@ struct SearchView: View {
                     ContentUnavailableView.search(text: vm.query)
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 16) {
+                        LazyVGrid(columns: columns, spacing: 12) {
                             if !vm.aniListResults.isEmpty {
                                 ForEach(vm.aniListResults) { media in
                                     NavigationLink {
@@ -108,6 +117,13 @@ struct SearchView: View {
                     .environmentObject(moduleManager)
             }
         }
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { isLandscape = geo.size.width > geo.size.height }
+                    .onChange(of: geo.size) { _, size in isLandscape = size.width > size.height }
+            }
+        )
         .onAppear {
             PlayerPresenter.shared.updateOrientationLock(.portrait)
         }
@@ -151,8 +167,7 @@ struct AniListCardView: View {
         Color.clear
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
-                ZStack(alignment: .bottomLeading) {
-                    // Background image
+                ZStack {
                     AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
                         switch phase {
                         case .success(let image):
@@ -172,7 +187,6 @@ struct AniListCardView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
 
-                    // Gradient overlay
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: 0.4),
@@ -182,31 +196,30 @@ struct AniListCardView: View {
                         endPoint: .bottom
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    // Title – extra padding
-                    Text(media.title.displayTitle)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-
-                    // Score badge – positioned with safe padding
-                    if let score = media.averageScore {
-                        Label("\(score)%", systemImage: "star.fill")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.yellow)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.black.opacity(0.55), in: Capsule())
-                            .padding(10) // outer padding from edges
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    }
                 }
             )
+            .overlay(alignment: .bottomLeading) {
+                Text(media.title.displayTitle)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+            }
+            .overlay(alignment: .topTrailing) {
+                if let score = media.averageScore {
+                    Label("\(score)%", systemImage: "star.fill")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .padding(10)
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
     }

@@ -168,21 +168,33 @@ struct AniListDetailView: View {
 @ViewBuilder
 private func heroSection(media: AniListMedia) -> some View {
     Color.clear
-        .frame(height: 240) // Fixed height, full width
+        .frame(height: 240)
         .overlay(
-            ZStack(alignment: .bottomLeading) {
-                // Banner image
-                AsyncImage(url: URL(string: media.bannerImage ?? media.coverImage.best ?? "")) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable()
-                            .aspectRatio(contentMode: .fill)
-                    default:
-                        Rectangle().fill(Color.gray.opacity(0.25))
+            ZStack {
+                // Background: banner or blurred cover fallback
+                if let banner = media.bannerImage, let url = URL(string: banner) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable().aspectRatio(contentMode: .fill)
+                        default:
+                            Rectangle().fill(Color.gray.opacity(0.25))
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                } else {
+                    AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable().scaledToFill().blur(radius: 20).brightness(-0.1)
+                        default:
+                            Rectangle().fill(Color.gray.opacity(0.25))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
 
                 // Fade to background
                 LinearGradient(
@@ -191,25 +203,23 @@ private func heroSection(media: AniListMedia) -> some View {
                     endPoint: .bottom
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                // Poster — only when a distinct banner is present
-                if media.bannerImage != nil {
-                    AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                        switch phase {
-                        case .success(let img):
-                            img.resizable().aspectRatio(contentMode: .fill)
-                        default:
-                            Rectangle().fill(Color.gray.opacity(0.3))
-                        }
-                    }
-                    .frame(width: 90, height: 135)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .shadow(radius: 8)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                }
             }
         )
+        .overlay(alignment: .bottomLeading) {
+            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                switch phase {
+                case .success(let img):
+                    img.resizable().aspectRatio(contentMode: .fill)
+                default:
+                    Rectangle().fill(Color.gray.opacity(0.3))
+                }
+            }
+            .frame(width: 90, height: 135)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .shadow(radius: 8)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
         .clipped()
 }
     // MARK: - Metadata
