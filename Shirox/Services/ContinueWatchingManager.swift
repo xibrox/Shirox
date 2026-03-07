@@ -58,8 +58,11 @@ import Foundation
     // MARK: - Persistence
 
     private func persist() {
-        if let data = try? JSONEncoder().encode(items) {
+        do {
+            let data = try JSONEncoder().encode(items)
             UserDefaults.standard.set(data, forKey: Keys.storage)
+        } catch {
+            assertionFailure("ContinueWatchingManager: encode failed — \(error)")
         }
     }
 
