@@ -14,6 +14,15 @@ struct CachedAsyncImage: View {
         return c
     }()
 
+    /// Number of images currently stored in the shared cache.
+    private(set) static var count: Int = 0
+
+    /// Evicts all cached images and resets the count.
+    static func resetCache() {
+        cache.removeAllObjects()
+        count = 0
+    }
+
     var body: some View {
         Group {
             if let uiImage {
@@ -44,6 +53,7 @@ struct CachedAsyncImage: View {
                 return
             }
             Self.cache.setObject(loaded, forKey: urlString as NSString)
+            Self.count += 1
             uiImage = loaded
         }
     }

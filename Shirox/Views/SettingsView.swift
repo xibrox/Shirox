@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("forceLandscape") private var forceLandscape = false
     @State private var showResetConfirmation = false
+    #if os(iOS)
+    @State private var imageCacheCount = CachedAsyncImage.count
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -10,6 +13,20 @@ struct SettingsView: View {
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
                 }
+                #if os(iOS)
+                Section("Cache") {
+                    Button {
+                        CachedAsyncImage.resetCache()
+                        imageCacheCount = 0
+                    } label: {
+                        LabeledContent("Reset Image Cache") {
+                            Text("\(imageCacheCount) images")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.red)
+                }
+                #endif
                 Section("Continue Watching") {
                     Button("Reset Continue Watching Data") {
                         showResetConfirmation = true
@@ -32,6 +49,9 @@ struct SettingsView: View {
         }
         .onAppear {
             PlayerPresenter.shared.updateOrientationLock(.portrait)
+            #if os(iOS)
+            imageCacheCount = CachedAsyncImage.count
+            #endif
         }
     }
 }
