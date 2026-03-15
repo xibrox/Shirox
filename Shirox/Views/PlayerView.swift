@@ -604,11 +604,12 @@ class PlayerHostingController<Content: View>: UIHostingController<Content> {
     }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        return .landscape
+        return PlayerPresenter.shared.orientationLock
     }
 
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
-        return .landscapeRight
+        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+        return forceLandscape ? .landscapeRight : .portrait
     }
 
     override var shouldAutorotate: Bool { true }

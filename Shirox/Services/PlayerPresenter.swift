@@ -67,7 +67,8 @@ final class PlayerPresenter: ObservableObject {
 
         self.playerVC = hostingController
         
-        updateOrientationLock(.allButUpsideDown, shouldRotate: false)
+        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+        updateOrientationLock(forceLandscape ? .landscape : .allButUpsideDown, shouldRotate: forceLandscape)
         
         topVC.present(hostingController, animated: true)
     }
@@ -83,8 +84,7 @@ final class PlayerPresenter: ObservableObject {
     }
 
     func resetToAppOrientation(shouldRotate: Bool = false) {
-        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
-        updateOrientationLock(forceLandscape ? .allButUpsideDown : .portrait, shouldRotate: shouldRotate)
+        updateOrientationLock(.portrait, shouldRotate: shouldRotate)
     }
 
     func updateOrientationLock(_ orientation: UIInterfaceOrientationMask, shouldRotate: Bool = false) {
