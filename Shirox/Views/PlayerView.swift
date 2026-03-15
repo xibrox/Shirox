@@ -65,6 +65,70 @@ private struct VideoLayerView: UIViewRepresentable {
         }
     }
 }
+
+// MARK: - Speed Boost Overlay (UIKit long-press, single-touch only)
+
+private final class SingleTouchLongPress: UILongPressGestureRecognizer {
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard (event.allTouches?.count ?? 0) == 1 else {
+            state = .failed
+            return
+        }
+        super.touchesBegan(touches, with: event)
+    }
+}
+
+private struct SpeedBoostOverlay: UIViewRepresentable {
+    var isLocked: Bool
+    var onBegan: () -> Void
+    var onEnded: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onBegan: onBegan, onEnded: onEnded) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        let gr = SingleTouchLongPress(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        gr.minimumPressDuration = 0.7
+        gr.cancelsTouchesInView = false
+        gr.delaysTouchesEnded = false
+        gr.delegate = context.coordinator
+        view.addGestureRecognizer(gr)
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.isLocked = isLocked
+        context.coordinator.onBegan = onBegan
+        context.coordinator.onEnded = onEnded
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var isLocked: Bool
+        var onBegan: () -> Void
+        var onEnded: () -> Void
+
+        init(onBegan: @escaping () -> Void, onEnded: @escaping () -> Void) {
+            self.isLocked = false
+            self.onBegan = onBegan
+            self.onEnded = onEnded
+        }
+
+        @objc func handle(_ gr: UILongPressGestureRecognizer) {
+            guard !isLocked else { return }
+            switch gr.state {
+            case .began:   onBegan()
+            case .ended, .cancelled, .failed: onEnded()
+            default: break
+            }
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            return true
+        }
+    }
+}
 #endif
 
 // MARK: - PlayerView
@@ -107,7 +171,6 @@ struct PlayerView: View {
     #if os(iOS)
     @State private var pipTrigger = 0
     @State private var isSpeedBoosted = false
-    @State private var speedBoostTask: Task<Void, Never>?
     #endif
 
     var body: some View {
@@ -174,6 +237,22 @@ struct PlayerView: View {
                     .animation(.easeInOut(duration: 0.15), value: isSpeedBoosted)
                     .allowsHitTesting(false)
                 }
+
+                // [3.6] Speed boost long-press handler (single-touch only)
+                SpeedBoostOverlay(
+                    isLocked: isLocked,
+                    onBegan: {
+                        isSpeedBoosted = true
+                        player.rate = 2.0
+                    },
+                    onEnded: {
+                        if isSpeedBoosted {
+                            isSpeedBoosted = false
+                            player.rate = isPlaying ? playbackSpeed : 0
+                        }
+                    }
+                )
+                .ignoresSafeArea()
                 #endif
 
                 // [4] Controls overlay (visible when showControls && !isLocked)
@@ -219,41 +298,8 @@ struct PlayerView: View {
             if isPlaying { player?.rate = newSpeed }
         }
         #if os(iOS)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    // Cancel if the user is swiping (Control Center, Notification Center, scrolling)
-                    let t = value.translation
-                    if abs(t.width) > 25 || abs(t.height) > 25 {
-                        speedBoostTask?.cancel()
-                        speedBoostTask = nil
-                        if isSpeedBoosted {
-                            isSpeedBoosted = false
-                            player?.rate = isPlaying ? playbackSpeed : 0
-                        }
-                        return
-                    }
-                    guard !isLocked, speedBoostTask == nil else { return }
-                    speedBoostTask = Task {
-                        try? await Task.sleep(for: .milliseconds(700))
-                        guard !Task.isCancelled else { return }
-                        isSpeedBoosted = true
-                        player?.rate = 2.0
-                    }
-                }
-                .onEnded { _ in
-                    speedBoostTask?.cancel()
-                    speedBoostTask = nil
-                    if isSpeedBoosted {
-                        isSpeedBoosted = false
-                        player?.rate = isPlaying ? playbackSpeed : 0
-                    }
-                }
-        )
         // Reset speed boost when iOS takes over (Control Center, Notification Center, incoming call…)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            speedBoostTask?.cancel()
-            speedBoostTask = nil
             if isSpeedBoosted {
                 isSpeedBoosted = false
                 player?.rate = isPlaying ? playbackSpeed : 0
