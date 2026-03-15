@@ -86,14 +86,11 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onBegan: onBegan, onEnded: onEnded) }
 
     func makeUIView(context: Context) -> UIView {
+        // Non-interactive — does not consume hit tests.
+        // The gesture recognizer is attached to the window in updateUIView.
         let view = UIView()
         view.backgroundColor = .clear
-        let gr = SingleTouchLongPress(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
-        gr.minimumPressDuration = 0.7
-        gr.cancelsTouchesInView = false
-        gr.delaysTouchesEnded = false
-        gr.delegate = context.coordinator
-        view.addGestureRecognizer(gr)
+        view.isUserInteractionEnabled = false
         return view
     }
 
@@ -101,15 +98,31 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
         context.coordinator.isLocked = isLocked
         context.coordinator.onBegan = onBegan
         context.coordinator.onEnded = onEnded
+
+        // Attach to window once it becomes available.
+        guard !context.coordinator.attached, let window = uiView.window else { return }
+        let gr = SingleTouchLongPress(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        gr.minimumPressDuration = 0.7
+        gr.cancelsTouchesInView = false
+        gr.delaysTouchesEnded = false
+        gr.delegate = context.coordinator
+        window.addGestureRecognizer(gr)
+        context.coordinator.recognizer = gr
+        context.coordinator.attached = true
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.recognizer?.view?.removeGestureRecognizer(coordinator.recognizer!)
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        var isLocked: Bool
+        var isLocked: Bool = false
         var onBegan: () -> Void
         var onEnded: () -> Void
+        var recognizer: UILongPressGestureRecognizer?
+        var attached = false
 
         init(onBegan: @escaping () -> Void, onEnded: @escaping () -> Void) {
-            self.isLocked = false
             self.onBegan = onBegan
             self.onEnded = onEnded
         }
