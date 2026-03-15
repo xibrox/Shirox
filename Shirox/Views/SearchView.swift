@@ -125,7 +125,7 @@ struct SearchView: View {
             }
         )
         .onAppear {
-            PlayerPresenter.shared.updateOrientationLock(.portrait)
+            PlayerPresenter.shared.resetToAppOrientation()
         }
     }
 

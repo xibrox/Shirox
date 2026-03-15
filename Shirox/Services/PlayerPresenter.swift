@@ -76,10 +76,15 @@ final class PlayerPresenter: ObservableObject {
         guard let playerVC = playerVC else { return }
         
         playerVC.dismiss(animated: true) { [weak self] in
-            self?.updateOrientationLock(.portrait, shouldRotate: true)
+            self?.resetToAppOrientation(shouldRotate: true)
             self?.playerVC = nil
             self?.sourceView = nil
         }
+    }
+
+    func resetToAppOrientation(shouldRotate: Bool = false) {
+        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+        updateOrientationLock(forceLandscape ? .allButUpsideDown : .portrait, shouldRotate: shouldRotate)
     }
 
     func updateOrientationLock(_ orientation: UIInterfaceOrientationMask, shouldRotate: Bool = false) {

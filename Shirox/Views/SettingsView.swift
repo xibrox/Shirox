@@ -12,6 +12,11 @@ struct SettingsView: View {
             List {
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
+                        #if os(iOS)
+                        .onChange(of: forceLandscape) { _, _ in
+                            PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
+                        }
+                        #endif
                 }
                 #if os(iOS)
                 Section("Cache") {
@@ -48,7 +53,7 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            PlayerPresenter.shared.updateOrientationLock(.portrait)
+            PlayerPresenter.shared.resetToAppOrientation()
             #if os(iOS)
             imageCacheSize = CachedAsyncImage.totalBytes
             #endif

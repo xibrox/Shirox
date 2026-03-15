@@ -22,7 +22,7 @@ struct DetailView: View {
             }
         }
         .onAppear {
-            PlayerPresenter.shared.updateOrientationLock(.portrait)
+            PlayerPresenter.shared.resetToAppOrientation()
         }
         .ignoresSafeArea(edges: .top)
         .navigationTitle("")

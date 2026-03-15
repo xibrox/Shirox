@@ -38,7 +38,7 @@ struct AniListDetailView: View {
             }
         }
         .onAppear {
-            PlayerPresenter.shared.updateOrientationLock(.portrait)
+            PlayerPresenter.shared.resetToAppOrientation()
         }
         .frame(maxWidth: .infinity)
         #if os(iOS)
