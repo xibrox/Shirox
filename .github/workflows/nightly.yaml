@@ -11,6 +11,8 @@ jobs:
  build-ios:
    name: Build iOS IPA
    runs-on: macos-26
+   permissions:
+     contents: write
    steps:
      - name: Checkout repository
        uses: actions/checkout@v4
@@ -29,3 +31,10 @@ jobs:
        with:
          name: Shirox-Nightly-IPA
          path: build/Shirox.ipa
+
+     - name: Upload IPA to beta release
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
+         gh release upload beta build/Shirox.ipa --clobber
