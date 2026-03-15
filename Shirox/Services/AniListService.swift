@@ -142,6 +142,83 @@ final class AniListService {
         return try await fetchPage(query: query)
     }
 
+    func browse(category: BrowseCategory, page: Int) async throws -> [AniListMedia] {
+        switch category {
+        case .trending:
+            let query = """
+            query ($page: Int) {
+              Page(page: $page, perPage: 20) {
+                media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  averageScore
+                  genres
+                  description(asHtml: false)
+                }
+              }
+            }
+            """
+            return try await fetchPage(query: query, variables: ["page": page])
+
+        case .seasonal:
+            let (season, year) = AniListSeason.current()
+            let query = """
+            query ($season: MediaSeason, $year: Int, $page: Int) {
+              Page(page: $page, perPage: 20) {
+                media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  averageScore
+                  genres
+                  description(asHtml: false)
+                }
+              }
+            }
+            """
+            return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year, "page": page])
+
+        case .popular:
+            let query = """
+            query ($page: Int) {
+              Page(page: $page, perPage: 20) {
+                media(type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  averageScore
+                  genres
+                  description(asHtml: false)
+                }
+              }
+            }
+            """
+            return try await fetchPage(query: query, variables: ["page": page])
+
+        case .topRated:
+            let query = """
+            query ($page: Int) {
+              Page(page: $page, perPage: 20) {
+                media(type: ANIME, sort: SCORE_DESC, isAdult: false) {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  averageScore
+                  genres
+                  description(asHtml: false)
+                }
+              }
+            }
+            """
+            return try await fetchPage(query: query, variables: ["page": page])
+        }
+    }
+
     func detail(id: Int) async throws -> AniListMedia {
         let query = """
         query ($id: Int) {
@@ -237,6 +314,24 @@ enum AniListError: LocalizedError {
             return "No data received from AniList."
         case .decodingError(let message):
             return "Failed to parse response: \(message)"
+        }
+    }
+}
+
+// MARK: - Browse Category
+
+enum BrowseCategory: String, CaseIterable, Hashable {
+    case trending
+    case seasonal
+    case popular
+    case topRated
+
+    var title: String {
+        switch self {
+        case .trending: return "Trending Now"
+        case .seasonal: return "This Season"
+        case .popular:  return "All-Time Popular"
+        case .topRated: return "Top Rated"
         }
     }
 }
