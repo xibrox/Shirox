@@ -73,6 +73,7 @@ final class AniListService {
               id
               title { romaji english native }
               coverImage { large extraLarge }
+              bannerImage
               averageScore
               genres
               description(asHtml: false)
@@ -92,6 +93,7 @@ final class AniListService {
               id
               title { romaji english native }
               coverImage { large extraLarge }
+              bannerImage
               averageScore
               genres
               description(asHtml: false)
@@ -110,6 +112,7 @@ final class AniListService {
               id
               title { romaji english native }
               coverImage { large extraLarge }
+              bannerImage
               averageScore
               genres
               description(asHtml: false)
@@ -128,6 +131,7 @@ final class AniListService {
               id
               title { romaji english native }
               coverImage { large extraLarge }
+              bannerImage
               averageScore
               genres
               description(asHtml: false)

@@ -11,6 +11,7 @@ struct ContinueWatchingItem: Identifiable, Codable {
     let subtitle: String?
     let aniListID: Int?
     let moduleId: String?
+    let detailHref: String?
     var watchedSeconds: Double
     var totalSeconds: Double
     let totalEpisodes: Int?

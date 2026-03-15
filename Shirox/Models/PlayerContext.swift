@@ -9,4 +9,5 @@ struct PlayerContext {
     let moduleId: String?
     let totalEpisodes: Int?
     let resumeFrom: Double?        // seconds to seek to on start (nil = from beginning)
+    let detailHref: String?        // module detail page URL, used for Up Next navigation
 }

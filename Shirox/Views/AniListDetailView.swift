@@ -107,14 +107,6 @@ struct AniListDetailView: View {
             .first
     }
 
-    private func episodeProgress(_ ep: Int, media: AniListMedia) -> Double? {
-        guard let item = continueWatching.items
-            .first(where: { $0.aniListID == media.id && $0.episodeNumber == ep }),
-              item.totalSeconds > 0
-        else { return nil }
-        return min(item.watchedSeconds / item.totalSeconds, 1.0)
-    }
-
     #if os(iOS)
     @ViewBuilder
     private func watchButton(media: AniListMedia) -> some View {
@@ -127,14 +119,23 @@ struct AniListDetailView: View {
                 vm.watchEpisode(1)
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: "play.fill")
+                    .font(.system(size: 13, weight: .bold))
                 Text(label)
                     .font(.system(size: 16, weight: .bold))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 25))
+            .frame(height: 52)
+            .background(
+                LinearGradient(
+                    colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 26)
+            )
+            .shadow(color: Color.accentColor.opacity(0.3), radius: 10, y: 4)
             .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
@@ -142,6 +143,10 @@ struct AniListDetailView: View {
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
+        if item.streamUrl.isEmpty {
+            vm.watchEpisode(item.episodeNumber)
+            return
+        }
         guard let url = URL(string: item.streamUrl) else { return }
         let stream = StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
@@ -157,7 +162,8 @@ struct AniListDetailView: View {
             aniListID: item.aniListID,
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
-            resumeFrom: item.watchedSeconds
+            resumeFrom: item.watchedSeconds,
+            detailHref: nil
         )
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
     }
@@ -168,10 +174,9 @@ struct AniListDetailView: View {
 @ViewBuilder
 private func heroSection(media: AniListMedia) -> some View {
     Color.clear
-        .frame(height: 240)
+        .frame(height: 300)
         .overlay(
             ZStack {
-                // Background: banner or blurred cover fallback
                 if let banner = media.bannerImage, let url = URL(string: banner) {
                     AsyncImage(url: url) { phase in
                         switch phase {
@@ -196,10 +201,13 @@ private func heroSection(media: AniListMedia) -> some View {
                     .clipped()
                 }
 
-                // Fade to background
                 LinearGradient(
-                    colors: [.clear, platformBackground],
-                    startPoint: .center,
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: platformBackground.opacity(0.25), location: 0.5),
+                        .init(color: platformBackground, location: 1.0)
+                    ],
+                    startPoint: .top,
                     endPoint: .bottom
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -214,9 +222,10 @@ private func heroSection(media: AniListMedia) -> some View {
                     Rectangle().fill(Color.gray.opacity(0.3))
                 }
             }
-            .frame(width: 90, height: 135)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .shadow(radius: 8)
+            .frame(width: 100, height: 150)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
@@ -233,11 +242,17 @@ private func heroSection(media: AniListMedia) -> some View {
 
             HStack(spacing: 8) {
                 if let score = media.averageScore {
-                    Label("\(score)%", systemImage: "star.fill")
-                        .font(.caption).fontWeight(.semibold)
-                        .foregroundStyle(.yellow)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(.yellow.opacity(0.15), in: Capsule())
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.yellow)
+                        Text("\(score)%")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(.yellow.opacity(0.12), in: Capsule())
+                    .overlay(Capsule().strokeBorder(.yellow.opacity(0.35), lineWidth: 0.5))
                 }
                 if let status = media.statusDisplay {
                     Text(status)
@@ -260,9 +275,11 @@ private func heroSection(media: AniListMedia) -> some View {
                     HStack(spacing: 6) {
                         ForEach(genres.prefix(6), id: \.self) { genre in
                             Text(genre)
-                                .font(.caption2).fontWeight(.medium)
-                                .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(Color.accentColor.opacity(0.15), in: Capsule())
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 10).padding(.vertical, 4)
+                                .background(Color.accentColor.opacity(0.1), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 0.5))
                         }
                     }
                 }
@@ -279,16 +296,20 @@ private func heroSection(media: AniListMedia) -> some View {
     @ViewBuilder
     private func episodesSection(media: AniListMedia) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .center, spacing: 10) {
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 22)
                 Text("Episodes")
-                    .font(.headline).fontWeight(.bold)
+                    .font(.title3.weight(.bold))
                 if let count = media.episodes {
                     Text("\(count)")
-                        .font(.caption).fontWeight(.semibold)
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.accentColor, in: Capsule())
                 }
+                Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -306,9 +327,13 @@ private func heroSection(media: AniListMedia) -> some View {
             } else if let count = media.episodes, count > 0 {
                 LazyVStack(spacing: 8) {
                     ForEach(1...count, id: \.self) { ep in
-                        AniListEpisodeRow(number: ep, progress: episodeProgress(ep, media: media)) {
-                            vm.watchEpisode(ep)
-                        }
+                        AniListEpisodeRowContainer(
+                            ep: ep,
+                            mediaId: media.id,
+                            coverImage: media.coverImage.best,
+                            totalEpisodes: media.episodes,
+                            onTap: { vm.watchEpisode(ep) }
+                        )
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -332,18 +357,98 @@ private struct SynopsisSection: View {
     @State private var expanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Synopsis")
-                .font(.headline).fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 18)
+                Text("Synopsis")
+                    .font(.headline.weight(.bold))
+            }
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(expanded ? nil : 4)
-            Button(expanded ? "Less" : "More") {
-                withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+            if text.count > 200 {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { expanded.toggle() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(expanded ? "Less" : "More")
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
             }
-            .font(.caption).fontWeight(.semibold)
         }
+    }
+}
+
+// MARK: - Episode Row Container
+
+private struct AniListEpisodeRowContainer: View {
+    let ep: Int
+    let mediaId: Int
+    let coverImage: String?
+    let totalEpisodes: Int?
+    let onTap: () -> Void
+    @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+
+    private var progress: Double? {
+        if continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
+                                      mediaTitle: "", episodeNumber: ep) {
+            return 1.0
+        }
+        guard let item = continueWatching.items
+            .first(where: { $0.aniListID == mediaId && $0.episodeNumber == ep }),
+              item.totalSeconds > 0
+        else { return nil }
+        return min(item.watchedSeconds / item.totalSeconds, 1.0)
+    }
+
+    private var allPreviousWatched: Bool {
+        ep > 1 && (1..<ep).allSatisfy {
+            continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
+                                       mediaTitle: "", episodeNumber: $0)
+        }
+    }
+
+    var body: some View {
+        AniListEpisodeRow(
+            number: ep,
+            progress: progress,
+            onTap: onTap,
+            onMarkWatched: {
+                ContinueWatchingManager.shared.markWatched(
+                    aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: ep,
+                    imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
+            },
+            onMarkUnwatched: {
+                ContinueWatchingManager.shared.markUnwatched(
+                    aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: ep,
+                    imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
+            },
+            allPreviousWatched: allPreviousWatched,
+            onTogglePreviousWatched: ep > 1 ? {
+                let fresh = (1..<ep).allSatisfy {
+                    ContinueWatchingManager.shared.isWatched(
+                        aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: $0)
+                }
+                if fresh {
+                    ContinueWatchingManager.shared.markUnwatched(
+                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: "")
+                } else {
+                    ContinueWatchingManager.shared.markWatched(
+                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: "",
+                        imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
+                }
+            } : nil
+        )
     }
 }
 
@@ -353,48 +458,53 @@ private struct AniListEpisodeRow: View {
     let number: Int
     var progress: Double? = nil
     let onTap: () -> Void
+    var onMarkWatched: (() -> Void)? = nil
+    var onMarkUnwatched: (() -> Void)? = nil
+    var allPreviousWatched: Bool = false
+    var onTogglePreviousWatched: (() -> Void)? = nil
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
-                HStack(spacing: 12) {
+                HStack(spacing: 14) {
                     ZStack {
+                        Circle()
+                            .fill(isComplete ? Color.green : Color.accentColor)
+                            .frame(width: 40, height: 40)
                         if isComplete {
                             Image(systemName: "checkmark")
-                                .font(.caption).fontWeight(.bold)
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(.white)
-                                .frame(width: 42, height: 32)
-                                .background(Color.green, in: RoundedRectangle(cornerRadius: 8))
                         } else {
                             Text("\(number)")
-                                .font(.caption).fontWeight(.bold)
+                                .font(.footnote.weight(.bold))
                                 .foregroundStyle(.white)
-                                .frame(width: 42, height: 32)
-                                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
+                    .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
+                            radius: 4, y: 2)
 
                     Text("Episode \(number)")
-                        .font(.subheadline)
+                        .font(.callout.weight(.medium))
 
                     Spacer()
 
                     Image(systemName: "play.fill")
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(Color.accentColor, in: Circle())
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(8)
+                        .background(Color.accentColor.opacity(0.1), in: Circle())
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 10)
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 12)
 
                 if let p = progress, p > 0, !isComplete {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Color.secondary.opacity(0.2))
+                            Capsule().fill(Color.secondary.opacity(0.15))
                             Capsule()
                                 .fill(Color.accentColor)
                                 .frame(width: geo.size.width * p)
@@ -402,13 +512,34 @@ private struct AniListEpisodeRow: View {
                         .frame(height: 3)
                     }
                     .frame(height: 3)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 14)
                     .padding(.bottom, 8)
                 }
             }
-            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(AniListEpisodePressStyle())
+        .contextMenu {
+            if isComplete {
+                Button { onMarkUnwatched?() } label: {
+                    Label("Mark as Unwatched", systemImage: "xmark.circle")
+                }
+            } else {
+                Button { onMarkWatched?() } label: {
+                    Label("Mark as Watched", systemImage: "checkmark.circle")
+                }
+            }
+            if let onTogglePreviousWatched {
+                Divider()
+                Button { onTogglePreviousWatched() } label: {
+                    Label(
+                        allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
+                        systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -416,6 +547,7 @@ private struct AniListEpisodePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.92 : 1.0)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }

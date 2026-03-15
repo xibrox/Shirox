@@ -177,24 +177,23 @@ private struct FeaturedCard: View {
         Group {
             #if os(iOS)
             if isWide {
-                // iPad: banner background (blurred cover fallback) + poster card + text
+                // iPad: banner background (poster fallback) + poster card + text
                 Color.clear
                     .overlay(
                         ZStack {
-                            Group {
-                                if let banner = media.bannerImage, let url = URL(string: banner) {
-                                    AsyncImage(url: url) { phase in
-                                        switch phase {
-                                        case .success(let img): img.resizable().scaledToFill()
-                                        default: blurredCoverBackground
-                                        }
+                            if let banner = media.bannerImage, let url = URL(string: banner) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let img): img.resizable().scaledToFill()
+                                    default: coverFallback
                                     }
-                                } else {
-                                    blurredCoverBackground
                                 }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .clipped()
+                            } else {
+                                coverFallback
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
 
                             LinearGradient(
                                 stops: [
@@ -237,11 +236,6 @@ private struct FeaturedCard: View {
                                     img.resizable().scaledToFill()
                                 default:
                                     Rectangle().fill(Color.gray.opacity(0.3))
-                                        .overlay(
-                                            Image(systemName: "photo")
-                                                .font(.largeTitle)
-                                                .foregroundStyle(.tertiary)
-                                        )
                                 }
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -377,13 +371,11 @@ private struct FeaturedCard: View {
     }
 
     @ViewBuilder
-    private var blurredCoverBackground: some View {
+    private var coverFallback: some View {
         AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
             switch phase {
-            case .success(let img):
-                img.resizable().scaledToFill().blur(radius: 20).brightness(-0.1)
-            default:
-                Rectangle().fill(Color.gray.opacity(0.3))
+            case .success(let img): img.resizable().scaledToFill()
+            default: gradientPlaceholder
             }
         }
     }

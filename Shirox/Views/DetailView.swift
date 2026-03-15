@@ -34,9 +34,6 @@ struct DetailView: View {
         .sheet(isPresented: $vm.showStreamPicker) {
             StreamPickerView(vm: vm)
         }
-        .sheet(isPresented: $vm.showStreamPicker) {
-            StreamPickerView(vm: vm)
-        }
     }
 
     // MARK: - Continue Watching Helpers
@@ -47,18 +44,6 @@ struct DetailView: View {
             .filter { $0.moduleId == moduleId && $0.mediaTitle == detail.title }
             .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
             .first
-    }
-
-    private func episodeProgress(_ episode: EpisodeLink, detail: MediaDetail) -> Double? {
-        let moduleId = ModuleManager.shared.activeModule?.id
-        guard let item = continueWatching.items.first(where: {
-                  $0.moduleId == moduleId
-                  && $0.mediaTitle == detail.title
-                  && $0.episodeNumber == Int(episode.number)
-              }),
-              item.totalSeconds > 0
-        else { return nil }
-        return min(item.watchedSeconds / item.totalSeconds, 1.0)
     }
 
     #if os(iOS)
@@ -73,14 +58,23 @@ struct DetailView: View {
                 vm.loadStreams(for: first)
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: "play.fill")
+                    .font(.system(size: 13, weight: .bold))
                 Text(label)
                     .font(.system(size: 16, weight: .bold))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 25))
+            .frame(height: 52)
+            .background(
+                LinearGradient(
+                    colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 26)
+            )
+            .shadow(color: Color.accentColor.opacity(0.3), radius: 10, y: 4)
             .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
@@ -88,6 +82,12 @@ struct DetailView: View {
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
+        if item.streamUrl.isEmpty {
+            if let episode = vm.detail?.episodes.first(where: { Int($0.number) == item.episodeNumber }) {
+                vm.loadStreams(for: episode)
+            }
+            return
+        }
         guard let url = URL(string: item.streamUrl) else { return }
         let stream = StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
@@ -103,7 +103,8 @@ struct DetailView: View {
             aniListID: item.aniListID,
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
-            resumeFrom: item.watchedSeconds
+            resumeFrom: item.watchedSeconds,
+            detailHref: item.detailHref
         )
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
     }
@@ -124,16 +125,19 @@ struct DetailView: View {
                     Rectangle().fill(Color.secondary.opacity(0.15))
                 }
             }
-            .frame(height: 300)
+            .frame(height: 340)
             .clipped()
 
-            // Fade to background
             LinearGradient(
-                colors: [.clear, platformBackground],
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: platformBackground.opacity(0.2), location: 0.45),
+                    .init(color: platformBackground, location: 1.0)
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 300)
+            .frame(height: 340)
 
             // Floating poster + metadata
             HStack(alignment: .bottom, spacing: 14) {
@@ -149,14 +153,14 @@ struct DetailView: View {
                             .overlay(ProgressView())
                     }
                 }
-                .frame(width: 100, height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
+                .frame(width: 110, height: 165)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(item.title)
-                        .font(.title3)
-                        .fontWeight(.bold)
+                        .font(.title3.weight(.bold))
                         .lineLimit(3)
 
                     if let detail = vm.detail, detail.aliases != "N/A" {
@@ -168,18 +172,18 @@ struct DetailView: View {
 
                     if let detail = vm.detail, detail.airdate != "N/A" {
                         Text(detail.airdate)
-                            .font(.caption2)
-                            .fontWeight(.medium)
+                            .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color.secondary.opacity(0.15), in: Capsule())
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
                     }
                 }
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .padding(.bottom, 20)
         }
     }
 
@@ -220,26 +224,35 @@ struct DetailView: View {
     // MARK: - Synopsis
 
     private func synopsisSection(detail: MediaDetail) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Synopsis")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 18)
+                Text("Synopsis")
+                    .font(.headline.weight(.bold))
+            }
 
             Text(detail.description)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(synopsisExpanded ? nil : 4)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
 
             if detail.description.count > 200 {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         synopsisExpanded.toggle()
                     }
                 } label: {
-                    Text(synopsisExpanded ? "Less" : "More")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(Color.accentColor)
+                    HStack(spacing: 4) {
+                        Text(synopsisExpanded ? "Less" : "More")
+                        Image(systemName: synopsisExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
             }
@@ -251,20 +264,21 @@ struct DetailView: View {
     @ViewBuilder
     private func episodesSection(detail: MediaDetail) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .center, spacing: 10) {
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 22)
                 Text("Episodes")
-                    .font(.title3)
-                    .fontWeight(.bold)
-
+                    .font(.title3.weight(.bold))
                 if vm.isLoadingEpisodes {
                     ProgressView()
-                        .scaleEffect(0.8)
-                        .padding(.leading, 4)
+                        .scaleEffect(0.75)
                 } else if !detail.episodes.isEmpty {
                     Text("\(detail.episodes.count)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 4)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Color.accentColor, in: Capsule())
                 }
                 Spacer()
             }
@@ -280,12 +294,90 @@ struct DetailView: View {
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(detail.episodes) { episode in
-                        EpisodeRowView(episode: episode, progress: episodeProgress(episode, detail: detail)) {
-                            vm.loadStreams(for: episode)
-                        }
+                        ModuleEpisodeRowContainer(
+                            episode: episode,
+                            mediaTitle: detail.title,
+                            itemImage: item.image,
+                            totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
+                            detailHref: vm.detailHref,
+                            onTap: { vm.loadStreams(for: episode) }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+// MARK: - Module Episode Row Container
+
+private struct ModuleEpisodeRowContainer: View {
+    let episode: EpisodeLink
+    let mediaTitle: String
+    let itemImage: String
+    let totalEpisodes: Int?
+    let detailHref: String?
+    let onTap: () -> Void
+    @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+
+    private var moduleId: String? { ModuleManager.shared.activeModule?.id }
+    private var epNum: Int { Int(episode.number) }
+
+    private var progress: Double? {
+        guard let moduleId else { return nil }
+        if continueWatching.isWatched(aniListID: nil, moduleId: moduleId,
+                                      mediaTitle: mediaTitle, episodeNumber: epNum) {
+            return 1.0
+        }
+        guard let item = continueWatching.items.first(where: {
+                  $0.moduleId == moduleId
+                  && $0.mediaTitle == mediaTitle
+                  && $0.episodeNumber == epNum
+              }),
+              item.totalSeconds > 0
+        else { return nil }
+        return min(item.watchedSeconds / item.totalSeconds, 1.0)
+    }
+
+    private var allPreviousWatched: Bool {
+        guard let moduleId else { return false }
+        return epNum > 1 && (1..<epNum).allSatisfy {
+            continueWatching.isWatched(aniListID: nil, moduleId: moduleId,
+                                       mediaTitle: mediaTitle, episodeNumber: $0)
+        }
+    }
+
+    var body: some View {
+        EpisodeRowView(
+            episode: episode,
+            progress: progress,
+            onTap: onTap,
+            onMarkWatched: {
+                ContinueWatchingManager.shared.markWatched(
+                    aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                    imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+            },
+            onMarkUnwatched: {
+                ContinueWatchingManager.shared.markUnwatched(
+                    aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                    imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+            },
+            allPreviousWatched: allPreviousWatched,
+            onTogglePreviousWatched: epNum > 1 ? {
+                let mid = ModuleManager.shared.activeModule?.id
+                let fresh = (1..<epNum).allSatisfy {
+                    ContinueWatchingManager.shared.isWatched(
+                        aniListID: nil, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
+                }
+                if fresh {
+                    ContinueWatchingManager.shared.markUnwatched(
+                        upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle)
+                } else {
+                    ContinueWatchingManager.shared.markWatched(
+                        upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle,
+                        imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                }
+            } : nil
+        )
     }
 }

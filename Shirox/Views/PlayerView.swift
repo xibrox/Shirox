@@ -332,6 +332,7 @@ struct PlayerView: View {
             subtitle: stream.subtitle,
             aniListID: context.aniListID,
             moduleId: context.moduleId,
+            detailHref: context.detailHref,
             watchedSeconds: currentTime,
             totalSeconds: duration,
             totalEpisodes: context.totalEpisodes,

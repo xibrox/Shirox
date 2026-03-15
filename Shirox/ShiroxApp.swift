@@ -40,6 +40,14 @@ struct ShiroxApp: App {
     #endif
     @StateObject private var moduleManager = ModuleManager.shared
 
+    init() {
+        URLCache.shared = URLCache(
+            memoryCapacity: 20 * 1024 * 1024,
+            diskCapacity: 150 * 1024 * 1024,
+            diskPath: nil
+        )
+    }
+
     var body: some Scene {
         WindowGroup {
             TabView {

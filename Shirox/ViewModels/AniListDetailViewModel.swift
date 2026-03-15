@@ -18,6 +18,7 @@ final class AniListDetailViewModel: ObservableObject {
     @Published var showPlayer = false
 
     func load(id: Int, preloaded: AniListMedia? = nil) async {
+        guard media == nil else { return }
         if let preloaded {
             media = preloaded
         }
@@ -53,7 +54,8 @@ final class AniListDetailViewModel: ObservableObject {
             aniListID: media.id,
             moduleId: nil,
             totalEpisodes: media.episodes,
-            resumeFrom: nil
+            resumeFrom: nil,
+            detailHref: nil
         )
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, from: sourceView)
     }

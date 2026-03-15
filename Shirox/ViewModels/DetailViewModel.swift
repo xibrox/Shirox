@@ -18,9 +18,13 @@ final class DetailViewModel: ObservableObject {
     @Published var selectedStream: StreamResult?
     @Published var showPlayer = false
 
+    private(set) var detailHref: String?
+
     // MARK: - Load
 
     func load(item: SearchItem) {
+        guard detail == nil && !isLoadingDetail else { return }
+        detailHref = item.href
         Task {
             isLoadingDetail = true
             errorMessage = nil
@@ -73,7 +77,8 @@ final class DetailViewModel: ObservableObject {
             aniListID: nil,
             moduleId: ModuleManager.shared.activeModule?.id,
             totalEpisodes: detail?.episodes.count,
-            resumeFrom: nil
+            resumeFrom: nil,
+            detailHref: detailHref
         )
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, from: sourceView)
     }
