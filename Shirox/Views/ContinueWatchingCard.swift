@@ -7,9 +7,15 @@ struct ContinueWatchingSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Continue Watching")
-                .font(.title3.weight(.semibold))
-                .padding(.horizontal, 16)
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 18)
+                Text("Continue Watching")
+                    .font(.title3.weight(.bold))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -102,7 +108,7 @@ struct ContinueWatchingCardDisplay: View {
         ZStack(alignment: .bottom) {
             // Thumbnail — URLSession-based loader avoids AsyncImage identity issues
             CardThumbnail(urlString: item.imageUrl)
-                .frame(width: 110, height: 160)
+                .frame(width: 120, height: 175)
                 .clipped()
                 .cornerRadius(12)
 
@@ -134,17 +140,17 @@ struct ContinueWatchingCardDisplay: View {
                 }
             }
             .padding(8)
-            .frame(width: 110)
+            .frame(width: 120)
             .background(
                 LinearGradient(
-                    colors: [.clear, .black.opacity(0.7)],
+                    colors: [.clear, .black.opacity(0.88)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .cornerRadius(12)
             )
         }
-        .frame(width: 110, height: 160)
+        .frame(width: 120, height: 175)
     }
 }
 

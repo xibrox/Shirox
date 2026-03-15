@@ -148,14 +148,14 @@ private struct PageIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<numberOfPages, id: \.self) { index in
                 Capsule()
-                    .fill(index == currentPage ? Color.white : Color.white.opacity(0.4))
-                    .frame(width: index == currentPage ? 18 : 6, height: 6)
+                    .fill(index == currentPage ? Color.accentColor : Color.white.opacity(0.3))
+                    .frame(width: index == currentPage ? 20 : 5, height: 5)
                     .animation(.easeInOut(duration: 0.25), value: currentPage)
             }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(.black.opacity(0.35), in: Capsule())
+        .padding(.vertical, 5)
+        .padding(.horizontal, 9)
+        .background(.black.opacity(0.5), in: Capsule())
     }
 }
 
@@ -243,9 +243,9 @@ private struct FeaturedCard: View {
 
                             LinearGradient(
                                 stops: [
-                                    .init(color: .clear, location: 0),
-                                    .init(color: .black.opacity(0.35), location: 0.5),
-                                    .init(color: .black.opacity(0.92), location: 1)
+                                    .init(color: .clear, location: 0.1),
+                                    .init(color: .black.opacity(0.15), location: 0.45),
+                                    .init(color: .black.opacity(0.97), location: 1)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -359,10 +359,12 @@ private struct FeaturedCard: View {
                 if let genres = media.genres, !genres.isEmpty {
                     ForEach(genres.prefix(2), id: \.self) { genre in
                         Text(genre)
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.8))
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(.white.opacity(0.15), in: Capsule())
                             .lineLimit(1)
-                            .truncationMode(.tail)
                     }
                 }
             }
@@ -406,9 +408,15 @@ private struct AnimeSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.title3).fontWeight(.bold)
-                .padding(.horizontal, 16)
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 18)
+                Text(title)
+                    .font(.title3.weight(.bold))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 16) {
@@ -433,7 +441,8 @@ private struct AnimeSection: View {
 private struct HomePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .opacity(configuration.isPressed ? 0.88 : 1.0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

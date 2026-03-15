@@ -189,8 +189,8 @@ struct AniListCardView: View {
 
                     LinearGradient(
                         stops: [
-                            .init(color: .clear, location: 0.4),
-                            .init(color: .black.opacity(0.85), location: 1)
+                            .init(color: .clear, location: 0.5),
+                            .init(color: .black.opacity(0.92), location: 1)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -220,7 +220,7 @@ struct AniListCardView: View {
                         .padding(10)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
     }
 }
