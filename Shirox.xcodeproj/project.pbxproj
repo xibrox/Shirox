@@ -111,6 +111,8 @@
 		3F944857548C49EB979DFFAA /* ContinueWatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */; };
 		7A2F29854EAC49CBBA429793 /* ContinueWatchingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */; };
 		C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */; };
+		748517C4AE504A939CC1610F /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */; };
+		70F287DD43E84880B274852E /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -169,6 +171,7 @@
 		314F4DA7D4564AA9B47E4BC2 /* PlayerContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerContext.swift; sourceTree = "<group>"; };
 		0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingManager.swift; sourceTree = "<group>"; };
 		4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingCard.swift; sourceTree = "<group>"; };
+		DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -211,6 +214,14 @@
 			path = Player;
 			sourceTree = "<group>";
 		};
+		755846B82BE74ECDB2F8481D /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		001361E1E34759C14A461D84 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -227,6 +238,7 @@
 				E06843969693AE9C1AEB7FAD /* PlayerView.swift */,
 				ECEA5105668982AD0021041F /* SearchView.swift */,
 				FD942143248855B7D74F9E0C /* SettingsView.swift */,
+				755846B82BE74ECDB2F8481D /* Shared */,
 				520D2B9F954BF05330758E81 /* StreamPickerView.swift */,
 			);
 			path = Views;
@@ -450,6 +462,7 @@
 				92E2BEB6562E4B97802F53BC /* PlayerContext.swift in Sources */,
 				E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */,
 				7A2F29854EAC49CBBA429793 /* ContinueWatchingCard.swift in Sources */,
+				748517C4AE504A939CC1610F /* CachedAsyncImage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -507,6 +520,7 @@
 				3DA0FE0FBD304EC4814AD384 /* PlayerContext.swift in Sources */,
 				3F944857548C49EB979DFFAA /* ContinueWatchingManager.swift in Sources */,
 				C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */,
+				70F287DD43E84880B274852E /* CachedAsyncImage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -168,6 +168,11 @@ struct AniListCardView: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
                 ZStack {
+                    #if os(iOS)
+                    CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                    #else
                     AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
                         switch phase {
                         case .success(let image):
@@ -186,6 +191,7 @@ struct AniListCardView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
+                    #endif
 
                     LinearGradient(
                         stops: [
