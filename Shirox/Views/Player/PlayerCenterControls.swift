@@ -17,6 +17,7 @@ struct PlayerCenterControls: View {
             circleButton(size: 72, iconSize: 40) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 40))
+                    .animation(nil, value: isPlaying)
             } action: { onPlayPause() }
 
             circleButton(size: 60, iconSize: 32) {

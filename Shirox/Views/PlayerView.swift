@@ -20,35 +20,47 @@ struct CircularButtonStyle: ButtonStyle {
 // MARK: - VideoLayerView (iOS only)
 
 #if os(iOS)
-private struct VideoLayerView: UIViewControllerRepresentable {
+private final class PlayerLayerUIView: UIView {
+    let playerLayer: AVPlayerLayer
+    init(player: AVPlayer) {
+        playerLayer = AVPlayerLayer(player: player)
+        playerLayer.videoGravity = .resizeAspect
+        super.init(frame: .zero)
+        layer.addSublayer(playerLayer)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer.frame = bounds
+    }
+}
+
+private struct VideoLayerView: UIViewRepresentable {
     let player: AVPlayer
-    var pipRequested: Bool = false
+    var pipTrigger: Int = 0
 
     class Coordinator: NSObject, AVPictureInPictureControllerDelegate {
         var pipController: AVPictureInPictureController?
+        var lastPipTrigger: Int = 0
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let vc = AVPlayerViewController()
-        vc.player = player
-        vc.showsPlaybackControls = false
-        vc.videoGravity = .resizeAspect
-        vc.allowsPictureInPicturePlayback = true
-        return vc
+    func makeUIView(context: Context) -> PlayerLayerUIView {
+        let view = PlayerLayerUIView(player: player)
+        if AVPictureInPictureController.isPictureInPictureSupported() {
+            let pip = AVPictureInPictureController(playerLayer: view.playerLayer)
+            pip?.delegate = context.coordinator
+            pip?.canStartPictureInPictureAutomaticallyFromInline = true
+            context.coordinator.pipController = pip
+        }
+        return view
     }
 
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        uiViewController.player = player
-        if pipRequested {
-            if context.coordinator.pipController == nil,
-               let playerLayer = uiViewController.view.layer.sublayers?
-                   .compactMap({ $0 as? AVPlayerLayer }).first {
-                let pip = AVPictureInPictureController(playerLayer: playerLayer)
-                pip?.delegate = context.coordinator
-                context.coordinator.pipController = pip
-            }
+    func updateUIView(_ uiView: PlayerLayerUIView, context: Context) {
+        uiView.playerLayer.player = player
+        if pipTrigger != context.coordinator.lastPipTrigger {
+            context.coordinator.lastPipTrigger = pipTrigger
             context.coordinator.pipController?.startPictureInPicture()
         }
     }
@@ -70,6 +82,7 @@ struct PlayerView: View {
     @State private var duration: Double = 0
     @State private var isScrubbing = false
     @State private var timeObserver: Any?
+    @State private var rateObserver: NSKeyValueObservation?
     @State private var didSeekToResume = false
     @State private var loadingOpacity: Double = 1.0
 
@@ -92,7 +105,9 @@ struct PlayerView: View {
 
     // PiP (iOS only)
     #if os(iOS)
-    @State private var pipRequested = false
+    @State private var pipTrigger = 0
+    @State private var isSpeedBoosted = false
+    @State private var speedBoostTask: Task<Void, Never>?
     #endif
 
     var body: some View {
@@ -102,7 +117,7 @@ struct PlayerView: View {
             // [1] VideoLayer (always present when player != nil)
             if let player {
                 #if os(iOS)
-                VideoLayerView(player: player, pipRequested: pipRequested)
+                VideoLayerView(player: player, pipTrigger: pipTrigger)
                     .ignoresSafeArea()
                 #else
                 VideoPlayer(player: player)
@@ -138,9 +153,42 @@ struct PlayerView: View {
                 )
                 .ignoresSafeArea()
 
+                // [3.5] Speed boost badge (iOS only)
+                #if os(iOS)
+                if isSpeedBoosted {
+                    VStack {
+                        HStack(spacing: 4) {
+                            Image(systemName: "forward.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("2× Speed")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        Spacer()
+                    }
+                    .padding(.top, 16)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.15), value: isSpeedBoosted)
+                    .allowsHitTesting(false)
+                }
+                #endif
+
                 // [4] Controls overlay (visible when showControls && !isLocked)
                 if showControls && !isLocked {
                     controlsOverlay
+                }
+
+                // [4.5] Invisible always-tappable play/pause (works when overlay is hidden)
+                if !isLocked {
+                    Button(action: togglePlayPause) {
+                        Color.clear
+                            .frame(width: 72, height: 72)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 // [5] Lock overlay (visible when isLocked)
@@ -160,6 +208,7 @@ struct PlayerView: View {
         .onDisappear {
             hideTask?.cancel()
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
+            rateObserver?.invalidate()
             player?.pause()
             saveProgress()
         }
@@ -170,14 +219,26 @@ struct PlayerView: View {
             if isPlaying { player?.rate = newSpeed }
         }
         #if os(iOS)
-        .onChange(of: pipRequested) { _, requested in
-            if requested {
-                Task {
-                    try? await Task.sleep(for: .milliseconds(500))
-                    pipRequested = false
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard !isLocked, speedBoostTask == nil else { return }
+                    speedBoostTask = Task {
+                        try? await Task.sleep(for: .milliseconds(300))
+                        guard !Task.isCancelled else { return }
+                        isSpeedBoosted = true
+                        player?.rate = 2.0
+                    }
                 }
-            }
-        }
+                .onEnded { _ in
+                    speedBoostTask?.cancel()
+                    speedBoostTask = nil
+                    if isSpeedBoosted {
+                        isSpeedBoosted = false
+                        player?.rate = isPlaying ? playbackSpeed : 0
+                    }
+                }
+        )
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         #endif
@@ -227,7 +288,7 @@ struct PlayerView: View {
                     isLocked: $isLocked,
                     onPiP: {
                         #if os(iOS)
-                        pipRequested = true
+                        pipTrigger += 1
                         #endif
                     }
                 )
@@ -240,7 +301,10 @@ struct PlayerView: View {
                     duration: duration,
                     playbackSpeed: $playbackSpeed,
                     onSeek: { time in seekTo(time) },
+                    onSliderDragStart: { hideTask?.cancel() },
+                    onSliderDragEnd: { scheduleHide() },
                     onSpeedTap: { showSpeedPicker = true },
+                    onSkip85: { skip(by: 85) },
                     onSubtitleSettingsTap: { showSubtitleSettings = true },
                     hasSubtitles: stream.subtitle != nil
                 )
@@ -387,8 +451,9 @@ struct PlayerView: View {
     }
 
     private func setupPlayer() {
-        // Clean up previous observer to prevent leak on re-entry
+        // Clean up previous observers to prevent leak on re-entry
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
+        rateObserver?.invalidate(); rateObserver = nil
 
         let asset: AVURLAsset
         if !stream.headers.isEmpty {
@@ -403,6 +468,13 @@ struct PlayerView: View {
         p.rate = playbackSpeed
         isPlaying = true
         player = p
+
+        // Sync isPlaying with AVPlayer — catches PiP pause/play and any external control
+        rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
+            DispatchQueue.main.async {
+                isPlaying = player.timeControlStatus == .playing
+            }
+        }
 
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak item] time in

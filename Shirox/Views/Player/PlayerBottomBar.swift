@@ -5,7 +5,10 @@ struct PlayerBottomBar: View {
     let duration: Double
     @Binding var playbackSpeed: Float
     var onSeek: (Double) -> Void
+    var onSliderDragStart: (() -> Void)? = nil
+    var onSliderDragEnd: (() -> Void)? = nil
     var onSpeedTap: () -> Void
+    var onSkip85: () -> Void
     var onSubtitleSettingsTap: () -> Void
     var hasSubtitles: Bool = false
 
@@ -13,13 +16,15 @@ struct PlayerBottomBar: View {
         VStack(spacing: 4) {
             // Action buttons row
             HStack(spacing: 8) {
-                speedButton
+                skip85Button
+
+                Spacer()
 
                 if hasSubtitles {
                     subtitleButton
                 }
 
-                Spacer()
+                speedButton
             }
             .padding(.horizontal, 20)
 
@@ -27,7 +32,9 @@ struct PlayerBottomBar: View {
             PlayerProgressSlider(
                 currentTime: $currentTime,
                 duration: duration,
-                onSeek: onSeek
+                onSeek: onSeek,
+                onDragStart: onSliderDragStart,
+                onDragEnd: onSliderDragEnd
             )
             .padding(.horizontal, 20)
         }
@@ -36,6 +43,22 @@ struct PlayerBottomBar: View {
     }
 
     // MARK: - Subviews
+
+    private var skip85Button: some View {
+        Button(action: onSkip85) {
+            HStack(spacing: 3) {
+                Image(systemName: "goforward")
+                    .font(.system(size: 12, weight: .medium))
+                Text("85s")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.2), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
 
     private var speedButton: some View {
         Button(action: onSpeedTap) {
@@ -93,6 +116,7 @@ struct PlayerBottomBar: View {
                 playbackSpeed: .constant(1.0),
                 onSeek: { _ in },
                 onSpeedTap: {},
+                onSkip85: {},
                 onSubtitleSettingsTap: {}
             )
         }
@@ -110,6 +134,7 @@ struct PlayerBottomBar: View {
                 playbackSpeed: .constant(1.5),
                 onSeek: { _ in },
                 onSpeedTap: {},
+                onSkip85: {},
                 onSubtitleSettingsTap: {},
                 hasSubtitles: true
             )
