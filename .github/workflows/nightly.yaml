@@ -38,3 +38,18 @@ jobs:
        run: |
          gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
          gh release upload beta build/Shirox.ipa --clobber
+
+     - name: Update apps.json
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         IPA_SIZE=$(wc -c < build/Shirox.ipa | tr -d ' ')
+         BUILD_DATE=$(date -u +%Y-%m-%d)
+         jq --argjson size "$IPA_SIZE" --arg date "$BUILD_DATE" \
+           '.apps[0].versions[0].size = $size | .apps[0].versions[0].date = $date' \
+           apps.json > apps.json.tmp && mv apps.json.tmp apps.json
+         git config user.name "github-actions[bot]"
+         git config user.email "github-actions[bot]@users.noreply.github.com"
+         git add apps.json
+         git diff --cached --quiet || git commit -m "chore: update apps.json [skip ci]"
+         git push
