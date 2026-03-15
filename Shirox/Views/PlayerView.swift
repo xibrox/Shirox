@@ -224,7 +224,7 @@ struct PlayerView: View {
                 .onChanged { _ in
                     guard !isLocked, speedBoostTask == nil else { return }
                     speedBoostTask = Task {
-                        try? await Task.sleep(for: .milliseconds(300))
+                        try? await Task.sleep(for: .milliseconds(700))
                         guard !Task.isCancelled else { return }
                         isSpeedBoosted = true
                         player?.rate = 2.0
