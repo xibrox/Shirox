@@ -221,7 +221,18 @@ struct PlayerView: View {
         #if os(iOS)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
-                .onChanged { _ in
+                .onChanged { value in
+                    // Cancel if the user is swiping (Control Center, Notification Center, scrolling)
+                    let t = value.translation
+                    if abs(t.width) > 25 || abs(t.height) > 25 {
+                        speedBoostTask?.cancel()
+                        speedBoostTask = nil
+                        if isSpeedBoosted {
+                            isSpeedBoosted = false
+                            player?.rate = isPlaying ? playbackSpeed : 0
+                        }
+                        return
+                    }
                     guard !isLocked, speedBoostTask == nil else { return }
                     speedBoostTask = Task {
                         try? await Task.sleep(for: .milliseconds(700))
@@ -239,6 +250,15 @@ struct PlayerView: View {
                     }
                 }
         )
+        // Reset speed boost when iOS takes over (Control Center, Notification Center, incoming call…)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            speedBoostTask?.cancel()
+            speedBoostTask = nil
+            if isSpeedBoosted {
+                isSpeedBoosted = false
+                player?.rate = isPlaying ? playbackSpeed : 0
+            }
+        }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         #endif
