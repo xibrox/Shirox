@@ -1,0 +1,42 @@
+{
+  "name": "Shirox",
+  "identifier": "com.shirox.altstore",
+  "sourceURL": "https://raw.githubusercontent.com/YOUR_USERNAME/Shirox/main/apps.json",
+  "subtitle": "Anime streaming app for iOS",
+  "description": "Shirox is a free, open-source anime streaming app for iOS 17+.\n\nBrowse and watch anime using community-built modules. AniList integration for tracking and discovery.",
+  "website": "https://github.com/YOUR_USERNAME/Shirox",
+  "featuredApps": [
+    "com.shirox.app"
+  ],
+  "apps": [
+    {
+      "name": "Shirox",
+      "bundleIdentifier": "com.shirox.app",
+      "developerName": "YOUR_NAME",
+      "subtitle": "Open-source anime streaming for iOS",
+      "localizedDescription": "Shirox is a free, open-source anime streaming app for iOS 17+.\n\n• Browse anime powered by community modules\n• AniList integration for discovery and tracking\n• Continue Watching — pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
+      "iconURL": "https://raw.githubusercontent.com/YOUR_USERNAME/Shirox/main/icon.png",
+      "tintColor": "ef4444",
+      "category": "entertainment",
+      "screenshots": [],
+      "appPermissions": {
+        "entitlements": [
+          "aps-environment"
+        ],
+        "privacy": {}
+      },
+      "versions": [
+        {
+          "version": "1.0",
+          "buildVersion": "1",
+          "date": "2026-03-15",
+          "localizedDescription": "Initial release.",
+          "downloadURL": "https://github.com/YOUR_USERNAME/Shirox/releases/download/v1.0/Shirox.ipa",
+          "size": 0,
+          "minOSVersion": "17.0"
+        }
+      ]
+    }
+  ],
+  "news": []
+}
