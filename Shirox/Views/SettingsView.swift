@@ -4,7 +4,7 @@ struct SettingsView: View {
     @AppStorage("forceLandscape") private var forceLandscape = false
     @State private var showResetConfirmation = false
     #if os(iOS)
-    @State private var imageCacheCount = CachedAsyncImage.count
+    @State private var imageCacheSize = CachedAsyncImage.totalBytes
     #endif
 
     var body: some View {
@@ -17,10 +17,10 @@ struct SettingsView: View {
                 Section("Cache") {
                     Button {
                         CachedAsyncImage.resetCache()
-                        imageCacheCount = 0
+                        imageCacheSize = 0
                     } label: {
                         LabeledContent("Reset Image Cache") {
-                            Text("\(imageCacheCount) images")
+                            Text(Self.formattedBytes(imageCacheSize))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -50,8 +50,17 @@ struct SettingsView: View {
         .onAppear {
             PlayerPresenter.shared.updateOrientationLock(.portrait)
             #if os(iOS)
-            imageCacheCount = CachedAsyncImage.count
+            imageCacheSize = CachedAsyncImage.totalBytes
             #endif
+        }
+    }
+
+    private static func formattedBytes(_ bytes: Int) -> String {
+        guard bytes > 0 else { return "0 KB" }
+        if bytes >= 1_000_000 {
+            return String(format: "%.1f MB", Double(bytes) / 1_000_000)
+        } else {
+            return String(format: "%.0f KB", Double(bytes) / 1_000)
         }
     }
 }
