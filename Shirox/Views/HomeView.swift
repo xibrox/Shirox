@@ -33,16 +33,16 @@ struct HomeView: View {
                             }
                             #endif
                             if !vm.trending.isEmpty {
-                                AnimeSection(title: "Trending Now", items: vm.trending)
+                                AnimeSection(title: "Trending Now",     items: vm.trending, category: .trending)
                             }
                             if !vm.seasonal.isEmpty {
-                                AnimeSection(title: "This Season", items: vm.seasonal)
+                                AnimeSection(title: "This Season",      items: vm.seasonal, category: .seasonal)
                             }
                             if !vm.popular.isEmpty {
-                                AnimeSection(title: "All-Time Popular", items: vm.popular)
+                                AnimeSection(title: "All-Time Popular", items: vm.popular,  category: .popular)
                             }
                             if !vm.topRated.isEmpty {
-                                AnimeSection(title: "Top Rated", items: vm.topRated)
+                                AnimeSection(title: "Top Rated",        items: vm.topRated, category: .topRated)
                             }
                         }
                         .padding(.bottom, 24)
@@ -396,6 +396,7 @@ private struct FeaturedCard: View {
 private struct AnimeSection: View {
     let title: String
     let items: [AniListMedia]
+    let category: BrowseCategory
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var cardWidth: CGFloat {
@@ -415,6 +416,18 @@ private struct AnimeSection: View {
                 Text(title)
                     .font(.title3.weight(.bold))
                 Spacer()
+                NavigationLink {
+                    BrowseView(category: category)
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("More")
+                            .font(.subheadline.weight(.medium))
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
 
