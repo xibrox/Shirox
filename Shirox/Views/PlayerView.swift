@@ -72,6 +72,60 @@ private struct VideoLayerView: UIViewRepresentable {
     }
 }
 
+// MARK: - Two-Finger Tap Overlay (UIKit tap, two touches required)
+
+private struct TwoFingerTapOverlay: UIViewRepresentable {
+    var isLocked: Bool
+    var onTap: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onTap: onTap) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.isLocked = isLocked
+        context.coordinator.onTap = onTap
+
+        guard !context.coordinator.attached, let window = uiView.window else { return }
+        let gr = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        gr.numberOfTouchesRequired = 2
+        gr.numberOfTapsRequired = 1
+        gr.cancelsTouchesInView = false
+        gr.delegate = context.coordinator
+        window.addGestureRecognizer(gr)
+        context.coordinator.recognizer = gr
+        context.coordinator.attached = true
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.recognizer?.view?.removeGestureRecognizer(coordinator.recognizer!)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var isLocked: Bool = false
+        var onTap: () -> Void
+        var recognizer: UITapGestureRecognizer?
+        var attached = false
+
+        init(onTap: @escaping () -> Void) { self.onTap = onTap }
+
+        @objc func handle(_ gr: UITapGestureRecognizer) {
+            guard !isLocked, gr.state == .ended else { return }
+            onTap()
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            return true
+        }
+    }
+}
+
 // MARK: - Speed Boost Overlay (UIKit long-press, single-touch only)
 
 private final class SingleTouchLongPress: UILongPressGestureRecognizer {
@@ -272,6 +326,10 @@ struct PlayerView: View {
                     }
                 )
                 .ignoresSafeArea()
+
+                // [3.7] Two-finger tap → play/pause
+                TwoFingerTapOverlay(isLocked: isLocked, onTap: togglePlayPause)
+                    .ignoresSafeArea()
                 #endif
 
                 // [4] Controls overlay (visible when showControls && !isLocked)
