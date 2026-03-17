@@ -10,10 +10,8 @@ struct PlayerDoubleTapSeek: View {
     @State private var showRightFeedback = false
     @State private var leftTask: Task<Void, Never>?
     @State private var rightTask: Task<Void, Never>?
-    #if !os(iOS)
-    // Debounce flag: suppress single-tap when a double-tap just fired (SwiftUI path only)
+    // Debounce flag: suppress single-tap when a double-tap just fired
     @State private var didDoubleTap = false
-    #endif
 
     var body: some View {
         HStack(spacing: 0) {
@@ -29,17 +27,6 @@ struct PlayerDoubleTapSeek: View {
         let showingFeedback = isLeft ? showLeftFeedback : showRightFeedback
 
         ZStack {
-            #if os(iOS)
-            // UIKit path: numberOfTouchesRequired = 1 prevents multi-finger taps from
-            // accidentally triggering show/hide controls during a two-finger play/pause tap.
-            SingleTouchTapView(
-                onSingleTap: { onSingleTap() },
-                onDoubleTap: {
-                    if isLeft { onSeekBackward(); showFeedback(left: true) }
-                    else { onSeekForward(); showFeedback(left: false) }
-                }
-            )
-            #else
             Color.clear
                 .contentShape(Rectangle())
                 .gesture(
@@ -53,6 +40,7 @@ struct PlayerDoubleTapSeek: View {
                                 onSeekForward()
                                 showFeedback(left: false)
                             }
+                            // Reset flag after a brief moment
                             Task {
                                 try? await Task.sleep(for: .milliseconds(350))
                                 didDoubleTap = false
@@ -64,7 +52,6 @@ struct PlayerDoubleTapSeek: View {
                         }
                     )
                 )
-            #endif
 
             if showingFeedback {
                 ZStack {
@@ -105,67 +92,6 @@ struct PlayerDoubleTapSeek: View {
         }
     }
 }
-
-// MARK: - iOS: UIKit single-touch tap view
-
-#if os(iOS)
-private struct SingleTouchTapView: UIViewRepresentable {
-    var onSingleTap: () -> Void
-    var onDoubleTap: () -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onSingleTap: onSingleTap, onDoubleTap: onDoubleTap)
-    }
-
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.backgroundColor = .clear
-
-        let doubleTap = SingleTouchTapGR(target: context.coordinator,
-                                         action: #selector(Coordinator.handleDouble))
-        doubleTap.numberOfTapsRequired = 2
-
-        let singleTap = SingleTouchTapGR(target: context.coordinator,
-                                          action: #selector(Coordinator.handleSingle))
-        singleTap.numberOfTapsRequired = 1
-        // Delay single-tap until double-tap fails — matches SwiftUI SimultaneousGesture behaviour
-        singleTap.require(toFail: doubleTap)
-
-        view.addGestureRecognizer(doubleTap)
-        view.addGestureRecognizer(singleTap)
-        return view
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        context.coordinator.onSingleTap = onSingleTap
-        context.coordinator.onDoubleTap = onDoubleTap
-    }
-
-    final class Coordinator: NSObject {
-        var onSingleTap: () -> Void
-        var onDoubleTap: () -> Void
-
-        init(onSingleTap: @escaping () -> Void, onDoubleTap: @escaping () -> Void) {
-            self.onSingleTap = onSingleTap
-            self.onDoubleTap = onDoubleTap
-        }
-
-        @objc func handleSingle() { onSingleTap() }
-        @objc func handleDouble() { onDoubleTap() }
-    }
-}
-
-/// Tap recognizer that immediately fails when more than one touch is detected.
-private final class SingleTouchTapGR: UITapGestureRecognizer {
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard (event.allTouches?.count ?? 0) == 1 else {
-            state = .failed
-            return
-        }
-        super.touchesBegan(touches, with: event)
-    }
-}
-#endif
 
 #Preview {
     ZStack {
