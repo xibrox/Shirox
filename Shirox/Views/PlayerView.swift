@@ -74,14 +74,20 @@ private struct VideoLayerView: UIViewRepresentable {
 
 // MARK: - Two-Finger Tap Overlay (UIKit tap, two touches required)
 
-/// Tap recognizer that also tracks when ≥2 touches are active so callers can suppress
-/// single-finger tap gestures that fire while a two-finger gesture is in progress.
+/// Reference-type flag shared between TwoFingerTapOverlay and onSingleTap closure.
+/// Using a class avoids SwiftUI Binding timing issues — writes are immediately visible
+/// to any closure that captured the same instance.
+final class TapSuppressor {
+    var active = false
+}
+
+/// Tap recognizer that sets suppressor.active = true the moment ≥2 touches are down,
+/// so that single-finger tap callbacks fired during the same event pass are blocked.
 private final class TwoFingerTapGR: UITapGestureRecognizer {
-    var onTwoFingersDown: () -> Void = {}
-    var onTwoFingersGone: () -> Void = {}
+    weak var suppressor: TapSuppressor?
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        if (event.allTouches?.count ?? 0) >= 2 { onTwoFingersDown() }
+        if (event.allTouches?.count ?? 0) >= 2 { suppressor?.active = true }
         super.touchesBegan(touches, with: event)
     }
 
@@ -89,21 +95,23 @@ private final class TwoFingerTapGR: UITapGestureRecognizer {
         super.touchesEnded(touches, with: event)
         let active = event.allTouches?.filter { $0.phase != .ended && $0.phase != .cancelled }.count ?? 0
         if active < 2 {
-            // Defer reset so SwiftUI tap callbacks (which fire synchronously in this same
-            // event pass) still see suppressSingleTap = true before it clears.
-            DispatchQueue.main.async { self.onTwoFingersGone() }
+            // Defer reset: single-tap SwiftUI callbacks fire synchronously in this same
+            // event pass and must still see active = true.
+            let s = suppressor
+            DispatchQueue.main.async { s?.active = false }
         }
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
         super.touchesCancelled(touches, with: event)
-        DispatchQueue.main.async { self.onTwoFingersGone() }
+        let s = suppressor
+        DispatchQueue.main.async { s?.active = false }
     }
 }
 
 private struct TwoFingerTapOverlay: UIViewRepresentable {
     var isLocked: Bool
-    @Binding var suppressSingleTap: Bool
+    var suppressor: TapSuppressor
     var onTap: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onTap: onTap) }
@@ -118,7 +126,6 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
     func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.isLocked = isLocked
         context.coordinator.onTap = onTap
-        context.coordinator.suppressSingleTap = _suppressSingleTap
 
         guard !context.coordinator.attached, let window = uiView.window else { return }
         let gr = TwoFingerTapGR(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
@@ -126,8 +133,7 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
         gr.numberOfTapsRequired = 1
         gr.cancelsTouchesInView = false
         gr.delegate = context.coordinator
-        gr.onTwoFingersDown = { context.coordinator.suppressSingleTap?.wrappedValue = true }
-        gr.onTwoFingersGone = { context.coordinator.suppressSingleTap?.wrappedValue = false }
+        gr.suppressor = suppressor
         window.addGestureRecognizer(gr)
         context.coordinator.recognizer = gr
         context.coordinator.attached = true
@@ -140,7 +146,6 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var isLocked: Bool = false
         var onTap: () -> Void
-        var suppressSingleTap: Binding<Bool>?
         var recognizer: TwoFingerTapGR?
         var attached = false
 
@@ -276,7 +281,9 @@ struct PlayerView: View {
     #if os(iOS)
     @State private var pipTrigger = 0
     @State private var isSpeedBoosted = false
-    @State private var suppressSingleTap = false
+    // Reference-type suppressor: written from UIKit touchesBegan, read in SwiftUI onSingleTap.
+    // Using a class avoids SwiftUI @State update latency.
+    private let tapSuppressor = TapSuppressor()
     #endif
 
     var body: some View {
@@ -306,7 +313,7 @@ struct PlayerView: View {
                 PlayerDoubleTapSeek(
                     onSingleTap: {
                         #if os(iOS)
-                        guard !suppressSingleTap else { return }
+                        guard !tapSuppressor.active else { return }
                         #endif
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showControls.toggle()
@@ -364,7 +371,7 @@ struct PlayerView: View {
                 .ignoresSafeArea()
 
                 // [3.7] Two-finger tap → play/pause
-                TwoFingerTapOverlay(isLocked: isLocked, suppressSingleTap: $suppressSingleTap, onTap: togglePlayPause)
+                TwoFingerTapOverlay(isLocked: isLocked, suppressor: tapSuppressor, onTap: togglePlayPause)
                     .ignoresSafeArea()
                 #endif
 
