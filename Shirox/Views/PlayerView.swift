@@ -126,6 +126,9 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
     func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.isLocked = isLocked
         context.coordinator.onTap = onTap
+        // Keep suppressor ref current (same instance every render thanks to @State,
+        // but update defensively so the GR always has the right object).
+        context.coordinator.recognizer?.suppressor = suppressor
 
         guard !context.coordinator.attached, let window = uiView.window else { return }
         let gr = TwoFingerTapGR(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
@@ -281,9 +284,10 @@ struct PlayerView: View {
     #if os(iOS)
     @State private var pipTrigger = 0
     @State private var isSpeedBoosted = false
-    // Reference-type suppressor: written from UIKit touchesBegan, read in SwiftUI onSingleTap.
-    // Using a class avoids SwiftUI @State update latency.
-    private let tapSuppressor = TapSuppressor()
+    // @State ensures the same TapSuppressor instance is reused across every SwiftUI render.
+    // (A plain `let` would create a new instance on each render, breaking the shared reference.)
+    @State private var tapSuppressor = TapSuppressor()
+    @State private var videoReady = false
     #endif
 
     var body: some View {
@@ -298,6 +302,23 @@ struct PlayerView: View {
                 #else
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
+                #endif
+
+                // [1.5] Thumbnail placeholder — hides the black AVPlayerLayer until the
+                // first frame is ready, then fades out.
+                #if os(iOS)
+                if !videoReady, let imageUrl = context?.imageUrl, let url = URL(string: imageUrl) {
+                    AsyncImage(url: url) { phase in
+                        if let img = phase.image {
+                            img.resizable().scaledToFill()
+                        } else {
+                            Color.black
+                        }
+                    }
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                }
                 #endif
 
                 // [2] PlayerSubtitleOverlay (always visible, not behind lock/control hide)
@@ -660,6 +681,9 @@ struct PlayerView: View {
         // Clean up previous observers to prevent leak on re-entry
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
         rateObserver?.invalidate(); rateObserver = nil
+        #if os(iOS)
+        videoReady = false
+        #endif
 
         let asset: AVURLAsset
         if !stream.headers.isEmpty {
@@ -676,10 +700,14 @@ struct PlayerView: View {
         isPlaying = true
         player = p
 
-        // Sync isPlaying with AVPlayer — catches PiP pause/play and any external control
+        // Sync isPlaying with AVPlayer — catches PiP pause/play and any external control.
+        // Also clears the thumbnail placeholder once the player is actually playing.
         rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
             DispatchQueue.main.async {
                 isPlaying = player.timeControlStatus != .paused
+                #if os(iOS)
+                if player.timeControlStatus == .playing { videoReady = true }
+                #endif
             }
         }
 
