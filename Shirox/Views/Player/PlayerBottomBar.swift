@@ -47,15 +47,15 @@ struct PlayerBottomBar: View {
 
     private var skip85Button: some View {
         Button(action: onSkip85) {
-            HStack(spacing: 3) {
+            HStack(spacing: 5) {
                 Image(systemName: "goforward")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
                 Text("85s")
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .frame(height: 36)
             .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)
@@ -64,10 +64,10 @@ struct PlayerBottomBar: View {
     private var speedButton: some View {
         Button(action: onSpeedTap) {
             Text(speedLabel)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 14)
+                .frame(height: 36)
                 .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)
@@ -76,10 +76,10 @@ struct PlayerBottomBar: View {
     private var subtitleButton: some View {
         Button(action: onSubtitleSettingsTap) {
             Image(systemName: "captions.bubble.fill")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 14)
+                .frame(height: 36)
                 .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)

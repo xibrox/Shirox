@@ -1,5 +1,8 @@
 import SwiftUI
 import AVKit
+#if os(iOS)
+import MediaPlayer
+#endif
 
 // MARK: - Circular Button Style (uniform size & appearance)
 
@@ -306,6 +309,9 @@ struct PlayerView: View {
             rateObserver?.invalidate()
             player?.pause()
             saveProgress()
+            #if os(iOS)
+            tearDownNowPlaying()
+            #endif
         }
         .onChange(of: volume) { _, newVolume in
             player?.volume = newVolume
@@ -586,6 +592,9 @@ struct PlayerView: View {
                 didSeekToResume = true
                 p.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600))
             }
+            #if os(iOS)
+            updateNowPlaying(player: p)
+            #endif
         }
 
         // Observe playback end to sync isPlaying state
@@ -601,6 +610,9 @@ struct PlayerView: View {
         }
 
         scheduleHide()
+        #if os(iOS)
+        setupRemoteCommands(player: p)
+        #endif
     }
 
     private func loadSubtitles() {
@@ -613,6 +625,72 @@ struct PlayerView: View {
             }
         }
     }
+
+    #if os(iOS)
+    private func setupRemoteCommands(player p: AVPlayer) {
+        let center = MPRemoteCommandCenter.shared()
+        center.playCommand.isEnabled = true
+        center.pauseCommand.isEnabled = true
+        center.togglePlayPauseCommand.isEnabled = true
+        center.changePlaybackPositionCommand.isEnabled = true
+        center.skipForwardCommand.isEnabled = true
+        center.skipForwardCommand.preferredIntervals = [10]
+        center.skipBackwardCommand.isEnabled = true
+        center.skipBackwardCommand.preferredIntervals = [10]
+
+        center.playCommand.addTarget { [weak p] _ in
+            p?.play(); return .success
+        }
+        center.pauseCommand.addTarget { [weak p] _ in
+            p?.pause(); return .success
+        }
+        center.togglePlayPauseCommand.addTarget { [weak p] _ in
+            guard let p else { return .commandFailed }
+            if p.timeControlStatus == .paused { p.play() } else { p.pause() }
+            return .success
+        }
+        center.changePlaybackPositionCommand.addTarget { [weak p] event in
+            guard let p, let e = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            p.seek(to: CMTime(seconds: e.positionTime, preferredTimescale: 600))
+            return .success
+        }
+        center.skipForwardCommand.addTarget { [weak p] _ in
+            guard let p else { return .commandFailed }
+            let t = p.currentTime().seconds + 10
+            p.seek(to: CMTime(seconds: t, preferredTimescale: 600))
+            return .success
+        }
+        center.skipBackwardCommand.addTarget { [weak p] _ in
+            guard let p else { return .commandFailed }
+            let t = max(0, p.currentTime().seconds - 10)
+            p.seek(to: CMTime(seconds: t, preferredTimescale: 600))
+            return .success
+        }
+    }
+
+    private func updateNowPlaying(player p: AVPlayer) {
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: stream.title,
+            MPNowPlayingInfoPropertyIsLiveStream: false,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: p.currentTime().seconds,
+            MPNowPlayingInfoPropertyPlaybackRate: Double(p.rate)
+        ]
+        if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
+        if let mediaTitle = context?.mediaTitle { info[MPMediaItemPropertyAlbumTitle] = mediaTitle }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func tearDownNowPlaying() {
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        let center = MPRemoteCommandCenter.shared()
+        center.playCommand.removeTarget(nil)
+        center.pauseCommand.removeTarget(nil)
+        center.togglePlayPauseCommand.removeTarget(nil)
+        center.changePlaybackPositionCommand.removeTarget(nil)
+        center.skipForwardCommand.removeTarget(nil)
+        center.skipBackwardCommand.removeTarget(nil)
+    }
+    #endif
 }
 
 // MARK: - PlayerHostingController (iOS only)

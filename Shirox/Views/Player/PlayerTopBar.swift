@@ -46,7 +46,7 @@ struct PlayerTopBar: View {
                             .padding(.vertical, 8)
                     }
                 }
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(Color.white.opacity(0.2), in: Capsule())
             }
         }
         .padding(.horizontal, 20)
