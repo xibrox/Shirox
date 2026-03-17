@@ -11,6 +11,7 @@ struct PlayerBottomBar: View {
     var onSkip85: () -> Void
     var onSubtitleSettingsTap: () -> Void
     var hasSubtitles: Bool = false
+    var bottomPadding: CGFloat = 24
 
     var body: some View {
         VStack(spacing: 4) {
@@ -38,7 +39,7 @@ struct PlayerBottomBar: View {
             )
             .padding(.horizontal, 20)
         }
-        .padding(.bottom, 24)        // matches top bar's padding
+        .padding(.bottom, bottomPadding)
         .background(bottomGradient)
     }
 

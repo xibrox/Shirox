@@ -9,22 +9,32 @@ struct PlayerCenterControls: View {
 
     var body: some View {
         HStack(spacing: 40) {
-            circleButton(size: 60, iconSize: 32) {
-                Image(systemName: "gobackward.\(Int(skipAmount))")
-                    .font(.system(size: 32))
-            } action: { onBackward() }
-
-            circleButton(size: 72, iconSize: 40) {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 40))
-                    .animation(nil, value: isPlaying)
-            } action: { onPlayPause() }
-
-            circleButton(size: 60, iconSize: 32) {
-                Image(systemName: "goforward.\(Int(skipAmount))")
-                    .font(.system(size: 32))
-            } action: { onForward() }
+            backwardButton
+            playPauseButton
+            forwardButton
         }
+    }
+
+    private var backwardButton: some View {
+        circleButton(size: 60, iconSize: 32) {
+            Image(systemName: "gobackward.\(Int(skipAmount))")
+                .font(.system(size: 32))
+        } action: { onBackward() }
+    }
+
+    private var playPauseButton: some View {
+        circleButton(size: 72, iconSize: 40) {
+            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: 40))
+                .animation(nil, value: isPlaying)
+        } action: { onPlayPause() }
+    }
+
+    private var forwardButton: some View {
+        circleButton(size: 60, iconSize: 32) {
+            Image(systemName: "goforward.\(Int(skipAmount))")
+                .font(.system(size: 32))
+        } action: { onForward() }
     }
 
     private func circleButton<Label: View>(

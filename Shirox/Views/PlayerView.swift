@@ -31,7 +31,10 @@ private final class PlayerLayerUIView: UIView {
     required init?(coder: NSCoder) { fatalError() }
     override func layoutSubviews() {
         super.layoutSubviews()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         playerLayer.frame = bounds
+        CATransaction.commit()
     }
 }
 
@@ -334,76 +337,93 @@ struct PlayerView: View {
     // MARK: - Controls Overlay (final version)
 
     private var controlsOverlay: some View {
-        ZStack {
-            // Gradient overlays (restored)
-            VStack {
-                Color.clear.frame(height: 120)
-                    .background(
-                        LinearGradient(
-                            colors: [.black.opacity(0.6), .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            #if os(iOS)
+            let uiInsets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets ?? .zero
+            let topPad: CGFloat = max(16, uiInsets.top + 8)
+            let bottomPad: CGFloat = max(16, uiInsets.bottom + 8)
+            let hSafe: CGFloat = isLandscape ? max(uiInsets.left, uiInsets.right) : 0
+            let outerHPad: CGFloat = max(16, hSafe)
+            #else
+            let topPad: CGFloat = 24
+            let bottomPad: CGFloat = 24
+            let outerHPad: CGFloat = 16
+            #endif
+
+            ZStack {
+                // Gradient overlays
+                VStack {
+                    Color.clear.frame(height: 120)
+                        .background(
+                            LinearGradient(
+                                colors: [.black.opacity(0.6), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .ignoresSafeArea()
                         )
-                        .ignoresSafeArea()
-                    )
-                Spacer()
-                Color.clear.frame(height: 160)
-                    .background(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.6)],
-                            startPoint: .top,
-                            endPoint: .bottom
+                    Spacer()
+                    Color.clear.frame(height: 160)
+                        .background(
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.6)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .ignoresSafeArea()
                         )
-                        .ignoresSafeArea()
+                }
+                .allowsHitTesting(false)
+
+                // Main vertical layout with top and bottom bars pinned to edges
+                VStack(spacing: 0) {
+                    PlayerTopBar(
+                        title: stream.title,
+                        onDismiss: handleDismiss,
+                        isLocked: $isLocked,
+                        onPiP: {
+                            #if os(iOS)
+                            pipTrigger += 1
+                            #endif
+                        },
+                        topPadding: topPad,
+                        isLandscape: isLandscape
                     )
-            }
-            .allowsHitTesting(false)
+                    .buttonStyle(CircularButtonStyle())
 
-            // Main vertical layout with top and bottom bars pinned to edges
-            VStack(spacing: 0) {
-                PlayerTopBar(
-                    title: stream.title,
-                    onDismiss: handleDismiss,
-                    isLocked: $isLocked,
-                    onPiP: {
-                        #if os(iOS)
-                        pipTrigger += 1
-                        #endif
-                    }
-                )
-                .buttonStyle(CircularButtonStyle())
+                    Spacer()
 
-                Spacer() // Pushes bottom bar down
+                    PlayerBottomBar(
+                        currentTime: $currentTime,
+                        duration: duration,
+                        playbackSpeed: $playbackSpeed,
+                        onSeek: { time in seekTo(time) },
+                        onSliderDragStart: { hideTask?.cancel() },
+                        onSliderDragEnd: { scheduleHide() },
+                        onSpeedTap: { showSpeedPicker = true },
+                        onSkip85: { skip(by: 85) },
+                        onSubtitleSettingsTap: { showSubtitleSettings = true },
+                        hasSubtitles: stream.subtitle != nil,
+                        bottomPadding: bottomPad
+                    )
+                    .buttonStyle(CircularButtonStyle())
+                }
+                .padding(.horizontal, outerHPad)
 
-                PlayerBottomBar(
-                    currentTime: $currentTime,
-                    duration: duration,
-                    playbackSpeed: $playbackSpeed,
-                    onSeek: { time in seekTo(time) },
-                    onSliderDragStart: { hideTask?.cancel() },
-                    onSliderDragEnd: { scheduleHide() },
-                    onSpeedTap: { showSpeedPicker = true },
-                    onSkip85: { skip(by: 85) },
-                    onSubtitleSettingsTap: { showSubtitleSettings = true },
-                    hasSubtitles: stream.subtitle != nil
-                )
-                .buttonStyle(CircularButtonStyle())
-                // No extra bottom padding – sits directly at the bottom edge
-            }
-            .padding(.horizontal, 16)
-
-            // Center controls as an overlay – guarantees exact vertical centering
-            HStack {
-                Spacer(minLength: 0)
-                PlayerCenterControls(
-                    isPlaying: $isPlaying,
-                    skipAmount: 10,
-                    onBackward: { skip(by: -10); scheduleHide() },
-                    onPlayPause: { togglePlayPause() },
-                    onForward: { skip(by: 10); scheduleHide() }
-                )
-                .buttonStyle(CircularButtonStyle())
-                Spacer(minLength: 0)
+                // Center controls — vertically centered, layout adapts to orientation
+                HStack {
+                    Spacer(minLength: 0)
+                    PlayerCenterControls(
+                        isPlaying: $isPlaying,
+                        skipAmount: 10,
+                        onBackward: { skip(by: -10); scheduleHide() },
+                        onPlayPause: { togglePlayPause() },
+                        onForward: { skip(by: 10); scheduleHide() }
+                    )
+                    .buttonStyle(CircularButtonStyle())
+                    Spacer(minLength: 0)
+                }
             }
         }
         .transition(.opacity)
@@ -544,6 +564,7 @@ struct PlayerView: View {
         let item = AVPlayerItem(asset: asset)
         let p = AVPlayer(playerItem: item)
         p.volume = volume
+        p.usesExternalPlaybackWhileExternalScreenIsActive = true
         p.rate = playbackSpeed
         isPlaying = true
         player = p
@@ -551,7 +572,7 @@ struct PlayerView: View {
         // Sync isPlaying with AVPlayer — catches PiP pause/play and any external control
         rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
             DispatchQueue.main.async {
-                isPlaying = player.timeControlStatus == .playing
+                isPlaying = player.timeControlStatus != .paused
             }
         }
 
