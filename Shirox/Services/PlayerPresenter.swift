@@ -75,8 +75,19 @@ final class PlayerPresenter: ObservableObject {
 
     func dismissPlayer() {
         guard let playerVC = playerVC else { return }
-        
+
         playerVC.dismiss(animated: true) { [weak self] in
+            self?.resetToAppOrientation(shouldRotate: true)
+            self?.playerVC = nil
+            self?.sourceView = nil
+        }
+    }
+
+    /// Called after the player view has already been manually animated off screen (drag-to-dismiss).
+    /// Skips the modal dismiss animation and just cleans up state.
+    func dragDismiss() {
+        guard let playerVC = playerVC else { return }
+        playerVC.dismiss(animated: false) { [weak self] in
             self?.resetToAppOrientation(shouldRotate: true)
             self?.playerVC = nil
             self?.sourceView = nil

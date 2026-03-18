@@ -24,21 +24,16 @@ struct CircularButtonStyle: ButtonStyle {
 
 #if os(iOS)
 private final class PlayerLayerUIView: UIView {
-    let playerLayer: AVPlayerLayer
+    // Using layerClass makes the view's backing layer the AVPlayerLayer itself,
+    // so UIKit always keeps the layer frame in sync — no manual frame updates needed.
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
     init(player: AVPlayer) {
-        playerLayer = AVPlayerLayer(player: player)
-        playerLayer.videoGravity = .resizeAspect
         super.init(frame: .zero)
-        layer.addSublayer(playerLayer)
+        playerLayer.player = player
+        playerLayer.videoGravity = .resizeAspect
     }
     required init?(coder: NSCoder) { fatalError() }
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        playerLayer.frame = bounds
-        CATransaction.commit()
-    }
 }
 
 private struct VideoLayerView: UIViewRepresentable {
@@ -263,20 +258,14 @@ struct PlayerView: View {
                     .ignoresSafeArea()
                 #endif
 
-                // [1.5] Thumbnail placeholder — hides the black AVPlayerLayer until the
-                // first frame is ready, then fades out.
+                // [1.5] Opaque cover — hides the black AVPlayerLayer until the first
+                // decodable frame is ready (or the resume seek lands). Fades out smoothly.
                 #if os(iOS)
-                if !videoReady, let imageUrl = context?.imageUrl, let url = URL(string: imageUrl) {
-                    AsyncImage(url: url) { phase in
-                        if let img = phase.image {
-                            img.resizable().scaledToFill()
-                        } else {
-                            Color.black
-                        }
-                    }
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
+                if !videoReady {
+                    Color.black
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
                 }
                 #endif
 
@@ -662,7 +651,9 @@ struct PlayerView: View {
             DispatchQueue.main.async {
                 isPlaying = player.timeControlStatus != .paused
                 #if os(iOS)
-                if player.timeControlStatus == .playing && !videoReady {
+                // Only clear the cover here for fresh (non-resume) playback.
+                // Resume playback clears it in the seek completion handler below.
+                if player.timeControlStatus == .playing && !videoReady && context?.resumeFrom == nil {
                     withAnimation(.easeOut(duration: 0.4)) { videoReady = true }
                 }
                 #endif
@@ -674,10 +665,18 @@ struct PlayerView: View {
             guard !isScrubbing else { return }
             currentTime = time.seconds
             if let d = item?.duration, d.isNumeric { duration = d.seconds }
-            // Resume-seek: seek once to saved position when duration is first known
+            // Resume-seek: seek once to saved position when duration is first known.
+            // videoReady is cleared here (not in the rate observer) so the black cover
+            // stays up until the seek lands on the correct frame.
             if let resumeFrom = context?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
-                p.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600))
+                p.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600),
+                       toleranceBefore: .zero, toleranceAfter: .zero) { completed in
+                    guard completed else { return }
+                    #if os(iOS)
+                    withAnimation(.easeOut(duration: 0.4)) { videoReady = true }
+                    #endif
+                }
             }
             #if os(iOS)
             updateNowPlaying(player: p)
@@ -784,22 +783,75 @@ struct PlayerView: View {
 
 #if os(iOS)
 class PlayerHostingController<Content: View>: UIHostingController<Content> {
+    private var panCoordinator: DragToDismissCoordinator?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        // Remove safe area insets from SwiftUI layout so VideoLayerView fills edge-to-edge
+        safeAreaRegions = []
+
+        let coordinator = DragToDismissCoordinator(viewController: self)
+        panCoordinator = coordinator
+        let pan = UIPanGestureRecognizer(target: coordinator,
+                                         action: #selector(DragToDismissCoordinator.handlePan(_:)))
+        pan.cancelsTouchesInView = false
+        pan.delegate = coordinator
+        view.addGestureRecognizer(pan)
     }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        return PlayerPresenter.shared.orientationLock
+        PlayerPresenter.shared.orientationLock
     }
 
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
-        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
-        return forceLandscape ? .landscapeRight : .portrait
+        UserDefaults.standard.bool(forKey: "forceLandscape") ? .landscapeRight : .portrait
     }
 
     override var shouldAutorotate: Bool { true }
-
     override var prefersStatusBarHidden: Bool { true }
+}
+
+private final class DragToDismissCoordinator: NSObject, UIGestureRecognizerDelegate {
+    weak var viewController: UIViewController?
+
+    init(viewController: UIViewController) { self.viewController = viewController }
+
+    @objc func handlePan(_ gr: UIPanGestureRecognizer) {
+        guard let vc = viewController else { return }
+        let t = gr.translation(in: vc.view)
+        switch gr.state {
+        case .changed:
+            vc.view.transform = CGAffineTransform(translationX: 0, y: max(0, t.y))
+        case .ended, .cancelled:
+            let v = gr.velocity(in: vc.view)
+            if t.y > 150 || v.y > 800 {
+                UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseIn, animations: {
+                    vc.view.transform = CGAffineTransform(translationX: 0, y: vc.view.bounds.height)
+                }, completion: { _ in
+                    PlayerPresenter.shared.dragDismiss()
+                })
+            } else {
+                UIView.animate(withDuration: 0.4, delay: 0,
+                               usingSpringWithDamping: 0.75, initialSpringVelocity: 1,
+                               options: []) {
+                    vc.view.transform = .identity
+                }
+            }
+        default: break
+        }
+    }
+
+    func gestureRecognizerShouldBegin(_ gr: UIGestureRecognizer) -> Bool {
+        guard let pan = gr as? UIPanGestureRecognizer, let vc = viewController else { return true }
+        let v = pan.velocity(in: vc.view)
+        // Only fire when moving predominantly downward
+        return v.y > 0 && v.y > abs(v.x)
+    }
+
+    func gestureRecognizer(_ gr: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
 }
 #endif
