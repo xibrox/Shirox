@@ -251,22 +251,54 @@ struct PlayerView: View {
             // [1] VideoLayer (always present when player != nil)
             if let player {
                 #if os(iOS)
+                // [1] + [1.5] Video layer with loading cover as overlay.
+                // Overlay shares the video layer's frame — zero effect on sibling layout.
                 VideoLayerView(player: player, pipTrigger: pipTrigger)
                     .ignoresSafeArea()
+                    .overlay {
+                        ZStack {
+                            if let urlStr = context?.imageUrl, let url = URL(string: urlStr) {
+                                AsyncImage(url: url) { phase in
+                                    if let img = phase.image {
+                                        img
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .blur(radius: 30, opaque: true)
+                                    } else {
+                                        Color.black
+                                    }
+                                }
+                                .clipped()
+                            } else {
+                                Color.black
+                            }
+
+                            Color.black.opacity(0.6)
+
+                            VStack(spacing: 10) {
+                                Text(context?.mediaTitle ?? stream.title)
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                if let ep = context?.episodeNumber {
+                                    Text("Episode \(ep)")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.white.opacity(0.65))
+                                }
+                                ProgressView()
+                                    .tint(.white)
+                                    .padding(.top, 8)
+                            }
+                            .padding(.horizontal, 32)
+                        }
+                        .allowsHitTesting(!videoReady)
+                        .opacity(videoReady ? 0 : 1)
+                        .animation(.easeOut(duration: 0.4), value: videoReady)
+                    }
                 #else
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
-                #endif
-
-                // [1.5] Opaque cover — hides the black AVPlayerLayer until the first
-                // decodable frame is ready (or the resume seek lands). Fades out smoothly.
-                #if os(iOS)
-                if !videoReady {
-                    Color.black
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-                }
                 #endif
 
                 // [2] PlayerSubtitleOverlay (always visible, not behind lock/control hide)
@@ -654,7 +686,7 @@ struct PlayerView: View {
                 // Only clear the cover here for fresh (non-resume) playback.
                 // Resume playback clears it in the seek completion handler below.
                 if player.timeControlStatus == .playing && !videoReady && context?.resumeFrom == nil {
-                    withAnimation(.easeOut(duration: 0.4)) { videoReady = true }
+                    videoReady = true
                 }
                 #endif
             }
@@ -674,7 +706,7 @@ struct PlayerView: View {
                        toleranceBefore: .zero, toleranceAfter: .zero) { completed in
                     guard completed else { return }
                     #if os(iOS)
-                    withAnimation(.easeOut(duration: 0.4)) { videoReady = true }
+                    videoReady = true
                     #endif
                 }
             }

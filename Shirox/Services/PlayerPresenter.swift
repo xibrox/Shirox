@@ -68,16 +68,25 @@ final class PlayerPresenter: ObservableObject {
         self.playerVC = hostingController
         
         let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
-        updateOrientationLock(forceLandscape ? .landscape : .allButUpsideDown, shouldRotate: forceLandscape)
-        
-        topVC.present(hostingController, animated: true)
+        // Set the lock before presentation so supportedInterfaceOrientations is correct immediately.
+        // Defer the actual rotation request until after presentation completes to avoid the
+        // portrait → landscape → portrait flicker during the presentation animation.
+        self.orientationLock = forceLandscape ? .landscape : .allButUpsideDown
+
+        topVC.present(hostingController, animated: true) { [weak self] in
+            if forceLandscape {
+                self?.requestRotation(to: .landscapeRight)
+                self?.refreshSupportedOrientations()
+            }
+        }
     }
 
     func dismissPlayer() {
         guard let playerVC = playerVC else { return }
-
         playerVC.dismiss(animated: true) { [weak self] in
-            self?.resetToAppOrientation(shouldRotate: true)
+            // shouldRotate: false — refreshSupportedOrientations() is enough to let iOS
+            // auto-rotate to portrait naturally; forcing rotation here caused black bars.
+            self?.resetToAppOrientation(shouldRotate: false)
             self?.playerVC = nil
             self?.sourceView = nil
         }
@@ -88,7 +97,7 @@ final class PlayerPresenter: ObservableObject {
     func dragDismiss() {
         guard let playerVC = playerVC else { return }
         playerVC.dismiss(animated: false) { [weak self] in
-            self?.resetToAppOrientation(shouldRotate: true)
+            self?.resetToAppOrientation(shouldRotate: false)
             self?.playerVC = nil
             self?.sourceView = nil
         }
