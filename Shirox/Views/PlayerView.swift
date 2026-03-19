@@ -225,7 +225,7 @@ struct PlayerView: View {
     @State private var playbackSpeed: Float = 1.0
 
     // UI
-    @State private var showControls = true
+    @State private var showControls = false
     @State private var isLocked = false
     @State private var hideTask: Task<Void, Never>?
 
@@ -373,9 +373,27 @@ struct PlayerView: View {
                     .ignoresSafeArea()
                 #endif
 
-                // [4] Controls overlay (visible when showControls && !isLocked)
+                // [4] Shadow Overlay & Controls
                 if showControls && !isLocked {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .black.opacity(0.7), location: 0.0),
+                                    .init(color: .clear, location: 0.35),
+                                    .init(color: .clear, location: 0.65),
+                                    .init(color: .black.opacity(0.7), location: 1.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+
                     controlsOverlay
+                        .transition(.opacity)
                 }
 
                 // [4.5] Invisible always-tappable play/pause (works when overlay is hidden)
@@ -398,6 +416,7 @@ struct PlayerView: View {
                 loadingView
             }
         }
+        .ignoresSafeArea()
         .onAppear {
             setupPlayer()
             loadSubtitles()
@@ -457,30 +476,6 @@ struct PlayerView: View {
             #endif
 
             ZStack {
-                // Gradient overlays
-                VStack {
-                    Color.clear.frame(height: 120)
-                        .background(
-                            LinearGradient(
-                                colors: [.black.opacity(0.6), .clear],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .ignoresSafeArea()
-                        )
-                    Spacer()
-                    Color.clear.frame(height: 160)
-                        .background(
-                            LinearGradient(
-                                colors: [.clear, .black.opacity(0.6)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .ignoresSafeArea()
-                        )
-                }
-                .allowsHitTesting(false)
-
                 // Main vertical layout with top and bottom bars pinned to edges
                 VStack(spacing: 0) {
                     PlayerTopBar(
@@ -530,7 +525,9 @@ struct PlayerView: View {
                     Spacer(minLength: 0)
                 }
             }
+            .ignoresSafeArea()
         }
+        .ignoresSafeArea()
         .transition(.opacity)
         .animation(.easeInOut(duration: 0.2), value: showControls)
     }

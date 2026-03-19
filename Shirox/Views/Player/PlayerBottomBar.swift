@@ -40,7 +40,6 @@ struct PlayerBottomBar: View {
             .padding(.horizontal, 20)
         }
         .padding(.bottom, bottomPadding)
-        .background(bottomGradient)
     }
 
     // MARK: - Subviews
@@ -83,15 +82,6 @@ struct PlayerBottomBar: View {
                 .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)
-    }
-
-    private var bottomGradient: some View {
-        LinearGradient(
-            colors: [.clear, .black.opacity(0.7)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
     }
 
     // MARK: - Helpers

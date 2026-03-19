@@ -52,14 +52,6 @@ struct PlayerTopBar: View {
         .padding(.horizontal, 20)
         .padding(.top, topPadding)
         .padding(.bottom, 16)
-        .background(
-            LinearGradient(
-                colors: [.black.opacity(0.7), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
     }
 
     @ViewBuilder
