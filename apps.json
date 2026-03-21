@@ -29,10 +29,10 @@
         {
           "version": "beta",
           "buildVersion": "1",
-          "date": "2026-03-19",
+          "date": "2026-03-21",
           "localizedDescription": "Initial beta release.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 561792,
+          "size": 568237,
           "minOSVersion": "17.0"
         }
       ]
