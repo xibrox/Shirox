@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 @preconcurrency import JavaScriptCore
 
 /// A short-lived, standalone JS runner for a single module.
@@ -77,8 +78,8 @@ final class ModuleJSRunner {
     // MARK: - Streams
 
     func fetchStreams(episodeUrl: String) async throws -> [StreamResult] {
+        await WKWebsiteDataStore.default().removeData(ofTypes: [WKWebsiteDataTypeCookies], modifiedSince: .distantPast)
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
-        NetworkFetchManager.clearCookies()
         let json = try await callAsyncJS("extractStreamUrl", args: [episodeUrl])
         let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
 

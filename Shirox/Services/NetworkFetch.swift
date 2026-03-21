@@ -331,7 +331,7 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
 
     private func setupWebView() {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = WKWebsiteDataStore.nonPersistent()
+        // Use default (shared) store so cookies are preserved across sequential networkFetch calls within one module session
         #if os(iOS)
         config.allowsInlineMediaPlayback = true
         #endif
@@ -770,7 +770,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
 
     private func setupWebView() {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = WKWebsiteDataStore.nonPersistent()
+        // Use default (shared) store so cookies are preserved across sequential networkFetch calls within one module session
         #if os(iOS)
         config.allowsInlineMediaPlayback = true
         #endif
