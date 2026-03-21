@@ -36,6 +36,5 @@ extension JSEngine {
             }
             return EpisodeLink(number: number, href: href)
         }
-        .sorted { $0.number < $1.number }
     }
 }

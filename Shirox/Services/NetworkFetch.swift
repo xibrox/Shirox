@@ -621,6 +621,16 @@ class NetworkFetchManager: NSObject, ObservableObject {
             }
         }
     }
+
+    /// Clears all WKWebView cookies so a new module starts with a clean session.
+    static func clearCookies() async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            WKWebsiteDataStore.default().removeData(
+                ofTypes: [WKWebsiteDataTypeCookies],
+                modifiedSince: .distantPast
+            ) { cont.resume() }
+        }
+    }
 }
 
 // MARK: - NetworkFetchMonitor
