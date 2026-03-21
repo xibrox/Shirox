@@ -49,7 +49,6 @@ struct HomeView: View {
                     }
                     .coordinateSpace(name: "homeScroll")
                     .ignoresSafeArea(edges: .top)
-                    .refreshable { await vm.reload() }
                 }
             }
             .navigationTitle("")
@@ -89,11 +88,27 @@ private struct FeaturedCarousel: View {
                 let extraH: CGFloat = 80
                 let tabHeight = imageHeight + extraH + stretch
                 let tabOffset = min(0, -extraH / 2 - scrollUp * 0.3) - stretch
+                let screenW = UIScreen.main.bounds.width
 
-                TabView(selection: $selectedTab) {
-                    carouselPages(isWide: isIPad)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 0) {
+                        carouselPages(isWide: isIPad, width: screenW, height: tabHeight)
+                    }
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(
+                                key: CarouselOffsetKey.self,
+                                value: -geo.frame(in: .named("carousel")).minX
+                            )
+                        }
+                    )
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .coordinateSpace(name: "carousel")
+                .scrollTargetBehavior(.paging)
+                .onPreferenceChange(CarouselOffsetKey.self) { offset in
+                    let page = Int((offset / screenW).rounded())
+                    selectedTab = max(0, min(page, items.prefix(8).count - 1))
+                }
                 .frame(maxWidth: .infinity)
                 .frame(height: tabHeight)
                 .offset(y: tabOffset)
@@ -214,19 +229,25 @@ private struct FeaturedCarousel: View {
     }
 
     @ViewBuilder
-    private func carouselPages(isWide: Bool) -> some View {
+    private func carouselPages(isWide: Bool, width: CGFloat, height: CGFloat) -> some View {
         ForEach(Array(items.prefix(8).enumerated()), id: \.element.id) { index, media in
             NavigationLink {
                 AniListDetailView(mediaId: media.id, preloadedMedia: media)
             } label: {
                 FeaturedCard(media: media, isWide: isWide)
+                    .frame(width: width, height: height)
             }
             .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .tag(index)
         }
     }
 
+}
+
+// MARK: - Carousel scroll offset preference key
+
+private struct CarouselOffsetKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 // MARK: - Page Indicator (animated pill style)
@@ -316,7 +337,7 @@ private struct FeaturedCard: View {
                 Color.clear
                     .overlay(
                         GeometryReader { geo in
-                            let minX = geo.frame(in: .global).minX
+                            let minX = geo.frame(in: .named("carousel")).minX
                             let screenW = UIScreen.main.bounds.width
                             let extra: CGFloat = 80
                             let px = -(extra / 2) - minX * (extra / (2 * screenW))
