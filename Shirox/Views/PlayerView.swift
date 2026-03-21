@@ -667,6 +667,9 @@ struct PlayerView: View {
             asset = AVURLAsset(url: stream.url)
         }
         let item = AVPlayerItem(asset: asset)
+        if stream.subtitle != nil {
+            item.preferredAudioLanguage = "ja"
+        }
         let p = AVPlayer(playerItem: item)
         p.volume = volume
         p.usesExternalPlaybackWhileExternalScreenIsActive = true
