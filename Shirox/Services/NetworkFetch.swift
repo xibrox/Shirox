@@ -331,6 +331,7 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
 
     private func setupWebView() {
         let config = WKWebViewConfiguration()
+        config.websiteDataStore = WKWebsiteDataStore.nonPersistent()
         #if os(iOS)
         config.allowsInlineMediaPlayback = true
         #endif
@@ -769,6 +770,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
 
     private func setupWebView() {
         let config = WKWebViewConfiguration()
+        config.websiteDataStore = WKWebsiteDataStore.nonPersistent()
         #if os(iOS)
         config.allowsInlineMediaPlayback = true
         #endif
