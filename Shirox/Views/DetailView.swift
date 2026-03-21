@@ -5,6 +5,7 @@ struct DetailView: View {
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var synopsisExpanded = false
+    @State private var selectedSeason = 0
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -268,10 +269,28 @@ struct DetailView: View {
         }
     }
 
+    // MARK: - Season Detection
+
+    private func detectSeasons(_ episodes: [EpisodeLink]) -> [[EpisodeLink]] {
+        guard !episodes.isEmpty else { return [] }
+        var seasons: [[EpisodeLink]] = [[episodes[0]]]
+        for i in 1..<episodes.count {
+            if episodes[i].number <= episodes[i - 1].number {
+                seasons.append([])
+            }
+            seasons[seasons.count - 1].append(episodes[i])
+        }
+        return seasons.count > 1 ? seasons : [episodes]
+    }
+
     // MARK: - Episodes
 
     @ViewBuilder
     private func episodesSection(detail: MediaDetail) -> some View {
+        let seasons = detectSeasons(detail.episodes)
+        let isMultiSeason = seasons.count > 1
+        let visibleEpisodes = isMultiSeason ? seasons[min(selectedSeason, seasons.count - 1)] : detail.episodes
+
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
                 Capsule()
@@ -292,6 +311,32 @@ struct DetailView: View {
                 Spacer()
             }
 
+            if isMultiSeason {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(0..<seasons.count, id: \.self) { i in
+                            Button {
+                                selectedSeason = i
+                            } label: {
+                                Text("Season \(i + 1)")
+                                    .font(.subheadline.weight(.medium))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        selectedSeason == i
+                                            ? Color.accentColor
+                                            : Color.accentColor.opacity(0.12),
+                                        in: Capsule()
+                                    )
+                                    .foregroundStyle(selectedSeason == i ? .white : Color.accentColor)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
             #if os(iOS)
             watchButton(detail: detail)
             #endif
@@ -302,7 +347,7 @@ struct DetailView: View {
                     .foregroundStyle(.secondary)
             } else {
                 LazyVStack(spacing: 8) {
-                    ForEach(detail.episodes) { episode in
+                    ForEach(visibleEpisodes) { episode in
                         ModuleEpisodeRowContainer(
                             episode: episode,
                             mediaTitle: detail.title,

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SearchView: View {
     @StateObject private var vm = SearchViewModel()
+    @StateObject private var history = SearchHistoryManager()
     @EnvironmentObject private var moduleManager: ModuleManager
     @State private var showModuleList = false
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -26,6 +27,9 @@ struct SearchView: View {
         NavigationStack {
             Group {
                 if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
+                    if vm.query.isEmpty && !history.queries.isEmpty {
+                        historyView
+                    } else {
                     emptyStateView(
                         icon: usingModule ? "puzzlepiece.extension" : "magnifyingglass",
                         title: usingModule ? "Search via Module" : "Search Anime",
@@ -33,6 +37,7 @@ struct SearchView: View {
                             ? "Searching \(moduleManager.activeModule?.sourceName ?? "")…"
                             : "Find any anime via AniList"
                     )
+                    }
                 } else if vm.isLoading {
                     VStack(spacing: 12) {
                         ProgressView()
@@ -83,6 +88,7 @@ struct SearchView: View {
             .navigationTitle("Shirox")
             .searchable(text: $vm.query, prompt: "Search anime…")
             .onSubmit(of: .search) {
+                history.add(vm.query)
                 vm.search(usingModule: usingModule)
             }
             .onChange(of: vm.query) { _, new in
@@ -129,6 +135,39 @@ struct SearchView: View {
         }
     }
 
+    private var historyView: some View {
+        List {
+            Section {
+                ForEach(history.queries, id: \.self) { query in
+                    Button {
+                        vm.query = query
+                        history.add(query)
+                        vm.search(usingModule: usingModule)
+                    } label: {
+                        Label(query, systemImage: "clock")
+                            .foregroundStyle(.primary)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            history.remove(query)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Recent Searches")
+                    Spacer()
+                    Button("Clear All") { history.clear() }
+                        .font(.caption)
+                        .textCase(nil)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {
             Image(systemName: icon)
@@ -145,6 +184,37 @@ struct SearchView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Search History Manager
+
+private final class SearchHistoryManager: ObservableObject {
+    @Published private(set) var queries: [String] = []
+    private let key = "searchHistory"
+    private let maxItems = 20
+
+    init() {
+        queries = UserDefaults.standard.stringArray(forKey: key) ?? []
+    }
+
+    func add(_ query: String) {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
+        var updated = queries.filter { $0.lowercased() != q.lowercased() }
+        updated.insert(q, at: 0)
+        queries = Array(updated.prefix(maxItems))
+        UserDefaults.standard.set(queries, forKey: key)
+    }
+
+    func remove(_ query: String) {
+        queries.removeAll { $0 == query }
+        UserDefaults.standard.set(queries, forKey: key)
+    }
+
+    func clear() {
+        queries = []
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }
 
