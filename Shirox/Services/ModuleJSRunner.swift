@@ -20,6 +20,10 @@ final class ModuleJSRunner {
     // MARK: - Load module
 
     func load(module: ModuleDefinition) async throws {
+        // Clear cookies so previous module sessions don't bleed in
+        HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
+        NetworkFetchManager.clearCookies()
+
         guard let url = URL(string: module.scriptUrl) else {
             throw URLError(.badURL)
         }

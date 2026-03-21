@@ -83,9 +83,18 @@ private struct FeaturedCarousel: View {
             // Image carousel with vertical parallax
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("homeScroll")).minY
+                let parallaxFactor: CGFloat = 0.5
+                let parallaxBuffer: CGFloat = 60
+
                 let stretch = max(0, scrollY)
-                let tabHeight = imageHeight + stretch
-                let tabOffset = -stretch
+                let tabHeight = imageHeight + stretch + parallaxBuffer
+
+                // At rest: image sits parallaxBuffer above container (fills status-bar area).
+                // Pull-down: keep that buffer plus compensate for stretch.
+                // Scroll-up: image lags at parallaxFactor speed; clamp so top never drops below container top.
+                let tabOffset = scrollY >= 0
+                    ? -stretch - parallaxBuffer
+                    : -parallaxBuffer - scrollY * (1 - parallaxFactor)
 
                 TabView(selection: $selectedTab) {
                     carouselPages(isWide: isIPad)
@@ -310,16 +319,25 @@ private struct FeaturedCard: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // iPhone: portrait cover image, full bleed
-                AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                    default:
-                        Rectangle().fill(Color.gray.opacity(0.3))
+                // iPhone: portrait cover image with horizontal parallax.
+                // The image is made wider than the card by `buffer` so it never shows
+                // empty edges. During a page swipe, the card's global minX tells us
+                // how far it is from centre; the image is shifted at 0.25× that speed,
+                // making the incoming image appear to grow out from the middle.
+                GeometryReader { geo in
+                    let pageOffset = geo.frame(in: .global).minX
+                    let buffer: CGFloat = 100
+                    AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable().scaledToFill()
+                        default:
+                            Rectangle().fill(Color.gray.opacity(0.3))
+                        }
                     }
+                    .frame(width: geo.size.width + buffer, height: geo.size.height)
+                    .offset(x: -(buffer / 2) - pageOffset * 0.25)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
             }
 
