@@ -77,6 +77,8 @@ final class ModuleJSRunner {
     // MARK: - Streams
 
     func fetchStreams(episodeUrl: String) async throws -> [StreamResult] {
+        HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
+        NetworkFetchManager.clearCookies()
         let json = try await callAsyncJS("extractStreamUrl", args: [episodeUrl])
         let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
 
