@@ -47,13 +47,16 @@ struct HomeView: View {
                         }
                         .padding(.bottom, 24)
                     }
+                    .coordinateSpace(name: "homeScroll")
+                    .ignoresSafeArea(edges: .top)
                     .refreshable { await vm.reload() }
                 }
             }
-            .navigationTitle("Discover")
-            // #if os(iOS)
-            // .navigationBarTitleDisplayMode(.inline)
-            // #endif
+            .navigationTitle("")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            #endif
         }
         .task { await vm.load() }
         .onAppear {
@@ -70,26 +73,40 @@ private struct FeaturedCarousel: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        VStack(spacing: 12) {
-            #if os(iOS)
-            let isIPad = sizeClass == .regular
-            let paddedWidth = UIScreen.main.bounds.width - 32
+        #if os(iOS)
+        let isIPad = sizeClass == .regular
+        let carouselHeight = isIPad
+            ? UIScreen.main.bounds.width * (9.0 / 16.0)
+            : UIScreen.main.bounds.height * 0.82
 
-            if isIPad {
-                TabView(selection: $selectedTab) { carouselPages(isWide: true) }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .padding(.horizontal, 16)
-            } else {
-                TabView(selection: $selectedTab) { carouselPages(isWide: false) }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .frame(width: paddedWidth)
-                    .aspectRatio(2/3, contentMode: .fit)
+        GeometryReader { proxy in
+            let scrollY = proxy.frame(in: .named("homeScroll")).minY
+            let stretch = max(0, scrollY)        // pull-down stretch
+            let scrollUp = min(0, scrollY)       // scroll-up parallax
+            let extraH: CGFloat = 80
+            // Pull-down: image anchors to top, TabView grows downward
+            // Scroll-up: image shifts down relative to carousel (appears to move slower)
+            let tabHeight = carouselHeight + extraH + stretch
+            let tabOffset = -extraH / 2 - scrollUp * 0.3 - stretch
+
+            TabView(selection: $selectedTab) {
+                carouselPages(isWide: isIPad)
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(maxWidth: .infinity)
+            .frame(height: tabHeight)
+            .offset(y: tabOffset)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: carouselHeight)
+        .clipped()
+        .overlay(alignment: .bottom) {
+            carouselHUD(isIPad: isIPad)
+        }
 
-            #else
-            // macOS: use GeometryReader to get available width, then size TabView accordingly
+        #else
+        // macOS: use GeometryReader to get available width, then size TabView accordingly
+        ZStack(alignment: .bottom) {
             GeometryReader { geometry in
                 let availableWidth = geometry.size.width
                 let cardWidth = max(0, availableWidth - 32)
@@ -107,19 +124,20 @@ private struct FeaturedCarousel: View {
                         .tag(index)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never)) // enables swiping on macOS
+                .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(width: availableWidth, height: cardHeight)
                 .position(x: availableWidth / 2, y: cardHeight / 2)
             }
-            .frame(height: (NSScreen.main?.frame.width ?? 800) * (9.0 / 16.0)) // fallback height
-            #endif
+            .frame(height: (NSScreen.main?.frame.width ?? 800) * (9.0 / 16.0))
 
             PageIndicator(
                 numberOfPages: min(items.count, 8),
                 currentPage: selectedTab
             )
+            .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)
+        #endif
     }
 
     @ViewBuilder
@@ -131,11 +149,103 @@ private struct FeaturedCarousel: View {
                 FeaturedCard(media: media, isWide: isWide)
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .tag(index)
         }
     }
+
+    // Independent HUD: gradient + text + indicator, layered over the image
+    @ViewBuilder
+    private func carouselHUD(isIPad: Bool) -> some View {
+        #if os(iOS)
+        let current = items[min(selectedTab, items.count - 1)]
+        ZStack(alignment: .bottom) {
+            // Gradient extends 40pt below the carousel frame to cover image overflow
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black.opacity(0.45), location: 0.35),
+                    .init(color: .black.opacity(0.92), location: 0.7),
+                    .init(color: Color(UIColor.systemBackground), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 260)
+
+            VStack(alignment: .leading, spacing: 6) {
+                if isIPad {
+                    HStack(alignment: .bottom, spacing: 12) {
+                        AsyncImage(url: URL(string: current.coverImage.best ?? "")) { phase in
+                            switch phase {
+                            case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
+                            default: Rectangle().fill(Color.gray.opacity(0.3))
+                            }
+                        }
+                        .frame(width: 80, height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .shadow(radius: 4)
+                        itemTextContent(current)
+                    }
+                } else {
+                    itemTextContent(current)
+                }
+                PageIndicator(
+                    numberOfPages: min(items.count, 8),
+                    currentPage: selectedTab
+                )
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 6)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
+        }
+        .frame(maxWidth: .infinity)
+        .allowsHitTesting(false)
+        #endif
+    }
+
+    #if os(iOS)
+    @ViewBuilder
+    private func itemTextContent(_ media: AniListMedia) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(media.title.displayTitle)
+                .font(.title2).fontWeight(.bold)
+                .foregroundStyle(.white)
+                .lineLimit(2)
+
+            if let desc = media.plainDescription, !desc.isEmpty {
+                Text(desc)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(2)
+            }
+
+            HStack(spacing: 8) {
+                if let score = media.averageScore {
+                    Label("\(score)%", systemImage: "star.fill")
+                        .font(.caption).fontWeight(.semibold)
+                        .foregroundStyle(.yellow)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                if let genres = media.genres, !genres.isEmpty {
+                    ForEach(genres.prefix(2), id: \.self) { genre in
+                        Text(genre)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(.white.opacity(0.15), in: Capsule())
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    #endif
 }
 
 // MARK: - Page Indicator (animated pill style)
@@ -181,18 +291,33 @@ private struct FeaturedCard: View {
                 Color.clear
                     .overlay(
                         ZStack {
-                            if let banner = media.bannerImage, let url = URL(string: banner) {
-                                AsyncImage(url: url) { phase in
-                                    switch phase {
-                                    case .success(let img): img.resizable().scaledToFill()
-                                    default: coverFallback
+                            GeometryReader { geo in
+                                let minX = geo.frame(in: .global).minX
+                                let screenW = UIScreen.main.bounds.width
+                                let extra: CGFloat = 80
+                                let px = -(extra / 2) - minX * (extra / (2 * screenW))
+
+                                if let banner = media.bannerImage, let url = URL(string: banner) {
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .success(let img):
+                                            img.resizable()
+                                                .scaledToFill()
+                                                .frame(width: geo.size.width + extra, height: geo.size.height)
+                                                .offset(x: px)
+                                        default:
+                                            coverFallback
+                                                .frame(width: geo.size.width + extra, height: geo.size.height)
+                                                .offset(x: px)
+                                        }
                                     }
+                                    .clipped()
+                                } else {
+                                    coverFallback
+                                        .frame(width: geo.size.width + extra, height: geo.size.height)
+                                        .offset(x: px)
+                                        .clipped()
                                 }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .clipped()
-                            } else {
-                                coverFallback
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
 
                             LinearGradient(
@@ -207,57 +332,32 @@ private struct FeaturedCard: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     )
-                    .overlay(alignment: .bottomLeading) {
-                        HStack(alignment: .bottom, spacing: 12) {
-                            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                                switch phase {
-                                case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
-                                default: Rectangle().fill(Color.gray.opacity(0.3))
-                                }
-                            }
-                            .frame(width: 80, height: 120)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 4)
-
-                            textContent
-                        }
-                        .padding(16)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // iPhone: portrait cover image
+                // iPhone: portrait cover image with horizontal parallax (gradient + text in carouselHUD)
                 Color.clear
                     .overlay(
-                        ZStack {
+                        GeometryReader { geo in
+                            let minX = geo.frame(in: .global).minX
+                            let screenW = UIScreen.main.bounds.width
+                            let extra: CGFloat = 80
+                            let px = -(extra / 2) - minX * (extra / (2 * screenW))
+
                             AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
                                 switch phase {
                                 case .success(let img):
-                                    img.resizable().scaledToFill()
+                                    img.resizable()
+                                        .scaledToFill()
+                                        .frame(width: geo.size.width + extra, height: geo.size.height)
+                                        .offset(x: px)
                                 default:
                                     Rectangle().fill(Color.gray.opacity(0.3))
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 }
                             }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
-
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .clear, location: 0.1),
-                                    .init(color: .black.opacity(0.15), location: 0.45),
-                                    .init(color: .black.opacity(0.97), location: 1)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     )
-                    .overlay(alignment: .bottomLeading) {
-                        textContent
-                            .padding(16)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 

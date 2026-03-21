@@ -21,6 +21,7 @@ struct DetailView: View {
                 bodySection
             }
         }
+        .coordinateSpace(name: "detailScroll")
         .onAppear {
             PlayerPresenter.shared.resetToAppOrientation()
         }
@@ -62,20 +63,17 @@ struct DetailView: View {
                 Image(systemName: "play.fill")
                     .font(.system(size: 13, weight: .bold))
                 Text(label)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
-            .background(
-                LinearGradient(
-                    colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                in: RoundedRectangle(cornerRadius: 26)
+            .frame(height: 46)
+            .background(Color.accentColor.opacity(0.12), in: Capsule())
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1)
             )
-            .shadow(color: Color.accentColor.opacity(0.3), radius: 10, y: 4)
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.accentColor)
         }
         .buttonStyle(.plain)
         .disabled(detail.episodes.isEmpty && item == nil)
@@ -114,19 +112,29 @@ struct DetailView: View {
 
     private var heroSection: some View {
         ZStack(alignment: .bottom) {
-            // Background image
-            AsyncImage(url: URL(string: item.image)) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().aspectRatio(contentMode: .fill)
-                case .failure:
-                    Rectangle().fill(Color.secondary.opacity(0.2))
-                default:
-                    Rectangle().fill(Color.secondary.opacity(0.15))
+            // Background image with parallax
+            GeometryReader { proxy in
+                let scrollY = proxy.frame(in: .named("detailScroll")).minY
+                let stretch = max(0, scrollY)
+                let parallax = min(0, scrollY) * 0.4
+                let imageH = 420 + stretch + max(0, -parallax)
+                let imageY = parallax - stretch
+
+                AsyncImage(url: URL(string: item.image)) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().aspectRatio(contentMode: .fill)
+                    case .failure:
+                        Rectangle().fill(Color.secondary.opacity(0.2))
+                    default:
+                        Rectangle().fill(Color.secondary.opacity(0.15))
+                    }
                 }
+                .frame(width: proxy.size.width, height: imageH)
+                .clipped()
+                .offset(y: imageY)
             }
-            .frame(height: 340)
-            .clipped()
+            .frame(height: 420)
 
             LinearGradient(
                 stops: [
@@ -137,7 +145,7 @@ struct DetailView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 340)
+            .frame(height: 420)
 
             // Floating poster + metadata
             HStack(alignment: .bottom, spacing: 14) {
