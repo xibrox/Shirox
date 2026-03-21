@@ -26,7 +26,7 @@ final class JSEngine: ObservableObject {
     func loadModule(_ module: ModuleDefinition) async throws {
         // Clear cookies so the previous module's session doesn't bleed into this one
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
-        await NetworkFetchManager.clearCookies()
+        NetworkFetchManager.clearCookies()
 
         guard let url = URL(string: module.scriptUrl) else {
             throw URLError(.badURL)
