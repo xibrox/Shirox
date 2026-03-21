@@ -84,10 +84,8 @@ private struct FeaturedCarousel: View {
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("homeScroll")).minY
                 let stretch = max(0, scrollY)
-                let scrollDown = max(0, -scrollY)
-                let extraH: CGFloat = 80
-                let tabHeight = imageHeight + extraH + stretch
-                let tabOffset = scrollDown * 0.5 - stretch
+                let tabHeight = imageHeight + stretch
+                let tabOffset = -stretch
 
                 TabView(selection: $selectedTab) {
                     carouselPages(isWide: isIPad)
@@ -312,31 +310,17 @@ private struct FeaturedCard: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // iPhone: portrait cover image with horizontal parallax (gradient + text in carouselHUD)
-                Color.clear
-                    .overlay(
-                        GeometryReader { geo in
-                            let minX = geo.frame(in: .named("carousel")).minX
-                            let screenW = UIScreen.main.bounds.width
-                            let extra: CGFloat = 80
-                            let px = -(extra / 2) - minX * (extra / (2 * screenW))
-
-                            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                                switch phase {
-                                case .success(let img):
-                                    img.resizable()
-                                        .scaledToFill()
-                                        .frame(width: geo.size.width + extra, height: geo.size.height)
-                                        .offset(x: px)
-                                default:
-                                    Rectangle().fill(Color.gray.opacity(0.3))
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                }
-                            }
-                            .clipped()
-                        }
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // iPhone: portrait cover image, full bleed
+                AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                    default:
+                        Rectangle().fill(Color.gray.opacity(0.3))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
             }
 
             #else
