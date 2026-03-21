@@ -4,15 +4,23 @@ import SwiftUI
 
 struct ContinueWatchingSection: View {
     let items: [ContinueWatchingItem]
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var cardWidth: CGFloat {
+        sizeClass == .regular ? 190 : 155
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: 18)
-                Text("Continue Watching")
-                    .font(.title3.weight(.bold))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Continue Watching")
+                        .font(.title2.weight(.heavy))
+                        .tracking(0.3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor.opacity(0.9))
+                        .frame(width: 36, height: 3)
+                }
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -21,6 +29,7 @@ struct ContinueWatchingSection: View {
                 HStack(spacing: 12) {
                     ForEach(items) { item in
                         itemView(for: item)
+                            .frame(width: cardWidth)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -105,52 +114,57 @@ struct ContinueWatchingCardDisplay: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Thumbnail — URLSession-based loader avoids AsyncImage identity issues
-            CardThumbnail(urlString: item.imageUrl)
-                .frame(width: 120, height: 175)
-                .clipped()
-                .cornerRadius(12)
+        Color.clear
+            .aspectRatio(2/3, contentMode: .fit)
+            .overlay(
+                ZStack(alignment: .bottom) {
+                    CardThumbnail(urlString: item.imageUrl)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
 
-            // Gradient + labels
-            VStack(alignment: .leading, spacing: 2) {
-                Spacer()
-                Text(item.mediaTitle)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text("Ep \(item.episodeNumber)")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.7))
+                    // Gradient + labels (same style as AniListCardView)
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.5),
+                            .init(color: .black.opacity(0.92), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                if item.streamUrl.isEmpty {
-                    Text("Up Next")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.85))
-                } else {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.white.opacity(0.3))
-                            Capsule().fill(Color.accentColor)
-                                .frame(width: geo.size.width * progress)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.mediaTitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                        Text("Ep \(item.episodeNumber)")
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.7))
+
+                        if item.streamUrl.isEmpty {
+                            Text("Up Next")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.white.opacity(0.85))
+                        } else {
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.white.opacity(0.3))
+                                    Capsule().fill(Color.accentColor)
+                                        .frame(width: geo.size.width * progress)
+                                }
+                                .frame(height: 3)
+                            }
+                            .frame(height: 3)
                         }
-                        .frame(height: 3)
                     }
-                    .frame(height: 3)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }
-            .padding(8)
-            .frame(width: 120)
-            .background(
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.88)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .cornerRadius(12)
             )
-        }
-        .frame(width: 120, height: 175)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
     }
 }
 

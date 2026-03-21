@@ -45,7 +45,7 @@ struct HomeView: View {
                                 AnimeSection(title: "Top Rated",        items: vm.topRated, category: .topRated)
                             }
                         }
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 28)
                     }
                     .coordinateSpace(name: "homeScroll")
                     .ignoresSafeArea(edges: .top)
@@ -75,33 +75,106 @@ private struct FeaturedCarousel: View {
     var body: some View {
         #if os(iOS)
         let isIPad = sizeClass == .regular
-        let carouselHeight = isIPad
+        let imageHeight: CGFloat = isIPad
             ? UIScreen.main.bounds.width * (9.0 / 16.0)
-            : UIScreen.main.bounds.height * 0.82
+            : 540
+        let current = items[min(selectedTab, items.count - 1)]
 
-        GeometryReader { proxy in
-            let scrollY = proxy.frame(in: .named("homeScroll")).minY
-            let stretch = max(0, scrollY)        // pull-down stretch
-            let scrollUp = min(0, scrollY)       // scroll-up parallax
-            let extraH: CGFloat = 80
-            // Pull-down: image anchors to top, TabView grows downward
-            // Scroll-up: image shifts down relative to carousel (appears to move slower)
-            let tabHeight = carouselHeight + extraH + stretch
-            let tabOffset = -extraH / 2 - scrollUp * 0.3 - stretch
+        VStack(spacing: 0) {
+            // Image carousel with parallax
+            GeometryReader { proxy in
+                let scrollY = proxy.frame(in: .named("homeScroll")).minY
+                let stretch = max(0, scrollY)
+                let scrollUp = min(0, scrollY)
+                let extraH: CGFloat = 80
+                let tabHeight = imageHeight + extraH + stretch
+                let tabOffset = min(0, -extraH / 2 - scrollUp * 0.3) - stretch
 
-            TabView(selection: $selectedTab) {
-                carouselPages(isWide: isIPad)
+                TabView(selection: $selectedTab) {
+                    carouselPages(isWide: isIPad)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(maxWidth: .infinity)
+                .frame(height: tabHeight)
+                .offset(y: tabOffset)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
             .frame(maxWidth: .infinity)
-            .frame(height: tabHeight)
-            .offset(y: tabOffset)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: carouselHeight)
-        .clipped()
-        .overlay(alignment: .bottom) {
-            carouselHUD(isIPad: isIPad)
+            .frame(height: imageHeight)
+            .mask(alignment: .bottom) {
+                Rectangle()
+                    .frame(height: imageHeight + 2000)
+            }
+            .overlay(alignment: .bottom) {
+                ZStack(alignment: .bottom) {
+                    // Gradient: clear → systemBackground (adapts to light/dark mode)
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: Color(UIColor.systemBackground).opacity(0.5), location: 0.38),
+                            .init(color: Color(UIColor.systemBackground).opacity(0.88), location: 0.68),
+                            .init(color: Color(UIColor.systemBackground), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 360)
+                    .allowsHitTesting(false)
+
+                    // Luna-style centered content: genres · title · overview · Watch button
+                    VStack(spacing: 10) {
+                        if let genres = current.genres, !genres.isEmpty {
+                            HStack(spacing: 6) {
+                                ForEach(genres.prefix(3), id: \.self) { g in
+                                    Text(g)
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.primary.opacity(0.8))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(Color.primary.opacity(0.1), in: Capsule())
+                                }
+                            }
+                        }
+
+                        Text(current.title.displayTitle)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+
+                        if let desc = current.plainDescription, !desc.isEmpty {
+                            Text(String(desc.prefix(120)) + (desc.count > 120 ? "…" : ""))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .padding(.horizontal, 8)
+                        }
+
+                        NavigationLink {
+                            AniListDetailView(mediaId: current.id, preloadedMedia: current)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "play.fill")
+                                    .font(.footnote.weight(.semibold))
+                                Text("Watch")
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundStyle(Color(UIColor.systemBackground))
+                            .frame(width: 130, height: 42)
+                            .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 18)
+                }
+            }
+
+            // Page indicator below the image, on systemBackground
+            PageIndicator(numberOfPages: min(items.count, 8), currentPage: selectedTab)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 10)
         }
 
         #else
@@ -154,98 +227,6 @@ private struct FeaturedCarousel: View {
         }
     }
 
-    // Independent HUD: gradient + text + indicator, layered over the image
-    @ViewBuilder
-    private func carouselHUD(isIPad: Bool) -> some View {
-        #if os(iOS)
-        let current = items[min(selectedTab, items.count - 1)]
-        ZStack(alignment: .bottom) {
-            // Gradient extends 40pt below the carousel frame to cover image overflow
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .black.opacity(0.45), location: 0.35),
-                    .init(color: .black.opacity(0.92), location: 0.7),
-                    .init(color: Color(UIColor.systemBackground), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 260)
-
-            VStack(alignment: .leading, spacing: 6) {
-                if isIPad {
-                    HStack(alignment: .bottom, spacing: 12) {
-                        AsyncImage(url: URL(string: current.coverImage.best ?? "")) { phase in
-                            switch phase {
-                            case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
-                            default: Rectangle().fill(Color.gray.opacity(0.3))
-                            }
-                        }
-                        .frame(width: 80, height: 120)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .shadow(radius: 4)
-                        itemTextContent(current)
-                    }
-                } else {
-                    itemTextContent(current)
-                }
-                PageIndicator(
-                    numberOfPages: min(items.count, 8),
-                    currentPage: selectedTab
-                )
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, 6)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 20)
-        }
-        .frame(maxWidth: .infinity)
-        .allowsHitTesting(false)
-        #endif
-    }
-
-    #if os(iOS)
-    @ViewBuilder
-    private func itemTextContent(_ media: AniListMedia) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(media.title.displayTitle)
-                .font(.title2).fontWeight(.bold)
-                .foregroundStyle(.white)
-                .lineLimit(2)
-
-            if let desc = media.plainDescription, !desc.isEmpty {
-                Text(desc)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(2)
-            }
-
-            HStack(spacing: 8) {
-                if let score = media.averageScore {
-                    Label("\(score)%", systemImage: "star.fill")
-                        .font(.caption).fontWeight(.semibold)
-                        .foregroundStyle(.yellow)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
-                if let genres = media.genres, !genres.isEmpty {
-                    ForEach(genres.prefix(2), id: \.self) { genre in
-                        Text(genre)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.white.opacity(0.15), in: Capsule())
-                            .lineLimit(1)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-    #endif
 }
 
 // MARK: - Page Indicator (animated pill style)
@@ -258,14 +239,11 @@ private struct PageIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<numberOfPages, id: \.self) { index in
                 Capsule()
-                    .fill(index == currentPage ? Color.accentColor : Color.white.opacity(0.3))
+                    .fill(index == currentPage ? Color.accentColor : Color.primary.opacity(0.25))
                     .frame(width: index == currentPage ? 20 : 5, height: 5)
                     .animation(.easeInOut(duration: 0.25), value: currentPage)
             }
         }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 9)
-        .background(.black.opacity(0.5), in: Capsule())
     }
 }
 
@@ -508,31 +486,37 @@ private struct AnimeSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: 18)
-                Text(title)
-                    .font(.title3.weight(.bold))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.title2.weight(.heavy))
+                        .tracking(0.3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor.opacity(0.9))
+                        .frame(width: 36, height: 3)
+                }
                 Spacer()
                 NavigationLink {
                     BrowseView(category: category)
                 } label: {
-                    HStack(spacing: 2) {
-                        Text("More")
-                            .font(.subheadline.weight(.medium))
+                    HStack(spacing: 3) {
+                        Text("See all")
+                            .font(.subheadline.weight(.semibold))
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                     }
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.07), in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 16) {
+                LazyHStack(spacing: 12) {
                     ForEach(items) { media in
                         NavigationLink {
                             AniListDetailView(mediaId: media.id, preloadedMedia: media)
