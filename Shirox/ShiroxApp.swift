@@ -60,6 +60,7 @@ struct ShiroxApp: App {
                 SettingsView()
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             }
+            .tint(.red)
             .environmentObject(moduleManager)
             .task {
                 await moduleManager.restoreActiveModule()

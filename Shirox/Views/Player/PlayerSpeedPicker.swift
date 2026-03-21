@@ -18,7 +18,7 @@ struct PlayerSpeedPicker: View {
                         Spacer()
                         if speed == selectedSpeed {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(.red)
                         }
                     }
                 }

@@ -178,9 +178,9 @@ private func heroSection(media: AniListMedia) -> some View {
         GeometryReader { proxy in
             let scrollY = proxy.frame(in: .named("heroScroll")).minY
             let stretch = max(0, scrollY)
-            let parallax = min(0, scrollY) * 0.4
-            let imageH = 420 + stretch + max(0, -parallax)
-            let imageY = parallax - stretch
+            let scrollDown = max(0, -scrollY)
+            let imageH = 420 + stretch + scrollDown * 0.5
+            let imageY = scrollDown * 0.5 - stretch
 
             AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
                 switch phase {
@@ -195,6 +195,7 @@ private func heroSection(media: AniListMedia) -> some View {
             .offset(y: imageY)
         }
         .frame(height: 420)
+        .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
 
         LinearGradient(
             stops: [
