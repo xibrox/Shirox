@@ -105,7 +105,16 @@ final class PlayerPresenter: ObservableObject {
     }
 
     private var currentInterfaceOrientation: UIInterfaceOrientation {
-        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation ?? .portrait
+        // UIDevice.current.orientation is device-level and works inside LiveContainer.
+        // Note: device landscape axes are flipped relative to interface axes.
+        switch UIDevice.current.orientation {
+        case .landscapeLeft:      return .landscapeRight
+        case .landscapeRight:     return .landscapeLeft
+        case .portraitUpsideDown: return .portraitUpsideDown
+        default:
+            // .unknown / .faceUp / .faceDown — fall back to scene
+            return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation ?? .portrait
+        }
     }
 
     /// If the user exits the player while in landscape, stay in that landscape side.
