@@ -54,6 +54,7 @@ final class PlayerPresenter: ObservableObject {
             context: context
         )
         .ignoresSafeArea()
+        .tint(.red)
         
         let hostingController = PlayerHostingController(rootView: playerView)
         hostingController.modalPresentationStyle = .fullScreen

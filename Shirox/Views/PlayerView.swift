@@ -488,7 +488,7 @@ struct PlayerView: View {
                             Spacer()
                             if option == selected {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(.blue)
+                                    .foregroundStyle(.red)
                             }
                         }
                         .padding(.horizontal, 20)

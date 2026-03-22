@@ -58,16 +58,19 @@ struct AniListDetailView: View {
                     vm.onStreamsLoaded(streams)
                 }
                 .environmentObject(moduleManager)
+                .tint(.red)
             }
         }
         // Final stream picker
         .sheet(isPresented: $vm.showFinalStreamPicker) {
             AniListStreamResultSheet(
                 episodeNumber: vm.selectedEpisodeNumber ?? 0,
-                streams: vm.pendingStreams
-            ) { stream, sourceView in
-                vm.selectStream(stream, from: sourceView)
-            }
+                streams: vm.pendingStreams,
+                onSelect: { stream, sourceView in
+                    vm.selectStream(stream, from: sourceView)
+                }
+            )
+            .tint(.red)
         }
     }
 

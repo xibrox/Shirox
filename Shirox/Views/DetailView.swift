@@ -35,6 +35,7 @@ struct DetailView: View {
         .onAppear { vm.load(item: item) }
         .sheet(isPresented: $vm.showStreamPicker) {
             StreamPickerView(vm: vm)
+                .tint(.red)
         }
     }
 
