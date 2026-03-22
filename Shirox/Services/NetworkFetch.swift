@@ -483,7 +483,7 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
                         }
                     }
                 });
-                const clickableSelectors = ['button', '.play', '.play-button', '[data-play]', '.video-play', '.jwplayer', '.player', '[id*="player"]', '[class*="play"]', 'div[onclick]', 'span[onclick]', 'a[onclick]'];
+                const clickableSelectors = ['.play', '.play-button', '[data-play]', '.video-play', '.jwplayer', '[id*="player"]', 'div[onclick]', 'span[onclick]', 'a[onclick]'];
                 clickableSelectors.forEach(function(selector) {
                     document.querySelectorAll(selector).forEach(function(el) {
                         try { el.click(); } catch(e) {}
@@ -969,12 +969,6 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
                         }
                     }
                 });
-                const clickableSelectors = ['button', '.play', '.play-button', '[data-play]', '.video-play', '.jwplayer', '.player', '[id*="player"]', '[class*="play"]', 'div[onclick]', 'span[onclick]', 'a[onclick]'];
-                clickableSelectors.forEach(function(selector) {
-                    document.querySelectorAll(selector).forEach(function(el) {
-                        try { el.click(); } catch(e) {}
-                    });
-                });
             };
             setTimeout(nuclearScan, 500);
             setTimeout(nuclearScan, 1500);
@@ -1000,20 +994,56 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         request.setValue("en-US,en;q=0.5", forHTTPHeaderField: "Accept-Language")
         request.setValue("gzip, deflate, br", forHTTPHeaderField: "Accept-Encoding")
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        for (key, value) in headers {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-        webView.load(request)
 
-        if !options.clickSelectors.isEmpty || !options.waitForSelectors.isEmpty {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                self.triggerClickAndWait()
-            }
-        } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.simulateUserInteraction()
+        // WKWebView ignores Cookie headers set on URLRequest — inject via WKHTTPCookieStore instead
+        var cookiesToInject: [HTTPCookie] = []
+        for (key, value) in headers {
+            if key.lowercased() == "cookie", let host = url.host {
+                for part in value.split(separator: ";") {
+                    let s = String(part).trimmingCharacters(in: .whitespaces)
+                    let kv = s.split(separator: "=", maxSplits: 1).map(String.init)
+                    if kv.count == 2,
+                       let cookie = HTTPCookie(properties: [
+                           .name: kv[0].trimmingCharacters(in: .whitespaces),
+                           .value: kv[1].trimmingCharacters(in: .whitespaces),
+                           .domain: host,
+                           .path: "/",
+                           .secure: "TRUE"
+                       ]) {
+                        cookiesToInject.append(cookie)
+                    }
+                }
+            } else {
+                request.setValue(value, forHTTPHeaderField: key)
             }
         }
+
+        let doLoad = { [weak self] in
+            guard let self else { return }
+            self.webView?.load(request)
+            if !options.clickSelectors.isEmpty || !options.waitForSelectors.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    self?.triggerClickAndWait()
+                }
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    self?.simulateUserInteraction()
+                }
+            }
+        }
+
+        if cookiesToInject.isEmpty {
+            doLoad()
+            return
+        }
+
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        let group = DispatchGroup()
+        for cookie in cookiesToInject {
+            group.enter()
+            cookieStore.setCookie(cookie) { group.leave() }
+        }
+        group.notify(queue: .main, execute: doLoad)
     }
 
     private func loadHTMLContent(_ html: String) {
