@@ -228,15 +228,12 @@ private struct FeaturedCarousel: View {
     @ViewBuilder
     private func carouselPages(isWide: Bool) -> some View {
         ForEach(0..<min(items.count, 8), id: \.self) { index in
-            let media = items[index]
-            NavigationLink {
-                AniListDetailView(mediaId: media.id, preloadedMedia: media)
-            } label: {
-                FeaturedCard(media: media, isWide: isWide)
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .tag(index)
+            // Non-interactive: the parallax TabView bleeds below its visible frame when
+            // scrolled, and NavigationLinks in that bleed area intercept touches on content
+            // below the carousel. Navigation is handled by the Watch button in the overlay.
+            FeaturedCard(media: items[index], isWide: isWide)
+                .allowsHitTesting(false)
+                .tag(index)
         }
     }
 

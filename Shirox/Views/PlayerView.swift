@@ -298,7 +298,8 @@ struct PlayerView: View {
                             }
                             .padding(.horizontal, 32)
                         }
-                        .allowsHitTesting(!videoReady)
+                        // Purely visual — UIKit pan gesture (drag-to-dismiss) must not be blocked.
+                        .allowsHitTesting(false)
                         .opacity(videoReady ? 0 : 1)
                         .animation(.easeOut(duration: 0.4), value: videoReady)
                     }
@@ -317,24 +318,27 @@ struct PlayerView: View {
                 .allowsHitTesting(false)
 
                 // [3] PlayerDoubleTapSeek (full-screen, transparent, owns ALL tap logic)
-                PlayerDoubleTapSeek(
-                    onSingleTap: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showControls.toggle()
-                        }
-                        if showControls { scheduleHide() }
-                    },
-                    onSeekBackward: {
-                        skip(by: -Double(skipShort))
-                        scheduleHide()
-                    },
-                    onSeekForward: {
-                        skip(by: Double(skipShort))
-                        scheduleHide()
-                    },
-                    seekAmount: Double(skipShort)
-                )
-                .ignoresSafeArea()
+                // Disabled while loading so the only interactive control is the dismiss button.
+                if controlsEnabled {
+                    PlayerDoubleTapSeek(
+                        onSingleTap: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showControls.toggle()
+                            }
+                            if showControls { scheduleHide() }
+                        },
+                        onSeekBackward: {
+                            skip(by: -Double(skipShort))
+                            scheduleHide()
+                        },
+                        onSeekForward: {
+                            skip(by: Double(skipShort))
+                            scheduleHide()
+                        },
+                        seekAmount: Double(skipShort)
+                    )
+                    .ignoresSafeArea()
+                }
 
                 // [3.5] Speed boost badge (iOS only)
                 #if os(iOS)
@@ -359,28 +363,30 @@ struct PlayerView: View {
                 }
 
                 // [3.6] Speed boost long-press handler (single-touch only)
-                SpeedBoostOverlay(
-                    isLocked: isLocked,
-                    onBegan: {
-                        isSpeedBoosted = true
-                        player.rate = 2.0
-                    },
-                    onEnded: {
-                        if isSpeedBoosted {
-                            isSpeedBoosted = false
-                            player.rate = isPlaying ? playbackSpeed : 0
+                if controlsEnabled {
+                    SpeedBoostOverlay(
+                        isLocked: isLocked,
+                        onBegan: {
+                            isSpeedBoosted = true
+                            player.rate = 2.0
+                        },
+                        onEnded: {
+                            if isSpeedBoosted {
+                                isSpeedBoosted = false
+                                player.rate = isPlaying ? playbackSpeed : 0
+                            }
                         }
-                    }
-                )
-                .ignoresSafeArea()
-
-                // [3.7] Two-finger tap → play/pause
-                TwoFingerTapOverlay(isLocked: isLocked, onTap: togglePlayPause)
+                    )
                     .ignoresSafeArea()
+
+                    // [3.7] Two-finger tap → play/pause
+                    TwoFingerTapOverlay(isLocked: isLocked, onTap: togglePlayPause)
+                        .ignoresSafeArea()
+                }
                 #endif
 
                 // [4] Shadow Overlay & Controls
-                if showControls && !isLocked {
+                if showControls && !isLocked && controlsEnabled {
                     Rectangle()
                         .fill(
                             LinearGradient(
@@ -403,7 +409,7 @@ struct PlayerView: View {
                 }
 
                 // [4.5] Invisible always-tappable play/pause (works when overlay is hidden)
-                if !isLocked {
+                if !isLocked && controlsEnabled {
                     Button(action: togglePlayPause) {
                         Color.clear
                             .frame(width: 72, height: 72)
@@ -413,9 +419,42 @@ struct PlayerView: View {
                 }
 
                 // [5] Lock overlay (visible when isLocked)
-                if isLocked {
+                if isLocked && controlsEnabled {
                     lockOverlay
                 }
+
+                // [6] Loading dismiss button (iOS only) — matches PlayerTopBar dismiss button exactly
+                #if os(iOS)
+                GeometryReader { geo in
+                    let isLandscape = geo.size.width > geo.size.height
+                    let uiInsets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets ?? .zero
+                    let topPad: CGFloat = max(16, uiInsets.top + 8)
+                    let hSafe: CGFloat = isLandscape ? max(uiInsets.left, uiInsets.right) : 0
+                    let hPad: CGFloat = max(16, hSafe) + 20
+                    VStack {
+                        HStack {
+                            Button(action: handleDismiss) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.white.opacity(0.25))
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.3), radius: 6)
+                            }
+                            .buttonStyle(.plain)
+                            Spacer()
+                        }
+                        .padding(.horizontal, hPad)
+                        .padding(.top, topPad)
+                        Spacer()
+                    }
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(!controlsEnabled)
+                .opacity(controlsEnabled ? 0 : 1)
+                .animation(.easeOut(duration: 0.4), value: controlsEnabled)
+                #endif
 
             } else {
                 // [6] Loading view (shown when player == nil)
@@ -577,6 +616,18 @@ struct PlayerView: View {
         .ignoresSafeArea()
         .transition(.opacity)
         .animation(.easeInOut(duration: 0.2), value: showControls)
+    }
+
+    // MARK: - Helpers
+
+    /// Controls are only interactive/visible once the video is ready to play.
+    /// On macOS (no videoReady state) they're always enabled.
+    private var controlsEnabled: Bool {
+        #if os(iOS)
+        return videoReady
+        #else
+        return true
+        #endif
     }
 
     // MARK: - Lock Overlay

@@ -61,9 +61,12 @@ final class PlayerPresenter: ObservableObject {
         
         let hostingController = PlayerHostingController(rootView: playerView)
         hostingController.modalPresentationStyle = .fullScreen
-        
-        // iOS 18+ Zoom Transition
-        if #available(iOS 18.0, *), let sourceView = sourceView {
+
+        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+
+        // iOS 18+ Zoom Transition — skip when launching in landscape because the zoom
+        // animation runs in portrait and the subsequent rotation causes a visible flash.
+        if #available(iOS 18.0, *), let sourceView = sourceView, !forceLandscape {
             hostingController.preferredTransition = .zoom { _ in
                 return sourceView
             }
@@ -71,42 +74,39 @@ final class PlayerPresenter: ObservableObject {
 
         self.playerVC = hostingController
 
-        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
-        // Set the lock before presentation so supportedInterfaceOrientations is correct immediately.
-        // Defer the actual rotation request until after presentation completes to avoid the
-        // portrait → landscape → portrait flicker during the presentation animation.
+        // Set the lock before presentation so supportedInterfaceOrientations is correct
+        // from the very first frame. preferredInterfaceOrientationForPresentation on
+        // PlayerHostingController returns .landscapeRight when forceLandscape, so iOS
+        // will present the VC directly in landscape — no post-animation rotation needed.
         self.orientationLock = forceLandscape ? .landscape : .allButUpsideDown
-        // Seed tracked orientation; notifications will keep it up to date.
         trackedPlayerOrientation = forceLandscape ? .landscapeRight : snapshotCurrentOrientation()
         startTrackingOrientation()
 
-        topVC.present(hostingController, animated: true) { [weak self] in
-            if forceLandscape {
-                self?.requestRotation(to: .landscapeRight)
-                self?.refreshSupportedOrientations()
-            }
-        }
+        topVC.present(hostingController, animated: true)
     }
 
     func dismissPlayer() {
         guard let playerVC = playerVC else { return }
-        let exitOrientation = trackedPlayerOrientation
+        let wasLandscape = trackedPlayerOrientation.isLandscape
         stopTrackingOrientation()
-        playerVC.dismiss(animated: true) { [weak self] in
-            self?.restoreOrientationAfterDismiss(exitOrientation)
+        // Reset orientation without animation before dismissing.
+        // UIView.performWithoutAnimation suppresses the system rotation animation on the
+        // root VC so the app snaps to portrait instantly instead of animating.
+        orientationLock = .portrait
+        UIView.performWithoutAnimation { refreshSupportedOrientations() }
+        playerVC.dismiss(animated: !wasLandscape) { [weak self] in
             self?.playerVC = nil
             self?.sourceView = nil
         }
     }
 
     /// Called after the player view has already been manually animated off screen (drag-to-dismiss).
-    /// Skips the modal dismiss animation and just cleans up state.
     func dragDismiss() {
         guard let playerVC = playerVC else { return }
-        let exitOrientation = trackedPlayerOrientation
         stopTrackingOrientation()
+        orientationLock = .portrait
+        UIView.performWithoutAnimation { refreshSupportedOrientations() }
         playerVC.dismiss(animated: false) { [weak self] in
-            self?.restoreOrientationAfterDismiss(exitOrientation)
             self?.playerVC = nil
             self?.sourceView = nil
         }
@@ -147,10 +147,6 @@ final class PlayerPresenter: ObservableObject {
         default:
             return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation ?? .portrait
         }
-    }
-
-    private func restoreOrientationAfterDismiss(_ orientation: UIInterfaceOrientation) {
-        resetToAppOrientation(shouldRotate: true)
     }
 
     func resetToAppOrientation(shouldRotate: Bool = false) {

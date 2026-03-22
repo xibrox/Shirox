@@ -22,7 +22,7 @@ struct PlayerTopBar: View {
             HStack(alignment: .top) {
                 // Dismiss button (left)
                 Button(action: onDismiss) {
-                    Image(systemName: "chevron.down")
+                    Image(systemName: "xmark")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
