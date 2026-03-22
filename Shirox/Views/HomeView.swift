@@ -69,14 +69,16 @@ struct HomeView: View {
 private struct FeaturedCarousel: View {
     let items: [AniListMedia]
     @State private var selectedTab = 0
+    @State private var overscrollY: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         #if os(iOS)
         let isIPad = sizeClass == .regular
+        // Leave room for the page indicator (≈30pt) + tab bar (≈83pt) + breathing room.
         let imageHeight: CGFloat = isIPad
             ? UIScreen.main.bounds.width * (9.0 / 16.0)
-            : 540
+            : UIScreen.main.bounds.height - 140
         let current = items[min(selectedTab, items.count - 1)]
 
         VStack(spacing: 0) {
@@ -103,9 +105,13 @@ private struct FeaturedCarousel: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: tabHeight)
                 .offset(y: tabOffset)
+                .background(Color.clear.preference(key: CarouselOverscrollKey.self, value: scrollY))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: imageHeight)
+            .frame(height: imageHeight + overscrollY)
+            .onPreferenceChange(CarouselOverscrollKey.self) { y in
+                overscrollY = max(0, y)
+            }
             .mask(alignment: .bottom) {
                 Rectangle()
                     .frame(height: imageHeight + 2000)
@@ -533,6 +539,13 @@ private struct AnimeSection: View {
             }
         }
     }
+}
+
+// MARK: - Carousel Overscroll Preference
+
+private struct CarouselOverscrollKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 // MARK: - Press Style
