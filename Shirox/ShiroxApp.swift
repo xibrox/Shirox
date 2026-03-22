@@ -64,6 +64,7 @@ struct ShiroxApp: App {
             .environmentObject(moduleManager)
             .task {
                 await moduleManager.restoreActiveModule()
+                await moduleManager.checkForUpdates()
             }
         }
     }

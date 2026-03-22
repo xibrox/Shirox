@@ -232,6 +232,10 @@ struct PlayerView: View {
     // Sheets
     @State private var showSpeedPicker = false
     @State private var showSubtitleSettings = false
+    @State private var showAudioPicker = false
+
+    // Audio tracks
+    @State private var audioGroup: AVMediaSelectionGroup? = nil
 
     // Subtitles
     @State private var subtitleCues: [SubtitleCue] = []
@@ -456,6 +460,44 @@ struct PlayerView: View {
             PlayerSubtitleSettingsView(settings: subtitleSettings)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showAudioPicker) {
+            audioPickerSheet
+                .presentationDetents([.height(CGFloat(60 + 56 * max(1, audioGroup?.options.count ?? 0)))])
+        }
+    }
+
+    // MARK: - Audio Picker Sheet
+
+    @ViewBuilder
+    private var audioPickerSheet: some View {
+        VStack(spacing: 0) {
+            Text("Audio Track")
+                .font(.headline)
+                .padding(.vertical, 16)
+            Divider()
+            if let group = audioGroup, let item = player?.currentItem {
+                let selected = item.currentMediaSelection.selectedMediaOption(in: group)
+                ForEach(group.options, id: \.self) { option in
+                    Button {
+                        item.select(option, in: group)
+                        showAudioPicker = false
+                    } label: {
+                        HStack {
+                            Text(option.displayName)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if option == selected {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .frame(height: 52)
+                    }
+                    Divider()
+                }
+            }
+        }
     }
 
     // MARK: - Controls Overlay (final version)
@@ -504,7 +546,9 @@ struct PlayerView: View {
                         onSpeedTap: { showSpeedPicker = true },
                         onSkip85: { skip(by: 85) },
                         onSubtitleSettingsTap: { showSubtitleSettings = true },
+                        onAudioTap: { showAudioPicker = true },
                         hasSubtitles: stream.subtitle != nil,
+                        audioTrackCount: audioGroup?.options.count ?? 0,
                         bottomPadding: bottomPad
                     )
                     .buttonStyle(CircularButtonStyle())
@@ -655,6 +699,7 @@ struct PlayerView: View {
         // Clean up previous observers to prevent leak on re-entry
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
         rateObserver?.invalidate(); rateObserver = nil
+        audioGroup = nil
         #if os(iOS)
         videoReady = false
         #endif
@@ -667,6 +712,23 @@ struct PlayerView: View {
             asset = AVURLAsset(url: stream.url)
         }
         let item = AVPlayerItem(asset: asset)
+        // If a subtitle is present this is a sub stream — prefer Japanese audio track.
+        // Kwik HLS m3u8s often contain both Japanese and English renditions with English
+        // marked DEFAULT=YES, so AVPlayer must be told to prefer Japanese explicitly.
+        Task {
+            guard let group = try? await asset.loadMediaSelectionGroup(for: .audible) else { return }
+            await MainActor.run { audioGroup = group }
+            // Auto-select Japanese for sub streams (subtitle present)
+            if stream.subtitle != nil {
+                let jaOptions = AVMediaSelectionGroup.mediaSelectionOptions(
+                    from: group.options,
+                    with: Locale(identifier: "ja")
+                )
+                if let jaOption = jaOptions.first {
+                    await MainActor.run { item.select(jaOption, in: group) }
+                }
+            }
+        }
         let p = AVPlayer(playerItem: item)
         p.volume = volume
         p.usesExternalPlaybackWhileExternalScreenIsActive = true

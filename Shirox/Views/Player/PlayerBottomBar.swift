@@ -10,7 +10,9 @@ struct PlayerBottomBar: View {
     var onSpeedTap: () -> Void
     var onSkip85: () -> Void
     var onSubtitleSettingsTap: () -> Void
+    var onAudioTap: () -> Void = {}
     var hasSubtitles: Bool = false
+    var audioTrackCount: Int = 0
     var bottomPadding: CGFloat = 24
 
     var body: some View {
@@ -20,6 +22,10 @@ struct PlayerBottomBar: View {
                 skip85Button
 
                 Spacer()
+
+                if audioTrackCount > 1 {
+                    audioButton
+                }
 
                 if hasSubtitles {
                     subtitleButton
@@ -67,6 +73,18 @@ struct PlayerBottomBar: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
                 .frame(height: 36)
+                .background(Color.white.opacity(0.2), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var audioButton: some View {
+        Button(action: onAudioTap) {
+            Image(systemName: "waveform")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(height: 36)
+                .padding(.horizontal, 14)
                 .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)

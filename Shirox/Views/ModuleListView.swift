@@ -4,6 +4,7 @@ struct ModuleListView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @Environment(\.dismiss) private var dismiss
     @State private var moduleURL = ""
+    @State private var isRefreshing = false
 
     var body: some View {
         NavigationStack {
@@ -97,6 +98,22 @@ struct ModuleListView: View {
             .navigationBarTitleDisplayMode(.inline)
 #endif
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        Task {
+                            isRefreshing = true
+                            await moduleManager.checkForUpdates()
+                            isRefreshing = false
+                        }
+                    } label: {
+                        if isRefreshing {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(moduleManager.modules.isEmpty || isRefreshing)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)

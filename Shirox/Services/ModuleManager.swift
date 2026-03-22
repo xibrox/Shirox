@@ -23,7 +23,8 @@ final class ModuleManager: ObservableObject {
         errorMessage = nil
         do {
             let (data, _) = try await URLSession.shared.data(from: jsonURL)
-            let module = try JSONDecoder().decode(ModuleDefinition.self, from: data)
+            var module = try JSONDecoder().decode(ModuleDefinition.self, from: data)
+            module.jsonUrl = jsonURL.absoluteString
 
             // Avoid duplicates
             if modules.contains(where: { $0.id == module.id }) {
@@ -73,6 +74,25 @@ final class ModuleManager: ObservableObject {
         guard let savedId = UserDefaults.standard.string(forKey: activeKey),
               let module = modules.first(where: { $0.id == savedId }) else { return }
         try? await selectModule(module)
+    }
+
+    // MARK: - Auto-Update
+
+    func checkForUpdates() async {
+        var didUpdate = false
+        for i in modules.indices {
+            guard let jsonUrlStr = modules[i].jsonUrl,
+                  let jsonURL = URL(string: jsonUrlStr),
+                  let (data, _) = try? await URLSession.shared.data(from: jsonURL),
+                  var fresh = try? JSONDecoder().decode(ModuleDefinition.self, from: data),
+                  fresh.version != modules[i].version else { continue }
+            fresh.jsonUrl = jsonUrlStr
+            let wasActive = activeModule?.id == modules[i].id
+            modules[i] = fresh
+            if wasActive { try? await selectModule(fresh) }
+            didUpdate = true
+        }
+        if didUpdate { saveToStorage() }
     }
 
     // MARK: - Persistence

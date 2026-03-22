@@ -15,6 +15,7 @@ struct ModuleDefinition: Codable, Identifiable {
     let quality: String?
     let language: String?
     let softsub: Bool?
+    var jsonUrl: String?     // stored client-side; not present in module JSON
 }
 
 struct ModuleAuthor: Codable {
