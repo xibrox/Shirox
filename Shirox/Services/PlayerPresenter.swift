@@ -19,6 +19,9 @@ final class PlayerPresenter: ObservableObject {
 
     private weak var playerVC: UIViewController?
     private var sourceView: UIView?
+    /// Last interface orientation observed during a player session via device-orientation notifications.
+    private var trackedPlayerOrientation: UIInterfaceOrientation = .portrait
+    private var orientationObserver: NSObjectProtocol?
 
     private init() {}
 
@@ -67,12 +70,15 @@ final class PlayerPresenter: ObservableObject {
         }
 
         self.playerVC = hostingController
-        
+
         let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
         // Set the lock before presentation so supportedInterfaceOrientations is correct immediately.
         // Defer the actual rotation request until after presentation completes to avoid the
         // portrait → landscape → portrait flicker during the presentation animation.
         self.orientationLock = forceLandscape ? .landscape : .allButUpsideDown
+        // Seed tracked orientation; notifications will keep it up to date.
+        trackedPlayerOrientation = forceLandscape ? .landscapeRight : snapshotCurrentOrientation()
+        startTrackingOrientation()
 
         topVC.present(hostingController, animated: true) { [weak self] in
             if forceLandscape {
@@ -84,7 +90,8 @@ final class PlayerPresenter: ObservableObject {
 
     func dismissPlayer() {
         guard let playerVC = playerVC else { return }
-        let exitOrientation = currentInterfaceOrientation
+        let exitOrientation = trackedPlayerOrientation
+        stopTrackingOrientation()
         playerVC.dismiss(animated: true) { [weak self] in
             self?.restoreOrientationAfterDismiss(exitOrientation)
             self?.playerVC = nil
@@ -96,7 +103,8 @@ final class PlayerPresenter: ObservableObject {
     /// Skips the modal dismiss animation and just cleans up state.
     func dragDismiss() {
         guard let playerVC = playerVC else { return }
-        let exitOrientation = currentInterfaceOrientation
+        let exitOrientation = trackedPlayerOrientation
+        stopTrackingOrientation()
         playerVC.dismiss(animated: false) { [weak self] in
             self?.restoreOrientationAfterDismiss(exitOrientation)
             self?.playerVC = nil
@@ -104,15 +112,39 @@ final class PlayerPresenter: ObservableObject {
         }
     }
 
-    private var currentInterfaceOrientation: UIInterfaceOrientation {
-        // UIDevice.current.orientation is device-level and works inside LiveContainer.
-        // Note: device landscape axes are flipped relative to interface axes.
+    // MARK: - Orientation tracking
+
+    private func startTrackingOrientation() {
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        orientationObserver = NotificationCenter.default.addObserver(
+            forName: UIDevice.orientationDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            let mapped = self?.snapshotCurrentOrientation()
+            // Only update for concrete orientations (ignore faceUp/faceDown/unknown).
+            if let o = mapped, o != .unknown {
+                self?.trackedPlayerOrientation = o
+            }
+        }
+    }
+
+    private func stopTrackingOrientation() {
+        if let obs = orientationObserver {
+            NotificationCenter.default.removeObserver(obs)
+            orientationObserver = nil
+        }
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    }
+
+    /// Converts the live device orientation to an interface orientation.
+    /// Returns the last scene orientation as a fallback for flat/unknown positions.
+    private func snapshotCurrentOrientation() -> UIInterfaceOrientation {
         switch UIDevice.current.orientation {
         case .landscapeLeft:      return .landscapeRight
         case .landscapeRight:     return .landscapeLeft
+        case .portrait:           return .portrait
         case .portraitUpsideDown: return .portraitUpsideDown
         default:
-            // .unknown / .faceUp / .faceDown — fall back to scene
             return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation ?? .portrait
         }
     }
