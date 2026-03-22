@@ -149,17 +149,8 @@ final class PlayerPresenter: ObservableObject {
         }
     }
 
-    /// If the user exits the player while in landscape, stay in that landscape side.
-    /// If they exit in portrait, reset to portrait lock as usual.
     private func restoreOrientationAfterDismiss(_ orientation: UIInterfaceOrientation) {
-        if orientation.isLandscape {
-            let mask: UIInterfaceOrientationMask = orientation == .landscapeLeft ? .landscapeLeft : .landscapeRight
-            orientationLock = .allButUpsideDown
-            requestRotation(to: mask)
-            refreshSupportedOrientations()
-        } else {
-            resetToAppOrientation(shouldRotate: false)
-        }
+        resetToAppOrientation(shouldRotate: true)
     }
 
     func resetToAppOrientation(shouldRotate: Bool = false) {
