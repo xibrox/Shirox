@@ -247,6 +247,8 @@ struct PlayerView: View {
     @State private var isSpeedBoosted = false
     @State private var videoReady = false
     #endif
+    @AppStorage("playerSkipShort") private var skipShort: Int = 10
+    @AppStorage("playerSkipLong")  private var skipLong:  Int = 85
 
     var body: some View {
         ZStack {
@@ -323,14 +325,14 @@ struct PlayerView: View {
                         if showControls { scheduleHide() }
                     },
                     onSeekBackward: {
-                        skip(by: -10)
+                        skip(by: -Double(skipShort))
                         scheduleHide()
                     },
                     onSeekForward: {
-                        skip(by: 10)
+                        skip(by: Double(skipShort))
                         scheduleHide()
                     },
-                    seekAmount: 10
+                    seekAmount: Double(skipShort)
                 )
                 .ignoresSafeArea()
 
@@ -544,7 +546,8 @@ struct PlayerView: View {
                         onSliderDragStart: { hideTask?.cancel() },
                         onSliderDragEnd: { scheduleHide() },
                         onSpeedTap: { showSpeedPicker = true },
-                        onSkip85: { skip(by: 85) },
+                        onSkip85: { skip(by: Double(skipLong)) },
+                        skipLongAmount: skipLong,
                         onSubtitleSettingsTap: { showSubtitleSettings = true },
                         onAudioTap: { showAudioPicker = true },
                         hasSubtitles: stream.subtitle != nil,
@@ -560,10 +563,10 @@ struct PlayerView: View {
                     Spacer(minLength: 0)
                     PlayerCenterControls(
                         isPlaying: $isPlaying,
-                        skipAmount: 10,
-                        onBackward: { skip(by: -10); scheduleHide() },
+                        skipAmount: Double(skipShort),
+                        onBackward: { skip(by: -Double(skipShort)); scheduleHide() },
                         onPlayPause: { togglePlayPause() },
-                        onForward: { skip(by: 10); scheduleHide() }
+                        onForward: { skip(by: Double(skipShort)); scheduleHide() }
                     )
                     .buttonStyle(CircularButtonStyle())
                     Spacer(minLength: 0)
@@ -811,9 +814,9 @@ struct PlayerView: View {
         center.togglePlayPauseCommand.isEnabled = true
         center.changePlaybackPositionCommand.isEnabled = true
         center.skipForwardCommand.isEnabled = true
-        center.skipForwardCommand.preferredIntervals = [10]
+        center.skipForwardCommand.preferredIntervals = [NSNumber(value: skipShort)]
         center.skipBackwardCommand.isEnabled = true
-        center.skipBackwardCommand.preferredIntervals = [10]
+        center.skipBackwardCommand.preferredIntervals = [NSNumber(value: skipShort)]
 
         center.playCommand.addTarget { [weak p] _ in
             p?.play(); return .success

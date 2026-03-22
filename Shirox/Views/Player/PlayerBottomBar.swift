@@ -9,6 +9,7 @@ struct PlayerBottomBar: View {
     var onSliderDragEnd: (() -> Void)? = nil
     var onSpeedTap: () -> Void
     var onSkip85: () -> Void
+    var skipLongAmount: Int = 85
     var onSubtitleSettingsTap: () -> Void
     var onAudioTap: () -> Void = {}
     var hasSubtitles: Bool = false
@@ -55,7 +56,7 @@ struct PlayerBottomBar: View {
             HStack(spacing: 5) {
                 Image(systemName: "goforward")
                     .font(.system(size: 15, weight: .medium))
-                Text("85s")
+                Text("\(skipLongAmount)s")
                     .font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(.white)

@@ -2,10 +2,15 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("forceLandscape") private var forceLandscape = false
+    @AppStorage("playerSkipShort") private var skipShort: Int = 10
+    @AppStorage("playerSkipLong") private var skipLong: Int = 85
     @State private var showResetConfirmation = false
     #if os(iOS)
     @State private var imageCacheSize = CachedAsyncImage.totalBytes
     #endif
+
+    private let shortOptions = [5, 10, 15, 30]
+    private let longOptions  = [30, 60, 85, 90, 120, 150, 180]
 
     var body: some View {
         NavigationStack {
@@ -17,6 +22,16 @@ struct SettingsView: View {
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
                         }
                         #endif
+                    Picker("Skip Duration", selection: $skipShort) {
+                        ForEach(shortOptions, id: \.self) { s in
+                            Text("\(s)s").tag(s)
+                        }
+                    }
+                    Picker("Long Skip Duration", selection: $skipLong) {
+                        ForEach(longOptions, id: \.self) { s in
+                            Text("\(s)s").tag(s)
+                        }
+                    }
                 }
                 #if os(iOS)
                 Section("Cache") {
