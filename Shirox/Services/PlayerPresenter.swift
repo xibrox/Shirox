@@ -84,10 +84,9 @@ final class PlayerPresenter: ObservableObject {
 
     func dismissPlayer() {
         guard let playerVC = playerVC else { return }
+        let exitOrientation = currentInterfaceOrientation
         playerVC.dismiss(animated: true) { [weak self] in
-            // shouldRotate: false — refreshSupportedOrientations() is enough to let iOS
-            // auto-rotate to portrait naturally; forcing rotation here caused black bars.
-            self?.resetToAppOrientation(shouldRotate: false)
+            self?.restoreOrientationAfterDismiss(exitOrientation)
             self?.playerVC = nil
             self?.sourceView = nil
         }
@@ -97,10 +96,28 @@ final class PlayerPresenter: ObservableObject {
     /// Skips the modal dismiss animation and just cleans up state.
     func dragDismiss() {
         guard let playerVC = playerVC else { return }
+        let exitOrientation = currentInterfaceOrientation
         playerVC.dismiss(animated: false) { [weak self] in
-            self?.resetToAppOrientation(shouldRotate: false)
+            self?.restoreOrientationAfterDismiss(exitOrientation)
             self?.playerVC = nil
             self?.sourceView = nil
+        }
+    }
+
+    private var currentInterfaceOrientation: UIInterfaceOrientation {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation ?? .portrait
+    }
+
+    /// If the user exits the player while in landscape, stay in that landscape side.
+    /// If they exit in portrait, reset to portrait lock as usual.
+    private func restoreOrientationAfterDismiss(_ orientation: UIInterfaceOrientation) {
+        if orientation.isLandscape {
+            let mask: UIInterfaceOrientationMask = orientation == .landscapeLeft ? .landscapeLeft : .landscapeRight
+            orientationLock = .allButUpsideDown
+            requestRotation(to: mask)
+            refreshSupportedOrientations()
+        } else {
+            resetToAppOrientation(shouldRotate: false)
         }
     }
 
