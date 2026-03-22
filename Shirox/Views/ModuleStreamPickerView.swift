@@ -1,42 +1,62 @@
 import SwiftUI
 
-// MARK: - Sheet
+// MARK: - Modal Overlay
 
 struct ModuleStreamPickerView: View {
     let animeTitle: String
     let episodeNumber: Int
+    let onDismiss: () -> Void
     let onStreamsLoaded: ([StreamResult]) -> Void
 
     @EnvironmentObject private var moduleManager: ModuleManager
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(moduleManager.modules) { module in
-                    ModuleStreamRow(
-                        module: module,
-                        animeTitle: animeTitle,
-                        episodeNumber: episodeNumber
-                    ) { streams in
-                        dismiss()
-                        onStreamsLoaded(streams)
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Watch Episode \(episodeNumber)")
+                    .font(.headline)
+                Spacer()
+                Button { onDismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(moduleManager.modules) { module in
+                        ModuleStreamRow(
+                            module: module,
+                            animeTitle: animeTitle,
+                            episodeNumber: episodeNumber
+                        ) { streams in
+                            onDismiss()
+                            onStreamsLoaded(streams)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+
+                        if module.id != moduleManager.modules.last?.id {
+                            Divider().padding(.leading, 16)
+                        }
                     }
                 }
             }
-            .listStyle(.plain)
-            .navigationTitle("Watch Episode \(episodeNumber)")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
+            .frame(maxHeight: 360)
+            .padding(.bottom, 8)
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .frame(maxWidth: 440)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.22), radius: 32, y: 12)
+        .padding(.horizontal, 20)
     }
 }
 
@@ -59,10 +79,26 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
     let module: ModuleDefinition
     private var runner: ModuleJSRunner?
+    private var currentTask: Task<Void, Never>?
 
     init(module: ModuleDefinition, initialTitle: String) {
         self.module = module
         self.searchTitle = initialTitle
+    }
+
+    func cancel() {
+        currentTask?.cancel()
+        currentTask = nil
+        runner = nil
+        state = .idle
+    }
+
+    func startFind(targetEpisodeNumber: Int) {
+        currentTask = Task { await find(targetEpisodeNumber: targetEpisodeNumber) }
+    }
+
+    func startSelectEpisode(_ episode: EpisodeLink) {
+        currentTask = Task { await selectEpisode(episode) }
     }
 
     func find(targetEpisodeNumber: Int) async {
@@ -122,6 +158,8 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     }
 
     func reset() {
+        currentTask?.cancel()
+        currentTask = nil
         state = .idle
         readyStreams = nil
         runner = nil
@@ -202,19 +240,22 @@ private struct ModuleStreamRow: View {
         switch rowVm.state {
         case .idle:
             Button("Find") {
-                Task { await rowVm.find(targetEpisodeNumber: episodeNumber) }
+                rowVm.startFind(targetEpisodeNumber: episodeNumber)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
 
         case .loading, .loadingStreams:
-            ProgressView()
-                .scaleEffect(0.8)
+            Button(action: { rowVm.cancel() }) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
 
         case .found:
             Button("Retry") {
                 rowVm.reset()
-                Task { await rowVm.find(targetEpisodeNumber: episodeNumber) }
+                rowVm.startFind(targetEpisodeNumber: episodeNumber)
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -223,7 +264,7 @@ private struct ModuleStreamRow: View {
         case .notFound:
             Button("Retry") {
                 rowVm.reset()
-                Task { await rowVm.find(targetEpisodeNumber: episodeNumber) }
+                rowVm.startFind(targetEpisodeNumber: episodeNumber)
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -231,7 +272,7 @@ private struct ModuleStreamRow: View {
         case .error:
             Button("Retry") {
                 rowVm.reset()
-                Task { await rowVm.find(targetEpisodeNumber: episodeNumber) }
+                rowVm.startFind(targetEpisodeNumber: episodeNumber)
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -247,14 +288,20 @@ private struct ModuleStreamRow: View {
             titleField
 
         case .loading:
-            Text("Searching \"\(rowVm.searchTitle)\"…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.7)
+                Text("Searching \"\(rowVm.searchTitle)\"…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
         case .loadingStreams:
-            Text("Fetching streams…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.7)
+                Text("Fetching streams…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
         case .found(let episodes):
             VStack(alignment: .leading, spacing: 4) {
@@ -293,7 +340,7 @@ private struct ModuleStreamRow: View {
                 .font(.caption)
                 .onSubmit {
                     rowVm.reset()
-                    Task { await rowVm.find(targetEpisodeNumber: episodeNumber) }
+                    rowVm.startFind(targetEpisodeNumber: episodeNumber)
                 }
         }
         .padding(.horizontal, 8)
@@ -306,7 +353,7 @@ private struct ModuleStreamRow: View {
             HStack(spacing: 8) {
                 ForEach(episodes) { ep in
                     Button("Ep \(ep.displayNumber)") {
-                        Task { await rowVm.selectEpisode(ep) }
+                        rowVm.startSelectEpisode(ep)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)

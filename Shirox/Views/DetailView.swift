@@ -33,9 +33,26 @@ struct DetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
 #endif
         .onAppear { vm.load(item: item) }
-        .sheet(isPresented: $vm.showStreamPicker) {
-            StreamPickerView(vm: vm)
-                .tint(.red)
+        .overlay {
+            ZStack {
+                if vm.showStreamPicker {
+                    Color.black.opacity(0.45)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            guard !vm.isLoadingStreams else { return }
+                            vm.showStreamPicker = false
+                        }
+                        .transition(.opacity)
+
+                    StreamPickerView(vm: vm)
+                        .tint(.red)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.88, anchor: .center).combined(with: .opacity),
+                            removal: .scale(scale: 0.96, anchor: .center).combined(with: .opacity)
+                        ))
+                }
+            }
+            .animation(.spring(response: 0.38, dampingFraction: 0.8), value: vm.showStreamPicker)
         }
     }
 

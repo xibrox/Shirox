@@ -20,6 +20,8 @@ final class SearchViewModel: ObservableObject {
         hasSearched = true
         isLoading = true
         errorMessage = nil
+        moduleResults = []
+        aniListResults = []
         searchTask = Task {
             do {
                 if usingModule {

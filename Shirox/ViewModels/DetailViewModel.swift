@@ -19,6 +19,7 @@ final class DetailViewModel: ObservableObject {
     @Published var showPlayer = false
 
     private(set) var detailHref: String?
+    private var streamsTask: Task<Void, Never>?
 
     // MARK: - Load
 
@@ -56,15 +57,32 @@ final class DetailViewModel: ObservableObject {
         showStreamPicker = true
         isLoadingStreams = true
 
-        Task {
+        streamsTask = Task {
             do {
                 let streams = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
-                streamOptions = streams.sorted { $0.title < $1.title }
+                guard !Task.isCancelled else { return }
+                let sorted = streams.sorted { $0.title < $1.title }
+                if sorted.count == 1 {
+                    showStreamPicker = false
+                    selectStream(sorted[0])
+                } else {
+                    streamOptions = sorted
+                }
             } catch {
-                errorMessage = error.localizedDescription
+                if !Task.isCancelled {
+                    errorMessage = error.localizedDescription
+                }
             }
             isLoadingStreams = false
         }
+    }
+
+    func cancelStreamLoading() {
+        streamsTask?.cancel()
+        streamsTask = nil
+        isLoadingStreams = false
+        showStreamPicker = false
+        streamOptions = []
     }
 
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {

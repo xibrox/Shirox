@@ -98,6 +98,10 @@ struct SearchView: View {
                     vm.hasSearched = false
                 }
             }
+            .onChange(of: moduleManager.activeModule?.id) { _, _ in
+                guard !vm.query.isEmpty else { return }
+                vm.search(usingModule: usingModule)
+            }
             .toolbar {
                 ToolbarItem(placement: .automatic) {
                     Button {
@@ -113,15 +117,29 @@ struct SearchView: View {
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
-                        .foregroundStyle(Color.accentColor)
+                        .background(Color.red.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.red)
                     }
                 }
             }
-            .sheet(isPresented: $showModuleList) {
-                ModuleListView()
-                    .environmentObject(moduleManager)
+        }
+        .overlay {
+            ZStack {
+                if showModuleList {
+                    Color.black.opacity(0.45)
+                        .ignoresSafeArea()
+                        .onTapGesture { showModuleList = false }
+                        .transition(.opacity)
+                    ModuleListView(onDismiss: { showModuleList = false })
+                        .environmentObject(moduleManager)
+                        .tint(.red)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.88, anchor: .center).combined(with: .opacity),
+                            removal: .scale(scale: 0.96, anchor: .center).combined(with: .opacity)
+                        ))
+                }
             }
+            .animation(.spring(response: 0.38, dampingFraction: 0.8), value: showModuleList)
         }
         .background(
             GeometryReader { geo in

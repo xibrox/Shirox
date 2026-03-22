@@ -37,10 +37,25 @@ final class AniListDetailViewModel: ObservableObject {
         showStreamPicker = true
     }
 
+    func dismissModulePicker() {
+        showStreamPicker = false
+        selectedEpisodeNumber = nil
+    }
+
+    func dismissFinalPicker() {
+        showFinalStreamPicker = false
+        pendingStreams = []
+    }
+
     func onStreamsLoaded(_ streams: [StreamResult]) {
         showStreamPicker = false
-        pendingStreams = streams.sorted { $0.title < $1.title }
-        showFinalStreamPicker = true
+        let sorted = streams.sorted { $0.title < $1.title }
+        if sorted.count == 1 {
+            selectStream(sorted[0])
+        } else {
+            pendingStreams = sorted
+            showFinalStreamPicker = true
+        }
     }
 
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {

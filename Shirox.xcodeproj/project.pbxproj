@@ -117,6 +117,8 @@
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FEA73D829CE9CD5C2259248F /* JSEngine+Details.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECAACC04670C75AE2C8303A /* JSEngine+Details.swift */; };
 		FFEA54B867C75F75B46DD67F /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */; };
+		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
+		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -178,6 +180,7 @@
 		F8CB72824DE1085225EDAB47 /* MediaDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetail.swift; sourceTree = "<group>"; };
 		FA54E15EA936A28D42B73886 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
 		FD942143248855B7D74F9E0C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -200,6 +203,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA000003000000000000CC01 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000003000000000000AA01 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA000003000000000000CC02 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000003000000000000AA02 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXGroup section */
 		001361E1E34759C14A461D84 /* Views */ = {
@@ -237,6 +259,7 @@
 		19F8272266C7C7D79BDAB093 /* Shirox */ = {
 			isa = PBXGroup;
 			children = (
+				AA000003000000000000BB01 /* Assets.xcassets */,
 				41894B1527B61C1E6E98EFA5 /* Info.plist */,
 				4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */,
 				6346CE798736A014D032063D /* Models */,
@@ -347,6 +370,7 @@
 			buildPhases = (
 				95DE5ABBF64ACBFE36B79FBD /* Sources */,
 				896FE0E84327FF272C55EBF6 /* Frameworks */,
+				AA000003000000000000CC01 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -365,6 +389,7 @@
 			buildPhases = (
 				71E452E51715804C32DE8FF0 /* Sources */,
 				0B60FF2F5B0AA8ED83325928 /* Frameworks */,
+				AA000003000000000000CC02 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -610,8 +635,8 @@
 		3820A88AF0A87AC8822E162B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Shirox/Info.plist;
@@ -633,8 +658,7 @@
 		4E9229C27A951422A31C75A9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_STYLE = Automatic;
+					CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -656,8 +680,8 @@
 		5E93568FEF6A44AEF1E1ABE4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Shirox/Info.plist;
@@ -740,8 +764,7 @@
 		CC7181A7C48C1B480151ED9A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_STYLE = Automatic;
+					CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
