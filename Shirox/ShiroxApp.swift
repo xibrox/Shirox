@@ -35,11 +35,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 @main
 struct ShiroxApp: App {
-    #if os(iOS)
+#if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    #endif
+#endif
     @StateObject private var moduleManager = ModuleManager.shared
-
+    
     init() {
         URLCache.shared = URLCache(
             memoryCapacity: 20 * 1024 * 1024,
@@ -47,24 +47,50 @@ struct ShiroxApp: App {
             diskPath: nil
         )
     }
-
+    
     var body: some Scene {
         WindowGroup {
-            TabView {
-                HomeView()
-                    .tabItem { Label("Home", systemImage: "house.fill") }
-
-                SearchView()
-                    .tabItem { Label("Search", systemImage: "magnifyingglass") }
-
-                SettingsView()
-                    .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-            }
-            .tint(.red)
-            .environmentObject(moduleManager)
-            .task {
-                await moduleManager.restoreActiveModule()
-                await moduleManager.checkForUpdates()
+            if #available(iOS 18, *) {
+                // iOS 18+ version using the new Tab API
+                TabView {
+                    Tab("Home", systemImage: "house.fill") {
+                        HomeView()
+                    }
+                    Tab("Settings", systemImage: "gearshape.fill") {
+                        SettingsView()
+                    }
+                    Tab(role: .search) {
+                        SearchView()
+                    }
+                }
+                .tint(.red)
+                .environmentObject(moduleManager)
+                .task {
+                    await moduleManager.restoreActiveModule()
+                    await moduleManager.checkForUpdates()
+                }
+            } else {
+                // Fallback for iOS 17 and earlier
+                TabView {
+                    HomeView()
+                        .tabItem {
+                            Label("Home", systemImage: "house.fill")
+                        }
+                    SettingsView()
+                        .tabItem {
+                            Label("Settings", systemImage: "gearshape.fill")
+                        }
+                    SearchView()
+                        .tabItem {
+                            Label("Search", systemImage: "magnifyingglass")
+                        }
+                }
+                .tint(.red)
+                .environmentObject(moduleManager)
+                .task {
+                    await moduleManager.restoreActiveModule()
+                    await moduleManager.checkForUpdates()
+                }
             }
         }
     }
