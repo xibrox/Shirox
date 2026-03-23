@@ -32,12 +32,12 @@
             }
           ],
           "glass" : true,
-          "image-name" : "Image 3.png",
-          "name" : "Image 3",
+          "image-name" : "白-shiro.png",
+          "name" : "白-shiro",
           "position" : {
-            "scale" : 0.66,
+            "scale" : 0.95,
             "translation-in-points" : [
-              56.10000000000002,
+              0,
               0
             ]
           }
