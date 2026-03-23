@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		03463CD9EFDC4342A7F38A8F /* BrowseViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4778869AF2D84C3F8463D89E /* BrowseViewModel.swift */; };
 		09B5F413C233D0F110C48072 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEA5105668982AD0021041F /* SearchView.swift */; };
+		0F6021372F71CCC900CEC66D /* shirox-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0F6021362F71CCC800CEC66D /* shirox-icon.icon */; };
+		0F6021382F71CCC900CEC66D /* shirox-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0F6021362F71CCC800CEC66D /* shirox-icon.icon */; };
 		0FB47691410BFA732D132352 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		142A89C22F58E5FF008652D9 /* PlayerPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142A89C12F58E5FD008652D9 /* PlayerPresenter.swift */; };
 		142A89C32F58E5FF008652D9 /* PlayerPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142A89C12F58E5FD008652D9 /* PlayerPresenter.swift */; };
@@ -94,6 +96,8 @@
 		AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB12 /* PlayerTopBar.swift */; };
 		AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
 		AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
+		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
+		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
 		AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
 		AFD909B8E23B2E6F048F0869 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD942143248855B7D74F9E0C /* SettingsView.swift */; };
@@ -117,12 +121,11 @@
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FEA73D829CE9CD5C2259248F /* JSEngine+Details.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECAACC04670C75AE2C8303A /* JSEngine+Details.swift */; };
 		FFEA54B867C75F75B46DD67F /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */; };
-		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
-		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingManager.swift; sourceTree = "<group>"; };
+		0F6021362F71CCC800CEC66D /* shirox-icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "shirox-icon.icon"; sourceTree = "<group>"; };
 		11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleStreamPickerView.swift; sourceTree = "<group>"; };
 		142A89C12F58E5FD008652D9 /* PlayerPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerPresenter.swift; sourceTree = "<group>"; };
 		142A89C42F58E804008652D9 /* ViewTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewTracker.swift; sourceTree = "<group>"; };
@@ -160,6 +163,7 @@
 		AA000001000000000000BB11 /* PlayerTimeFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTimeFormat.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB12 /* PlayerTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTopBar.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB13 /* PlayerVolumeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerVolumeSlider.swift; sourceTree = "<group>"; };
+		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		B371AE47E8FD36A0C11174AC /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
@@ -180,7 +184,6 @@
 		F8CB72824DE1085225EDAB47 /* MediaDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetail.swift; sourceTree = "<group>"; };
 		FA54E15EA936A28D42B73886 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
 		FD942143248855B7D74F9E0C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -203,25 +206,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
-
-/* Begin PBXResourcesBuildPhase section */
-		AA000003000000000000CC01 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				AA000003000000000000AA01 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		AA000003000000000000CC02 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				AA000003000000000000AA02 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXGroup section */
 		001361E1E34759C14A461D84 /* Views */ = {
@@ -266,6 +250,7 @@
 				265C6164ACC898EE12E32F48 /* Services */,
 				F1FFDC19D8C12F84DFB49FBB /* ViewModels */,
 				001361E1E34759C14A461D84 /* Views */,
+				0F6021362F71CCC800CEC66D /* shirox-icon.icon */,
 			);
 			path = Shirox;
 			sourceTree = "<group>";
@@ -439,6 +424,27 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA000003000000000000CC01 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0F6021372F71CCC900CEC66D /* shirox-icon.icon in Resources */,
+				AA000003000000000000AA01 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA000003000000000000CC02 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0F6021382F71CCC900CEC66D /* shirox-icon.icon in Resources */,
+				AA000003000000000000AA02 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		71E452E51715804C32DE8FF0 /* Sources */ = {
@@ -635,8 +641,9 @@
 		3820A88AF0A87AC8822E162B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-					CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Shirox/Info.plist;
@@ -658,7 +665,7 @@
 		4E9229C27A951422A31C75A9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-					CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -680,8 +687,9 @@
 		5E93568FEF6A44AEF1E1ABE4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-					CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Shirox/Info.plist;
@@ -764,7 +772,7 @@
 		CC7181A7C48C1B480151ED9A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-					CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
