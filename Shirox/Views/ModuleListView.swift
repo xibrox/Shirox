@@ -267,7 +267,7 @@ struct ModuleListView: View {
 
     // MARK: - Empty State (solid)
     private var emptyModulesView: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Image(systemName: "puzzlepiece.extension")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
@@ -281,8 +281,8 @@ struct ModuleListView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 16)   // Matches row content padding
+        .background(Color.clear)    // Transparent – lets section background show through
     }
 
     // MARK: - Actions
