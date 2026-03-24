@@ -25,121 +25,39 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
-                    if vm.query.isEmpty && !history.queries.isEmpty {
-                        historyView
+            mainContent
+                .navigationTitle("Search")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        moduleButton
+                    }
+                }
+                .searchable(
+                    text: $vm.query,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Search anime…"
+                )
+                .onSubmit(of: .search) {
+                    history.add(vm.query)
+                    vm.search(usingModule: usingModule)
+                }
+                .onChange(of: vm.query) { _, new in
+                    if new.isEmpty {
+                        vm.clearResults()
                     } else {
-                    emptyStateView(
-                        icon: usingModule ? "puzzlepiece.extension" : "magnifyingglass",
-                        title: usingModule ? "Search via Module" : "Search Anime",
-                        subtitle: usingModule
-                            ? "Searching \(moduleManager.activeModule?.sourceName ?? "")…"
-                            : "Find any anime via AniList"
-                    )
-                    }
-                } else if vm.isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        Text("Searching…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let err = vm.errorMessage {
-                    emptyStateView(
-                        icon: "exclamationmark.triangle",
-                        title: "Something went wrong",
-                        subtitle: err
-                    )
-                } else if !vm.hasResults && !vm.query.isEmpty {
-                    ContentUnavailableView.search(text: vm.query)
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            if !vm.aniListResults.isEmpty {
-                                ForEach(vm.aniListResults) { media in
-                                    NavigationLink {
-                                        AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                                    } label: {
-                                        AniListCardView(media: media)
-                                    }
-                                    .buttonStyle(CardPressStyle())
-                                }
-                            } else {
-                                ForEach(vm.moduleResults) { item in
-                                    NavigationLink {
-                                        DetailView(item: item)
-                                    } label: {
-                                        AnimeCardView(item: item)
-                                    }
-                                    .buttonStyle(CardPressStyle())
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 16)
-                        .animation(.easeInOut(duration: 0.25), value: vm.resultCount)
+                        vm.hasSearched = false
                     }
                 }
-            }
-            .navigationTitle("Shirox")
-            .searchable(text: $vm.query, prompt: "Search anime…")
-            .onSubmit(of: .search) {
-                history.add(vm.query)
-                vm.search(usingModule: usingModule)
-            }
-            .onChange(of: vm.query) { _, new in
-                if new.isEmpty {
-                    vm.clearResults()
-                } else {
-                    vm.hasSearched = false
+                .onChange(of: moduleManager.activeModule?.id) { _, _ in
+                    guard !vm.query.isEmpty else { return }
+                    vm.search(usingModule: usingModule)
                 }
-            }
-            .onChange(of: moduleManager.activeModule?.id) { _, _ in
-                guard !vm.query.isEmpty else { return }
-                vm.search(usingModule: usingModule)
-            }
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        showModuleList = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "puzzlepiece.extension")
-                            if let name = moduleManager.activeModule?.sourceName {
-                                Text(name)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.red.opacity(0.12), in: Capsule())
-                        .foregroundStyle(.red)
-                    }
-                }
-            }
         }
-        .overlay {
-            ZStack {
-                if showModuleList {
-                    Color.black.opacity(0.45)
-                        .ignoresSafeArea()
-                        .onTapGesture { showModuleList = false }
-                        .transition(.opacity)
-                    ModuleListView(onDismiss: { showModuleList = false })
-                        .environmentObject(moduleManager)
-                        .tint(.red)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.88, anchor: .center).combined(with: .opacity),
-                            removal: .scale(scale: 0.96, anchor: .center).combined(with: .opacity)
-                        ))
-                }
-            }
-            .animation(.spring(response: 0.38, dampingFraction: 0.8), value: showModuleList)
+        .toolbarRole(.navigationStack)
+        .sheet(isPresented: $showModuleList) {
+            ModuleListView()
+                .environmentObject(moduleManager)
+                .tint(.red)
         }
         .background(
             GeometryReader { geo in
@@ -153,6 +71,80 @@ struct SearchView: View {
         }
     }
 
+    // MARK: - Main Content
+    @ViewBuilder
+    private var mainContent: some View {
+        if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
+            if vm.query.isEmpty && !history.queries.isEmpty {
+                historyView
+            } else {
+                emptyStateView(
+                    icon: usingModule ? "puzzlepiece.extension" : "magnifyingglass",
+                    title: usingModule ? "Search via Module" : "Search Anime",
+                    subtitle: usingModule
+                        ? "Searching \(moduleManager.activeModule?.sourceName ?? "")…"
+                        : "Find any anime via AniList"
+                )
+            }
+        } else if vm.isLoading {
+            loadingView
+        } else if let err = vm.errorMessage {
+            emptyStateView(
+                icon: "exclamationmark.triangle",
+                title: "Something went wrong",
+                subtitle: err
+            )
+        } else if !vm.hasResults && !vm.query.isEmpty {
+            ContentUnavailableView.search(text: vm.query)
+        } else {
+            resultsView
+        }
+    }
+
+    // MARK: - Results Grid
+    private var resultsView: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 12) {
+                if !vm.aniListResults.isEmpty {
+                    ForEach(vm.aniListResults) { media in
+                        NavigationLink {
+                            AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                        } label: {
+                            AniListCardView(media: media)
+                        }
+                        .buttonStyle(CardPressStyle())
+                    }
+                } else {
+                    ForEach(vm.moduleResults) { item in
+                        NavigationLink {
+                            DetailView(item: item)
+                        } label: {
+                            AnimeCardView(item: item)
+                        }
+                        .buttonStyle(CardPressStyle())
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+            .animation(.easeInOut(duration: 0.25), value: vm.resultCount)
+        }
+    }
+
+    // MARK: - Loading View
+    private var loadingView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .scaleEffect(1.2)
+            Text("Searching…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - History View
     private var historyView: some View {
         List {
             Section {
@@ -186,6 +178,7 @@ struct SearchView: View {
         .listStyle(.insetGrouped)
     }
 
+    // MARK: - Empty State
     private func emptyStateView(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 16) {
             Image(systemName: icon)
@@ -203,10 +196,74 @@ struct SearchView: View {
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: - Module Button
+    @ViewBuilder
+    private var moduleButton: some View {
+        Button {
+            showModuleList = true
+        } label: {
+            HStack(spacing: 6) {
+                // Icon container (rounded)
+                Group {
+                    if usingModule {
+                        // Active module icon (or fallback puzzle)
+                        if let iconUrlString = moduleManager.activeModule?.iconUrl,
+                           !iconUrlString.isEmpty,
+                           let url = URL(string: iconUrlString) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                default:
+                                    fallbackIcon
+                                }
+                            }
+                        } else {
+                            fallbackIcon
+                        }
+                    } else {
+                        // AniList icon (built‑in)
+                        AsyncImage(url: URL(string: "https://anilist.co/img/icons/apple-touch-icon.png")) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            default:
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
+                }
+                .frame(width: 20, height: 20)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .background(
+                    (usingModule ? Color.secondary.opacity(0.1) : Color.red.opacity(0.1)),
+                    in: RoundedRectangle(cornerRadius: 4)
+                )
+
+                // Text label
+                Text(usingModule ? (moduleManager.activeModule?.sourceName ?? "Module") : "AniList")
+                    .font(.callout)
+                    .fontWeight(.medium)
+            }
+            .foregroundStyle(.primary)
+        }
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: "puzzlepiece.extension")
+            .font(.system(size: 14))
+            .foregroundStyle(.secondary)
+    }
 }
 
 // MARK: - Search History Manager
-
 private final class SearchHistoryManager: ObservableObject {
     @Published private(set) var queries: [String] = []
     private let key = "searchHistory"
@@ -237,7 +294,6 @@ private final class SearchHistoryManager: ObservableObject {
 }
 
 // MARK: - Card Press Style
-
 private struct CardPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -247,7 +303,6 @@ private struct CardPressStyle: ButtonStyle {
 }
 
 // MARK: - AniList Card
-
 struct AniListCardView: View {
     let media: AniListMedia
 
