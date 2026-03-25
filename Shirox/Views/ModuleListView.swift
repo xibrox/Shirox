@@ -5,6 +5,8 @@ struct ModuleListView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var moduleURL = ""
     @State private var isRefreshing = false
+    @State private var isAddingModule = false
+    @State private var addModuleError: String?
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
@@ -16,7 +18,7 @@ struct ModuleListView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
 
-                if let error = moduleManager.errorMessage {
+                if let error = addModuleError ?? moduleManager.errorMessage {
                     Section {
                         errorBanner(error)
                     }
@@ -77,6 +79,12 @@ struct ModuleListView: View {
                     }
                     .disabled(moduleManager.modules.isEmpty || isRefreshing)
                 }
+                // --- TEST BUTTON (uncomment to test spinner) ---
+                // ToolbarItem(placement: .topBarLeading) {
+                //     Button("Test Spinner") {
+                //         isAddingModule.toggle()
+                //     }
+                // }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -90,9 +98,13 @@ struct ModuleListView: View {
         .onTapGesture {
             isTextFieldFocused = false
         }
+        .onChange(of: moduleURL) { _, _ in
+            addModuleError = nil
+            moduleManager.errorMessage = nil
+        }
     }
 
-    // MARK: - Add Module Card (liquid glass)
+    // MARK: - Add Module Card
     private var addModuleCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Add Module")
@@ -112,19 +124,26 @@ struct ModuleListView: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
                     .focused($isTextFieldFocused)
+                    .disabled(isAddingModule)
+                    .onSubmit {
+                        addModule()
+                    }
 
                 Button {
                     addModule()
                 } label: {
-                    if moduleManager.isLoading {
-                        ProgressView().scaleEffect(0.8)
+                    if isAddingModule {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .frame(width: 28, height: 28)
                     } else {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
                             .foregroundStyle(moduleURL.isEmpty ? Color.secondary : Color.red)
                     }
                 }
-                .disabled(moduleURL.isEmpty || moduleManager.isLoading)
+                .buttonStyle(.plain)
+                .disabled(moduleURL.isEmpty || isAddingModule)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -134,7 +153,7 @@ struct ModuleListView: View {
         .background(Color.clear)
     }
 
-    // MARK: - Error Banner (solid)
+    // MARK: - Error Banner
     private func errorBanner(_ error: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "xmark.circle.fill")
@@ -151,7 +170,7 @@ struct ModuleListView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - AniList Row (solid)
+    // MARK: - AniList Row
     private var aniListRow: some View {
         let isActive = moduleManager.activeModule == nil
         return Button {
@@ -166,9 +185,7 @@ struct ModuleListView: View {
                 AsyncImage(url: URL(string: "https://anilist.co/img/icons/apple-touch-icon.png")) { phase in
                     switch phase {
                     case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
+                        image.resizable().aspectRatio(contentMode: .fit)
                     case .failure, .empty:
                         Image(systemName: "list.bullet")
                             .font(.title2)
@@ -203,7 +220,7 @@ struct ModuleListView: View {
         .animation(.easeOut(duration: 0.2), value: isActive)
     }
 
-    // MARK: - Module Row (solid)
+    // MARK: - Module Row
     private func moduleRow(_ module: ModuleDefinition) -> some View {
         let isActive = moduleManager.activeModule?.id == module.id
         return Button {
@@ -265,7 +282,7 @@ struct ModuleListView: View {
         .animation(.easeOut(duration: 0.2), value: isActive)
     }
 
-    // MARK: - Empty State (solid)
+    // MARK: - Empty State
     private var emptyModulesView: some View {
         VStack(spacing: 12) {
             Image(systemName: "puzzlepiece.extension")
@@ -281,25 +298,45 @@ struct ModuleListView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .padding(.horizontal, 16)   // Matches row content padding
-        .background(Color.clear)    // Transparent – lets section background show through
+        .padding(.horizontal, 16)
+        .background(Color.clear)
     }
 
     // MARK: - Actions
     private func addModule() {
-        guard let url = URL(string: moduleURL) else { return }
+        let trimmedURL = moduleURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedURL.isEmpty, let url = URL(string: trimmedURL) else {
+            addModuleError = "Invalid URL"
+            #if os(iOS)
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            #endif
+            return
+        }
+
+        withAnimation {
+            addModuleError = nil
+            isAddingModule = true
+        }
+
         Task {
             await moduleManager.addModule(from: url)
-            if moduleManager.errorMessage == nil {
-                moduleURL = ""
-                isTextFieldFocused = false
-                #if os(iOS)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                #endif
-            } else {
-                #if os(iOS)
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-                #endif
+            
+            await MainActor.run {
+                withAnimation {
+                    isAddingModule = false
+                    if moduleManager.errorMessage == nil {
+                        moduleURL = ""
+                        isTextFieldFocused = false
+                        #if os(iOS)
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        #endif
+                    } else {
+                        addModuleError = moduleManager.errorMessage
+                        #if os(iOS)
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        #endif
+                    }
+                }
             }
         }
     }
