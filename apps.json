@@ -27,7 +27,7 @@
       },
       "versions": [
         {
-          "version": "0.0.5",
+          "version": "0.0.6",
           "buildVersion": "2",
           "date": "2026-03-25",
           "localizedDescription": "Initial beta release.",
