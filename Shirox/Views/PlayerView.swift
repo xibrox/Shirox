@@ -201,12 +201,20 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
 }
 #endif
 
+// MARK: - WatchNextLoader
+
+/// (currentEpisodeNumber) async throws -> (streams, nextEpisodeNumber)?
+/// Returns nil when there is no next episode.
+typealias WatchNextLoader = (Int) async throws -> (streams: [StreamResult], episodeNumber: Int)?
+
 // MARK: - PlayerView
 
 struct PlayerView: View {
-    let stream: StreamResult
     var customDismiss: (() -> Void)? = nil
-    var context: PlayerContext? = nil
+    let onWatchNext: WatchNextLoader?
+
+    @State private var currentStream: StreamResult
+    @State private var currentContext: PlayerContext?
     @Environment(\.dismiss) private var dismiss
 
     // Video
@@ -250,6 +258,22 @@ struct PlayerView: View {
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong")  private var skipLong:  Int = 85
 
+    // Next episode
+    @AppStorage("autoNextEpisode") private var autoNextEpisode = false
+    @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
+    @State private var showNextEpisodeButton = false
+    @State private var isLoadingNextEpisode = false
+    @State private var nextEpisodeStreams: [StreamResult] = []
+    @State private var nextEpisodeNumber: Int = 0
+    @State private var showNextEpisodePicker = false
+
+    init(stream: StreamResult, customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil) {
+        _currentStream = State(initialValue: stream)
+        _currentContext = State(initialValue: context)
+        self.customDismiss = customDismiss
+        self.onWatchNext = onWatchNext
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -263,7 +287,7 @@ struct PlayerView: View {
                     .ignoresSafeArea()
                     .overlay {
                         ZStack {
-                            if let urlStr = context?.imageUrl, let url = URL(string: urlStr) {
+                            if let urlStr = currentContext?.imageUrl, let url = URL(string: urlStr) {
                                 AsyncImage(url: url) { phase in
                                     if let img = phase.image {
                                         img
@@ -282,12 +306,12 @@ struct PlayerView: View {
                             Color.black.opacity(0.6)
 
                             VStack(spacing: 10) {
-                                Text(context?.mediaTitle ?? stream.title)
+                                Text(currentContext?.mediaTitle ?? currentStream.title)
                                     .font(.title3.weight(.semibold))
                                     .foregroundStyle(.white)
                                     .multilineTextAlignment(.center)
                                     .lineLimit(2)
-                                if let ep = context?.episodeNumber {
+                                if let ep = currentContext?.episodeNumber {
                                     Text("Episode \(ep)")
                                         .font(.subheadline)
                                         .foregroundStyle(.white.opacity(0.65))
@@ -312,6 +336,7 @@ struct PlayerView: View {
                 PlayerSubtitleOverlay(
                     cues: subtitleCues,
                     currentTime: currentTime,
+                    showControls: showControls,
                     settings: subtitleSettings
                 )
                 .ignoresSafeArea()
@@ -384,6 +409,16 @@ struct PlayerView: View {
                         .ignoresSafeArea()
                 }
                 #endif
+
+                // [3.8] Next episode loading overlay
+                if isLoadingNextEpisode {
+                    Color.black.opacity(0.65)
+                        .ignoresSafeArea()
+                        .overlay(ProgressView().tint(.white).scaleEffect(1.5))
+                        .allowsHitTesting(true)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.2), value: isLoadingNextEpisode)
+                }
 
                 // [4] Shadow Overlay & Controls
                 if showControls && !isLocked && controlsEnabled {
@@ -505,6 +540,15 @@ struct PlayerView: View {
             audioPickerSheet
                 .presentationDetents([.height(CGFloat(60 + 56 * max(1, audioGroup?.options.count ?? 0)))])
         }
+        .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
+            nextEpisodeStreams = []
+            nextEpisodeNumber = 0
+        }) {
+            PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
+                swapStream(selected, episodeNumber: nextEpisodeNumber)
+            }
+            .presentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
+        }
     }
 
     // MARK: - Audio Picker Sheet
@@ -562,7 +606,7 @@ struct PlayerView: View {
                 // Main vertical layout with top and bottom bars pinned to edges
                 VStack(spacing: 0) {
                     PlayerTopBar(
-                        title: stream.title,
+                        title: currentStream.title,
                         onDismiss: handleDismiss,
                         isLocked: $isLocked,
                         onPiP: {
@@ -589,9 +633,11 @@ struct PlayerView: View {
                         skipLongAmount: skipLong,
                         onSubtitleSettingsTap: { showSubtitleSettings = true },
                         onAudioTap: { showAudioPicker = true },
-                        hasSubtitles: stream.subtitle != nil,
+                        hasSubtitles: currentStream.subtitle != nil,
                         audioTrackCount: audioGroup?.options.count ?? 0,
-                        bottomPadding: bottomPad
+                        bottomPadding: bottomPad,
+                        onNextEpisodeTap: onWatchNext != nil ? { Task { @MainActor in await loadAndAdvance() } } : nil,
+                        showNextEpisodeButton: showNextEpisodeButton
                     )
                     .buttonStyle(CircularButtonStyle())
                 }
@@ -678,8 +724,8 @@ struct PlayerView: View {
     // MARK: - Player Actions
 
     private func saveProgress() {
-        guard let context, duration > 0 else { return }
-        let urlString = stream.url.absoluteString
+        guard let context = currentContext, duration > 0 else { return }
+        let urlString = currentStream.url.absoluteString
         let episodeNumber = context.episodeNumber
         // Reuse existing id to keep stable identity across repeated saves for the same episode
         let existingId = ContinueWatchingManager.shared.items
@@ -690,9 +736,9 @@ struct PlayerView: View {
             episodeNumber: context.episodeNumber,
             episodeTitle: context.episodeTitle,
             imageUrl: context.imageUrl,
-            streamUrl: stream.url.absoluteString,
-            headers: stream.headers.isEmpty ? nil : stream.headers,
-            subtitle: stream.subtitle,
+            streamUrl: currentStream.url.absoluteString,
+            headers: currentStream.headers.isEmpty ? nil : currentStream.headers,
+            subtitle: currentStream.subtitle,
             aniListID: context.aniListID,
             moduleId: context.moduleId,
             detailHref: context.detailHref,
@@ -724,8 +770,13 @@ struct PlayerView: View {
     private func skip(by seconds: Double) {
         guard let player, duration > 0 else { return }
         let newTime = min(max(currentTime + seconds, 0), duration)
-        player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
         currentTime = newTime
+        isScrubbing = true
+        player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            isScrubbing = false
+        }
     }
 
     private func seekTo(_ time: Double) {
@@ -759,11 +810,11 @@ struct PlayerView: View {
         #endif
 
         let asset: AVURLAsset
-        if !stream.headers.isEmpty {
-            let opts: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": stream.headers]
-            asset = AVURLAsset(url: stream.url, options: opts)
+        if !currentStream.headers.isEmpty {
+            let opts: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": currentStream.headers]
+            asset = AVURLAsset(url: currentStream.url, options: opts)
         } else {
-            asset = AVURLAsset(url: stream.url)
+            asset = AVURLAsset(url: currentStream.url)
         }
         let item = AVPlayerItem(asset: asset)
         // If a subtitle is present this is a sub stream — prefer Japanese audio track.
@@ -773,7 +824,7 @@ struct PlayerView: View {
             guard let group = try? await asset.loadMediaSelectionGroup(for: .audible) else { return }
             await MainActor.run { audioGroup = group }
             // Auto-select Japanese for sub streams (subtitle present)
-            if stream.subtitle != nil {
+            if currentStream.subtitle != nil {
                 let jaOptions = AVMediaSelectionGroup.mediaSelectionOptions(
                     from: group.options,
                     with: Locale(identifier: "ja")
@@ -798,7 +849,7 @@ struct PlayerView: View {
                 #if os(iOS)
                 // Only clear the cover here for fresh (non-resume) playback.
                 // Resume playback clears it in the seek completion handler below.
-                if player.timeControlStatus == .playing && !videoReady && context?.resumeFrom == nil {
+                if player.timeControlStatus == .playing && !videoReady && currentContext?.resumeFrom == nil {
                     videoReady = true
                 }
                 #endif
@@ -806,39 +857,38 @@ struct PlayerView: View {
         }
 
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-        timeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak item] time in
+        timeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak p] time in
             guard !isScrubbing else { return }
             currentTime = time.seconds
-            if let d = item?.duration, d.isNumeric { duration = d.seconds }
+            if let d = p?.currentItem?.duration, d.isNumeric { duration = d.seconds }
+            if onWatchNext != nil && duration > 0 {
+                let shouldShow = currentTime / duration >= watchedPercentage / 100.0
+                if shouldShow != showNextEpisodeButton {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        showNextEpisodeButton = shouldShow
+                    }
+                }
+            }
             // Resume-seek: seek once to saved position when duration is first known.
             // videoReady is cleared here (not in the rate observer) so the black cover
             // stays up until the seek lands on the correct frame.
-            if let resumeFrom = context?.resumeFrom, !didSeekToResume, duration > 0 {
+            if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
-                p.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600),
-                       toleranceBefore: .zero, toleranceAfter: .zero) { completed in
+                p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600),
+                        toleranceBefore: .zero, toleranceAfter: .zero) { completed in
                     guard completed else { return }
                     #if os(iOS)
-                    videoReady = true
+                    DispatchQueue.main.async { videoReady = true }
                     #endif
                 }
             }
             #if os(iOS)
-            updateNowPlaying(player: p)
+            if let p { updateNowPlaying(player: p) }
             #endif
         }
 
-        // Observe playback end to sync isPlaying state
-        NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.didPlayToEndTimeNotification,
-            object: item,
-            queue: .main
-        ) { _ in
-            Task { @MainActor in
-                isPlaying = false
-                withAnimation { showControls = true }
-            }
-        }
+        // Observe playback end
+        setupPlaybackEndObserver(for: item)
 
         scheduleHide()
         #if os(iOS)
@@ -847,7 +897,7 @@ struct PlayerView: View {
     }
 
     private func loadSubtitles() {
-        guard let urlString = stream.subtitle, !urlString.isEmpty else { return }
+        guard let urlString = currentStream.subtitle, !urlString.isEmpty else { return }
         Task {
             do {
                 subtitleCues = try await VTTSubtitlesLoader.load(from: urlString)
@@ -901,13 +951,13 @@ struct PlayerView: View {
 
     private func updateNowPlaying(player p: AVPlayer) {
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: stream.title,
+            MPMediaItemPropertyTitle: currentStream.title,
             MPNowPlayingInfoPropertyIsLiveStream: false,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: p.currentTime().seconds,
             MPNowPlayingInfoPropertyPlaybackRate: Double(p.rate)
         ]
         if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
-        if let mediaTitle = context?.mediaTitle { info[MPMediaItemPropertyAlbumTitle] = mediaTitle }
+        if let mediaTitle = currentContext?.mediaTitle { info[MPMediaItemPropertyAlbumTitle] = mediaTitle }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
@@ -922,6 +972,131 @@ struct PlayerView: View {
         center.skipBackwardCommand.removeTarget(nil)
     }
     #endif
+
+    // MARK: - Next Episode
+
+    private func setupPlaybackEndObserver(for item: AVPlayerItem) {
+        NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification,
+            object: item,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                isPlaying = false
+                withAnimation { showControls = true }
+                if autoNextEpisode { await loadAndAdvance() }
+            }
+        }
+    }
+
+    @MainActor
+    private func loadAndAdvance() async {
+        guard let loader = onWatchNext,
+              let epNum = currentContext?.episodeNumber else { return }
+        isLoadingNextEpisode = true
+        do {
+            guard let result = try await loader(epNum) else {
+                isLoadingNextEpisode = false
+                return
+            }
+            isLoadingNextEpisode = false
+            guard !result.streams.isEmpty else { return }
+
+            if let match = result.streams.first(where: { $0.title == currentStream.title }) {
+                swapStream(match, episodeNumber: result.episodeNumber)
+            } else if result.streams.count == 1 {
+                swapStream(result.streams[0], episodeNumber: result.episodeNumber)
+            } else {
+                nextEpisodeNumber = result.episodeNumber
+                nextEpisodeStreams = result.streams
+                showNextEpisodePicker = true
+            }
+        } catch {
+            isLoadingNextEpisode = false
+        }
+    }
+
+    @MainActor
+    private func swapStream(_ next: StreamResult, episodeNumber: Int) {
+        // Save progress for the current episode before swapping
+        saveProgress()
+
+        // Build the new player item
+        let asset: AVURLAsset
+        if !next.headers.isEmpty {
+            let opts: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": next.headers]
+            asset = AVURLAsset(url: next.url, options: opts)
+        } else {
+            asset = AVURLAsset(url: next.url)
+        }
+        let newItem = AVPlayerItem(asset: asset)
+
+        // Register end observer for the new item before swapping
+        setupPlaybackEndObserver(for: newItem)
+
+        // Seamless swap — same AVPlayer, new item
+        player?.replaceCurrentItem(with: newItem)
+        player?.rate = playbackSpeed
+        isPlaying = true
+
+        // Reset progress state
+        currentTime = 0
+        duration = 0
+        showNextEpisodeButton = false
+        showNextEpisodePicker = false
+        nextEpisodeStreams = []
+        nextEpisodeNumber = 0
+        didSeekToResume = true  // prevent resume-seek logic from re-triggering
+
+        // Update current stream and context
+        currentStream = next
+        if let ctx = currentContext {
+            currentContext = PlayerContext(
+                mediaTitle: ctx.mediaTitle,
+                episodeNumber: episodeNumber,
+                episodeTitle: nil,
+                imageUrl: ctx.imageUrl,
+                aniListID: ctx.aniListID,
+                moduleId: ctx.moduleId,
+                totalEpisodes: ctx.totalEpisodes,
+                resumeFrom: nil,
+                detailHref: ctx.detailHref
+            )
+        }
+
+        // Reload audio group for new stream
+        audioGroup = nil
+        Task {
+            guard let group = try? await asset.loadMediaSelectionGroup(for: .audible) else { return }
+            await MainActor.run { audioGroup = group }
+            if next.subtitle != nil {
+                let jaOptions = AVMediaSelectionGroup.mediaSelectionOptions(
+                    from: group.options, with: Locale(identifier: "ja")
+                )
+                if let jaOption = jaOptions.first {
+                    await MainActor.run { newItem.select(jaOption, in: group) }
+                }
+            }
+        }
+
+        // Reload subtitles
+        subtitleCues = []
+        if let urlString = next.subtitle, !urlString.isEmpty {
+            Task {
+                do {
+                    subtitleCues = try await VTTSubtitlesLoader.load(from: urlString)
+                } catch {
+                    print("[Subtitles] Failed to load after swap: \(error)")
+                }
+            }
+        }
+
+        #if os(iOS)
+        if let p = player { updateNowPlaying(player: p) }
+        #endif
+
+        scheduleHide()
+    }
 }
 
 // MARK: - PlayerHostingController (iOS only)

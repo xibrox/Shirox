@@ -4,6 +4,8 @@ struct SettingsView: View {
     @AppStorage("forceLandscape") private var forceLandscape = false
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
+    @AppStorage("autoNextEpisode") private var autoNextEpisode = false
+    @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
     @State private var showResetConfirmation = false
     #if os(iOS)
     @State private var imageCacheSize = CachedAsyncImage.totalBytes
@@ -32,6 +34,11 @@ struct SettingsView: View {
                             Text("\(s)s").tag(s)
                         }
                     }
+                    Toggle("Auto Next Episode", isOn: $autoNextEpisode)
+                    Stepper(
+                        "Next episode at \(Int(watchedPercentage))%",
+                        value: $watchedPercentage, in: 50...99, step: 5
+                    )
                 }
                 #if os(iOS)
                 Section("Cache") {

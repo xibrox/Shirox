@@ -96,6 +96,10 @@
 		AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB12 /* PlayerTopBar.swift */; };
 		AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
 		AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB13 /* PlayerVolumeSlider.swift */; };
+		AA000001000000000000AA27 /* PlayerNextEpisodeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB14 /* PlayerNextEpisodeButton.swift */; };
+		AA000001000000000000AA28 /* PlayerNextEpisodeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB14 /* PlayerNextEpisodeButton.swift */; };
+		AA000001000000000000AA29 /* PlayerNextEpisodePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */; };
+		AA000001000000000000AA30 /* PlayerNextEpisodePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
@@ -163,6 +167,8 @@
 		AA000001000000000000BB11 /* PlayerTimeFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTimeFormat.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB12 /* PlayerTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerTopBar.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB13 /* PlayerVolumeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerVolumeSlider.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB14 /* PlayerNextEpisodeButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNextEpisodeButton.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNextEpisodePicker.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -330,6 +336,8 @@
 				AA000001000000000000BB11 /* PlayerTimeFormat.swift */,
 				AA000001000000000000BB12 /* PlayerTopBar.swift */,
 				AA000001000000000000BB13 /* PlayerVolumeSlider.swift */,
+				AA000001000000000000BB14 /* PlayerNextEpisodeButton.swift */,
+				AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -499,6 +507,8 @@
 				AA000001000000000000AA22 /* PlayerTimeFormat.swift in Sources */,
 				AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */,
 				AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */,
+				AA000001000000000000AA28 /* PlayerNextEpisodeButton.swift in Sources */,
+				AA000001000000000000AA30 /* PlayerNextEpisodePicker.swift in Sources */,
 				1C6D1244BDD3462C8E0CBCD4 /* ContinueWatchingItem.swift in Sources */,
 				92E2BEB6562E4B97802F53BC /* PlayerContext.swift in Sources */,
 				E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */,
@@ -559,6 +569,8 @@
 				AA000001000000000000AA21 /* PlayerTimeFormat.swift in Sources */,
 				AA000001000000000000AA23 /* PlayerTopBar.swift in Sources */,
 				AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */,
+				AA000001000000000000AA27 /* PlayerNextEpisodeButton.swift in Sources */,
+				AA000001000000000000AA29 /* PlayerNextEpisodePicker.swift in Sources */,
 				1C7242C86CDC40F6956D4F05 /* ContinueWatchingItem.swift in Sources */,
 				3DA0FE0FBD304EC4814AD384 /* PlayerContext.swift in Sources */,
 				3F944857548C49EB979DFFAA /* ContinueWatchingManager.swift in Sources */,
@@ -645,13 +657,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.6;
+				MARKETING_VERSION = 0.0.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -668,14 +680,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.1;
+				MARKETING_VERSION = 0.0.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -692,13 +704,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.6;
+				MARKETING_VERSION = 0.0.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -776,14 +788,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.1;
+				MARKETING_VERSION = 0.0.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

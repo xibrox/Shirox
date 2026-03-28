@@ -6,6 +6,7 @@ struct DetailView: View {
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var synopsisExpanded = false
     @State private var selectedSeason = 0
+    @State private var showResetConfirmation = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -327,6 +328,27 @@ struct DetailView: View {
                         .background(Color.accentColor, in: Capsule())
                 }
                 Spacer()
+                let moduleId = ModuleManager.shared.activeModule?.id
+                if continueWatching.hasProgress(aniListID: nil, moduleId: moduleId, mediaTitle: detail.title) {
+                    Button {
+                        showResetConfirmation = true
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .alert("Reset Progress", isPresented: $showResetConfirmation) {
+                Button("Reset", role: .destructive) {
+                    let moduleId = ModuleManager.shared.activeModule?.id
+                    ContinueWatchingManager.shared.resetProgress(
+                        aniListID: nil, moduleId: moduleId, mediaTitle: detail.title)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will clear all watched history and progress for \(detail.title).")
             }
 
             if isMultiSeason {
@@ -433,6 +455,10 @@ private struct ModuleEpisodeRowContainer: View {
                 ContinueWatchingManager.shared.markUnwatched(
                     aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
                     imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+            },
+            onResetProgress: {
+                ContinueWatchingManager.shared.resetEpisodeProgress(
+                    aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
             },
             allPreviousWatched: allPreviousWatched,
             onTogglePreviousWatched: epNum > 1 ? {

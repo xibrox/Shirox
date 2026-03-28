@@ -20,7 +20,7 @@ extension JSEngine {
         // 2. {streams: ["url1", "url2"]}
         // 3. {stream: "url"} or {stream: {url, headers}}
 
-        let subtitleUrl = (obj["subtitle"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let subtitleUrl = (obj["subtitle"] as? String ?? obj["subtitles"] as? String).flatMap { $0.isEmpty ? nil : $0 }
 
         var results: [StreamResult] = []
 

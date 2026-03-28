@@ -15,6 +15,8 @@ struct PlayerBottomBar: View {
     var hasSubtitles: Bool = false
     var audioTrackCount: Int = 0
     var bottomPadding: CGFloat = 24
+    var onNextEpisodeTap: (() -> Void)? = nil
+    var showNextEpisodeButton: Bool = false
 
     var body: some View {
         VStack(spacing: 4) {
@@ -24,15 +26,15 @@ struct PlayerBottomBar: View {
 
                 Spacer()
 
-                if audioTrackCount > 1 {
-                    audioButton
+                if showNextEpisodeButton, let onNextEpisodeTap {
+                    nextEpisodeButton(action: onNextEpisodeTap)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .trailing)),
+                            removal: .opacity
+                        ))
                 }
 
-                if hasSubtitles {
-                    subtitleButton
-                }
-
-                speedButton
+                rightButtonGroup
             }
             .padding(.horizontal, 20)
 
@@ -51,6 +53,23 @@ struct PlayerBottomBar: View {
 
     // MARK: - Subviews
 
+    @ViewBuilder
+    private func nextEpisodeButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: "forward.end.fill")
+                    .font(.system(size: 14, weight: .medium))
+                Text("Next")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(Color.white.opacity(0.2), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var skip85Button: some View {
         Button(action: onSkip85) {
             HStack(spacing: 5) {
@@ -67,40 +86,38 @@ struct PlayerBottomBar: View {
         .buttonStyle(.plain)
     }
 
-    private var speedButton: some View {
-        Button(action: onSpeedTap) {
-            Text(speedLabel)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .frame(height: 36)
-                .background(Color.white.opacity(0.2), in: Capsule())
+    @ViewBuilder private var rightButtonGroup: some View {
+        HStack(spacing: 0) {
+            if audioTrackCount > 1 {
+                Button(action: onAudioTap) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 34)
+                }
+                .buttonStyle(.plain)
+            }
+            if hasSubtitles {
+                Button(action: onSubtitleSettingsTap) {
+                    Image(systemName: "captions.bubble.fill")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 34)
+                }
+                .buttonStyle(.plain)
+            }
+            Button(action: onSpeedTap) {
+                Text(speedLabel)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(height: 34)
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
-    }
-
-    private var audioButton: some View {
-        Button(action: onAudioTap) {
-            Image(systemName: "waveform")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(height: 36)
-                .padding(.horizontal, 14)
-                .background(Color.white.opacity(0.2), in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var subtitleButton: some View {
-        Button(action: onSubtitleSettingsTap) {
-            Image(systemName: "captions.bubble.fill")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .frame(height: 36)
-                .background(Color.white.opacity(0.2), in: Capsule())
-        }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
+        .background(Color.white.opacity(0.2), in: Capsule())
     }
 
     // MARK: - Helpers

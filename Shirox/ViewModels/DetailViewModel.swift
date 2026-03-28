@@ -77,6 +77,13 @@ final class DetailViewModel: ObservableObject {
         }
     }
 
+    /// Fetches streams for the given episode and returns them sorted by title.
+    /// Unlike loadStreams(for:), this does not affect UI state — safe to call from onWatchNext.
+    func fetchStreams(for episode: EpisodeLink) async throws -> [StreamResult] {
+        let streams = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
+        return streams.sorted { $0.title < $1.title }
+    }
+
     func cancelStreamLoading() {
         streamsTask?.cancel()
         streamsTask = nil
@@ -98,6 +105,21 @@ final class DetailViewModel: ObservableObject {
             resumeFrom: nil,
             detailHref: detailHref
         )
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, from: sourceView)
+
+        // Build a WatchNextLoader that dynamically finds the next episode by current episode number
+        let episodes = detail?.episodes ?? []
+        let watchNextLoader: WatchNextLoader? = episodes.isEmpty ? nil : { [weak self] currentEpNum in
+            guard let self,
+                  let idx = self.detail?.episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                  let episodes = self.detail?.episodes,
+                  idx + 1 < episodes.count
+            else { return nil }
+            let nextEp = episodes[idx + 1]
+            let streams = try await self.fetchStreams(for: nextEp)
+            guard !streams.isEmpty else { return nil }
+            return (streams: streams, episodeNumber: Int(nextEp.number))
+        }
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: watchNextLoader, from: sourceView)
     }
 }

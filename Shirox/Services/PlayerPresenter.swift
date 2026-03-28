@@ -47,14 +47,15 @@ final class PlayerPresenter: ObservableObject {
         return root
     }
 
-    func presentPlayer(stream: StreamResult, context: PlayerContext? = nil, from sourceView: UIView? = nil) {
+    func presentPlayer(stream: StreamResult, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, from sourceView: UIView? = nil) {
         guard let topVC = Self.findTopViewController() else { return }
         self.sourceView = sourceView
 
         let playerView = PlayerView(
             stream: stream,
             customDismiss: { [weak self] in self?.dismissPlayer() },
-            context: context
+            context: context,
+            onWatchNext: onWatchNext
         )
         .ignoresSafeArea()
         .tint(.red)

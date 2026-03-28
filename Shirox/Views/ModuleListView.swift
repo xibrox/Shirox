@@ -18,7 +18,15 @@ struct ModuleListView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
 
-                if let error = addModuleError ?? moduleManager.errorMessage {
+                if let error = addModuleError {
+                    Section {
+                        errorBanner(error)
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+
+                if let error = moduleManager.errorMessage {
                     Section {
                         errorBanner(error)
                     }
@@ -320,7 +328,7 @@ struct ModuleListView: View {
 
         Task {
             await moduleManager.addModule(from: url)
-            
+
             await MainActor.run {
                 withAnimation {
                     isAddingModule = false

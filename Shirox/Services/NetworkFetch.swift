@@ -483,7 +483,7 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
                         }
                     }
                 });
-                const clickableSelectors = ['.play', '.play-button', '[data-play]', '.video-play', '.jwplayer', '[id*="player"]', 'div[onclick]', 'span[onclick]', 'a[onclick]'];
+                const clickableSelectors = ['button', '.play', '.play-button', '[data-play]', '.video-play', '.jwplayer', '.player', '[id*="player"]', '[class*="play"]', 'div[onclick]', 'span[onclick]', 'a[onclick]'];
                 clickableSelectors.forEach(function(selector) {
                     document.querySelectorAll(selector).forEach(function(el) {
                         try { el.click(); } catch(e) {}
@@ -968,6 +968,12 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
                             });
                         }
                     }
+                });
+                const clickableSelectors = ['button', '.play', '.play-button', '[data-play]', '.video-play', '.jwplayer', '.player', '[id*="player"]', '[class*="play"]', 'div[onclick]', 'span[onclick]', 'a[onclick]'];
+                clickableSelectors.forEach(function(selector) {
+                    document.querySelectorAll(selector).forEach(function(el) {
+                        try { el.click(); } catch(e) {}
+                    });
                 });
             };
             setTimeout(nuclearScan, 500);

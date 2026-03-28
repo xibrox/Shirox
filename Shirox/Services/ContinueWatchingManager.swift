@@ -34,7 +34,11 @@ import Foundation
         var newItems = items
         removeAllShowItems(for: item, in: &newItems)
 
-        if item.totalSeconds > 0 && item.watchedSeconds / item.totalSeconds >= 0.9 {
+        let watchedThreshold: Double = {
+            guard UserDefaults.standard.object(forKey: "watchedPercentage") != nil else { return 0.9 }
+            return UserDefaults.standard.double(forKey: "watchedPercentage") / 100.0
+        }()
+        if item.totalSeconds > 0 && item.watchedSeconds / item.totalSeconds >= watchedThreshold {
             markWatched(item)
             if let placeholder = makePlaceholder(
                 episodeNumber: item.episodeNumber + 1, from: item,
@@ -60,6 +64,47 @@ import Foundation
     func remove(_ item: ContinueWatchingItem) {
         items.removeAll { $0.id == item.id }
         persist()
+    }
+
+    /// Removes the watched key and any CW item for a single episode.
+    func resetEpisodeProgress(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int) {
+        if let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
+                                     mediaTitle: mediaTitle, episodeNumber: episodeNumber) {
+            watchedKeys.remove(key)
+        }
+        items.removeAll {
+            matchesShow($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
+            && $0.episodeNumber == episodeNumber
+        }
+        persist()
+    }
+
+    /// Removes all watched keys and CW items for a single show.
+    func resetProgress(aniListID: Int?, moduleId: String?, mediaTitle: String) {
+        if let aid = aniListID {
+            watchedKeys = watchedKeys.filter { !$0.hasPrefix("a:\(aid):") }
+        } else if let mid = moduleId, !mid.isEmpty {
+            let prefix = "m:\(mid):\(mediaTitle):"
+            watchedKeys = watchedKeys.filter { !$0.hasPrefix(prefix) }
+        }
+        var arr = items
+        removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)
+        items = arr
+        persist()
+    }
+
+    /// Returns true if the show has any CW item or watched episode.
+    func hasProgress(aniListID: Int?, moduleId: String?, mediaTitle: String) -> Bool {
+        if items.contains(where: { matchesShow($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle) }) {
+            return true
+        }
+        if let aid = aniListID {
+            return watchedKeys.contains(where: { $0.hasPrefix("a:\(aid):") })
+        }
+        if let mid = moduleId, !mid.isEmpty {
+            return watchedKeys.contains(where: { $0.hasPrefix("m:\(mid):\(mediaTitle):") })
+        }
+        return false
     }
 
     /// Clears all watched history and Continue Watching cards.

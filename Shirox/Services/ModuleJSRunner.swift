@@ -92,7 +92,7 @@ final class ModuleJSRunner {
             throw JSEngineError.parseError("Could not parse stream result")
         }
 
-        let subtitleUrl = (obj["subtitle"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let subtitleUrl = (obj["subtitle"] as? String ?? obj["subtitles"] as? String).flatMap { $0.isEmpty ? nil : $0 }
 
         var results: [StreamResult] = []
 

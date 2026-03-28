@@ -8,6 +8,7 @@ struct AniListDetailView: View {
     @StateObject private var vm = AniListDetailViewModel()
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    @State private var showResetConfirmation = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -344,9 +345,28 @@ private func heroSection(media: AniListMedia) -> some View {
                         .background(Color.accentColor, in: Capsule())
                 }
                 Spacer()
+                if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
+                    Button {
+                        showResetConfirmation = true
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
+            .alert("Reset Progress", isPresented: $showResetConfirmation) {
+                Button("Reset", role: .destructive) {
+                    ContinueWatchingManager.shared.resetProgress(
+                        aniListID: media.id, moduleId: nil, mediaTitle: "")
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will clear all watched history and progress for \(media.title.displayTitle).")
+            }
 
             if moduleManager.modules.isEmpty {
                 HStack(spacing: 10) {
@@ -467,6 +487,10 @@ private struct AniListEpisodeRowContainer: View {
                     aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: ep,
                     imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
             },
+            onResetProgress: {
+                ContinueWatchingManager.shared.resetEpisodeProgress(
+                    aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: ep)
+            },
             allPreviousWatched: allPreviousWatched,
             onTogglePreviousWatched: ep > 1 ? {
                 let fresh = (1..<ep).allSatisfy {
@@ -494,6 +518,7 @@ private struct AniListEpisodeRow: View {
     let onTap: () -> Void
     var onMarkWatched: (() -> Void)? = nil
     var onMarkUnwatched: (() -> Void)? = nil
+    var onResetProgress: (() -> Void)? = nil
     var allPreviousWatched: Bool = false
     var onTogglePreviousWatched: (() -> Void)? = nil
 
@@ -571,6 +596,12 @@ private struct AniListEpisodeRow: View {
                         allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
                         systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
                     )
+                }
+            }
+            if let onResetProgress, progress != nil {
+                Divider()
+                Button(role: .destructive) { onResetProgress() } label: {
+                    Label("Reset Progress", systemImage: "arrow.counterclockwise")
                 }
             }
         }

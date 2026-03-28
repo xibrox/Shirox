@@ -6,6 +6,7 @@ struct EpisodeRowView: View {
     let onTap: () -> Void
     var onMarkWatched: (() -> Void)? = nil
     var onMarkUnwatched: (() -> Void)? = nil
+    var onResetProgress: (() -> Void)? = nil
     var allPreviousWatched: Bool = false
     var onTogglePreviousWatched: (() -> Void)? = nil
 
@@ -84,6 +85,12 @@ struct EpisodeRowView: View {
                         allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
                         systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
                     )
+                }
+            }
+            if let onResetProgress, progress != nil {
+                Divider()
+                Button(role: .destructive) { onResetProgress() } label: {
+                    Label("Reset Progress", systemImage: "arrow.counterclockwise")
                 }
             }
         }
