@@ -11,6 +11,9 @@
 *.xcodeproj/*.xcworkspace/xcshareddata/*
 !*.xcodeproj/*.xcworkspace/xcshareddata/swiftpm/
 
+*.xcuserstate
+**/xcuserdata/
+
 # Other
 .DS_Store
 
@@ -23,5 +26,3 @@ build/
 # Claude Code
 .claude/
 docs
-*.xcuserstate
-**/xcuserdata/
