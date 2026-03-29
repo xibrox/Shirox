@@ -18,6 +18,9 @@ final class DetailViewModel: ObservableObject {
     @Published var selectedStream: StreamResult?
     @Published var showPlayer = false
 
+    /// Stream selected by user in the picker — presented after the sheet fully dismisses.
+    var pendingStream: StreamResult?
+
     private(set) var detailHref: String?
     private var streamsTask: Task<Void, Never>?
 
@@ -63,8 +66,8 @@ final class DetailViewModel: ObservableObject {
                 guard !Task.isCancelled else { return }
                 let sorted = streams.sorted { $0.title < $1.title }
                 if sorted.count == 1 {
+                    pendingStream = sorted[0]
                     showStreamPicker = false
-                    selectStream(sorted[0])
                 } else {
                     streamOptions = sorted
                 }

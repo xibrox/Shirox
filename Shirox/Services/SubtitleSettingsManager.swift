@@ -41,7 +41,6 @@ final class SubtitleSettingsManager: ObservableObject {
         didSet { UserDefaults.standard.set(backgroundEnabled, forKey: Keys.backgroundEnabled) }
     }
 
-    // approx. iOS safe-area + controls height
     @Published var bottomPadding: Double {
         didSet { UserDefaults.standard.set(bottomPadding, forKey: Keys.bottomPadding) }
     }
@@ -53,15 +52,25 @@ final class SubtitleSettingsManager: ObservableObject {
     // MARK: - Init
 
     private init() {
-        let defaults = UserDefaults.standard
+        // register(defaults:) provides fallbacks only when a key has never been written —
+        // previously saved values always take precedence.
+        UserDefaults.standard.register(defaults: [
+            Keys.enabled:           true,
+            Keys.fontSize:          24.0,
+            Keys.shadowRadius:      2.0,
+            Keys.backgroundEnabled: false,
+            Keys.bottomPadding:     80.0,
+            Keys.delay:             0.0
+        ])
 
-        enabled = defaults.object(forKey: Keys.enabled) as? Bool ?? true
-        fontSize = defaults.object(forKey: Keys.fontSize) as? Double ?? 20.0
-        shadowRadius = defaults.object(forKey: Keys.shadowRadius) as? Double ?? 2.0
-        backgroundEnabled = defaults.object(forKey: Keys.backgroundEnabled) as? Bool ?? false
-        bottomPadding = defaults.object(forKey: Keys.bottomPadding) as? Double ?? 80.0
-        delaySeconds = defaults.object(forKey: Keys.delay) as? Double ?? 0.0
-        foregroundColor = SubtitleSettingsManager.loadColorFromDefaults()
+        let d = UserDefaults.standard
+        enabled           = d.bool(forKey: Keys.enabled)
+        fontSize          = d.double(forKey: Keys.fontSize)
+        shadowRadius      = d.double(forKey: Keys.shadowRadius)
+        backgroundEnabled = d.bool(forKey: Keys.backgroundEnabled)
+        bottomPadding     = d.double(forKey: Keys.bottomPadding)
+        delaySeconds      = d.double(forKey: Keys.delay)
+        foregroundColor   = SubtitleSettingsManager.loadColorFromDefaults()
     }
 
     // MARK: - Color Serialization
@@ -78,22 +87,21 @@ final class SubtitleSettingsManager: ObservableObject {
         let b = native.blueComponent
         let a = native.alphaComponent
 #endif
-        let defaults = UserDefaults.standard
-        defaults.set(Double(r), forKey: Keys.colorR)
-        defaults.set(Double(g), forKey: Keys.colorG)
-        defaults.set(Double(b), forKey: Keys.colorB)
-        defaults.set(Double(a), forKey: Keys.colorA)
+        let d = UserDefaults.standard
+        d.set(Double(r), forKey: Keys.colorR)
+        d.set(Double(g), forKey: Keys.colorG)
+        d.set(Double(b), forKey: Keys.colorB)
+        d.set(Double(a), forKey: Keys.colorA)
     }
 
     private static func loadColorFromDefaults() -> Color {
-        let defaults = UserDefaults.standard
-        guard defaults.object(forKey: Keys.colorR) != nil else {
-            return .white
-        }
-        let r = defaults.double(forKey: Keys.colorR)
-        let g = defaults.double(forKey: Keys.colorG)
-        let b = defaults.double(forKey: Keys.colorB)
-        let a = defaults.double(forKey: Keys.colorA)
-        return Color(red: r, green: g, blue: b, opacity: a)
+        let d = UserDefaults.standard
+        guard d.object(forKey: Keys.colorR) != nil else { return .white }
+        return Color(
+            red:     d.double(forKey: Keys.colorR),
+            green:   d.double(forKey: Keys.colorG),
+            blue:    d.double(forKey: Keys.colorB),
+            opacity: d.double(forKey: Keys.colorA)
+        )
     }
 }

@@ -17,6 +17,10 @@ final class AniListDetailViewModel: ObservableObject {
     @Published var selectedStream: StreamResult?
     @Published var showPlayer = false
 
+    /// Deferred streams waiting to be presented after a sheet fully dismisses.
+    var pendingModuleStream: StreamResult?   // single-stream from ModuleStreamPickerView
+    var pendingFinalStream: StreamResult?    // chosen stream from AniListStreamResultSheet
+
     func load(id: Int, preloaded: AniListMedia? = nil) async {
         guard media == nil else { return }
         if let preloaded {
@@ -48,14 +52,15 @@ final class AniListDetailViewModel: ObservableObject {
     }
 
     func onStreamsLoaded(_ streams: [StreamResult]) {
-        showStreamPicker = false
         let sorted = streams.sorted { $0.title < $1.title }
         if sorted.count == 1 {
-            selectStream(sorted[0])
+            // Store and let onDismiss present after the sheet fully clears.
+            pendingModuleStream = sorted[0]
         } else {
             pendingStreams = sorted
             showFinalStreamPicker = true
         }
+        showStreamPicker = false
     }
 
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {

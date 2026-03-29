@@ -12,21 +12,19 @@ struct PlayerSubtitleOverlay: View {
         return cues.first { ($0.start...$0.end).contains(adjustedTime) }
     }
 
-    // When controls are hidden, slide the subtitle down so the gap between
+    // When controls are hidden, shift the subtitle DOWN so the gap between
     // the subtitle bottom and the screen edge equals the gap that was between
     // the subtitle bottom and the progress bar top while controls were visible.
-    private var effectiveBottomPadding: CGFloat {
-        guard !showControls else { return CGFloat(settings.bottomPadding) }
-        let barHeight: CGFloat
+    // Positive Y = moves down in SwiftUI.
+    private var hiddenOffset: CGFloat {
         #if os(iOS)
         let safeBottom = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
             .windows.first?.safeAreaInsets.bottom ?? 0
-        // bottomPad (max 16 or safeBottom+8) + approx action-buttons+spacing+slider (≈60)
-        barHeight = max(16, safeBottom + 8) + 60
+        // bottomPad (safe-area + 8, min 16) + action-buttons + spacing + slider ≈ 60
+        return max(16, safeBottom + 8) + 60
         #else
-        barHeight = 84 // 24 (bottomPad macOS) + 60
+        return 84
         #endif
-        return max(8, CGFloat(settings.bottomPadding) - barHeight)
     }
 
     // Black outline for light text, white outline for dark text.
@@ -67,11 +65,14 @@ struct PlayerSubtitleOverlay: View {
                             ? RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.6))
                             : nil
                     )
-                    .padding(.bottom, effectiveBottomPadding)
+                    // bottomPadding directly drives position — slider always works
+                    .padding(.bottom, CGFloat(settings.bottomPadding))
+                    // offset shifts down when controls hide, up when they show
+                    .offset(y: showControls ? 0 : hiddenOffset)
+                    .animation(.easeInOut(duration: 0.2), value: showControls)
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: showControls)
         .animation(.easeInOut(duration: 0.15), value: activeCue?.id)
     }
 }

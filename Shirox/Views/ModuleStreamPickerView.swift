@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Modal Overlay
+// MARK: - Sheet
 
 struct ModuleStreamPickerView: View {
     let animeTitle: String
@@ -11,52 +11,29 @@ struct ModuleStreamPickerView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Watch Episode \(episodeNumber)")
-                    .font(.headline)
-                Spacer()
-                Button { onDismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 12)
-
-            Divider()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(moduleManager.modules) { module in
-                        ModuleStreamRow(
-                            module: module,
-                            animeTitle: animeTitle,
-                            episodeNumber: episodeNumber
-                        ) { streams in
-                            onDismiss()
-                            onStreamsLoaded(streams)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-
-                        if module.id != moduleManager.modules.last?.id {
-                            Divider().padding(.leading, 16)
-                        }
+        NavigationStack {
+            List {
+                ForEach(moduleManager.modules) { module in
+                    ModuleStreamRow(
+                        module: module,
+                        animeTitle: animeTitle,
+                        episodeNumber: episodeNumber
+                    ) { streams in
+                        onDismiss()
+                        onStreamsLoaded(streams)
                     }
                 }
             }
-            .frame(maxHeight: 360)
-            .padding(.bottom, 8)
+            .listStyle(.insetGrouped)
+            .navigationTitle("Watch Episode \(episodeNumber)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onDismiss() }
+                }
+            }
         }
-        .frame(maxWidth: 440)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.22), radius: 32, y: 12)
-        .padding(.horizontal, 20)
+        .presentationDetents([.medium, .large])
     }
 }
 

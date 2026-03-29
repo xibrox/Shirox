@@ -34,26 +34,20 @@ struct DetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
 #endif
         .onAppear { vm.load(item: item) }
-        .overlay {
-            ZStack {
-                if vm.showStreamPicker {
-                    Color.black.opacity(0.45)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            guard !vm.isLoadingStreams else { return }
-                            vm.showStreamPicker = false
-                        }
-                        .transition(.opacity)
-
-                    StreamPickerView(vm: vm)
-                        .tint(.red)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.88, anchor: .center).combined(with: .opacity),
-                            removal: .scale(scale: 0.96, anchor: .center).combined(with: .opacity)
-                        ))
-                }
+        .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
+            if let stream = vm.pendingStream {
+                vm.pendingStream = nil
+                let s = stream
+                // Defer presentation by one run-loop turn so UIKit fully clears the
+                // sheet's presentedViewController before we call present(_:animated:).
+                // Without this, findTopViewController may still see the dismissing sheet
+                // and present the player on it — which gets torn down with the sheet.
+                DispatchQueue.main.async { vm.selectStream(s) }
+            } else {
+                vm.cancelStreamLoading()
             }
-            .animation(.spring(response: 0.38, dampingFraction: 0.8), value: vm.showStreamPicker)
+        }) {
+            StreamPickerView(vm: vm)
         }
     }
 

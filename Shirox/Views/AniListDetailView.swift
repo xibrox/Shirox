@@ -49,54 +49,44 @@ struct AniListDetailView: View {
         #endif
         .navigationTitle("")
         .task { await vm.load(id: mediaId, preloaded: preloadedMedia) }
-        .overlay {
-            ZStack {
-                let anyModalShown = vm.showStreamPicker || vm.showFinalStreamPicker
-                if anyModalShown {
-                    Color.black.opacity(0.45)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            if vm.showFinalStreamPicker { vm.dismissFinalPicker() }
-                            else { vm.dismissModulePicker() }
-                        }
-                        .transition(.opacity)
-                }
-
-                if vm.showStreamPicker, let media = vm.media, let ep = vm.selectedEpisodeNumber {
-                    ModuleStreamPickerView(
-                        animeTitle: media.title.searchTitle,
-                        episodeNumber: ep,
-                        onDismiss: { vm.dismissModulePicker() }
-                    ) { streams in
-                        vm.onStreamsLoaded(streams)
-                    }
-                    .environmentObject(moduleManager)
-                    .tint(.red)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.88, anchor: .center).combined(with: .opacity),
-                        removal: .scale(scale: 0.96, anchor: .center).combined(with: .opacity)
-                    ))
-                }
-
-                if vm.showFinalStreamPicker {
-                    AniListStreamResultSheet(
-                        episodeNumber: vm.selectedEpisodeNumber ?? 0,
-                        streams: vm.pendingStreams,
-                        onDismiss: { vm.dismissFinalPicker() },
-                        onSelect: { stream, sourceView in
-                            vm.dismissFinalPicker()
-                            vm.selectStream(stream, from: sourceView)
-                        }
-                    )
-                    .tint(.red)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.88, anchor: .center).combined(with: .opacity),
-                        removal: .scale(scale: 0.96, anchor: .center).combined(with: .opacity)
-                    ))
-                }
+        .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
+            if let stream = vm.pendingModuleStream {
+                vm.pendingModuleStream = nil
+                let s = stream
+                DispatchQueue.main.async { vm.selectStream(s) }
+            } else {
+                vm.dismissModulePicker()
             }
-            .animation(.spring(response: 0.38, dampingFraction: 0.8), value: vm.showStreamPicker)
-            .animation(.spring(response: 0.38, dampingFraction: 0.8), value: vm.showFinalStreamPicker)
+        }) {
+            if let media = vm.media, let ep = vm.selectedEpisodeNumber {
+                ModuleStreamPickerView(
+                    animeTitle: media.title.searchTitle,
+                    episodeNumber: ep,
+                    onDismiss: { vm.showStreamPicker = false }
+                ) { streams in
+                    vm.onStreamsLoaded(streams)
+                }
+                .environmentObject(moduleManager)
+            }
+        }
+        .sheet(isPresented: $vm.showFinalStreamPicker, onDismiss: {
+            if let stream = vm.pendingFinalStream {
+                vm.pendingFinalStream = nil
+                let s = stream
+                DispatchQueue.main.async { vm.selectStream(s) }
+            } else {
+                vm.dismissFinalPicker()
+            }
+        }) {
+            AniListStreamResultSheet(
+                episodeNumber: vm.selectedEpisodeNumber ?? 0,
+                streams: vm.pendingStreams,
+                onDismiss: { vm.showFinalStreamPicker = false },
+                onSelect: { stream, _ in
+                    vm.pendingFinalStream = stream
+                    vm.showFinalStreamPicker = false
+                }
+            )
         }
     }
 
@@ -625,74 +615,34 @@ struct AniListStreamResultSheet: View {
     let onDismiss: () -> Void
     let onSelect: (StreamResult, UIView?) -> Void
 
-    @State private var buttonViews: [URL: UIView] = [:]
-
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Episode \(episodeNumber)")
-                    .font(.headline)
-                Spacer()
-                Button { onDismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
-
-            Divider()
-
-            if streams.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No Streams Found")
-                        .font(.headline)
-                    Text("No playable streams were found.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 32)
-                .frame(maxWidth: .infinity)
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(streams) { stream in
-                        Button { onSelect(stream, buttonViews[stream.url]) } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: "play.rectangle.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(Color.accentColor)
-                                    .frame(width: 36)
-                                Text(stream.title)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption).fontWeight(.semibold)
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
-                            .contentShape(RoundedRectangle(cornerRadius: 14))
+        NavigationStack {
+            Group {
+                if streams.isEmpty {
+                    ContentUnavailableView(
+                        "No Streams Found",
+                        systemImage: "antenna.radiowaves.left.and.right.slash",
+                        description: Text("No playable streams were found.")
+                    )
+                } else {
+                    List(streams) { stream in
+                        Button {
+                            onSelect(stream, nil)
+                        } label: {
+                            Label(stream.title, systemImage: "play.fill")
+                                .foregroundStyle(.primary)
                         }
-                        .buttonStyle(StreamCardPressStyle())
-                        .captureView { view in buttonViews[stream.url] = view }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+            }
+            .navigationTitle("Episode \(episodeNumber)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onDismiss() }
+                }
             }
         }
-        .frame(maxWidth: 440)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.22), radius: 32, y: 12)
-        .padding(.horizontal, 20)
+        .presentationDetents([.medium, .large])
     }
 }
