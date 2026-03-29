@@ -59,7 +59,7 @@ final class SubtitleSettingsManager: ObservableObject {
             Keys.fontSize:          24.0,
             Keys.shadowRadius:      2.0,
             Keys.backgroundEnabled: false,
-            Keys.bottomPadding:     80.0,
+            Keys.bottomPadding:     60.0,
             Keys.delay:             0.0
         ])
 
