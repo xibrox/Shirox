@@ -23,3 +23,5 @@ build/
 # Claude Code
 .claude/
 docs
+*.xcuserstate
+**/xcuserdata/
