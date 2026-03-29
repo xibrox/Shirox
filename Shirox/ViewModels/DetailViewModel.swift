@@ -21,6 +21,9 @@ final class DetailViewModel: ObservableObject {
     /// Stream selected by user in the picker — presented after the sheet fully dismisses.
     var pendingStream: StreamResult?
 
+    /// Resume position if navigated from Continue Watching
+    var resumeWatchedSeconds: Double?
+
     private(set) var detailHref: String?
     private var streamsTask: Task<Void, Never>?
 
@@ -105,7 +108,7 @@ final class DetailViewModel: ObservableObject {
             aniListID: nil,
             moduleId: ModuleManager.shared.activeModule?.id,
             totalEpisodes: detail?.episodes.count,
-            resumeFrom: nil,
+            resumeFrom: resumeWatchedSeconds,
             detailHref: detailHref
         )
 

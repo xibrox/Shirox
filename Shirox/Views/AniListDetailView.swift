@@ -4,11 +4,14 @@ import AVKit
 struct AniListDetailView: View {
     let mediaId: Int
     let preloadedMedia: AniListMedia?
+    var resumeEpisodeNumber: Int?
+    var resumeWatchedSeconds: Double?
 
     @StateObject private var vm = AniListDetailViewModel()
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var showResetConfirmation = false
+    @State private var autoPlayOnLoad = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -48,7 +51,19 @@ struct AniListDetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         #endif
         .navigationTitle("")
-        .task { await vm.load(id: mediaId, preloaded: preloadedMedia) }
+        .task {
+            vm.resumeWatchedSeconds = resumeWatchedSeconds
+            await vm.load(id: mediaId, preloaded: preloadedMedia)
+        }
+        .onChange(of: vm.media?.episodes) { episodes in
+            // Auto-load streams for resume episode if specified
+            guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber,
+                  let episode = vm.media?.episodes.first(where: { $0.number == resumeEpNum })
+            else { return }
+            autoPlayOnLoad = true
+            vm.selectedEpisodeNumber = resumeEpNum
+            vm.loadStreams()
+        }
         .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
             if let stream = vm.pendingModuleStream {
                 vm.pendingModuleStream = nil

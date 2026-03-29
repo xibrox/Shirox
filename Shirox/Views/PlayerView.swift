@@ -861,8 +861,8 @@ struct PlayerView: View {
             guard !isScrubbing else { return }
             currentTime = time.seconds
             if let d = p?.currentItem?.duration, d.isNumeric { duration = d.seconds }
-            if onWatchNext != nil && duration > 0 {
-                let shouldShow = currentTime / duration >= watchedPercentage / 100.0
+            if duration > 0 {
+                let shouldShow = onWatchNext != nil && currentTime / duration >= watchedPercentage / 100.0
                 if shouldShow != showNextEpisodeButton {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         showNextEpisodeButton = shouldShow

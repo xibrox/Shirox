@@ -41,28 +41,20 @@ struct ContinueWatchingSection: View {
 
     @ViewBuilder
     private func itemView(for item: ContinueWatchingItem) -> some View {
-        if item.streamUrl.isEmpty, let aniListID = item.aniListID {
-            // AniList Up Next — NavigationLink directly in ForEach, same as AnimeSection
+        if let aniListID = item.aniListID {
+            // AniList item (Up Next or in-progress) — fetch fresh streams via detail view
             NavigationLink {
-                AniListDetailView(mediaId: aniListID)
+                AniListDetailView(mediaId: aniListID, resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds)
             } label: {
                 ContinueWatchingCardDisplay(item: item)
             }
             .buttonStyle(.plain)
             .contextMenu { removeButton(for: item) }
-        } else if item.streamUrl.isEmpty,
-                  let href = item.detailHref,
-                  item.moduleId != nil {
-            // Module Up Next — NavigationLink directly in ForEach
+        } else if let href = item.detailHref, item.moduleId != nil {
+            // Module item (Up Next or in-progress) — fetch fresh streams via detail view
             NavigationLink {
-                DetailView(item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href))
+                DetailView(item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href), resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds)
             } label: {
-                ContinueWatchingCardDisplay(item: item)
-            }
-            .buttonStyle(.plain)
-            .contextMenu { removeButton(for: item) }
-        } else {
-            Button { resume(item) } label: {
                 ContinueWatchingCardDisplay(item: item)
             }
             .buttonStyle(.plain)
@@ -76,30 +68,6 @@ struct ContinueWatchingSection: View {
         } label: {
             Label("Remove", systemImage: "xmark.circle")
         }
-    }
-
-    private func resume(_ item: ContinueWatchingItem) {
-        guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
-        let stream = StreamResult(
-            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
-            url: url,
-            headers: item.headers ?? [:],
-            subtitle: item.subtitle
-        )
-        let context = PlayerContext(
-            mediaTitle: item.mediaTitle,
-            episodeNumber: item.episodeNumber,
-            episodeTitle: item.episodeTitle,
-            imageUrl: item.imageUrl,
-            aniListID: item.aniListID,
-            moduleId: item.moduleId,
-            totalEpisodes: item.totalEpisodes,
-            resumeFrom: item.watchedSeconds,
-            detailHref: item.detailHref
-        )
-        #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
-        #endif
     }
 }
 

@@ -2,11 +2,14 @@ import SwiftUI
 
 struct DetailView: View {
     let item: SearchItem
+    var resumeEpisodeNumber: Int?
+    var resumeWatchedSeconds: Double?
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var synopsisExpanded = false
     @State private var selectedSeason = 0
     @State private var showResetConfirmation = false
+    @State private var autoPlayOnLoad = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -33,7 +36,18 @@ struct DetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
 #endif
-        .onAppear { vm.load(item: item) }
+        .onAppear {
+            vm.resumeWatchedSeconds = resumeWatchedSeconds
+            vm.load(item: item)
+        }
+        .onChange(of: vm.detail?.episodes) { episodes in
+            // Auto-load streams for resume episode if specified
+            guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber,
+                  let episode = vm.detail?.episodes.first(where: { Int($0.number) == resumeEpNum })
+            else { return }
+            autoPlayOnLoad = true
+            vm.loadStreams(for: episode)
+        }
         .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
             if let stream = vm.pendingStream {
                 vm.pendingStream = nil

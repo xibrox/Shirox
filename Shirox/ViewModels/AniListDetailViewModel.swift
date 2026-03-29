@@ -21,6 +21,9 @@ final class AniListDetailViewModel: ObservableObject {
     var pendingModuleStream: StreamResult?   // single-stream from ModuleStreamPickerView
     var pendingFinalStream: StreamResult?    // chosen stream from AniListStreamResultSheet
 
+    /// Resume position if navigated from Continue Watching
+    var resumeWatchedSeconds: Double?
+
     func load(id: Int, preloaded: AniListMedia? = nil) async {
         guard media == nil else { return }
         if let preloaded {
@@ -74,7 +77,7 @@ final class AniListDetailViewModel: ObservableObject {
             aniListID: media.id,
             moduleId: nil,
             totalEpisodes: media.episodes,
-            resumeFrom: nil,
+            resumeFrom: resumeWatchedSeconds,
             detailHref: nil
         )
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, from: sourceView)
