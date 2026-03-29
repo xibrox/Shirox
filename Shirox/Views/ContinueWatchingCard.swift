@@ -41,25 +41,77 @@ struct ContinueWatchingSection: View {
 
     @ViewBuilder
     private func itemView(for item: ContinueWatchingItem) -> some View {
-        if let aniListID = item.aniListID {
-            // AniList item (Up Next or in-progress) — fetch fresh streams via detail view
+        if item.streamUrl.isEmpty, let aniListID = item.aniListID {
+            // AniList Up Next — navigate to detail to pick episode
             NavigationLink {
-                AniListDetailView(mediaId: aniListID, resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds)
+                AniListDetailView(mediaId: aniListID, preloadedMedia: nil, resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds)
             } label: {
                 ContinueWatchingCardDisplay(item: item)
             }
             .buttonStyle(.plain)
             .contextMenu { removeButton(for: item) }
-        } else if let href = item.detailHref, item.moduleId != nil {
-            // Module item (Up Next or in-progress) — fetch fresh streams via detail view
+        } else if item.streamUrl.isEmpty, let href = item.detailHref, let mid = item.moduleId {
+            // Module Up Next — navigate to detail, activating the correct module first
             NavigationLink {
-                DetailView(item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href), resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds)
+                DetailView(item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href), resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds, moduleId: mid)
             } label: {
+                ContinueWatchingCardDisplay(item: item)
+            }
+            .buttonStyle(.plain)
+            .contextMenu { removeButton(for: item) }
+        } else {
+            // In-progress item — resume directly with stored URL; PlayerView re-fetches if expired
+            Button { resume(item) } label: {
                 ContinueWatchingCardDisplay(item: item)
             }
             .buttonStyle(.plain)
             .contextMenu { removeButton(for: item) }
         }
+    }
+
+    private func resume(_ item: ContinueWatchingItem) {
+        guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
+        let stream = StreamResult(
+            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            url: url,
+            headers: item.headers ?? [:],
+            subtitle: item.subtitle
+        )
+        let context = PlayerContext(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            episodeTitle: item.episodeTitle,
+            imageUrl: item.imageUrl,
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            totalEpisodes: item.totalEpisodes,
+            resumeFrom: item.watchedSeconds,
+            detailHref: item.detailHref
+        )
+        let epNum = item.episodeNumber
+        let detailHref = item.detailHref
+
+        // Re-fetch current episode streams when stored URL expires
+        let onExpired: StreamRefetchLoader? = detailHref.map { href in {
+            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+            return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
+        }}
+
+        // Load next episode streams (enables the Next Episode button)
+        let onWatchNext: WatchNextLoader? = detailHref.map { href in { currentEpNum in
+            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+            guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                  idx + 1 < episodes.count else { return nil }
+            let nextEp = episodes[idx + 1]
+            let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+            guard !streams.isEmpty else { return nil }
+            return (streams: streams, episodeNumber: Int(nextEp.number))
+        }}
+
+        #if os(iOS)
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
+        #endif
     }
 
     private func removeButton(for item: ContinueWatchingItem) -> some View {

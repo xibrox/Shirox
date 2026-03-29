@@ -4,6 +4,7 @@ struct DetailView: View {
     let item: SearchItem
     var resumeEpisodeNumber: Int?
     var resumeWatchedSeconds: Double?
+    var moduleId: String?
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var synopsisExpanded = false
@@ -38,7 +39,16 @@ struct DetailView: View {
 #endif
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
-            vm.load(item: item)
+            // If a specific module is required (e.g. from Continue Watching), activate it first
+            if let mid = moduleId, ModuleManager.shared.activeModule?.id != mid,
+               let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
+                Task {
+                    try? await ModuleManager.shared.selectModule(module)
+                    vm.load(item: item)
+                }
+            } else {
+                vm.load(item: item)
+            }
         }
         .onChange(of: vm.detail?.episodes) { episodes in
             // Auto-load streams for resume episode if specified
@@ -132,7 +142,14 @@ struct DetailView: View {
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref
         )
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+        let epNum = item.episodeNumber
+        let detailHref = item.detailHref
+        let onExpired: StreamRefetchLoader? = detailHref.map { href in {
+            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+            return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
+        }}
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onStreamExpired: onExpired)
     }
     #endif
 

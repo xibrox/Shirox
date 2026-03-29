@@ -21,9 +21,11 @@ struct AniListDetailView: View {
         #endif
     }
 
-    init(mediaId: Int, preloadedMedia: AniListMedia? = nil) {
+    init(mediaId: Int, preloadedMedia: AniListMedia? = nil, resumeEpisodeNumber: Int? = nil, resumeWatchedSeconds: Double? = nil) {
         self.mediaId = mediaId
         self.preloadedMedia = preloadedMedia
+        self.resumeEpisodeNumber = resumeEpisodeNumber
+        self.resumeWatchedSeconds = resumeWatchedSeconds
     }
 
     var body: some View {
@@ -55,14 +57,12 @@ struct AniListDetailView: View {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             await vm.load(id: mediaId, preloaded: preloadedMedia)
         }
-        .onChange(of: vm.media?.episodes) { episodes in
+        .onChange(of: vm.media?.id) { _ in
             // Auto-load streams for resume episode if specified
-            guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber,
-                  let episode = vm.media?.episodes.first(where: { $0.number == resumeEpNum })
-            else { return }
+            guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber else { return }
+            guard vm.media?.episodes != nil else { return }
             autoPlayOnLoad = true
-            vm.selectedEpisodeNumber = resumeEpNum
-            vm.loadStreams()
+            vm.watchEpisode(resumeEpNum)
         }
         .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
             if let stream = vm.pendingModuleStream {

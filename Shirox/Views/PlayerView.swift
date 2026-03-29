@@ -206,12 +206,15 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
 /// (currentEpisodeNumber) async throws -> (streams, nextEpisodeNumber)?
 /// Returns nil when there is no next episode.
 typealias WatchNextLoader = (Int) async throws -> (streams: [StreamResult], episodeNumber: Int)?
+/// Re-fetches fresh streams when the stored URL has expired. Returns sorted stream list.
+typealias StreamRefetchLoader = () async throws -> [StreamResult]
 
 // MARK: - PlayerView
 
 struct PlayerView: View {
     var customDismiss: (() -> Void)? = nil
     let onWatchNext: WatchNextLoader?
+    let onStreamExpired: StreamRefetchLoader?
 
     @State private var currentStream: StreamResult
     @State private var currentContext: PlayerContext?
@@ -258,6 +261,9 @@ struct PlayerView: View {
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong")  private var skipLong:  Int = 85
 
+    // Stream expired / re-fetch
+    @State private var isRefetchingStream = false
+
     // Next episode
     @AppStorage("autoNextEpisode") private var autoNextEpisode = false
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
@@ -267,11 +273,12 @@ struct PlayerView: View {
     @State private var nextEpisodeNumber: Int = 0
     @State private var showNextEpisodePicker = false
 
-    init(stream: StreamResult, customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil) {
+    init(stream: StreamResult, customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil) {
         _currentStream = State(initialValue: stream)
         _currentContext = State(initialValue: context)
         self.customDismiss = customDismiss
         self.onWatchNext = onWatchNext
+        self.onStreamExpired = onStreamExpired
     }
 
     var body: some View {
@@ -410,14 +417,14 @@ struct PlayerView: View {
                 }
                 #endif
 
-                // [3.8] Next episode loading overlay
-                if isLoadingNextEpisode {
+                // [3.8] Next episode / stream re-fetch loading overlay
+                if isLoadingNextEpisode || isRefetchingStream {
                     Color.black.opacity(0.65)
                         .ignoresSafeArea()
                         .overlay(ProgressView().tint(.white).scaleEffect(1.5))
                         .allowsHitTesting(true)
                         .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.2), value: isLoadingNextEpisode)
+                        .animation(.easeInOut(duration: 0.2), value: isLoadingNextEpisode || isRefetchingStream)
                 }
 
                 // [4] Shadow Overlay & Controls
@@ -856,6 +863,24 @@ struct PlayerView: View {
             }
         }
 
+        // Detect expired/failed stream URL and re-fetch automatically.
+        // Covers both mid-playback failures and immediate load failures (403/404).
+        if onStreamExpired != nil {
+            Task { @MainActor [weak p] in
+                // Poll item status — fires quickly when URL is immediately invalid
+                for await status in item.publisher(for: \.status).values {
+                    guard let currentItem = p?.currentItem, currentItem === item else { break }
+                    if status == .failed {
+                        guard !isRefetchingStream else { break }
+                        await refetchStream()
+                        break
+                    } else if status == .readyToPlay {
+                        break
+                    }
+                }
+            }
+        }
+
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak p] time in
             guard !isScrubbing else { return }
@@ -990,6 +1015,24 @@ struct PlayerView: View {
     }
 
     @MainActor
+    private func refetchStream() async {
+        guard let loader = onStreamExpired else { return }
+        isRefetchingStream = true
+        do {
+            let streams = try await loader()
+            isRefetchingStream = false
+            guard !streams.isEmpty else { return }
+            let isSub = currentStream.subtitle != nil
+            let match = streams.first(where: { $0.title == currentStream.title && ($0.subtitle != nil) == isSub })
+                ?? streams.first(where: { ($0.subtitle != nil) == isSub })
+                ?? streams.first(where: { $0.title == currentStream.title })
+                ?? streams[0]
+            swapStream(match, episodeNumber: currentContext?.episodeNumber ?? 1)
+        } catch {
+            isRefetchingStream = false
+        }
+    }
+
     private func loadAndAdvance() async {
         guard let loader = onWatchNext,
               let epNum = currentContext?.episodeNumber else { return }
@@ -1002,7 +1045,12 @@ struct PlayerView: View {
             isLoadingNextEpisode = false
             guard !result.streams.isEmpty else { return }
 
-            if let match = result.streams.first(where: { $0.title == currentStream.title }) {
+            let isSub = currentStream.subtitle != nil
+            // Match by title AND sub/dub type so a sub stream doesn't swap to dub (or vice versa)
+            let match = result.streams.first(where: { $0.title == currentStream.title && ($0.subtitle != nil) == isSub })
+                ?? result.streams.first(where: { ($0.subtitle != nil) == isSub })
+                ?? result.streams.first(where: { $0.title == currentStream.title })
+            if let match {
                 swapStream(match, episodeNumber: result.episodeNumber)
             } else if result.streams.count == 1 {
                 swapStream(result.streams[0], episodeNumber: result.episodeNumber)
