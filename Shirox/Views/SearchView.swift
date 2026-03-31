@@ -311,30 +311,9 @@ struct AniListCardView: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
                 ZStack {
-                    #if os(iOS)
                     CachedAsyncImage(urlString: media.coverImage.best ?? "")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
-                    #else
-                    AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().scaledToFill()
-                        case .failure:
-                            Rectangle().fill(Color.gray.opacity(0.3))
-                                .overlay(
-                                    Image(systemName: "photo")
-                                        .font(.largeTitle)
-                                        .foregroundStyle(.tertiary)
-                                )
-                        default:
-                            Rectangle().fill(Color.gray.opacity(0.15))
-                                .overlay(ProgressView().scaleEffect(0.6))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    #endif
 
                     LinearGradient(
                         stops: [

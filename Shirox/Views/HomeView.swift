@@ -68,57 +68,66 @@ struct HomeView: View {
 
 private struct FeaturedCarousel: View {
     let items: [AniListMedia]
-    @State private var selectedTab = 0
+    @State private var selectedTab = 1
     @State private var overscrollY: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var realItems: [AniListMedia] { items.prefix(8).map { $0 } }
+    private var loopingItems: [AniListMedia] {
+        guard !realItems.isEmpty else { return [] }
+        return [realItems.last!] + realItems + [realItems.first!]
+    }
+
+    private var displayCount: Int { realItems.count }
+    private var currentIndex: Int {
+        guard displayCount > 0 else { return 0 }
+        // Maps buffer indices back to real indices:
+        // 0 (last) -> displayCount - 1
+        // 1..displayCount -> 0..displayCount-1
+        // displayCount + 1 (first) -> 0
+        return (selectedTab - 1 + displayCount) % displayCount
+    }
 
     var body: some View {
         #if os(iOS)
         let isIPad = sizeClass == .regular
-        // Leave room for the page indicator (≈30pt) + tab bar (≈83pt) + breathing room.
         let imageHeight: CGFloat = isIPad
             ? UIScreen.main.bounds.width * (9.0 / 16.0)
             : UIScreen.main.bounds.height - 140
-        let current = items[min(selectedTab, items.count - 1)]
+        
+        let current = realItems[currentIndex]
 
         VStack(spacing: 0) {
-            // Image carousel with vertical parallax
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("homeScroll")).minY
                 let parallaxFactor: CGFloat = 0.5
                 let parallaxBuffer: CGFloat = 60
-
                 let stretch = max(0, scrollY)
                 let tabHeight = imageHeight + stretch + parallaxBuffer
-
-                // At rest: image sits parallaxBuffer above container (fills status-bar area).
-                // Pull-down: keep that buffer plus compensate for stretch.
-                // Scroll-up: image lags at parallaxFactor speed; clamp so top never drops below container top.
-                let tabOffset = scrollY >= 0
-                    ? -stretch - parallaxBuffer
-                    : -parallaxBuffer - scrollY * (1 - parallaxFactor)
+                let tabOffset = scrollY >= 0 ? -stretch - parallaxBuffer : -parallaxBuffer - scrollY * (1 - parallaxFactor)
 
                 TabView(selection: $selectedTab) {
-                    carouselPages(isWide: isIPad)
+                    ForEach(0..<loopingItems.count, id: \.self) { index in
+                        FeaturedCard(media: loopingItems[index], isWide: isIPad)
+                            .allowsHitTesting(false)
+                            .tag(index)
+                    }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(maxWidth: .infinity)
                 .frame(height: tabHeight)
                 .offset(y: tabOffset)
                 .background(Color.clear.preference(key: CarouselOverscrollKey.self, value: scrollY))
+                .onChange(of: selectedTab) { newValue in
+                    handleIndexJump(newValue, count: displayCount)
+                }
             }
             .frame(maxWidth: .infinity)
             .frame(height: imageHeight + overscrollY)
-            .onPreferenceChange(CarouselOverscrollKey.self) { y in
-                overscrollY = max(0, y)
-            }
-            .mask(alignment: .bottom) {
-                Rectangle()
-                    .frame(height: imageHeight + 2000)
-            }
+            .onPreferenceChange(CarouselOverscrollKey.self) { y in overscrollY = max(0, y) }
+            .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
             .overlay(alignment: .bottom) {
                 ZStack(alignment: .bottom) {
-                    // Gradient: clear → systemBackground (adapts to light/dark mode)
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: 0),
@@ -132,7 +141,6 @@ private struct FeaturedCarousel: View {
                     .frame(height: 360)
                     .allowsHitTesting(false)
 
-                    // Luna-style centered content: genres · title · overview · Watch button
                     VStack(spacing: 10) {
                         if let genres = current.genres, !genres.isEmpty {
                             HStack(spacing: 6) {
@@ -166,10 +174,8 @@ private struct FeaturedCarousel: View {
                             AniListDetailView(mediaId: current.id, preloadedMedia: current)
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "play.fill")
-                                    .font(.footnote.weight(.semibold))
-                                Text("Watch")
-                                    .fontWeight(.semibold)
+                                Image(systemName: "play.fill").font(.footnote.weight(.semibold))
+                                Text("Watch").fontWeight(.semibold)
                             }
                             .foregroundStyle(Color(UIColor.systemBackground))
                             .frame(width: 130, height: 42)
@@ -183,14 +189,12 @@ private struct FeaturedCarousel: View {
                 }
             }
 
-            // Page indicator below the image, on systemBackground
-            PageIndicator(numberOfPages: min(items.count, 8), currentPage: selectedTab)
+            PageIndicator(numberOfPages: displayCount, currentPage: currentIndex)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 10)
         }
 
         #else
-        // macOS: use GeometryReader to get available width, then size TabView accordingly
         ZStack(alignment: .bottom) {
             GeometryReader { geometry in
                 let availableWidth = geometry.size.width
@@ -198,12 +202,13 @@ private struct FeaturedCarousel: View {
                 let cardHeight = cardWidth * (9.0 / 16.0)
 
                 TabView(selection: $selectedTab) {
-                    ForEach(Array(items.prefix(8).enumerated()), id: \.element.id) { index, media in
+                    ForEach(0..<loopingItems.count, id: \.self) { index in
+                        let media = loopingItems[index]
                         NavigationLink {
                             AniListDetailView(mediaId: media.id, preloadedMedia: media)
                         } label: {
                             FeaturedCard(media: media)
-                                .padding(.horizontal, horizontalPadding)
+                                .padding(.horizontal, 16)
                         }
                         .buttonStyle(.plain)
                         .tag(index)
@@ -212,31 +217,37 @@ private struct FeaturedCarousel: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(width: availableWidth, height: cardHeight)
                 .position(x: availableWidth / 2, y: cardHeight / 2)
+                .onChange(of: selectedTab) { newValue in
+                    handleIndexJump(newValue, count: displayCount)
+                }
             }
             .frame(height: (NSScreen.main?.frame.width ?? 800) * (9.0 / 16.0))
 
-            PageIndicator(
-                numberOfPages: min(items.count, 8),
-                currentPage: selectedTab
-            )
-            .padding(.bottom, 20)
+            PageIndicator(numberOfPages: displayCount, currentPage: currentIndex)
+                .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)
         #endif
     }
 
-    @ViewBuilder
-    private func carouselPages(isWide: Bool) -> some View {
-        ForEach(0..<min(items.count, 8), id: \.self) { index in
-            // Non-interactive: the parallax TabView bleeds below its visible frame when
-            // scrolled, and NavigationLinks in that bleed area intercept touches on content
-            // below the carousel. Navigation is handled by the Watch button in the overlay.
-            FeaturedCard(media: items[index], isWide: isWide)
-                .allowsHitTesting(false)
-                .tag(index)
+    private func handleIndexJump(_ newValue: Int, count: Int) {
+        guard count > 0 else { return }
+        if newValue == 0 {
+            // Reached left fake item (last), jump to real last item silently
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                if selectedTab == 0 {
+                    withAnimation(.none) { selectedTab = count }
+                }
+            }
+        } else if newValue == count + 1 {
+            // Reached right fake item (first), jump to real first item silently
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                if selectedTab == count + 1 {
+                    withAnimation(.none) { selectedTab = 1 }
+                }
+            }
         }
     }
-
 }
 
 // MARK: - Page Indicator (animated pill style)
@@ -285,21 +296,11 @@ private struct FeaturedCard: View {
                                 let extra: CGFloat = 80
                                 let px = -(extra / 2) - minX * (extra / (2 * screenW))
 
-                                if let banner = media.bannerImage, let url = URL(string: banner) {
-                                    AsyncImage(url: url) { phase in
-                                        switch phase {
-                                        case .success(let img):
-                                            img.resizable()
-                                                .scaledToFill()
-                                                .frame(width: geo.size.width + extra, height: geo.size.height)
-                                                .offset(x: px)
-                                        default:
-                                            coverFallback
-                                                .frame(width: geo.size.width + extra, height: geo.size.height)
-                                                .offset(x: px)
-                                        }
-                                    }
-                                    .clipped()
+                                if let banner = media.bannerImage {
+                                    CachedAsyncImage(urlString: banner)
+                                        .frame(width: geo.size.width + extra, height: geo.size.height)
+                                        .offset(x: px)
+                                        .clipped()
                                 } else {
                                     coverFallback
                                         .frame(width: geo.size.width + extra, height: geo.size.height)
@@ -323,23 +324,12 @@ private struct FeaturedCard: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // iPhone: portrait cover image with horizontal parallax.
-                // The image is made wider than the card by `buffer` so it never shows
-                // empty edges. During a page swipe, the card's global minX tells us
-                // how far it is from centre; the image is shifted at 0.25× that speed,
-                // making the incoming image appear to grow out from the middle.
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
                     let buffer: CGFloat = 100
-                    AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                        switch phase {
-                        case .success(let img):
-                            img.resizable().scaledToFill()
-                        default:
-                            Rectangle().fill(Color.gray.opacity(0.3))
-                        }
-                    }
-                    .frame(width: geo.size.width + buffer, height: geo.size.height)
-                    .offset(x: -(buffer / 2) - pageOffset * 0.25)
+                    CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                        .frame(width: geo.size.width + buffer, height: geo.size.height)
+                        .offset(x: -(buffer / 2) - pageOffset * 0.25)
                 }
                 .clipped()
             }
@@ -361,7 +351,7 @@ private struct FeaturedCard: View {
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        posterImage
+                        CachedAsyncImage(urlString: media.coverImage.best ?? "")
                             .frame(width: 80, height: 120)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .shadow(radius: 4)
@@ -382,37 +372,10 @@ private struct FeaturedCard: View {
     // MARK: - Banner Background (macOS only)
     @ViewBuilder
     private var bannerBackground: some View {
-        if let bannerUrlString = media.bannerImage, let url = URL(string: bannerUrlString) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().scaledToFill()
-                case .failure:
-                    gradientPlaceholder
-                default:
-                    Rectangle().fill(Color.gray.opacity(0.15))
-                        .overlay(ProgressView())
-                }
-            }
+        if let bannerUrlString = media.bannerImage {
+            CachedAsyncImage(urlString: bannerUrlString)
         } else {
             gradientPlaceholder
-        }
-    }
-
-    // MARK: - Poster Image (macOS only)
-    @ViewBuilder
-    private var posterImage: some View {
-        AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-            switch phase {
-            case .success(let img):
-                img.resizable().aspectRatio(contentMode: .fill)
-            case .failure:
-                Rectangle().fill(Color.gray.opacity(0.3))
-                    .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
-            default:
-                Rectangle().fill(Color.gray.opacity(0.15))
-                    .overlay(ProgressView())
-            }
         }
     }
 
@@ -457,12 +420,7 @@ private struct FeaturedCard: View {
 
     @ViewBuilder
     private var coverFallback: some View {
-        AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-            switch phase {
-            case .success(let img): img.resizable().scaledToFill()
-            default: gradientPlaceholder
-            }
-        }
+        CachedAsyncImage(urlString: media.coverImage.best ?? "")
     }
 
     private var gradientPlaceholder: some View {

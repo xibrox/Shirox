@@ -1,16 +1,23 @@
-#if os(iOS)
 import SwiftUI
 
-/// URLSession + NSCache image loader. Avoids AsyncImage's re-fetch-on-render
-/// behavior in LazyHStack/LazyVGrid scroll containers.
+#if os(iOS)
+import UIKit
+typealias PlatformImage = UIImage
+#else
+import AppKit
+typealias PlatformImage = NSImage
+#endif
+
+/// Cross-platform URLSession + NSCache image loader.
 struct CachedAsyncImage: View {
     let urlString: String
-    @State private var uiImage: UIImage?
+    @State private var platformImage: PlatformImage?
     @State private var loadFailed = false
 
-    private static let cache: NSCache<NSString, UIImage> = {
-        let c = NSCache<NSString, UIImage>()
-        c.countLimit = 150
+    private static let cache: NSCache<NSString, PlatformImage> = {
+        let c = NSCache<NSString, PlatformImage>()
+        // Increased limit for better coverage of new posters
+        c.countLimit = 350
         return c
     }()
 
@@ -25,10 +32,16 @@ struct CachedAsyncImage: View {
 
     var body: some View {
         Group {
-            if let uiImage {
-                Image(uiImage: uiImage)
+            if let platformImage {
+                #if os(iOS)
+                Image(uiImage: platformImage)
                     .resizable()
                     .scaledToFill()
+                #else
+                Image(nsImage: platformImage)
+                    .resizable()
+                    .scaledToFill()
+                #endif
             } else if loadFailed {
                 Rectangle().fill(Color.gray.opacity(0.3))
                     .overlay(
@@ -43,19 +56,21 @@ struct CachedAsyncImage: View {
         .task(id: urlString) {
             loadFailed = false
             guard !urlString.isEmpty, let url = URL(string: urlString) else { return }
+            
             if let cached = Self.cache.object(forKey: urlString as NSString) {
-                uiImage = cached
+                platformImage = cached
                 return
             }
+            
             guard let (data, _) = try? await URLSession.shared.data(from: url),
-                  let loaded = UIImage(data: data) else {
+                  let loaded = PlatformImage(data: data) else {
                 loadFailed = true
                 return
             }
+            
             Self.cache.setObject(loaded, forKey: urlString as NSString)
             Self.totalBytes += data.count
-            uiImage = loaded
+            platformImage = loaded
         }
     }
 }
-#endif
