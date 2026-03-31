@@ -16,10 +16,14 @@ struct CachedAsyncImage: View {
 
     private static let cache: NSCache<NSString, PlatformImage> = {
         let c = NSCache<NSString, PlatformImage>()
-        // Increased limit for better coverage of new posters
         c.countLimit = 350
         return c
-    }()
+    } ()
+
+    private var cachedImage: PlatformImage? {
+        guard !urlString.isEmpty else { return nil }
+        return Self.cache.object(forKey: urlString as NSString)
+    }
 
     /// Total compressed bytes currently stored in the shared cache.
     private(set) static var totalBytes: Int = 0
@@ -32,13 +36,13 @@ struct CachedAsyncImage: View {
 
     var body: some View {
         Group {
-            if let platformImage {
+            if let displayImage = platformImage ?? cachedImage {
                 #if os(iOS)
-                Image(uiImage: platformImage)
+                Image(uiImage: displayImage)
                     .resizable()
                     .scaledToFill()
                 #else
-                Image(nsImage: platformImage)
+                Image(nsImage: displayImage)
                     .resizable()
                     .scaledToFill()
                 #endif
@@ -57,8 +61,7 @@ struct CachedAsyncImage: View {
             loadFailed = false
             guard !urlString.isEmpty, let url = URL(string: urlString) else { return }
             
-            if let cached = Self.cache.object(forKey: urlString as NSString) {
-                platformImage = cached
+            if Self.cache.object(forKey: urlString as NSString) != nil {
                 return
             }
             

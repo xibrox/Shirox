@@ -68,24 +68,18 @@ struct HomeView: View {
 
 private struct FeaturedCarousel: View {
     let items: [AniListMedia]
-    @State private var selectedTab = 1
+    // Use a high range to avoid jump flickering
+    @State private var selectedTab = 1000
     @State private var overscrollY: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var realItems: [AniListMedia] { items.prefix(8).map { $0 } }
-    private var loopingItems: [AniListMedia] {
-        guard !realItems.isEmpty else { return [] }
-        return [realItems.last!] + realItems + [realItems.first!]
-    }
-
     private var displayCount: Int { realItems.count }
+    
     private var currentIndex: Int {
-        guard displayCount > 0 else { return 0 }
-        // Maps buffer indices back to real indices:
-        // 0 (last) -> displayCount - 1
-        // 1..displayCount -> 0..displayCount-1
-        // displayCount + 1 (first) -> 0
-        return (selectedTab - 1 + displayCount) % displayCount
+        let count = displayCount
+        guard count > 0 else { return 0 }
+        return selectedTab % count
     }
 
     var body: some View {
@@ -95,7 +89,8 @@ private struct FeaturedCarousel: View {
             ? UIScreen.main.bounds.width * (9.0 / 16.0)
             : UIScreen.main.bounds.height - 140
         
-        let current = realItems[currentIndex]
+        let displayItems = realItems
+        let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]
 
         VStack(spacing: 0) {
             GeometryReader { proxy in
@@ -107,10 +102,12 @@ private struct FeaturedCarousel: View {
                 let tabOffset = scrollY >= 0 ? -stretch - parallaxBuffer : -parallaxBuffer - scrollY * (1 - parallaxFactor)
 
                 TabView(selection: $selectedTab) {
-                    ForEach(0..<loopingItems.count, id: \.self) { index in
-                        FeaturedCard(media: loopingItems[index], isWide: isIPad)
-                            .allowsHitTesting(false)
-                            .tag(index)
+                    ForEach(0..<2000, id: \.self) { index in
+                        if !displayItems.isEmpty {
+                            FeaturedCard(media: displayItems[index % displayItems.count], isWide: isIPad)
+                                .allowsHitTesting(false)
+                                .tag(index)
+                        }
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -118,9 +115,6 @@ private struct FeaturedCarousel: View {
                 .frame(height: tabHeight)
                 .offset(y: tabOffset)
                 .background(Color.clear.preference(key: CarouselOverscrollKey.self, value: scrollY))
-                .onChange(of: selectedTab) { newValue in
-                    handleIndexJump(newValue, count: displayCount)
-                }
             }
             .frame(maxWidth: .infinity)
             .frame(height: imageHeight + overscrollY)
@@ -142,7 +136,7 @@ private struct FeaturedCarousel: View {
                     .allowsHitTesting(false)
 
                     VStack(spacing: 10) {
-                        if let genres = current.genres, !genres.isEmpty {
+                        if let genres = currentMedia.genres, !genres.isEmpty {
                             HStack(spacing: 6) {
                                 ForEach(genres.prefix(3), id: \.self) { g in
                                     Text(g)
@@ -155,13 +149,13 @@ private struct FeaturedCarousel: View {
                             }
                         }
 
-                        Text(current.title.displayTitle)
+                        Text(currentMedia.title.displayTitle)
                             .font(.title2.weight(.bold))
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
 
-                        if let desc = current.plainDescription, !desc.isEmpty {
+                        if let desc = currentMedia.plainDescription, !desc.isEmpty {
                             Text(String(desc.prefix(120)) + (desc.count > 120 ? "…" : ""))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
@@ -171,7 +165,7 @@ private struct FeaturedCarousel: View {
                         }
 
                         NavigationLink {
-                            AniListDetailView(mediaId: current.id, preloadedMedia: current)
+                            AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "play.fill").font(.footnote.weight(.semibold))
@@ -193,8 +187,15 @@ private struct FeaturedCarousel: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 10)
         }
+        .onAppear {
+            if displayCount > 0 {
+                // Initialize to a middle point for safety
+                selectedTab = (1000 / displayCount) * displayCount
+            }
+        }
 
         #else
+        let displayItems = realItems
         ZStack(alignment: .bottom) {
             GeometryReader { geometry in
                 let availableWidth = geometry.size.width
@@ -202,24 +203,23 @@ private struct FeaturedCarousel: View {
                 let cardHeight = cardWidth * (9.0 / 16.0)
 
                 TabView(selection: $selectedTab) {
-                    ForEach(0..<loopingItems.count, id: \.self) { index in
-                        let media = loopingItems[index]
-                        NavigationLink {
-                            AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                        } label: {
-                            FeaturedCard(media: media)
-                                .padding(.horizontal, 16)
+                    ForEach(0..<2000, id: \.self) { index in
+                        if !displayItems.isEmpty {
+                            let media = displayItems[index % displayItems.count]
+                            NavigationLink {
+                                AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                            } label: {
+                                FeaturedCard(media: media)
+                                    .padding(.horizontal, 16)
+                            }
+                            .buttonStyle(.plain)
+                            .tag(index)
                         }
-                        .buttonStyle(.plain)
-                        .tag(index)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(width: availableWidth, height: cardHeight)
                 .position(x: availableWidth / 2, y: cardHeight / 2)
-                .onChange(of: selectedTab) { newValue in
-                    handleIndexJump(newValue, count: displayCount)
-                }
             }
             .frame(height: (NSScreen.main?.frame.width ?? 800) * (9.0 / 16.0))
 
@@ -227,26 +227,12 @@ private struct FeaturedCarousel: View {
                 .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)
-        #endif
-    }
-
-    private func handleIndexJump(_ newValue: Int, count: Int) {
-        guard count > 0 else { return }
-        if newValue == 0 {
-            // Reached left fake item (last), jump to real last item silently
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                if selectedTab == 0 {
-                    withAnimation(.none) { selectedTab = count }
-                }
-            }
-        } else if newValue == count + 1 {
-            // Reached right fake item (first), jump to real first item silently
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                if selectedTab == count + 1 {
-                    withAnimation(.none) { selectedTab = 1 }
-                }
+        .onAppear {
+            if displayCount > 0 {
+                selectedTab = (1000 / displayCount) * displayCount
             }
         }
+        #endif
     }
 }
 
