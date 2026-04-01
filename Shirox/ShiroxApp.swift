@@ -46,6 +46,8 @@ struct ShiroxApp: App {
             diskCapacity: 150 * 1024 * 1024,
             diskPath: nil
         )
+        // Initialize Chromecast
+        _ = CastManager.shared
     }
     
     var body: some Scene {

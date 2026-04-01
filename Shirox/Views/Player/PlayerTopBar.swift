@@ -57,8 +57,12 @@ struct PlayerTopBar: View {
     @ViewBuilder
     private var rightButtons: some View {
         #if os(iOS)
-        AirPlayButton()
-            .frame(width: 32, height: 32)
+        HStack(spacing: 4) {
+            CastButton()
+                .frame(width: 32, height: 32)
+            AirPlayButton()
+                .frame(width: 32, height: 32)
+        }
         if onPiP != nil {
             Button { onPiP?() } label: {
                 Image(systemName: "pip.enter")

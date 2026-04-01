@@ -272,6 +272,7 @@ struct PlayerView: View {
     // Subtitles
     @State private var subtitleCues: [SubtitleCue] = []
     @ObservedObject var subtitleSettings = SubtitleSettingsManager.shared
+    @ObservedObject var castManager = CastManager.shared
 
     // PiP (iOS only)
     #if os(iOS)
@@ -545,6 +546,13 @@ struct PlayerView: View {
         .onChange(of: playbackSpeed) { _, newSpeed in
             if isPlaying { player?.rate = newSpeed }
         }
+        .onChange(of: castManager.isConnected) { _, connected in
+            if connected {
+                castCurrentMedia()
+                player?.pause()
+                isPlaying = false
+            }
+        }
         #if os(iOS)
         // Reset speed boost when iOS takes over (Control Center, Notification Center, incoming call…)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
@@ -780,6 +788,14 @@ struct PlayerView: View {
 
     private func handleDismiss() {
         if let customDismiss { customDismiss() } else { dismiss() }
+    }
+
+    private func castCurrentMedia() {
+        CastManager.shared.castMedia(
+            url: currentStream.url,
+            title: currentContext?.mediaTitle ?? currentStream.title,
+            posterUrl: currentContext?.imageUrl
+        )
     }
 
     private func togglePlayPause() {
