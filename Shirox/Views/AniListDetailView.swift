@@ -199,7 +199,52 @@ struct AniListDetailView: View {
             resumeFrom: item.watchedSeconds,
             detailHref: nil
         )
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+        let epNum = item.episodeNumber
+        let mediaTitle = item.mediaTitle
+        let totalEpisodes = item.totalEpisodes
+        let streamIsDub = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub")
+
+        // Helper to get episodes list via search fallback (AniList items lack href)
+        let fetchEpisodes: () async throws -> [EpisodeLink] = {
+            guard let module = ModuleManager.shared.activeModule else { return [] }
+            let runner = ModuleJSRunner()
+            try await runner.load(module: module)
+            let results = try await runner.search(keyword: mediaTitle)
+            let match = streamIsDub
+                ? results.first(where: { $0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
+                : results.first(where: { !$0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
+            if let href = match?.href {
+                return try await runner.fetchEpisodes(url: href)
+            }
+            return []
+        }
+
+        // Re-fetch current episode streams when stored URL expires
+        let onExpired: StreamRefetchLoader? = {
+            return {
+                let episodes = try await fetchEpisodes()
+                guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+                let runner = ModuleJSRunner()
+                if let module = ModuleManager.shared.activeModule { try? await runner.load(module: module) }
+                return try await runner.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
+            }
+        }()
+
+        // Load next episode streams (enables the Next Episode button)
+        let onWatchNext: WatchNextLoader? = {
+            return { currentEpNum in
+                let nextEpNum = currentEpNum + 1
+                if let total = totalEpisodes, nextEpNum > total { return nil }
+                let episodes = try await fetchEpisodes()
+                guard let ep = episodes.first(where: { Int($0.number) == nextEpNum }) else { return nil }
+                let runner = ModuleJSRunner()
+                if let module = ModuleManager.shared.activeModule { try? await runner.load(module: module) }
+                return (streams: try await runner.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title },
+                        episodeNumber: nextEpNum)
+            }
+        }()
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
     }
     #endif
 

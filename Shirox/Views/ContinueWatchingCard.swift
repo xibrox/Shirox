@@ -90,24 +90,46 @@ struct ContinueWatchingSection: View {
         )
         let epNum = item.episodeNumber
         let detailHref = item.detailHref
+        let mediaTitle = item.mediaTitle
+        let mid = item.moduleId
+
+        // Helper to get episodes list (either via href or search fallback)
+        let fetchEpisodes: () async throws -> [EpisodeLink] = {
+            if let href = detailHref {
+                return try await JSEngine.shared.fetchEpisodes(url: href)
+            } else if let mid = mid {
+                // AniList fallback: find the item in the module by title
+                let results = try await JSEngine.shared.search(keyword: mediaTitle)
+                // Try exact match then fuzzy
+                let match = results.first { $0.title.lowercased() == mediaTitle.lowercased() } ?? results.first
+                if let href = match?.href {
+                    return try await JSEngine.shared.fetchEpisodes(url: href)
+                }
+            }
+            return []
+        }
 
         // Re-fetch current episode streams when stored URL expires
-        let onExpired: StreamRefetchLoader? = detailHref.map { href in {
-            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
-            return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
-        }}
+        let onExpired: StreamRefetchLoader? = {
+            return {
+                let episodes = try await fetchEpisodes()
+                guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+                return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
+            }
+        }()
 
         // Load next episode streams (enables the Next Episode button)
-        let onWatchNext: WatchNextLoader? = detailHref.map { href in { currentEpNum in
-            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-            guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                  idx + 1 < episodes.count else { return nil }
-            let nextEp = episodes[idx + 1]
-            let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
-            guard !streams.isEmpty else { return nil }
-            return (streams: streams, episodeNumber: Int(nextEp.number))
-        }}
+        let onWatchNext: WatchNextLoader? = {
+            return { currentEpNum in
+                let episodes = try await fetchEpisodes()
+                guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                      idx + 1 < episodes.count else { return nil }
+                let nextEp = episodes[idx + 1]
+                let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+                guard !streams.isEmpty else { return nil }
+                return (streams: streams, episodeNumber: Int(nextEp.number))
+            }
+        }()
 
         #if os(iOS)
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)

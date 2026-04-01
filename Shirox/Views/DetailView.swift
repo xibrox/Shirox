@@ -144,12 +144,26 @@ struct DetailView: View {
         )
         let epNum = item.episodeNumber
         let detailHref = item.detailHref
+
+        // Re-fetch current episode streams when stored URL expires
         let onExpired: StreamRefetchLoader? = detailHref.map { href in {
             let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
             guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
             return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
         }}
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onStreamExpired: onExpired)
+
+        // Load next episode streams (enables the Next Episode button)
+        let onWatchNext: WatchNextLoader? = detailHref.map { href in { currentEpNum in
+            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+            guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                  idx + 1 < episodes.count else { return nil }
+            let nextEp = episodes[idx + 1]
+            let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+            guard !streams.isEmpty else { return nil }
+            return (streams: streams, episodeNumber: Int(nextEp.number))
+        }}
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
     }
     #endif
 
