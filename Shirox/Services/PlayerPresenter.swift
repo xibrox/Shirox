@@ -229,23 +229,12 @@ final class CastManager: NSObject, ObservableObject {
         let criteria = GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID)
         let options = GCKCastOptions(discoveryCriteria: criteria)
         GCKCastContext.setSharedInstanceWith(options)
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(castSessionDidChange),
-            name: .gckCastSessionDidStart,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(castSessionDidChange),
-            name: .gckCastSessionDidEnd,
-            object: nil
-        )
+        GCKCastContext.sharedInstance().sessionManager.add(self)
+        updateState()
         #endif
     }
     
-    @objc private func castSessionDidChange() {
+    private func updateState() {
         #if canImport(GoogleCast)
         let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession
         isConnected = session != nil
@@ -265,7 +254,7 @@ final class CastManager: NSObject, ObservableObject {
         
         let mediaInfoBuilder = GCKMediaInformationBuilder(contentURL: url)
         mediaInfoBuilder.streamType = .buffered
-        mediaInfoBuilder.contentType = "video/mp4"
+        mediaInfoBuilder.contentType = "video/mp4" // or application/x-mpegurl for HLS
         mediaInfoBuilder.metadata = metadata
         
         let mediaInfo = mediaInfoBuilder.build()
@@ -279,6 +268,20 @@ final class CastManager: NSObject, ObservableObject {
 }
 
 #if canImport(GoogleCast)
+extension CastManager: GCKSessionManagerDelegate {
+    func sessionManager(_ sessionManager: GCKSessionManager, didStart session: GCKCastSession) {
+        updateState()
+    }
+    
+    func sessionManager(_ sessionManager: GCKSessionManager, didEnd session: GCKCastSession, withError error: Error?) {
+        updateState()
+    }
+    
+    func sessionManager(_ sessionManager: GCKSessionManager, didResumeCastSession session: GCKCastSession) {
+        updateState()
+    }
+}
+
 extension CastManager: GCKRequestDelegate {
     func request(_ request: GCKRequest, didFailWithError error: GCKError) {
         print("[Cast] Request failed: \(error.localizedDescription)")

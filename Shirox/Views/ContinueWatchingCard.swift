@@ -97,7 +97,7 @@ struct ContinueWatchingSection: View {
         let fetchEpisodes: () async throws -> [EpisodeLink] = {
             if let href = detailHref {
                 return try await JSEngine.shared.fetchEpisodes(url: href)
-            } else if let mid = mid {
+            } else if item.moduleId != nil {
                 // AniList fallback: find the item in the module by title
                 let results = try await JSEngine.shared.search(keyword: mediaTitle)
                 // Try exact match then fuzzy
