@@ -65,6 +65,9 @@ final class PlayerPresenter: ObservableObject {
         hostingController.modalPresentationStyle = .fullScreen
 
         let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+        let lastRaw = UserDefaults.standard.integer(forKey: "lastLandscapeOrientation")
+        let lastLandscape = UIInterfaceOrientation(rawValue: lastRaw)
+        let preferredLandscape: UIInterfaceOrientation = (lastLandscape != nil && lastLandscape!.isLandscape) ? lastLandscape! : .landscapeRight
 
         // iOS 18+ Zoom Transition — skip when launching in landscape because the zoom
         // animation runs in portrait and the subsequent rotation causes a visible flash.
@@ -78,10 +81,10 @@ final class PlayerPresenter: ObservableObject {
 
         // Set the lock before presentation so supportedInterfaceOrientations is correct
         // from the very first frame. preferredInterfaceOrientationForPresentation on
-        // PlayerHostingController returns .landscapeRight when forceLandscape, so iOS
-        // will present the VC directly in landscape — no post-animation rotation needed.
+        // PlayerHostingController returns the last landscape side, so iOS
+        // will present the VC directly in that side.
         self.orientationLock = forceLandscape ? .landscape : .allButUpsideDown
-        trackedPlayerOrientation = forceLandscape ? .landscapeRight : snapshotCurrentOrientation()
+        trackedPlayerOrientation = preferredLandscape
         startTrackingOrientation()
 
         topVC.present(hostingController, animated: true)
@@ -90,6 +93,10 @@ final class PlayerPresenter: ObservableObject {
     func dismissPlayer() {
         guard let playerVC = playerVC else { return }
         let wasLandscape = trackedPlayerOrientation.isLandscape
+        // Save the side one last time before dismissing
+        if wasLandscape {
+            UserDefaults.standard.set(trackedPlayerOrientation.rawValue, forKey: "lastLandscapeOrientation")
+        }
         stopTrackingOrientation()
         // Reset orientation without animation before dismissing.
         // UIView.performWithoutAnimation suppresses the system rotation animation on the
@@ -105,6 +112,9 @@ final class PlayerPresenter: ObservableObject {
     /// Called after the player view has already been manually animated off screen (drag-to-dismiss).
     func dragDismiss() {
         guard let playerVC = playerVC else { return }
+        if trackedPlayerOrientation.isLandscape {
+            UserDefaults.standard.set(trackedPlayerOrientation.rawValue, forKey: "lastLandscapeOrientation")
+        }
         stopTrackingOrientation()
         orientationLock = .portrait
         UIView.performWithoutAnimation { refreshSupportedOrientations() }
@@ -126,6 +136,9 @@ final class PlayerPresenter: ObservableObject {
             // Only update for concrete orientations (ignore faceUp/faceDown/unknown).
             if let o = mapped, o != .unknown {
                 self?.trackedPlayerOrientation = o
+                if o.isLandscape {
+                    UserDefaults.standard.set(o.rawValue, forKey: "lastLandscapeOrientation")
+                }
             }
         }
     }

@@ -43,6 +43,24 @@ private struct VideoLayerView: UIViewRepresentable {
     class Coordinator: NSObject, AVPictureInPictureControllerDelegate {
         var pipController: AVPictureInPictureController?
         var lastPipTrigger: Int = 0
+        private var foregroundObserver: NSObjectProtocol?
+
+        override init() {
+            super.init()
+            foregroundObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.willEnterForegroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.pipController?.stopPictureInPicture()
+            }
+        }
+
+        deinit {
+            if let obs = foregroundObserver {
+                NotificationCenter.default.removeObserver(obs)
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -1173,7 +1191,12 @@ class PlayerHostingController<Content: View>: UIHostingController<Content> {
     }
 
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
-        UserDefaults.standard.bool(forKey: "forceLandscape") ? .landscapeRight : .portrait
+        let lastRaw = UserDefaults.standard.integer(forKey: "lastLandscapeOrientation")
+        let last = UIInterfaceOrientation(rawValue: lastRaw)
+        if let last = last, last.isLandscape {
+            return last
+        }
+        return .landscapeRight
     }
 
     override var shouldAutorotate: Bool { true }
