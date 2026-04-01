@@ -307,61 +307,15 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // [1] VideoLayer (always present when player != nil)
             if let player {
                 #if os(iOS)
-                // [1] + [1.5] Video layer with loading cover as overlay.
-                // Overlay shares the video layer's frame — zero effect on sibling layout.
                 VideoLayerView(player: player, pipTrigger: pipTrigger)
                     .ignoresSafeArea()
-                    .overlay {
-                        ZStack {
-                            if let urlStr = currentContext?.imageUrl, let url = URL(string: urlStr) {
-                                AsyncImage(url: url) { phase in
-                                    if let img = phase.image {
-                                        img
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .blur(radius: 30, opaque: true)
-                                    } else {
-                                        Color.black
-                                    }
-                                }
-                                .clipped()
-                            } else {
-                                Color.black
-                            }
-
-                            Color.black.opacity(0.6)
-
-                            VStack(spacing: 10) {
-                                Text(currentContext?.mediaTitle ?? currentStream.title)
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-                                if let ep = currentContext?.episodeNumber {
-                                    Text("Episode \(ep)")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.white.opacity(0.65))
-                                }
-                                ProgressView()
-                                    .tint(.white)
-                                    .padding(.top, 8)
-                            }
-                            .padding(.horizontal, 32)
-                        }
-                        // Purely visual — UIKit pan gesture (drag-to-dismiss) must not be blocked.
-                        .allowsHitTesting(false)
-                        .opacity(videoReady ? 0 : 1)
-                        .animation(.easeOut(duration: 0.4), value: videoReady)
-                    }
+                    .overlay { videoLoadingOverlay }
                 #else
-                VideoPlayer(player: player)
-                    .ignoresSafeArea()
+                VideoPlayer(player: player).ignoresSafeArea()
                 #endif
 
-                // [2] PlayerSubtitleOverlay (always visible, not behind lock/control hide)
                 PlayerSubtitleOverlay(
                     cues: subtitleCues,
                     currentTime: currentTime,
@@ -371,158 +325,28 @@ struct PlayerView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-                // [3] PlayerDoubleTapSeek (full-screen, transparent, owns ALL tap logic)
-                // Disabled while loading so the only interactive control is the dismiss button.
                 if controlsEnabled {
-                    PlayerDoubleTapSeek(
-                        onSingleTap: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showControls.toggle()
-                            }
-                            if showControls { scheduleHide() }
-                        },
-                        onSeekBackward: {
-                            skip(by: -Double(skipShort))
-                            scheduleHide()
-                        },
-                        onSeekForward: {
-                            skip(by: Double(skipShort))
-                            scheduleHide()
-                        },
-                        seekAmount: Double(skipShort)
-                    )
-                    .ignoresSafeArea()
+                    interactionLayer(player: player)
                 }
 
-                // [3.5] Speed boost badge (iOS only)
-                #if os(iOS)
-                if isSpeedBoosted {
-                    VStack {
-                        HStack(spacing: 4) {
-                            Image(systemName: "forward.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                            Text("2× Speed")
-                                .font(.caption.weight(.semibold))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        Spacer()
-                    }
-                    .padding(.top, 16)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.15), value: isSpeedBoosted)
-                    .allowsHitTesting(false)
-                }
-
-                // [3.6] Speed boost long-press handler (single-touch only)
-                if controlsEnabled {
-                    SpeedBoostOverlay(
-                        isLocked: isLocked,
-                        onBegan: {
-                            isSpeedBoosted = true
-                            player.rate = 2.0
-                        },
-                        onEnded: {
-                            if isSpeedBoosted {
-                                isSpeedBoosted = false
-                                player.rate = isPlaying ? playbackSpeed : 0
-                            }
-                        }
-                    )
-                    .ignoresSafeArea()
-
-                    // [3.7] Two-finger tap → play/pause
-                    TwoFingerTapOverlay(isLocked: isLocked, onTap: togglePlayPause)
-                        .ignoresSafeArea()
-                }
-                #endif
-
-                // [3.8] Next episode / stream re-fetch loading overlay
-                if isLoadingNextEpisode || isRefetchingStream {
-                    Color.black.opacity(0.65)
-                        .ignoresSafeArea()
-                        .overlay(ProgressView().tint(.white).scaleEffect(1.5))
-                        .allowsHitTesting(true)
-                        .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.2), value: isLoadingNextEpisode || isRefetchingStream)
-                }
-
-                // [4] Shadow Overlay & Controls
                 if showControls && !isLocked && controlsEnabled {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .black.opacity(0.7), location: 0.0),
-                                    .init(color: .clear, location: 0.35),
-                                    .init(color: .clear, location: 0.65),
-                                    .init(color: .black.opacity(0.7), location: 1.0)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-
-                    controlsOverlay
-                        .transition(.opacity)
+                    controlsContent
                 }
 
-                // [4.5] Invisible always-tappable play/pause (works when overlay is hidden)
                 if !isLocked && controlsEnabled {
-                    Button(action: togglePlayPause) {
-                        Color.clear
-                            .frame(width: 72, height: 72)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    playPauseButton
                 }
 
-                // [5] Lock overlay (visible when isLocked)
                 if isLocked && controlsEnabled {
-                    lockOverlay
+                    lockOverlayView
                 }
 
-                // [6] Loading dismiss button (iOS only) — matches PlayerTopBar dismiss button exactly
                 #if os(iOS)
-                GeometryReader { geo in
-                    let isLandscape = geo.size.width > geo.size.height
-                    let uiInsets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets ?? .zero
-                    let topPad: CGFloat = max(16, uiInsets.top + 8)
-                    let hSafe: CGFloat = isLandscape ? max(uiInsets.left, uiInsets.right) : 0
-                    let hPad: CGFloat = max(16, hSafe) + 20
-                    VStack {
-                        HStack {
-                            Button(action: handleDismiss) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(Color.white.opacity(0.25))
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.3), radius: 6)
-                            }
-                            .buttonStyle(.plain)
-                            Spacer()
-                        }
-                        .padding(.horizontal, hPad)
-                        .padding(.top, topPad)
-                        Spacer()
-                    }
-                }
-                .ignoresSafeArea()
-                .allowsHitTesting(!controlsEnabled)
-                .opacity(controlsEnabled ? 0 : 1)
-                .animation(.easeOut(duration: 0.4), value: controlsEnabled)
+                loadingDismissButton
                 #endif
 
             } else {
-                // [6] Loading view (shown when player == nil)
-                loadingView
+                loadingViewPlaceholder
             }
         }
         .ignoresSafeArea()
@@ -554,7 +378,6 @@ struct PlayerView: View {
             }
         }
         #if os(iOS)
-        // Reset speed boost when iOS takes over (Control Center, Notification Center, incoming call…)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             if isSpeedBoosted {
                 isSpeedBoosted = false
@@ -587,8 +410,202 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Audio Picker Sheet
+    // MARK: - Extracted UI Components
 
+    @ViewBuilder
+    private var videoLoadingOverlay: some View {
+        #if os(iOS)
+        ZStack {
+            if let urlStr = currentContext?.imageUrl, let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    if let img = phase.image {
+                        img.resizable().aspectRatio(contentMode: .fill).blur(radius: 30, opaque: true)
+                    } else { Color.black }
+                }
+                .clipped()
+            } else { Color.black }
+
+            Color.black.opacity(0.6)
+
+            VStack(spacing: 10) {
+                Text(currentContext?.mediaTitle ?? currentStream.title)
+                    .font(.title3.weight(.semibold)).foregroundStyle(.white)
+                    .multilineTextAlignment(.center).lineLimit(2)
+                if let ep = currentContext?.episodeNumber {
+                    Text("Episode \(ep)").font(.subheadline).foregroundStyle(.white.opacity(0.65))
+                }
+                ProgressView().tint(.white).padding(.top, 8)
+            }
+            .padding(.horizontal, 32)
+        }
+        .allowsHitTesting(false)
+        .opacity(videoReady ? 0 : 1)
+        .animation(.easeOut(duration: 0.4), value: videoReady)
+        #else
+        EmptyView()
+        #endif
+    }
+
+    @ViewBuilder
+    private func interactionLayer(player: AVPlayer) -> some View {
+        ZStack {
+            PlayerDoubleTapSeek(
+                onSingleTap: {
+                    withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+                    if showControls { scheduleHide() }
+                },
+                onSeekBackward: { skip(by: -Double(skipShort)); scheduleHide() },
+                onSeekForward: { skip(by: Double(skipShort)); scheduleHide() },
+                seekAmount: Double(skipShort)
+            )
+            .ignoresSafeArea()
+
+            #if os(iOS)
+            if isSpeedBoosted {
+                speedBoostBadge
+            }
+
+            SpeedBoostOverlay(
+                isLocked: isLocked,
+                onBegan: { isSpeedBoosted = true; player.rate = 2.0 },
+                onEnded: {
+                    if isSpeedBoosted {
+                        isSpeedBoosted = false
+                        player.rate = isPlaying ? playbackSpeed : 0
+                    }
+                }
+            )
+            .ignoresSafeArea()
+
+            TwoFingerTapOverlay(isLocked: isLocked, onTap: togglePlayPause)
+                .ignoresSafeArea()
+            #endif
+
+            if isLoadingNextEpisode || isRefetchingStream {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .overlay(ProgressView().tint(.white).scaleEffect(1.5))
+                    .allowsHitTesting(true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var speedBoostBadge: some View {
+        VStack {
+            HStack(spacing: 4) {
+                Image(systemName: "forward.fill").font(.system(size: 12, weight: .semibold))
+                Text("2× Speed").font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+            Spacer()
+        }
+        .padding(.top, 16).transition(.opacity)
+        .animation(.easeInOut(duration: 0.15), value: isSpeedBoosted)
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var controlsContent: some View {
+        ZStack {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.7), location: 0.0),
+                            .init(color: .clear, location: 0.35),
+                            .init(color: .clear, location: 0.65),
+                            .init(color: .black.opacity(0.7), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .ignoresSafeArea().allowsHitTesting(false)
+
+            controlsOverlay
+        }
+        .transition(.opacity)
+    }
+
+    @ViewBuilder
+    private var playPauseButton: some View {
+        Button(action: togglePlayPause) {
+            Color.clear.frame(width: 72, height: 72).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var lockOverlayView: some View {
+        VStack {
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isLocked = false }
+                } label: {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white).padding(12)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .buttonStyle(.plain).padding(.leading, 20).padding(.top, 20)
+                Spacer()
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var loadingDismissButton: some View {
+        #if os(iOS)
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            let uiInsets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets ?? .zero
+            let topPad: CGFloat = max(16, uiInsets.top + 8)
+            let hSafe: CGFloat = isLandscape ? max(uiInsets.left, uiInsets.right) : 0
+            let hPad: CGFloat = max(16, hSafe) + 20
+            VStack {
+                HStack {
+                    Button(action: handleDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: 44, height: 44).background(Color.white.opacity(0.25))
+                            .clipShape(Circle()).shadow(color: .black.opacity(0.3), radius: 6)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+                .padding(.horizontal, hPad).padding(.top, topPad)
+                Spacer()
+            }
+        }
+        .ignoresSafeArea().allowsHitTesting(!controlsEnabled)
+        .opacity(controlsEnabled ? 0 : 1)
+        .animation(.easeOut(duration: 0.4), value: controlsEnabled)
+        #else
+        EmptyView()
+        #endif
+    }
+
+    @ViewBuilder
+    private var loadingViewPlaceholder: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "play.circle")
+                .font(.system(size: 64)).foregroundStyle(.white.opacity(0.6))
+                .opacity(loadingOpacity)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                        loadingOpacity = 0.2
+                    }
+                }
+            Text("Loading…").font(.subheadline).foregroundStyle(.white.opacity(0.5))
+        }
+    }
+}
+
+// MARK: - Audio Picker Sheet
+
+extension PlayerView {
     @ViewBuilder
     private var audioPickerSheet: some View {
         VStack(spacing: 0) {
