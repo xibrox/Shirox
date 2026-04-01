@@ -48,11 +48,14 @@ private struct VideoLayerView: UIViewRepresentable {
         override init() {
             super.init()
             foregroundObserver = NotificationCenter.default.addObserver(
-                forName: UIApplication.willEnterForegroundNotification,
+                forName: UIApplication.didBecomeActiveNotification,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.pipController?.stopPictureInPicture()
+                // Small delay ensures the controller is ready to receive the stop command
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self?.pipController?.stopPictureInPicture()
+                }
             }
         }
 
