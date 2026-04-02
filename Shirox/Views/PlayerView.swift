@@ -4,6 +4,11 @@ import AVKit
 import MediaPlayer
 #endif
 
+// MARK: - Typealiases
+
+typealias WatchNextLoader = (Int) async throws -> (streams: [StreamResult], episodeNumber: Int)?
+typealias StreamRefetchLoader = () async throws -> [StreamResult]
+
 // MARK: - Circular Button Style (uniform size & appearance)
 
 struct CircularButtonStyle: ButtonStyle {
@@ -145,7 +150,7 @@ struct PlayerView: View {
             player?.volume = newVolume
         }
         .onChange(of: playbackSpeed) { _, newSpeed in
-            if isPlaying { player?.rate = newSpeed }
+            if isPlaying { player?.rate = Float(newSpeed) }
         }
         .onChange(of: castManager.isConnected) { _, connected in
             if connected {
@@ -158,15 +163,18 @@ struct PlayerView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             if isSpeedBoosted {
                 isSpeedBoosted = false
-                player?.rate = isPlaying ? playbackSpeed : 0
+                player?.rate = isPlaying ? Float(playbackSpeed) : 0
             }
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         #endif
         .sheet(isPresented: $showSpeedPicker) {
-            PlayerSpeedPicker(selectedSpeed: $playbackSpeed)
-                .presentationDetents([.height(320)])
+            PlayerSpeedPicker(selectedSpeed: Binding(
+                get: { Float(playbackSpeed) },
+                set: { playbackSpeed = Double($0) }
+            ))
+            .presentationDetents([.height(320)])
         }
         .sheet(isPresented: $showSubtitleSettings) {
             PlayerSubtitleSettingsView(settings: subtitleSettings)
@@ -248,7 +256,7 @@ struct PlayerView: View {
                 onEnded: {
                     if isSpeedBoosted {
                         isSpeedBoosted = false
-                        player.rate = isPlaying ? playbackSpeed : 0
+                        player.rate = isPlaying ? Float(playbackSpeed) : 0
                     }
                 }
             )
@@ -365,7 +373,10 @@ struct PlayerView: View {
         PlayerBottomBar(
             currentTime: $currentTime,
             duration: duration,
-            playbackSpeed: $playbackSpeed,
+            playbackSpeed: Binding(
+                get: { Float(playbackSpeed) },
+                set: { playbackSpeed = Double($0) }
+            ),
             onSeek: { time in seekTo(time) },
             onSliderDragStart: { hideTask?.cancel() },
             onSliderDragEnd: { scheduleHide() },
@@ -386,11 +397,11 @@ struct PlayerView: View {
     @ViewBuilder
     private var centerControlsView: some View {
         PlayerCenterControls(
-            isPlaying: isPlaying,
-            onTogglePlayPause: togglePlayPause,
-            onSkipBackward: { skip(by: -Double(skipShort)); scheduleHide() },
-            onSkipForward: { skip(by: Double(skipShort)); scheduleHide() },
-            skipShortAmount: skipShort
+            isPlaying: $isPlaying,
+            skipAmount: Double(skipShort),
+            onBackward: { skip(by: -Double(skipShort)); scheduleHide() },
+            onPlayPause: { togglePlayPause() },
+            onForward: { skip(by: Double(skipShort)); scheduleHide() }
         )
         .buttonStyle(CircularButtonStyle())
     }
@@ -516,7 +527,7 @@ struct PlayerView: View {
             player.pause()
             isPlaying = false
         } else {
-            player.rate = playbackSpeed
+            player.rate = Float(playbackSpeed)
             isPlaying = true
         }
         scheduleHide()
@@ -584,7 +595,7 @@ struct PlayerView: View {
         let p = AVPlayer(playerItem: item)
         p.volume = volume
         p.usesExternalPlaybackWhileExternalScreenIsActive = true
-        p.rate = playbackSpeed
+        p.rate = Float(playbackSpeed)
         isPlaying = true
         player = p
 
@@ -738,10 +749,17 @@ struct PlayerView: View {
             isRefetchingStream = false
             guard !streams.isEmpty else { return }
             let isSub = currentStream.subtitle != nil
-            let match = streams.first(where: { $0.title == currentStream.title && ($0.subtitle != nil) == isSub })
-                ?? streams.first(where: { ($0.subtitle != nil) == isSub })
-                ?? streams.first(where: { $0.title == currentStream.title })
+            
+            // Break down complex expression for compiler
+            let matchingStreams = streams.filter { $0.title == currentStream.title && ($0.subtitle != nil) == isSub }
+            let fallbackStreams = streams.filter { ($0.subtitle != nil) == isSub }
+            let titleMatchingStreams = streams.filter { $0.title == currentStream.title }
+            
+            let match = matchingStreams.first
+                ?? fallbackStreams.first
+                ?? titleMatchingStreams.first
                 ?? streams[0]
+                
             swapStream(match, episodeNumber: currentContext?.episodeNumber ?? 1)
         } catch { isRefetchingStream = false }
     }
@@ -754,9 +772,16 @@ struct PlayerView: View {
             isLoadingNextEpisode = false
             guard !result.streams.isEmpty else { return }
             let isSub = currentStream.subtitle != nil
-            let match = result.streams.first(where: { $0.title == currentStream.title && ($0.subtitle != nil) == isSub })
-                ?? result.streams.first(where: { ($0.subtitle != nil) == isSub })
-                ?? result.streams.first(where: { $0.title == currentStream.title })
+            
+            // Break down complex expression for compiler
+            let matchingStreams = result.streams.filter { $0.title == currentStream.title && ($0.subtitle != nil) == isSub }
+            let fallbackStreams = result.streams.filter { ($0.subtitle != nil) == isSub }
+            let titleMatchingStreams = result.streams.filter { $0.title == currentStream.title }
+            
+            let match = matchingStreams.first
+                ?? fallbackStreams.first
+                ?? titleMatchingStreams.first
+            
             if let match { swapStream(match, episodeNumber: result.episodeNumber) }
             else if result.streams.count == 1 { swapStream(result.streams[0], episodeNumber: result.episodeNumber) }
             else {
@@ -776,7 +801,7 @@ struct PlayerView: View {
         let newItem = AVPlayerItem(asset: asset)
         setupPlaybackEndObserver(for: newItem)
         player?.replaceCurrentItem(with: newItem)
-        player?.rate = playbackSpeed
+        player?.rate = Float(playbackSpeed)
         isPlaying = true
         currentTime = 0
         duration = 0
@@ -909,6 +934,133 @@ class PlayerLayerUIView: UIView {
         playerLayer.videoGravity = .resizeAspect
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+#endif
+
+// MARK: - Two-Finger Tap Overlay (UIKit tap, two touches required)
+
+#if os(iOS)
+private struct TwoFingerTapOverlay: UIViewRepresentable {
+    var isLocked: Bool
+    var onTap: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onTap: onTap) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.isLocked = isLocked
+        context.coordinator.onTap = onTap
+
+        guard !context.coordinator.attached, let window = uiView.window else { return }
+        let gr = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        gr.numberOfTouchesRequired = 2
+        gr.numberOfTapsRequired = 1
+        gr.cancelsTouchesInView = false
+        gr.delegate = context.coordinator
+        window.addGestureRecognizer(gr)
+        context.coordinator.recognizer = gr
+        context.coordinator.attached = true
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.recognizer?.view?.removeGestureRecognizer(coordinator.recognizer!)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var isLocked: Bool = false
+        var onTap: () -> Void
+        var recognizer: UITapGestureRecognizer?
+        var attached = false
+
+        init(onTap: @escaping () -> Void) { self.onTap = onTap }
+
+        @objc func handle(_ gr: UITapGestureRecognizer) {
+            guard !isLocked, gr.state == .ended else { return }
+            onTap()
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            return true
+        }
+    }
+}
+
+// MARK: - Speed Boost Overlay (UIKit long-press, single-touch only)
+
+private final class SingleTouchLongPress: UILongPressGestureRecognizer {
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard (event.allTouches?.count ?? 0) == 1 else {
+            state = .failed
+            return
+        }
+        super.touchesBegan(touches, with: event)
+    }
+}
+
+private struct SpeedBoostOverlay: UIViewRepresentable {
+    var isLocked: Bool
+    var onBegan: () -> Void
+    var onEnded: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onBegan: onBegan, onEnded: onEnded) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.isLocked = isLocked
+        context.coordinator.onBegan = onBegan
+        context.coordinator.onEnded = onEnded
+
+        guard !context.coordinator.attached, let window = uiView.window else { return }
+        let gr = SingleTouchLongPress(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        gr.minimumPressDuration = 0.7
+        gr.cancelsTouchesInView = false
+        gr.delaysTouchesEnded = false
+        gr.delegate = context.coordinator
+        window.addGestureRecognizer(gr)
+        context.coordinator.recognizer = gr
+        context.coordinator.attached = true
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.recognizer?.view?.removeGestureRecognizer(coordinator.recognizer!)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var isLocked: Bool = false
+        var onBegan: () -> Void
+        var onEnded: () -> Void
+        var recognizer: UILongPressGestureRecognizer?
+        var attached = false
+
+        init(onBegan: @escaping () -> Void, onEnded: @escaping () -> Void) {
+            self.onBegan = onBegan
+            self.onEnded = onEnded
+        }
+
+        @objc func handle(_ gr: UILongPressGestureRecognizer) {
+            guard !isLocked else { return }
+            if gr.state == .began { onBegan() }
+            else if gr.state == .ended || gr.state == .cancelled { onEnded() }
+        }
+
+        func gestureRecognizer(_ gr: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            return true
+        }
+    }
 }
 #endif
 

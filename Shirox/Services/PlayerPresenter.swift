@@ -63,10 +63,9 @@ final class PlayerPresenter: ObservableObject {
             onStreamExpired: onStreamExpired
         )
         .ignoresSafeArea()
-        .tint(.red)
         
         let hostingController = PlayerHostingController(rootView: playerView)
-        hostingController.modalPresentationStyle = .fullScreen
+        hostingController.modalPresentationStyle = UIModalPresentationStyle.fullScreen
 
         let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
         let lastRaw = UserDefaults.standard.integer(forKey: "lastLandscapeOrientation")
@@ -268,7 +267,7 @@ final class CastManager: NSObject, ObservableObject {
 }
 
 #if canImport(GoogleCast)
-extension CastManager: GCKSessionManagerDelegate {
+extension CastManager: GCKSessionManagerListener {
     func sessionManager(_ sessionManager: GCKSessionManager, didStart session: GCKCastSession) {
         updateState()
     }
