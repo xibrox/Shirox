@@ -29,3 +29,5 @@ build/
 # Claude Code
 .claude/
 docs
+
+conductor

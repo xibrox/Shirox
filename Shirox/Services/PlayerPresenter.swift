@@ -215,6 +215,11 @@ final class CastManager: NSObject, ObservableObject {
     
     @Published var isConnected = false
     @Published var currentDeviceName: String?
+    @Published var isPlaying = false
+    @Published var currentPosition: Double = 0
+    @Published var duration: Double = 0
+    
+    private var progressTimer: Timer?
     
     private override init() {
         super.init()
@@ -228,6 +233,14 @@ final class CastManager: NSObject, ObservableObject {
         let criteria = GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID)
         let options = GCKCastOptions(discoveryCriteria: criteria)
         GCKCastContext.setSharedInstanceWith(options)
+        GCKCastContext.sharedInstance().useDefaultExpandedMediaControls = true
+        
+        let controller = GCKCastContext.sharedInstance().defaultExpandedMediaControlsViewController
+        controller.setButtonType(.skipBackward10, at: 0)
+        controller.setButtonType(.playPause, at: 1)
+        controller.setButtonType(.skipForward10, at: 2)
+        controller.setButtonType(.none, at: 3)
+        
         GCKCastContext.sharedInstance().sessionManager.add(self)
         updateState()
         #endif
@@ -238,6 +251,88 @@ final class CastManager: NSObject, ObservableObject {
         let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession
         isConnected = session != nil
         currentDeviceName = session?.device.friendlyName
+        
+        if let remoteMediaClient = session?.remoteMediaClient {
+            remoteMediaClient.add(self)
+            updateMediaStatus(remoteMediaClient.mediaStatus)
+        } else {
+            stopProgressTimer()
+            isPlaying = false
+            currentPosition = 0
+            duration = 0
+        }
+        #endif
+    }
+    
+    private func updateMediaStatus(_ status: GCKMediaStatus?) {
+        #if canImport(GoogleCast)
+        guard let status = status else { return }
+        isPlaying = status.playerState == .playing || status.playerState == .buffering
+        duration = status.mediaInformation?.streamDuration ?? 0
+        currentPosition = status.streamPosition
+        
+        if isPlaying {
+            startProgressTimer()
+        } else {
+            stopProgressTimer()
+        }
+        #endif
+    }
+    
+    private func startProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateCurrentPosition()
+            }
+        }
+    }
+    
+    private func stopProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = nil
+    }
+    
+    private func updateCurrentPosition() {
+        #if canImport(GoogleCast)
+        if let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession,
+           let remoteMediaClient = session.remoteMediaClient {
+            currentPosition = remoteMediaClient.approximateStreamPosition()
+        }
+        #endif
+    }
+    
+    func play() {
+        #if canImport(GoogleCast)
+        GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.play()
+        #endif
+    }
+    
+    func pause() {
+        #if canImport(GoogleCast)
+        GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.pause()
+        #endif
+    }
+    
+    func seek(to time: Double) {
+        #if canImport(GoogleCast)
+        let options = GCKMediaSeekOptions()
+        options.interval = time
+        options.resumeState = .unchanged
+        GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.seek(with: options)
+        #endif
+    }
+    
+    func skip(by seconds: Double) {
+        #if canImport(GoogleCast)
+        let newTime = currentPosition + seconds
+        seek(to: max(0, newTime))
+        #endif
+    }
+    
+    func disconnect() {
+        #if canImport(GoogleCast)
+        GCKCastContext.sharedInstance().sessionManager.endSessionAndStopCasting(true)
         #endif
     }
     
@@ -261,6 +356,7 @@ final class CastManager: NSObject, ObservableObject {
         if let remoteMediaClient = session.remoteMediaClient {
             let request = remoteMediaClient.loadMedia(mediaInfo)
             request.delegate = self
+            remoteMediaClient.add(self)
         }
         #endif
     }
@@ -278,6 +374,12 @@ extension CastManager: GCKSessionManagerListener {
     
     func sessionManager(_ sessionManager: GCKSessionManager, didResumeCastSession session: GCKCastSession) {
         updateState()
+    }
+}
+
+extension CastManager: GCKRemoteMediaClientListener {
+    func remoteMediaClient(_ client: GCKRemoteMediaClient, didUpdate mediaStatus: GCKMediaStatus?) {
+        updateMediaStatus(mediaStatus)
     }
 }
 

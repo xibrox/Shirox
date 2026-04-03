@@ -145,6 +145,7 @@ struct PlayerView: View {
             #if os(iOS)
             tearDownNowPlaying()
             #endif
+            castManager.disconnect()
         }
         .onChange(of: volume) { _, newVolume in
             player?.volume = newVolume
@@ -158,6 +159,15 @@ struct PlayerView: View {
                 player?.pause()
                 isPlaying = false
             }
+        }
+        .onChange(of: castManager.isPlaying) { _, playing in
+            if castManager.isConnected { isPlaying = playing }
+        }
+        .onChange(of: castManager.currentPosition) { _, pos in
+            if castManager.isConnected && !isScrubbing { currentTime = pos }
+        }
+        .onChange(of: castManager.duration) { _, dur in
+            if castManager.isConnected && dur > 0 { duration = dur }
         }
         #if os(iOS)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
@@ -521,6 +531,11 @@ struct PlayerView: View {
     }
 
     private func togglePlayPause() {
+        if castManager.isConnected {
+            if isPlaying { castManager.pause() } else { castManager.play() }
+            scheduleHide()
+            return
+        }
         guard let player else { return }
         if isPlaying {
             saveProgress()
@@ -534,6 +549,11 @@ struct PlayerView: View {
     }
 
     private func skip(by seconds: Double) {
+        if castManager.isConnected {
+            castManager.skip(by: seconds)
+            scheduleHide()
+            return
+        }
         guard let player, duration > 0 else { return }
         let newTime = min(max(currentTime + seconds, 0), duration)
         currentTime = newTime
@@ -546,6 +566,11 @@ struct PlayerView: View {
     }
 
     private func seekTo(_ time: Double) {
+        if castManager.isConnected {
+            castManager.seek(to: time)
+            if isPlaying { scheduleHide() }
+            return
+        }
         isScrubbing = true
         currentTime = time
         player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
