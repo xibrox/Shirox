@@ -3,6 +3,7 @@ import SwiftUI
 struct PlayerProgressSlider: View {
     @Binding var currentTime: Double
     let duration: Double
+    var bufferProgress: Double = 0
     var onSeek: (Double) -> Void
     var onDragStart: (() -> Void)? = nil
     var onDragEnd: (() -> Void)? = nil
@@ -19,13 +20,22 @@ struct PlayerProgressSlider: View {
         return min(max(displayTime / duration, 0), 1)
     }
 
+    private var buffered: Double {
+        return min(max(bufferProgress, 0), 1)
+    }
+
     var body: some View {
         VStack(spacing: 2) {                     // minimal spacing
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     // Background track
                     Capsule()
+                        .fill(Color.white.opacity(0.2))
+
+                    // Buffer portion
+                    Capsule()
                         .fill(Color.white.opacity(0.3))
+                        .frame(width: geo.size.width * buffered)
 
                     // Filled portion
                     Capsule()

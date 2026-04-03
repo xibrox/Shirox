@@ -64,6 +64,7 @@ struct PlayerView: View {
     @State private var showAudioPicker = false
     @State private var videoReady = false
     @State private var audioGroup: AVMediaSelectionGroup? = nil
+    @State private var bufferProgress: Double = 0
 
     // Subtitles
     @State private var subtitleCues: [SubtitleCue] = []
@@ -229,7 +230,19 @@ struct PlayerView: View {
                 if let ep = currentContext?.episodeNumber {
                     Text("Episode \(ep)").font(.subheadline).foregroundStyle(.white.opacity(0.65))
                 }
-                ProgressView().tint(.white).padding(.top, 8)
+                
+                VStack(spacing: 8) {
+                    if bufferProgress > 0 {
+                        ProgressView(value: bufferProgress, total: 1.0)
+                            .progressViewStyle(.linear)
+                            .tint(.white)
+                            .frame(width: 120)
+                            .scaleEffect(x: 1, y: 0.5)
+                    } else {
+                        ProgressView().tint(.white)
+                    }
+                }
+                .padding(.top, 8)
             }
             .padding(.horizontal, 32)
         }
@@ -383,6 +396,7 @@ struct PlayerView: View {
         PlayerBottomBar(
             currentTime: $currentTime,
             duration: duration,
+            bufferProgress: bufferProgress,
             playbackSpeed: Binding(
                 get: { Float(playbackSpeed) },
                 set: { playbackSpeed = Double($0) }
@@ -623,6 +637,7 @@ struct PlayerView: View {
         p.rate = Float(playbackSpeed)
         isPlaying = true
         player = p
+        bufferProgress = 0
 
         rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
             DispatchQueue.main.async {
@@ -632,6 +647,17 @@ struct PlayerView: View {
                     videoReady = true
                 }
                 #endif
+            }
+        }
+
+        // Buffer progress observer
+        Task { @MainActor [weak item] in
+            guard let item = item else { return }
+            for await ranges in item.publisher(for: \.loadedTimeRanges).values {
+                let duration = item.duration.seconds
+                guard duration > 0, let range = ranges.first?.timeRangeValue else { continue }
+                let loaded = range.start.seconds + range.duration.seconds
+                bufferProgress = loaded / duration
             }
         }
 
@@ -830,6 +856,19 @@ struct PlayerView: View {
         isPlaying = true
         currentTime = 0
         duration = 0
+        bufferProgress = 0
+
+        // Buffer progress observer for new item
+        Task { @MainActor [weak newItem] in
+            guard let item = newItem else { return }
+            for await ranges in item.publisher(for: \.loadedTimeRanges).values {
+                let duration = item.duration.seconds
+                guard duration > 0, let range = ranges.first?.timeRangeValue else { continue }
+                let loaded = range.start.seconds + range.duration.seconds
+                bufferProgress = loaded / duration
+            }
+        }
+
         showNextEpisodeButton = false
         showNextEpisodePicker = false
         nextEpisodeStreams = []

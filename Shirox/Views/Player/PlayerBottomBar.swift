@@ -3,6 +3,7 @@ import SwiftUI
 struct PlayerBottomBar: View {
     @Binding var currentTime: Double
     let duration: Double
+    var bufferProgress: Double = 0
     @Binding var playbackSpeed: Float
     var onSeek: (Double) -> Void
     var onSliderDragStart: (() -> Void)? = nil
@@ -42,6 +43,7 @@ struct PlayerBottomBar: View {
             PlayerProgressSlider(
                 currentTime: $currentTime,
                 duration: duration,
+                bufferProgress: bufferProgress,
                 onSeek: onSeek,
                 onDragStart: onSliderDragStart,
                 onDragEnd: onSliderDragEnd

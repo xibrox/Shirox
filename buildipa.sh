@@ -18,7 +18,7 @@ cd build
 
 echo "--- Building $APPLICATION_NAME for iOS ---"
 
-xcodebuild -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
+xcodebuild -workspace "$WORKING_LOCATION/$APPLICATION_NAME.xcworkspace" \
    -scheme "$SCHEME_NAME" \
    -configuration Release \
    -derivedDataPath "$WORKING_LOCATION/build/DerivedDataApp" \

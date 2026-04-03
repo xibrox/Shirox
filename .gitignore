@@ -1,33 +1,45 @@
 # Xcode
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcodeproj/*.xcworkspace/
-
-*.xcodeproj/*.xcworkspace/*
-!*.xcodeproj/*.xcworkspace/contents.xcworkspacedata
-!*.xcodeproj/*.xcworkspace/xcshareddata/
-
-*.xcodeproj/*.xcworkspace/xcshareddata/*
-!*.xcodeproj/*.xcworkspace/xcshareddata/swiftpm/
-
-*.xcuserstate
-**/xcuserdata/
-
-*.xcuserstate
-**/xcuserdata/
-
-# Other
-.DS_Store
-
-# Xcode-Build-Server
-buildServer.json
-
-# Build folder
+#
 build/
+DerivedData/
+*.xcuserstate
+**/xcuserdata/
+*.xcworkspace/
+!*.xcodeproj/project.xcworkspace
+!*.xcodeproj/xcshareddata/
 
-# Claude Code
+# CocoaPods
+#
+# It is recommended to not store the Pods directory in source control.
+# If you are working on a team and want to ensure everyone is using
+# the same pod versions, commit the Podfile.lock.
+Pods/
+Podfile.lock
+
+# Swift Package Manager
+#
+.build/
+.swiftpm/
+Package.resolved
+
+# Apple specific
+#
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Security Audit
+#
+.gemini_security/
+
+# Build Tools
+#
+buildServer.json
+*.ipa
+
+# Agent specific
+#
 .claude/
-docs
-
-conductor
+.gemini/
+docs/
+conductor/
