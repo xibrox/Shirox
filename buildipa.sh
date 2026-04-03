@@ -10,6 +10,11 @@ WORKING_LOCATION="$(pwd)"
 APPLICATION_NAME=Shirox
 SCHEME_NAME="Shirox_iOS"
 
+if [ ! -d "$WORKING_LOCATION/$APPLICATION_NAME.xcworkspace" ]; then
+   echo "--- Workspace not found, running pod install ---"
+   pod install
+fi
+
 if [ ! -d "build" ]; then
    mkdir build
 fi

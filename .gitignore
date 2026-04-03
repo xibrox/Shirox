@@ -10,11 +10,9 @@ DerivedData/
 
 # CocoaPods
 #
-# It is recommended to not store the Pods directory in source control.
-# If you are working on a team and want to ensure everyone is using
-# the same pod versions, commit the Podfile.lock.
+# It is recommended to store the Podfile.lock in source control
+# to ensure everyone uses the same pod versions.
 Pods/
-Podfile.lock
 
 # Swift Package Manager
 #

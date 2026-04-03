@@ -264,8 +264,8 @@ final class CastManager: NSObject, ObservableObject {
         #endif
     }
     
+    #if canImport(GoogleCast)
     private func updateMediaStatus(_ status: GCKMediaStatus?) {
-        #if canImport(GoogleCast)
         guard let status = status else { return }
         isPlaying = status.playerState == .playing || status.playerState == .buffering
         duration = status.mediaInformation?.streamDuration ?? 0
@@ -276,8 +276,8 @@ final class CastManager: NSObject, ObservableObject {
         } else {
             stopProgressTimer()
         }
-        #endif
     }
+    #endif
     
     private func startProgressTimer() {
         progressTimer?.invalidate()
