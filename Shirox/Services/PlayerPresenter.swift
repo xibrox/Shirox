@@ -11,7 +11,7 @@ import UIKit
 #endif
 
 #if canImport(GoogleCast)
-import GoogleCast
+@preconcurrency import GoogleCast
 #endif
 
 final class PlayerPresenter: ObservableObject {
@@ -236,9 +236,9 @@ final class CastManager: NSObject, ObservableObject {
         GCKCastContext.sharedInstance().useDefaultExpandedMediaControls = true
         
         let controller = GCKCastContext.sharedInstance().defaultExpandedMediaControlsViewController
-        controller.setButtonType(.skipBackward10, at: 0)
-        controller.setButtonType(.playPause, at: 1)
-        controller.setButtonType(.skipForward10, at: 2)
+        controller.setButtonType(.rewind30Seconds, at: 0)
+        controller.setButtonType(.playPauseToggle, at: 1)
+        controller.setButtonType(.forward30Seconds, at: 2)
         controller.setButtonType(.none, at: 3)
         
         GCKCastContext.sharedInstance().sessionManager.add(self)
@@ -363,6 +363,7 @@ final class CastManager: NSObject, ObservableObject {
 }
 
 #if canImport(GoogleCast)
+@MainActor
 extension CastManager: GCKSessionManagerListener {
     func sessionManager(_ sessionManager: GCKSessionManager, didStart session: GCKCastSession) {
         updateState()
@@ -377,12 +378,14 @@ extension CastManager: GCKSessionManagerListener {
     }
 }
 
+@MainActor
 extension CastManager: GCKRemoteMediaClientListener {
     func remoteMediaClient(_ client: GCKRemoteMediaClient, didUpdate mediaStatus: GCKMediaStatus?) {
         updateMediaStatus(mediaStatus)
     }
 }
 
+@MainActor
 extension CastManager: GCKRequestDelegate {
     func request(_ request: GCKRequest, didFailWithError error: GCKError) {
         print("[Cast] Request failed: \(error.localizedDescription)")
