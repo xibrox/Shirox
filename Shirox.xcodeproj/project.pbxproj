@@ -26,6 +26,7 @@
 		1E7F1EA26D78D5F7FDF3B6DD /* JSEngine+Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51053A55A3C1D2682EB7719D /* JSEngine+Streams.swift */; };
 		222F85E214054D8A05316CF9 /* JSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCADDEA3748C5AE8D3C1A3CD /* JSEngine.swift */; };
 		25718B355004C8AD7E4A215E /* AniListService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3FBB9F1A9B237743F4808C /* AniListService.swift */; };
+		25B137EA2039D82A97F114B4 /* Pods_Shirox_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C07A4FDD2C778ADD65D2324 /* Pods_Shirox_iOS.framework */; };
 		25CE71961C1EBBEE80BEDB25 /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */; };
 		2655381CCFCFAC0158241F3C /* ModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 330313A7F7AB1EF362097130 /* ModuleListView.swift */; };
 		2994A7DB305F2731C61A4517 /* JSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCADDEA3748C5AE8D3C1A3CD /* JSEngine.swift */; };
@@ -108,7 +109,6 @@
 		B28F4CA7C301FB3448693046 /* ModuleJSRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */; };
 		B85FDAB9BAB5CFDC3F324ACD /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
 		B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
-		C2ACDD71C5FA1D1618CCFBA4 /* Pods_Shirox_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A21AD123D3095517CF40E90 /* Pods_Shirox_iOS.framework */; };
 		C513DCB66EC4AFC34A15DC7A /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
 		C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */; };
 		CA620998EF1BCA1D9C95B49D /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
@@ -137,6 +137,7 @@
 		1AAE3976E02954E212D46BD4 /* SearchItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchItem.swift; sourceTree = "<group>"; };
 		1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeLink.swift; sourceTree = "<group>"; };
+		287888A165C62B6B1BF14321 /* Pods-Shirox_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Shirox_iOS.debug.xcconfig"; path = "Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleJSRunner.swift; sourceTree = "<group>"; };
 		314F4DA7D4564AA9B47E4BC2 /* PlayerContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerContext.swift; sourceTree = "<group>"; };
 		330313A7F7AB1EF362097130 /* ModuleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleListView.swift; sourceTree = "<group>"; };
@@ -145,18 +146,17 @@
 		4778869AF2D84C3F8463D89E /* BrowseViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseViewModel.swift; sourceTree = "<group>"; };
 		4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingCard.swift; sourceTree = "<group>"; };
 		4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiroxApp.swift; sourceTree = "<group>"; };
+		4C07A4FDD2C778ADD65D2324 /* Pods_Shirox_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Shirox_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C8891C8EC305651E62AC138 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		51053A55A3C1D2682EB7719D /* JSEngine+Streams.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JSEngine+Streams.swift"; sourceTree = "<group>"; };
 		520D2B9F954BF05330758E81 /* StreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamPickerView.swift; sourceTree = "<group>"; };
 		5C20E69AFCB9F0507E969ECF /* AniListMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListMedia.swift; sourceTree = "<group>"; };
 		5E45F91C732C2601421713C8 /* NetworkFetch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkFetch.swift; sourceTree = "<group>"; };
-		69AB41FD94A954DAA014AFA0 /* Pods-Shirox_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Shirox_iOS.debug.xcconfig"; path = "Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		6DDFD568A3E8F21EA674244C /* WatchHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchHistoryService.swift; sourceTree = "<group>"; };
 		71374A74E55E4B9BB0555C59 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
-		8D5FE955DDD64284DEA296F7 /* Pods-Shirox_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Shirox_iOS.release.xcconfig"; path = "Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS.release.xcconfig"; sourceTree = "<group>"; };
 		8DB2ACC14C82E1EC1E47DC2E /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
-		9A21AD123D3095517CF40E90 /* Pods_Shirox_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Shirox_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FDEB48E6D33442D88E5028D /* ContinueWatchingItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingItem.swift; sourceTree = "<group>"; };
+		A254B9B58DA9DA1B09F17CFE /* Pods-Shirox_iOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Shirox_iOS.release.xcconfig"; path = "Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS.release.xcconfig"; sourceTree = "<group>"; };
 		A60FE2CBD595A40B9E50E4D1 /* JSEngine+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JSEngine+Search.swift"; sourceTree = "<group>"; };
 		AA000001000000000000BB01 /* SubtitleSettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleSettingsManager.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VTTSubtitlesLoader.swift; sourceTree = "<group>"; };
@@ -212,7 +212,7 @@
 			files = (
 				42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */,
 				0FB47691410BFA732D132352 /* WebKit.framework in Frameworks */,
-				C2ACDD71C5FA1D1618CCFBA4 /* Pods_Shirox_iOS.framework in Frameworks */,
+				25B137EA2039D82A97F114B4 /* Pods_Shirox_iOS.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -248,7 +248,7 @@
 				19F8272266C7C7D79BDAB093 /* Shirox */,
 				72DBC967D4D99D6643034FF4 /* Frameworks */,
 				73D712B4138A3740575F996E /* Products */,
-				99B22C78B6E061D66A67F2B2 /* Pods */,
+				72E24C10012F427E44623D4F /* Pods */,
 			);
 			sourceTree = "<group>";
 		};
@@ -307,9 +307,18 @@
 			children = (
 				AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */,
 				1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */,
-				9A21AD123D3095517CF40E90 /* Pods_Shirox_iOS.framework */,
+				4C07A4FDD2C778ADD65D2324 /* Pods_Shirox_iOS.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		72E24C10012F427E44623D4F /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				287888A165C62B6B1BF14321 /* Pods-Shirox_iOS.debug.xcconfig */,
+				A254B9B58DA9DA1B09F17CFE /* Pods-Shirox_iOS.release.xcconfig */,
+			);
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		73D712B4138A3740575F996E /* Products */ = {
@@ -327,16 +336,6 @@
 				DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */,
 			);
 			path = Shared;
-			sourceTree = "<group>";
-		};
-		99B22C78B6E061D66A67F2B2 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				69AB41FD94A954DAA014AFA0 /* Pods-Shirox_iOS.debug.xcconfig */,
-				8D5FE955DDD64284DEA296F7 /* Pods-Shirox_iOS.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
 			sourceTree = "<group>";
 		};
 		AA000001000000000000CC01 /* Player */ = {
@@ -378,11 +377,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = E281F590D0056E68BB2F08EC /* Build configuration list for PBXNativeTarget "Shirox_iOS" */;
 			buildPhases = (
-				E11A2ECA1C4D52BDBDA7044A /* [CP] Check Pods Manifest.lock */,
+				EA770A29136DA076EB813892 /* [CP] Check Pods Manifest.lock */,
 				95DE5ABBF64ACBFE36B79FBD /* Sources */,
 				896FE0E84327FF272C55EBF6 /* Frameworks */,
 				AA000003000000000000CC01 /* Resources */,
-				79320FD1EF58468FB1B294DA /* [CP] Copy Pods Resources */,
+				711A9830635EAC44A70937D1 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -471,7 +470,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		79320FD1EF58468FB1B294DA /* [CP] Copy Pods Resources */ = {
+		711A9830635EAC44A70937D1 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -488,7 +487,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		E11A2ECA1C4D52BDBDA7044A /* [CP] Check Pods Manifest.lock */ = {
+		EA770A29136DA076EB813892 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -710,19 +709,19 @@
 		};
 		3820A88AF0A87AC8822E162B /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 69AB41FD94A954DAA014AFA0 /* Pods-Shirox_iOS.debug.xcconfig */;
+			baseConfigurationReference = 287888A165C62B6B1BF14321 /* Pods-Shirox_iOS.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.18;
+				MARKETING_VERSION = 0.0.19;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -739,14 +738,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.18;
+				MARKETING_VERSION = 0.0.19;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -758,19 +757,19 @@
 		};
 		5E93568FEF6A44AEF1E1ABE4 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D5FE955DDD64284DEA296F7 /* Pods-Shirox_iOS.release.xcconfig */;
+			baseConfigurationReference = A254B9B58DA9DA1B09F17CFE /* Pods-Shirox_iOS.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.18;
+				MARKETING_VERSION = 0.0.19;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -848,14 +847,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.18;
+				MARKETING_VERSION = 0.0.19;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
