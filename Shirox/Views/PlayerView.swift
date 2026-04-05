@@ -66,6 +66,7 @@ struct PlayerView: View {
     @State private var showSubtitleSettings = false
     @State private var showAudioPicker = false
     @State private var videoReady = false
+    @State private var isBuffering = false
     @State private var audioGroup: AVMediaSelectionGroup? = nil
     @State private var bufferProgress: Double = 0
 
@@ -101,6 +102,7 @@ struct PlayerView: View {
                     deviceName: castManager.currentDeviceName ?? "TV",
                     onDismiss: exitCastMode
                 )
+                .tint(.red)
                 .ignoresSafeArea()
             } else if let player {
                 #if os(iOS)
@@ -123,6 +125,13 @@ struct PlayerView: View {
                 )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
+
+                if isBuffering && videoReady && !castManager.isConnected {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(1.5)
+                        .allowsHitTesting(false)
+                }
 
                 if controlsEnabled {
                     interactionLayer(player: player)
@@ -683,25 +692,17 @@ struct PlayerView: View {
 
         rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
             DispatchQueue.main.async {
-                isPlaying = player.timeControlStatus != .paused
+                let status = player.timeControlStatus
+                isPlaying = status != .paused
+                isBuffering = status == .waitingToPlayAtSpecifiedRate
                 #if os(iOS)
-                if player.timeControlStatus == .playing && !videoReady && currentContext?.resumeFrom == nil {
+                if status == .playing && !videoReady && currentContext?.resumeFrom == nil {
                     videoReady = true
                 }
                 #endif
             }
         }
 
-        // Buffer progress observer
-        Task { @MainActor [weak item] in
-            guard let item = item else { return }
-            for await ranges in item.publisher(for: \.loadedTimeRanges).values {
-                let duration = item.duration.seconds
-                guard duration > 0, let range = ranges.first?.timeRangeValue else { continue }
-                let loaded = range.start.seconds + range.duration.seconds
-                bufferProgress = loaded / duration
-            }
-        }
 
         if onStreamExpired != nil {
             Task { @MainActor [weak p] in
@@ -721,6 +722,12 @@ struct PlayerView: View {
             guard !isScrubbing else { return }
             currentTime = time.seconds
             if let d = p?.currentItem?.duration, d.isNumeric { duration = d.seconds }
+            if duration > 0, let ranges = p?.currentItem?.loadedTimeRanges {
+                let maxLoaded = ranges.compactMap { $0.timeRangeValue }
+                    .map { $0.start.seconds + $0.duration.seconds }
+                    .max() ?? 0
+                bufferProgress = min(maxLoaded / duration, 1)
+            }
             if duration > 0 {
                 let shouldShow = onWatchNext != nil && currentTime / duration >= watchedPercentage / 100.0
                 if shouldShow != showNextEpisodeButton {
@@ -731,7 +738,7 @@ struct PlayerView: View {
             }
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
-                p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { completed in
+                p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600), toleranceBefore: CMTime(seconds: 2, preferredTimescale: 600), toleranceAfter: .zero) { completed in
                     guard completed else { return }
                     #if os(iOS)
                     DispatchQueue.main.async { videoReady = true }
@@ -900,16 +907,6 @@ struct PlayerView: View {
         duration = 0
         bufferProgress = 0
 
-        // Buffer progress observer for new item
-        Task { @MainActor [weak newItem] in
-            guard let item = newItem else { return }
-            for await ranges in item.publisher(for: \.loadedTimeRanges).values {
-                let duration = item.duration.seconds
-                guard duration > 0, let range = ranges.first?.timeRangeValue else { continue }
-                let loaded = range.start.seconds + range.duration.seconds
-                bufferProgress = loaded / duration
-            }
-        }
 
         showNextEpisodeButton = false
         showNextEpisodePicker = false
