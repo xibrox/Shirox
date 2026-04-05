@@ -41,3 +41,4 @@ buildServer.json
 .gemini/
 docs/
 conductor/
+.worktrees
