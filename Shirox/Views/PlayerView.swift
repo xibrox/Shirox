@@ -611,6 +611,7 @@ struct PlayerView: View {
         if !currentStream.headers.isEmpty {
             HLSProxyServer.shared.start(headers: currentStream.headers)
             castURL = HLSProxyServer.shared.proxyURL(for: currentStream.url) ?? currentStream.url
+            print("[Cast] proxy URL: \(castURL)")
         } else {
             castURL = currentStream.url
         }

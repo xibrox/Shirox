@@ -132,6 +132,10 @@ final class HLSProxyServer {
     // MARK: - Local IP
 
     private func localIPAddress() -> String? {
+        // Prefer WiFi (en0), fall back to any active non-loopback IPv4
+        for targetIface in ["en0", "en1", "en2"] {
+            if let ip = ipForInterface(targetIface) { return ip }
+        }
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&ifaddr) == 0 else { return nil }
         defer { freeifaddrs(ifaddr) }
@@ -145,6 +149,26 @@ final class HLSProxyServer {
                 getnameinfo(ifa.pointee.ifa_addr, socklen_t(addr.sa_len),
                             &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
                 return String(cString: hostname)
+            }
+            ptr = ifa.pointee.ifa_next
+        }
+        return nil
+    }
+
+    private func ipForInterface(_ name: String) -> String? {
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0 else { return nil }
+        defer { freeifaddrs(ifaddr) }
+        var ptr = ifaddr
+        while let ifa = ptr {
+            let ifName = String(cString: ifa.pointee.ifa_name)
+            let addr = ifa.pointee.ifa_addr.pointee
+            if ifName == name, addr.sa_family == UInt8(AF_INET) {
+                var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                getnameinfo(ifa.pointee.ifa_addr, socklen_t(addr.sa_len),
+                            &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
+                let ip = String(cString: hostname)
+                if !ip.isEmpty { return ip }
             }
             ptr = ifa.pointee.ifa_next
         }
