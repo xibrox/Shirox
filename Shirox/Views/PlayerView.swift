@@ -90,7 +90,15 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let player {
+            if castManager.isConnected {
+                CastOverlayView(
+                    mediaTitle: currentContext?.mediaTitle ?? currentStream.title,
+                    episodeNumber: currentContext?.episodeNumber,
+                    imageUrl: currentContext?.imageUrl,
+                    deviceName: castManager.currentDeviceName ?? "TV"
+                )
+                .ignoresSafeArea()
+            } else if let player {
                 #if os(iOS)
                 VideoLayerView(player: player, pipTrigger: pipTrigger)
                     .ignoresSafeArea()
@@ -98,7 +106,11 @@ struct PlayerView: View {
                 #else
                 VideoPlayer(player: player).ignoresSafeArea()
                 #endif
+            } else {
+                loadingViewPlaceholder
+            }
 
+            if let player {
                 PlayerSubtitleOverlay(
                     cues: subtitleCues,
                     currentTime: currentTime,
@@ -127,9 +139,6 @@ struct PlayerView: View {
                 #if os(iOS)
                 loadingDismissButton
                 #endif
-
-            } else {
-                loadingViewPlaceholder
             }
         }
         .ignoresSafeArea()
@@ -924,7 +933,7 @@ struct PlayerView: View {
 
     private var controlsEnabled: Bool {
         #if os(iOS)
-        return videoReady
+        return videoReady || castManager.isConnected
         #else
         return true
         #endif
