@@ -336,27 +336,49 @@ final class CastManager: NSObject, ObservableObject {
         #endif
     }
     
-    func castMedia(url: URL, title: String, posterUrl: String?) {
+    func castMedia(url: URL, title: String, posterUrl: String?, subtitleURL: URL? = nil) {
         #if canImport(GoogleCast)
         guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }
-        
+
         let metadata = GCKMediaMetadata(metadataType: .movie)
         metadata.setString(title, forKey: kGCKMetadataKeyTitle)
-        if let posterUrl = posterUrl, let url = URL(string: posterUrl) {
-            metadata.addImage(GCKImage(url: url, width: 480, height: 720))
+        if let posterUrl = posterUrl, let posterURL = URL(string: posterUrl) {
+            metadata.addImage(GCKImage(url: posterURL, width: 480, height: 720))
         }
-        
+
         let mediaInfoBuilder = GCKMediaInformationBuilder(contentURL: url)
         mediaInfoBuilder.streamType = .buffered
-        mediaInfoBuilder.contentType = "video/mp4" // or application/x-mpegurl for HLS
+        mediaInfoBuilder.contentType = "video/mp4"
         mediaInfoBuilder.metadata = metadata
-        
+
+        if let subtitleURL {
+            let textTrack = GCKMediaTrack(
+                identifier: 0,
+                contentIdentifier: subtitleURL.absoluteString,
+                contentType: "text/vtt",
+                type: .text,
+                textSubtype: .subtitles,
+                name: "Subtitles",
+                languageCode: "en",
+                customData: nil
+            )
+            mediaInfoBuilder.mediaTracks = [textTrack].compactMap { $0 }
+        }
+
         let mediaInfo = mediaInfoBuilder.build()
-        
-        if let remoteMediaClient = session.remoteMediaClient {
+
+        guard let remoteMediaClient = session.remoteMediaClient else { return }
+        remoteMediaClient.add(self)
+
+        if subtitleURL != nil {
+            let requestDataBuilder = GCKMediaLoadRequestDataBuilder()
+            requestDataBuilder.mediaInformation = mediaInfo
+            requestDataBuilder.activeTrackIDs = [0]
+            let request = remoteMediaClient.loadMedia(with: requestDataBuilder.build())
+            request.delegate = self
+        } else {
             let request = remoteMediaClient.loadMedia(mediaInfo)
             request.delegate = self
-            remoteMediaClient.add(self)
         }
         #endif
     }

@@ -546,10 +546,12 @@ struct PlayerView: View {
     }
 
     private func castCurrentMedia() {
+        let subtitleURL = currentStream.subtitle.flatMap { URL(string: $0) }
         CastManager.shared.castMedia(
             url: currentStream.url,
             title: currentContext?.mediaTitle ?? currentStream.title,
-            posterUrl: currentContext?.imageUrl
+            posterUrl: currentContext?.imageUrl,
+            subtitleURL: subtitleURL
         )
     }
 
