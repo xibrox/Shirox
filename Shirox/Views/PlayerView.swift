@@ -116,7 +116,7 @@ struct PlayerView: View {
                 loadingViewPlaceholder
             }
 
-            if let player {
+            if let player, !castManager.isConnected {
                 PlayerSubtitleOverlay(
                     cues: subtitleCues,
                     currentTime: currentTime,
@@ -126,34 +126,36 @@ struct PlayerView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-                if isBuffering && videoReady && !castManager.isConnected {
+                if isBuffering && videoReady {
                     ProgressView()
                         .tint(.white)
                         .scaleEffect(1.5)
                         .allowsHitTesting(false)
                 }
 
-                if controlsEnabled {
-                    interactionLayer(player: player)
-                }
-
-                if showControls && !isLocked && controlsEnabled {
-                    controlsContent
-                }
-
-                if !isLocked && controlsEnabled {
-                    playPauseButtonView
-                }
-
-                if isLocked && controlsEnabled {
-                    lockOverlayView
-                }
-
                 #if os(iOS)
-                if !castManager.isConnected {
-                    loadingDismissButton
-                }
+                loadingDismissButton
                 #endif
+            }
+
+            if controlsEnabled {
+                if let player {
+                    interactionLayer(player: player)
+                } else if castManager.isConnected {
+                    castInteractionLayer
+                }
+            }
+
+            if showControls && !isLocked && controlsEnabled {
+                controlsContent
+            }
+
+            if !isLocked && controlsEnabled && !castManager.isConnected {
+                playPauseButtonView
+            }
+
+            if isLocked && controlsEnabled {
+                lockOverlayView
             }
         }
         .ignoresSafeArea()
@@ -181,6 +183,12 @@ struct PlayerView: View {
             #endif
         }
         .onChange(of: playbackSpeed) { _, newSpeed in
+            #if canImport(GoogleCast)
+            if castManager.isConnected {
+                GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.setPlaybackRate(Float(newSpeed))
+                return
+            }
+            #endif
             if isPlaying { player?.rate = Float(newSpeed) }
         }
         .onChange(of: castManager.isConnected) { _, connected in
@@ -221,8 +229,10 @@ struct PlayerView: View {
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showAudioPicker) {
+            let optionCount = audioGroup?.options.count ?? 0
+            let sheetHeight = CGFloat(60 + 56 * max(1, optionCount))
             audioPickerSheet
-                .presentationDetents([.height(CGFloat(60 + 56 * max(1, audioGroup?.options.count ?? 0)))])
+                .presentationDetents([.height(sheetHeight)])
         }
         .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
             nextEpisodeStreams = []
@@ -289,6 +299,16 @@ struct PlayerView: View {
         #else
         EmptyView()
         #endif
+    }
+
+    private var castInteractionLayer: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+                if showControls { scheduleHide() }
+            }
+            .ignoresSafeArea()
     }
 
     @ViewBuilder
@@ -415,7 +435,7 @@ struct PlayerView: View {
     private func topBarView(topPad: CGFloat, isLandscape: Bool) -> some View {
         PlayerTopBar(
             title: currentStream.title,
-            onDismiss: handleDismiss,
+            onDismiss: castManager.isConnected ? exitCastMode : handleDismiss,
             isLocked: $isLocked,
             onPiP: {
                 #if os(iOS)
@@ -576,6 +596,7 @@ struct PlayerView: View {
     private func exitCastMode() {
         let resumeAt = castManager.currentPosition
         castManager.disconnect()
+        HLSProxyServer.shared.stop()
         guard let player else { return }
         player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600))
         player.rate = Float(playbackSpeed)
@@ -586,8 +607,15 @@ struct PlayerView: View {
 
     private func castCurrentMedia() {
         let subtitleURL = currentStream.subtitle.flatMap { URL(string: $0) }
+        let castURL: URL
+        if !currentStream.headers.isEmpty {
+            HLSProxyServer.shared.start(headers: currentStream.headers)
+            castURL = HLSProxyServer.shared.proxyURL(for: currentStream.url) ?? currentStream.url
+        } else {
+            castURL = currentStream.url
+        }
         CastManager.shared.castMedia(
-            url: currentStream.url,
+            url: castURL,
             title: currentContext?.mediaTitle ?? currentStream.title,
             posterUrl: currentContext?.imageUrl,
             subtitleURL: subtitleURL,

@@ -102,6 +102,8 @@
 		AA000001000000000000AA30 /* PlayerNextEpisodePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */; };
 		AA000001000000000000AA31 /* CastOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB16 /* CastOverlayView.swift */; };
 		AA000001000000000000AA32 /* CastOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB16 /* CastOverlayView.swift */; };
+		AA000001000000000000AA50 /* HLSProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB50 /* HLSProxyServer.swift */; };
+		AA000001000000000000AA51 /* HLSProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB50 /* HLSProxyServer.swift */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
@@ -174,6 +176,7 @@
 		AA000001000000000000BB14 /* PlayerNextEpisodeButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNextEpisodeButton.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNextEpisodePicker.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB16 /* CastOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastOverlayView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB50 /* HLSProxyServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSProxyServer.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -285,6 +288,7 @@
 				5E45F91C732C2601421713C8 /* NetworkFetch.swift */,
 				AA000001000000000000BB01 /* SubtitleSettingsManager.swift */,
 				AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */,
+				AA000001000000000000BB50 /* HLSProxyServer.swift */,
 				6DDFD568A3E8F21EA674244C /* WatchHistoryService.swift */,
 			);
 			path = Services;
@@ -561,6 +565,7 @@
 				1C2F1DA4C30DB8F46405C768 /* WatchHistoryService.swift in Sources */,
 				AA000001000000000000AA02 /* SubtitleSettingsManager.swift in Sources */,
 				AA000001000000000000AA04 /* VTTSubtitlesLoader.swift in Sources */,
+				AA000001000000000000AA51 /* HLSProxyServer.swift in Sources */,
 				AA000001000000000000AA06 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA08 /* PlayerBottomBar.swift in Sources */,
 				AA000001000000000000AA10 /* PlayerCenterControls.swift in Sources */,
@@ -624,6 +629,7 @@
 				EADD7BDDF8A641980A2CFE35 /* WatchHistoryService.swift in Sources */,
 				AA000001000000000000AA01 /* SubtitleSettingsManager.swift in Sources */,
 				AA000001000000000000AA03 /* VTTSubtitlesLoader.swift in Sources */,
+				AA000001000000000000AA50 /* HLSProxyServer.swift in Sources */,
 				AA000001000000000000AA05 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA07 /* PlayerBottomBar.swift in Sources */,
 				AA000001000000000000AA09 /* PlayerCenterControls.swift in Sources */,
@@ -725,13 +731,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.21;
+				MARKETING_VERSION = 0.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -748,14 +754,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.21;
+				MARKETING_VERSION = 0.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -773,13 +779,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.21;
+				MARKETING_VERSION = 0.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -857,14 +863,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.21;
+				MARKETING_VERSION = 0.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

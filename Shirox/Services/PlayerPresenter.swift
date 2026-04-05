@@ -369,9 +369,12 @@ final class CastManager: NSObject, ObservableObject {
             metadata.addImage(GCKImage(url: posterURL, width: 480, height: 720))
         }
 
+        let isHLS = url.pathExtension.lowercased() == "m3u8"
+            || url.absoluteString.contains(".m3u8")
+        print("[Cast] URL: \(url.absoluteString), isHLS: \(isHLS)")
         let mediaInfoBuilder = GCKMediaInformationBuilder(contentURL: url)
-        mediaInfoBuilder.streamType = .buffered
-        mediaInfoBuilder.contentType = "video/mp4"
+        mediaInfoBuilder.streamType = isHLS ? .unknown : .buffered
+        mediaInfoBuilder.contentType = isHLS ? "application/x-mpegURL" : "video/mp4"
         mediaInfoBuilder.metadata = metadata
 
         if let subtitleURL {
