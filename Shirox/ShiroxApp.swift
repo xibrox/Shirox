@@ -9,6 +9,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
+    func applicationWillTerminate(_ application: UIApplication) {
+        CastManager.shared.disconnect()
+    }
+
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         #if os(iOS)
         if UIDevice.current.userInterfaceIdiom == .pad {
