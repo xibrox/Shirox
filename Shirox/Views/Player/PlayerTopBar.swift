@@ -7,6 +7,7 @@ struct PlayerTopBar: View {
     var onPiP: (() -> Void)? = nil
     var topPadding: CGFloat = 24
     var isLandscape: Bool = true
+    var showDismiss: Bool = true
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -21,16 +22,20 @@ struct PlayerTopBar: View {
 
             HStack(alignment: .top) {
                 // Dismiss button (left)
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Color.white.opacity(0.25))
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.3), radius: 6)
+                if showDismiss {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.25))
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.3), radius: 6)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Color.clear.frame(width: 44, height: 44)
                 }
-                .buttonStyle(.plain)
 
                 Spacer()
 

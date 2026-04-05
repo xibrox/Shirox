@@ -3,6 +3,9 @@ import AVKit
 #if os(iOS)
 import MediaPlayer
 #endif
+#if canImport(GoogleCast)
+import GoogleCast
+#endif
 
 // MARK: - Typealiases
 
@@ -95,7 +98,8 @@ struct PlayerView: View {
                     mediaTitle: currentContext?.mediaTitle ?? currentStream.title,
                     episodeNumber: currentContext?.episodeNumber,
                     imageUrl: currentContext?.imageUrl,
-                    deviceName: castManager.currentDeviceName ?? "TV"
+                    deviceName: castManager.currentDeviceName ?? "TV",
+                    onDismiss: exitCastMode
                 )
                 .ignoresSafeArea()
             } else if let player {
@@ -137,7 +141,9 @@ struct PlayerView: View {
                 }
 
                 #if os(iOS)
-                loadingDismissButton
+                if !castManager.isConnected {
+                    loadingDismissButton
+                }
                 #endif
             }
         }
@@ -159,6 +165,11 @@ struct PlayerView: View {
         }
         .onChange(of: volume) { _, newVolume in
             player?.volume = newVolume
+            #if canImport(GoogleCast)
+            if castManager.isConnected {
+                GCKCastContext.sharedInstance().sessionManager.currentCastSession?.setDeviceVolume(newVolume)
+            }
+            #endif
         }
         .onChange(of: playbackSpeed) { _, newSpeed in
             if isPlaying { player?.rate = Float(newSpeed) }
@@ -222,12 +233,17 @@ struct PlayerView: View {
         #if os(iOS)
         ZStack {
             if let urlStr = currentContext?.imageUrl, let url = URL(string: urlStr) {
-                AsyncImage(url: url) { phase in
-                    if let img = phase.image {
-                        img.resizable().aspectRatio(contentMode: .fill).blur(radius: 30, opaque: true)
-                    } else { Color.black }
+                GeometryReader { geo in
+                    AsyncImage(url: url) { phase in
+                        if let img = phase.image {
+                            img.resizable()
+                                .scaledToFill()
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                                .blur(radius: 30, opaque: true)
+                        } else { Color.black }
+                    }
                 }
-                .clipped()
             } else { Color.black }
 
             Color.black.opacity(0.6)
@@ -239,7 +255,7 @@ struct PlayerView: View {
                 if let ep = currentContext?.episodeNumber {
                     Text("Episode \(ep)").font(.subheadline).foregroundStyle(.white.opacity(0.65))
                 }
-                
+
                 VStack(spacing: 8) {
                     if bufferProgress > 0 {
                         ProgressView(value: bufferProgress, total: 1.0)
@@ -255,6 +271,9 @@ struct PlayerView: View {
             }
             .padding(.horizontal, 32)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .ignoresSafeArea()
         .allowsHitTesting(false)
         .opacity(videoReady ? 0 : 1)
         .animation(.easeOut(duration: 0.4), value: videoReady)
@@ -284,7 +303,7 @@ struct PlayerView: View {
 
             SpeedBoostOverlay(
                 isLocked: isLocked,
-                onBegan: { isSpeedBoosted = true; player.rate = 2.0 },
+                onBegan: { if !castManager.isConnected { isSpeedBoosted = true; player.rate = 2.0 } },
                 onEnded: {
                     if isSpeedBoosted {
                         isSpeedBoosted = false
@@ -477,7 +496,7 @@ struct PlayerView: View {
             let hPad: CGFloat = max(16, hSafe) + 20
             VStack {
                 HStack {
-                    Button(action: handleDismiss) {
+                    Button(action: castManager.isConnected ? exitCastMode : handleDismiss) {
                         Image(systemName: "xmark")
                             .font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
                             .frame(width: 44, height: 44).background(Color.white.opacity(0.25))
@@ -490,8 +509,8 @@ struct PlayerView: View {
                 Spacer()
             }
         }
-        .ignoresSafeArea().allowsHitTesting(!controlsEnabled)
-        .opacity(controlsEnabled ? 0 : 1)
+        .ignoresSafeArea().allowsHitTesting(!controlsEnabled || castManager.isConnected)
+        .opacity(controlsEnabled && !castManager.isConnected ? 0 : 1)
         .animation(.easeOut(duration: 0.4), value: controlsEnabled)
         #else
         EmptyView()
@@ -545,13 +564,25 @@ struct PlayerView: View {
         if let customDismiss { customDismiss() } else { dismiss() }
     }
 
+    private func exitCastMode() {
+        let resumeAt = castManager.currentPosition
+        castManager.disconnect()
+        guard let player else { return }
+        player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600))
+        player.rate = Float(playbackSpeed)
+        isPlaying = true
+        currentTime = resumeAt
+        scheduleHide()
+    }
+
     private func castCurrentMedia() {
         let subtitleURL = currentStream.subtitle.flatMap { URL(string: $0) }
         CastManager.shared.castMedia(
             url: currentStream.url,
             title: currentContext?.mediaTitle ?? currentStream.title,
             posterUrl: currentContext?.imageUrl,
-            subtitleURL: subtitleURL
+            subtitleURL: subtitleURL,
+            startTime: currentTime
         )
     }
 

@@ -17,14 +17,22 @@ struct AirPlayButton: UIViewRepresentable {
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }
 
+#if canImport(GoogleCast)
+private final class AlwaysVisibleCastButton: GCKUICastButton {
+    override var isHidden: Bool {
+        get { false }
+        set {}
+    }
+}
+#endif
+
 struct CastButton: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         #if canImport(GoogleCast)
-        let castButton = GCKUICastButton(frame: CGRect(x: 0, y: 0, width: 24, height: 24))
+        let castButton = AlwaysVisibleCastButton(frame: CGRect(x: 0, y: 0, width: 24, height: 24))
         castButton.tintColor = .white
         return castButton
         #else
-        // Fallback if SDK not present
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "apps.iphone.badge.plus"), for: .normal)
         button.tintColor = .white.withAlphaComponent(0.5)

@@ -2,6 +2,9 @@ import SwiftUI
 #if os(iOS)
 import UIKit
 import AVFoundation
+#if canImport(GoogleCast)
+import GoogleCast
+#endif
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -10,7 +13,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        CastManager.shared.disconnect()
+        #if canImport(GoogleCast)
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = application.beginBackgroundTask { application.endBackgroundTask(bgTask) }
+        GCKCastContext.sharedInstance().sessionManager.endSessionAndStopCasting(true)
+        Thread.sleep(forTimeInterval: 1.0)
+        application.endBackgroundTask(bgTask)
+        #endif
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {

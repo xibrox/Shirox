@@ -5,29 +5,36 @@ struct CastOverlayView: View {
     let episodeNumber: Int?
     let imageUrl: String?
     let deviceName: String
+    let onDismiss: () -> Void
 
     var body: some View {
-        ZStack {
-            // Blurred artwork background
-            if let urlStr = imageUrl, let url = URL(string: urlStr) {
-                AsyncImage(url: url) { phase in
-                    if let img = phase.image {
-                        img.resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .blur(radius: 40, opaque: true)
-                    } else {
-                        Color.black
+        ZStack(alignment: .topLeading) {
+            // Blurred artwork background — fills behind safe area
+            Group {
+                if let urlStr = imageUrl, let url = URL(string: urlStr) {
+                    GeometryReader { geo in
+                        AsyncImage(url: url) { phase in
+                            if let img = phase.image {
+                                img.resizable()
+                                    .scaledToFill()
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                    .clipped()
+                                    .blur(radius: 40, opaque: true)
+                            } else {
+                                Color.black
+                            }
+                        }
                     }
+                } else {
+                    Color.black
                 }
-                .clipped()
-            } else {
-                Color.black
             }
+            .ignoresSafeArea()
 
-            Color.black.opacity(0.55)
+            Color.black.opacity(0.55).ignoresSafeArea()
 
+            // Center content
             VStack(spacing: 16) {
-                // Artwork thumbnail
                 if let urlStr = imageUrl, let url = URL(string: urlStr) {
                     AsyncImage(url: url) { phase in
                         if let img = phase.image {
@@ -44,7 +51,6 @@ struct CastOverlayView: View {
                     }
                 }
 
-                // Title + episode
                 VStack(spacing: 4) {
                     Text(mediaTitle)
                         .font(.title3.weight(.semibold))
@@ -59,7 +65,6 @@ struct CastOverlayView: View {
                     }
                 }
 
-                // "Playing on X" pill
                 HStack(spacing: 6) {
                     Image(systemName: "tv.fill")
                         .font(.system(size: 12, weight: .semibold))
@@ -71,8 +76,22 @@ struct CastOverlayView: View {
                 .padding(.vertical, 7)
                 .background(.ultraThinMaterial, in: Capsule())
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 32)
+
+            // // Dismiss button — respects safe area so it sits at the real top
+            // Button(action: onDismiss) {
+            //     Image(systemName: "xmark")
+            //         .font(.system(size: 18, weight: .semibold))
+            //         .foregroundStyle(.white)
+            //         .frame(width: 44, height: 44)
+            //         .background(Color.white.opacity(0.25))
+            //         .clipShape(Circle())
+            //         .shadow(color: .black.opacity(0.3), radius: 6)
+            // }
+            // .buttonStyle(.plain)
+            // .padding(.leading, 20)
+            // .padding(.top, 8)
         }
-        .ignoresSafeArea()
     }
 }

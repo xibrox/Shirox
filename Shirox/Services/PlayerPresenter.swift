@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 #if os(iOS)
 import UIKit
 #endif
@@ -62,6 +63,7 @@ final class PlayerPresenter: ObservableObject {
             onWatchNext: onWatchNext,
             onStreamExpired: onStreamExpired
         )
+        .tint(.red)
         .ignoresSafeArea()
         
         let hostingController = PlayerHostingController(rootView: playerView)
@@ -220,7 +222,8 @@ final class CastManager: NSObject, ObservableObject {
     @Published var duration: Double = 0
     
     private var progressTimer: Timer?
-    
+    private var volumeObserver: NSKeyValueObservation?
+
     private override init() {
         super.init()
         #if canImport(GoogleCast)
@@ -251,17 +254,37 @@ final class CastManager: NSObject, ObservableObject {
         let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession
         isConnected = session != nil
         currentDeviceName = session?.device.friendlyName
-        
+
         if let remoteMediaClient = session?.remoteMediaClient {
             remoteMediaClient.add(self)
             updateMediaStatus(remoteMediaClient.mediaStatus)
+            startVolumeObservation()
         } else {
             stopProgressTimer()
+            stopVolumeObservation()
             isPlaying = false
             currentPosition = 0
             duration = 0
         }
         #endif
+    }
+
+    private func startVolumeObservation() {
+        guard volumeObserver == nil else { return }
+        let audioSession = AVAudioSession.sharedInstance()
+        volumeObserver = audioSession.observe(\.outputVolume, options: [.new]) { [weak self] session, _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isConnected else { return }
+                #if canImport(GoogleCast)
+                GCKCastContext.sharedInstance().sessionManager.currentCastSession?.setDeviceVolume(session.outputVolume)
+                #endif
+            }
+        }
+    }
+
+    private func stopVolumeObservation() {
+        volumeObserver?.invalidate()
+        volumeObserver = nil
     }
     
     #if canImport(GoogleCast)
@@ -336,7 +359,7 @@ final class CastManager: NSObject, ObservableObject {
         #endif
     }
     
-    func castMedia(url: URL, title: String, posterUrl: String?, subtitleURL: URL? = nil) {
+    func castMedia(url: URL, title: String, posterUrl: String?, subtitleURL: URL? = nil, startTime: Double = 0) {
         #if canImport(GoogleCast)
         guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }
 
@@ -370,16 +393,12 @@ final class CastManager: NSObject, ObservableObject {
         guard let remoteMediaClient = session.remoteMediaClient else { return }
         remoteMediaClient.add(self)
 
-        if subtitleURL != nil {
-            let requestDataBuilder = GCKMediaLoadRequestDataBuilder()
-            requestDataBuilder.mediaInformation = mediaInfo
-            requestDataBuilder.activeTrackIDs = [0]
-            let request = remoteMediaClient.loadMedia(with: requestDataBuilder.build())
-            request.delegate = self
-        } else {
-            let request = remoteMediaClient.loadMedia(mediaInfo)
-            request.delegate = self
-        }
+        let requestDataBuilder = GCKMediaLoadRequestDataBuilder()
+        requestDataBuilder.mediaInformation = mediaInfo
+        requestDataBuilder.startTime = startTime
+        if subtitleURL != nil { requestDataBuilder.activeTrackIDs = [0] }
+        let request = remoteMediaClient.loadMedia(with: requestDataBuilder.build())
+        request.delegate = self
         #endif
     }
 }
