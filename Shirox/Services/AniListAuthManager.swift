@@ -83,7 +83,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             Task { @MainActor in self.handleCallback(url: url) }
         }
         session.presentationContextProvider = self
-        session.prefersEphemeralWebBrowserSession = false
+        session.prefersEphemeralWebBrowserSession = true
         authSession = session
         session.start()
     }
