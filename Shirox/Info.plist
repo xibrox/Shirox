@@ -27,6 +27,19 @@
     <key>UILaunchScreen</key>
     <dict/>
 
+    <!-- AniList OAuth URL scheme -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>shirox</string>
+            </array>
+            <key>CFBundleURLName</key>
+            <string>com.shirox.auth</string>
+        </dict>
+    </array>
+
     <!-- Background modes for PiP and audio playback -->
     <key>UIBackgroundModes</key>
     <array>
