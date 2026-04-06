@@ -42,4 +42,3 @@ buildServer.json
 docs/
 conductor/
 .worktrees
-Secrets.xcconfig
