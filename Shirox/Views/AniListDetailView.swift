@@ -11,10 +11,11 @@ struct AniListDetailView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var auth = AniListAuthManager.shared
-    @StateObject private var libraryVM = LibraryViewModel()
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
     @State private var showLibraryEdit = false
+    @State private var existingEntry: LibraryEntry? = nil
+    @State private var isLoadingEntry = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -61,11 +62,21 @@ struct AniListDetailView: View {
             if auth.isLoggedIn {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showLibraryEdit = true
+                        Task {
+                            isLoadingEntry = true
+                            existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId)
+                            isLoadingEntry = false
+                            showLibraryEdit = true
+                        }
                     } label: {
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 17, weight: .medium))
+                        if isLoadingEntry {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "pencil.circle")
+                                .font(.system(size: 17, weight: .medium))
+                        }
                     }
+                    .disabled(isLoadingEntry)
                 }
             }
         }
@@ -86,7 +97,7 @@ struct AniListDetailView: View {
                 vm.pendingModuleStream = nil
                 let s = stream
                 DispatchQueue.main.async { vm.selectStream(s) }
-            } else {
+            } else if !vm.showFinalStreamPicker {
                 vm.dismissModulePicker()
             }
         }) {
@@ -123,23 +134,27 @@ struct AniListDetailView: View {
         #if os(iOS)
         .sheet(isPresented: $showLibraryEdit) {
             if let media = vm.media {
-                let existingEntry = libraryVM.entries.first { $0.media.id == media.id }
                 LibraryEntryEditSheet(entry: existingEntry, media: media) { status, progress, score in
+                    // Update locally first for immediate feedback
+                    if var updated = existingEntry {
+                        updated.status = status
+                        updated.progress = progress
+                        updated.score = score
+                        existingEntry = updated
+                    }
+                    
+                    if status == .completed {
+                        ContinueWatchingManager.shared.resetProgress(
+                            aniListID: media.id, moduleId: nil, mediaTitle: media.title.searchTitle
+                        )
+                    }
+                    
                     Task {
-                        if let existing = existingEntry {
-                            await libraryVM.update(entry: existing, status: status, progress: progress, score: score)
-                        } else {
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: media.id, status: status, progress: progress, score: score
-                            )
-                        }
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: media.id, status: status, progress: progress, score: score
+                        )
                     }
                 }
-            }
-        }
-        .task(id: showLibraryEdit) {
-            if showLibraryEdit, vm.media != nil, auth.isLoggedIn {
-                await libraryVM.load()
             }
         }
         #endif
@@ -474,6 +489,7 @@ private func heroSection(media: AniListMedia) -> some View {
                         AniListEpisodeRowContainer(
                             ep: ep,
                             mediaId: media.id,
+                            mediaTitle: media.title.searchTitle,
                             coverImage: media.coverImage.best,
                             totalEpisodes: media.episodes,
                             onTap: { vm.watchEpisode(ep) }
@@ -538,6 +554,7 @@ private struct SynopsisSection: View {
 private struct AniListEpisodeRowContainer: View {
     let ep: Int
     let mediaId: Int
+    let mediaTitle: String
     let coverImage: String?
     let totalEpisodes: Int?
     let onTap: () -> Void
@@ -545,7 +562,7 @@ private struct AniListEpisodeRowContainer: View {
 
     private var progress: Double? {
         if continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
-                                      mediaTitle: "", episodeNumber: ep) {
+                                      mediaTitle: mediaTitle, episodeNumber: ep) {
             return 1.0
         }
         guard let item = continueWatching.items
@@ -558,7 +575,7 @@ private struct AniListEpisodeRowContainer: View {
     private var allPreviousWatched: Bool {
         ep > 1 && (1..<ep).allSatisfy {
             continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
-                                       mediaTitle: "", episodeNumber: $0)
+                                       mediaTitle: mediaTitle, episodeNumber: $0)
         }
     }
 
@@ -569,30 +586,30 @@ private struct AniListEpisodeRowContainer: View {
             onTap: onTap,
             onMarkWatched: {
                 ContinueWatchingManager.shared.markWatched(
-                    aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: ep,
+                    aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: ep,
                     imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
             },
             onMarkUnwatched: {
                 ContinueWatchingManager.shared.markUnwatched(
-                    aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: ep,
+                    aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: ep,
                     imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
             },
             onResetProgress: {
                 ContinueWatchingManager.shared.resetEpisodeProgress(
-                    aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: ep)
+                    aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: ep)
             },
             allPreviousWatched: allPreviousWatched,
             onTogglePreviousWatched: ep > 1 ? {
                 let fresh = (1..<ep).allSatisfy {
                     ContinueWatchingManager.shared.isWatched(
-                        aniListID: mediaId, moduleId: nil, mediaTitle: "", episodeNumber: $0)
+                        aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: $0)
                 }
                 if fresh {
                     ContinueWatchingManager.shared.markUnwatched(
-                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: "")
+                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle)
                 } else {
                     ContinueWatchingManager.shared.markWatched(
-                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: "",
+                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle,
                         imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
                 }
             } : nil

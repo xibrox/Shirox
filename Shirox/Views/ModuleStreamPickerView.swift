@@ -44,7 +44,9 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     enum State {
         case idle
         case loading
-        case found([EpisodeLink])
+        case searchResults([SearchItem])
+        case loadingEpisodes(SearchItem)
+        case selectingEpisode([EpisodeLink])
         case loadingStreams
         case notFound
         case error(String)
@@ -66,19 +68,22 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     func cancel() {
         currentTask?.cancel()
         currentTask = nil
-        runner = nil
         state = .idle
     }
 
-    func startFind(targetEpisodeNumber: Int) {
-        currentTask = Task { await find(targetEpisodeNumber: targetEpisodeNumber) }
+    func startFind() {
+        currentTask = Task { await find() }
+    }
+
+    func startSelectResult(_ item: SearchItem, targetEpisodeNumber: Int) {
+        currentTask = Task { await selectResult(item, targetEpisodeNumber: targetEpisodeNumber) }
     }
 
     func startSelectEpisode(_ episode: EpisodeLink) {
         currentTask = Task { await selectEpisode(episode) }
     }
 
-    func find(targetEpisodeNumber: Int) async {
+    func find() async {
         let keyword = searchTitle.trimmingCharacters(in: .whitespaces)
         guard !keyword.isEmpty else { return }
 
@@ -92,14 +97,24 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             try await r.load(module: module)
             let results = try await r.search(keyword: keyword)
 
-            guard let first = results.first else {
+            if results.isEmpty {
                 state = .notFound
-                return
+            } else {
+                state = .searchResults(results)
             }
+        } catch {
+            if (error as? CancellationError) != nil { return }
+            state = .error(error.localizedDescription)
+        }
+    }
 
-            let episodes = try await r.fetchEpisodes(url: first.href)
+    func selectResult(_ item: SearchItem, targetEpisodeNumber: Int) async {
+        guard let r = runner else { return }
+        state = .loadingEpisodes(item)
 
-            // Auto-match by episode number
+        do {
+            let episodes = try await r.fetchEpisodes(url: item.href)
+
             let targetDouble = Double(targetEpisodeNumber)
             if let matched = episodes.first(where: { $0.number == targetDouble }) {
                 state = .loadingStreams
@@ -109,12 +124,11 @@ private final class ModuleStreamRowViewModel: ObservableObject {
                 } else {
                     readyStreams = streams
                 }
-                return
+            } else {
+                state = .selectingEpisode(episodes)
             }
-
-            // No exact match → show episode list for manual selection
-            state = .found(episodes)
         } catch {
+            if (error as? CancellationError) != nil { return }
             state = .error(error.localizedDescription)
         }
     }
@@ -130,6 +144,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
                 readyStreams = streams
             }
         } catch {
+            if (error as? CancellationError) != nil { return }
             state = .error(error.localizedDescription)
         }
     }
@@ -152,6 +167,7 @@ private struct ModuleStreamRow: View {
     let onStreamsLoaded: ([StreamResult]) -> Void
 
     @StateObject private var rowVm: ModuleStreamRowViewModel
+    @State private var showAllResults = false
 
     init(
         module: ModuleDefinition,
@@ -176,13 +192,20 @@ private struct ModuleStreamRow: View {
             guard let streams else { return }
             onStreamsLoaded(streams)
         }
+        .sheet(isPresented: $showAllResults) {
+            if case .searchResults(let items) = rowVm.state {
+                SearchResultsPickerSheet(items: items, module: module) { item in
+                    showAllResults = false
+                    rowVm.startSelectResult(item, targetEpisodeNumber: episodeNumber)
+                }
+            }
+        }
     }
 
     // MARK: Header
 
     private var headerRow: some View {
         HStack(spacing: 12) {
-            // Module icon
             AsyncImage(url: URL(string: module.iconUrl ?? "")) { phase in
                 if case .success(let img) = phase {
                     img.resizable().scaledToFill()
@@ -194,7 +217,6 @@ private struct ModuleStreamRow: View {
             .frame(width: 32, height: 32)
             .clipShape(RoundedRectangle(cornerRadius: 7))
 
-            // Module name
             VStack(alignment: .leading, spacing: 2) {
                 Text(module.sourceName)
                     .font(.subheadline).fontWeight(.semibold)
@@ -206,8 +228,6 @@ private struct ModuleStreamRow: View {
             }
 
             Spacer()
-
-            // Action button / status indicator
             actionButton
         }
     }
@@ -216,43 +236,21 @@ private struct ModuleStreamRow: View {
     private var actionButton: some View {
         switch rowVm.state {
         case .idle:
-            Button("Find") {
-                rowVm.startFind(targetEpisodeNumber: episodeNumber)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            Button("Find") { rowVm.startFind() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
 
-        case .loading, .loadingStreams:
-            Button(action: { rowVm.cancel() }) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
+        case .loading, .loadingEpisodes, .loadingStreams:
+            Button { rowVm.cancel() } label: {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
 
-        case .found:
-            Button("Retry") {
-                rowVm.reset()
-                rowVm.startFind(targetEpisodeNumber: episodeNumber)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .foregroundStyle(.secondary)
-
-        case .notFound:
-            Button("Retry") {
-                rowVm.reset()
-                rowVm.startFind(targetEpisodeNumber: episodeNumber)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-
-        case .error:
-            Button("Retry") {
-                rowVm.reset()
-                rowVm.startFind(targetEpisodeNumber: episodeNumber)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+        case .searchResults, .selectingEpisode, .notFound, .error:
+            Button("Retry") { rowVm.reset(); rowVm.startFind() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .foregroundStyle(.red)
         }
     }
 
@@ -268,42 +266,75 @@ private struct ModuleStreamRow: View {
             HStack(spacing: 6) {
                 ProgressView().scaleEffect(0.7)
                 Text("Searching \"\(rowVm.searchTitle)\"…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+        case .loadingEpisodes(let item):
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.7)
+                Text("Loading episodes for \"\(item.title)\"…")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
         case .loadingStreams:
             HStack(spacing: 6) {
                 ProgressView().scaleEffect(0.7)
                 Text("Fetching streams…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
-        case .found(let episodes):
-            VStack(alignment: .leading, spacing: 4) {
+        case .searchResults(let items):
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    titleField
+                    Button("Show All") { showAllResults = true }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(items) { item in
+                            Button {
+                                rowVm.startSelectResult(item, targetEpisodeNumber: episodeNumber)
+                            } label: {
+                                SearchResultCard(item: item)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.bottom, 2)
+                }
+            }
+
+        case .selectingEpisode(let episodes):
+            VStack(alignment: .leading, spacing: 6) {
                 titleField
-                Divider().padding(.vertical, 2)
                 Text("Episode not auto-matched — pick manually:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                episodeList(episodes)
+                    .font(.caption).foregroundStyle(.secondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(episodes) { ep in
+                            Button("Ep \(ep.displayNumber)") {
+                                rowVm.startSelectEpisode(ep)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                        }
+                    }
+                }
             }
 
         case .notFound:
             VStack(alignment: .leading, spacing: 6) {
-                Text("No results for \"\(rowVm.searchTitle)\"")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 titleField
+                Text("No results found")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
         case .error(let msg):
             VStack(alignment: .leading, spacing: 6) {
-                Text(msg)
-                    .font(.caption)
-                    .foregroundStyle(.red)
                 titleField
+                Text(msg).font(.caption).foregroundStyle(.red)
             }
         }
     }
@@ -311,31 +342,106 @@ private struct ModuleStreamRow: View {
     private var titleField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
             TextField("Search title…", text: $rowVm.searchTitle)
                 .font(.caption)
-                .onSubmit {
-                    rowVm.reset()
-                    rowVm.startFind(targetEpisodeNumber: episodeNumber)
-                }
+                .onSubmit { rowVm.reset(); rowVm.startFind() }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
     }
+}
 
-    private func episodeList(_ episodes: [EpisodeLink]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(episodes) { ep in
-                    Button("Ep \(ep.displayNumber)") {
-                        rowVm.startSelectEpisode(ep)
+// MARK: - Compact search result card
+
+private struct SearchResultCard: View {
+    let item: SearchItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Color.clear
+                .aspectRatio(2/3, contentMode: .fit)
+                .frame(width: 72)
+                .overlay(
+                    ZStack {
+                        CachedAsyncImage(urlString: item.image)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0.5),
+                                .init(color: .black.opacity(0.8), location: 1)
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                }
-            }
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+
+            Text(item.title)
+                .font(.caption2.weight(.medium))
+                .lineLimit(2)
+                .frame(width: 72, height: 32, alignment: .topLeading)
+                .foregroundStyle(.primary)
         }
+        .frame(width: 72)
+    }
+}
+
+// MARK: - Full results picker sheet
+
+private struct SearchResultsPickerSheet: View {
+    let items: [SearchItem]
+    let module: ModuleDefinition
+    let onSelect: (SearchItem) -> Void
+
+    private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(items) { item in
+                        Button { onSelect(item) } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Color.clear
+                                    .aspectRatio(2/3, contentMode: .fit)
+                                    .overlay(
+                                        ZStack {
+                                            CachedAsyncImage(urlString: item.image)
+                                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                                .clipped()
+                                            LinearGradient(
+                                                stops: [
+                                                    .init(color: .clear, location: 0.5),
+                                                    .init(color: .black.opacity(0.85), location: 1)
+                                                ],
+                                                startPoint: .top, endPoint: .bottom
+                                            )
+                                        }
+                                    )
+                                    .overlay(alignment: .bottomLeading) {
+                                        Text(item.title)
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(.white)
+                                            .lineLimit(2)
+                                            .padding(.horizontal, 8)
+                                            .padding(.bottom, 8)
+                                    }
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle(module.sourceName)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
     }
 }

@@ -26,6 +26,9 @@ final class ModuleManager: ObservableObject {
             var module = try JSONDecoder().decode(ModuleDefinition.self, from: data)
             module.jsonUrl = jsonURL.absoluteString
 
+            // Cache script and icon
+            await cacheAssets(for: &module)
+
             // Avoid duplicates
             if modules.contains(where: { $0.id == module.id }) {
                 modules.removeAll { $0.id == module.id }
@@ -87,12 +90,34 @@ final class ModuleManager: ObservableObject {
                   var fresh = try? JSONDecoder().decode(ModuleDefinition.self, from: data),
                   fresh.version != modules[i].version else { continue }
             fresh.jsonUrl = jsonUrlStr
+            
+            // Cache fresh assets
+            await cacheAssets(for: &fresh)
+            
             let wasActive = activeModule?.id == modules[i].id
             modules[i] = fresh
             if wasActive { try? await selectModule(fresh) }
             didUpdate = true
         }
         if didUpdate { saveToStorage() }
+    }
+
+    // MARK: - Asset Caching
+
+    private func cacheAssets(for module: inout ModuleDefinition) async {
+        // 1. Script
+        if let scriptURL = URL(string: module.scriptUrl),
+           let (data, _) = try? await URLSession.shared.data(from: scriptURL),
+           let script = String(data: data, encoding: .utf8) {
+            module.scriptContent = script
+        }
+        
+        // 2. Icon
+        if let iconUrlStr = module.iconUrl,
+           let iconURL = URL(string: iconUrlStr),
+           let (data, _) = try? await URLSession.shared.data(from: iconURL) {
+            module.iconData = data.base64EncodedString()
+        }
     }
 
     // MARK: - Persistence

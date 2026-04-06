@@ -46,6 +46,10 @@ struct PlayerView: View {
     @State private var loadingOpacity = 0.8
     @State private var didSeekToResume = false
 
+    // AniList tracking
+    @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    @State private var didTrackEpisode = false
+
     // Multi-stream / Next episode state
     @State private var currentStream: StreamResult
     @State private var currentContext: PlayerContext?
@@ -565,6 +569,21 @@ struct PlayerView: View {
         }
     }
 
+    // MARK: - AniList Tracking
+
+    private func trackAniListProgress() {
+        guard aniListAuth.isLoggedIn,
+              let aniListID = currentContext?.aniListID,
+              let episodeNumber = currentContext?.episodeNumber else { return }
+        Task {
+            try? await AniListLibraryService.shared.updateEntry(
+                mediaId: aniListID,
+                status: .current,
+                progress: episodeNumber
+            )
+        }
+    }
+
     // MARK: - Player Actions
 
     private func saveProgress() {
@@ -762,11 +781,16 @@ struct PlayerView: View {
                 bufferProgress = min(maxLoaded / duration, 1)
             }
             if duration > 0 {
-                let shouldShow = onWatchNext != nil && currentTime / duration >= watchedPercentage / 100.0
+                let progress = currentTime / duration
+                let shouldShow = onWatchNext != nil && progress >= watchedPercentage / 100.0
                 if shouldShow != showNextEpisodeButton {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         showNextEpisodeButton = shouldShow
                     }
+                }
+                if progress >= watchedPercentage / 100.0 && !didTrackEpisode {
+                    didTrackEpisode = true
+                    trackAniListProgress()
                 }
             }
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
@@ -927,6 +951,7 @@ struct PlayerView: View {
 
     @MainActor
     private func swapStream(_ next: StreamResult, episodeNumber: Int) {
+        didTrackEpisode = false
         saveProgress()
         let asset: AVURLAsset
         if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }

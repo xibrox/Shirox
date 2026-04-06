@@ -5,18 +5,21 @@ final class AniListLibraryService {
     private let endpoint = URL(string: "https://graphql.anilist.co")!
     private init() {}
 
-    // MARK: - Fetch list
+    // MARK: - Fetch all lists (status + custom)
 
-    func fetchList(status: MediaListStatus, userId: Int) async throws -> [LibraryEntry] {
+    func fetchAllLists(userId: Int) async throws -> [LibraryEntry] {
         let query = """
-        query ($userId: Int, $status: MediaListStatus) {
-          MediaListCollection(userId: $userId, type: ANIME, status: $status) {
+        query ($userId: Int) {
+          MediaListCollection(userId: $userId, type: ANIME) {
             lists {
+              name
+              isCustomList
               entries {
                 id
                 status
                 progress
                 score
+                updatedAt
                 media {
                   id
                   title { romaji english native }
@@ -35,7 +38,7 @@ final class AniListLibraryService {
           }
         }
         """
-        let variables: [String: Any] = ["userId": userId, "status": status.rawValue]
+        let variables: [String: Any] = ["userId": userId]
         let data = try await post(query: query, variables: variables)
 
         struct Response: Decodable {
@@ -46,6 +49,8 @@ final class AniListLibraryService {
                 let lists: [MediaList]
             }
             struct MediaList: Decodable {
+                let name: String
+                let isCustomList: Bool
                 let entries: [RawEntry]
             }
             struct RawEntry: Decodable {
@@ -53,21 +58,93 @@ final class AniListLibraryService {
                 let status: MediaListStatus
                 let progress: Int
                 let score: Double
+                let updatedAt: Int?
                 let media: AniListMedia
             }
             let data: ResponseData?
         }
 
         let response = try JSONDecoder().decode(Response.self, from: data)
-        return response.data?.MediaListCollection.lists
-            .flatMap(\.entries)
-            .map { LibraryEntry(id: $0.id, media: $0.media, status: $0.status, progress: $0.progress, score: $0.score) }
-            ?? []
+        guard let lists = response.data?.MediaListCollection.lists else { return [] }
+
+        var result: [LibraryEntry] = []
+        for list in lists {
+            let customName: String? = list.isCustomList ? list.name : nil
+            for raw in list.entries {
+                result.append(LibraryEntry(
+                    id: raw.id,
+                    media: raw.media,
+                    status: raw.status,
+                    progress: raw.progress,
+                    score: raw.score,
+                    updatedAt: raw.updatedAt,
+                    customListName: customName
+                ))
+            }
+        }
+        return result
+    }
+
+    // MARK: - Fetch single entry for a media id
+
+    func fetchEntry(mediaId: Int) async throws -> LibraryEntry? {
+        guard let userId = await AniListAuthManager.shared.userId else { return nil }
+        let query = """
+        query ($userId: Int, $mediaId: Int) {
+          MediaList(userId: $userId, mediaId: $mediaId, type: ANIME) {
+            id
+            status
+            progress
+            score
+            updatedAt
+            media {
+              id
+              title { romaji english native }
+              coverImage { large extraLarge }
+              episodes
+              status
+              averageScore
+              genres
+              bannerImage
+              description(asHtml: false)
+              season
+              seasonYear
+            }
+          }
+        }
+        """
+        let variables: [String: Any] = ["userId": userId, "mediaId": mediaId]
+        let data = try await post(query: query, variables: variables)
+
+        struct Response: Decodable {
+            struct ResponseData: Decodable {
+                let MediaList: RawEntry?
+            }
+            struct RawEntry: Decodable {
+                let id: Int
+                let status: MediaListStatus
+                let progress: Int
+                let score: Double
+                let updatedAt: Int?
+                let media: AniListMedia
+            }
+            let data: ResponseData?
+        }
+
+        guard let raw = try JSONDecoder().decode(Response.self, from: data).data?.MediaList else { return nil }
+        return LibraryEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil)
+    }
+
+    // MARK: - Fetch list (by status, kept for compatibility)
+
+    func fetchList(status: MediaListStatus, userId: Int) async throws -> [LibraryEntry] {
+        let all = try await fetchAllLists(userId: userId)
+        return all.filter { $0.status == status && $0.customListName == nil }
     }
 
     // MARK: - Update entry
 
-    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double) async throws {
+    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil) async throws {
         let mutation = """
         mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
           SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
@@ -75,12 +152,12 @@ final class AniListLibraryService {
           }
         }
         """
-        let variables: [String: Any] = [
+        var variables: [String: Any] = [
             "mediaId": mediaId,
             "status": status.rawValue,
-            "progress": progress,
-            "score": score
+            "progress": progress
         ]
+        if let score { variables["score"] = score }
         _ = try await post(query: mutation, variables: variables)
     }
 

@@ -14,11 +14,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     func applicationWillTerminate(_ application: UIApplication) {
         #if canImport(GoogleCast)
-        var bgTask: UIBackgroundTaskIdentifier = .invalid
-        bgTask = application.beginBackgroundTask { application.endBackgroundTask(bgTask) }
-        GCKCastContext.sharedInstance().sessionManager.endSessionAndStopCasting(true)
-        Thread.sleep(forTimeInterval: 1.0)
-        application.endBackgroundTask(bgTask)
+        let bgTask = application.beginBackgroundTask { }
+        Task { @MainActor in
+            CastManager.shared.stopCasting()
+            application.endBackgroundTask(bgTask)
+        }
+        // Small sleep to give the network request a chance to fire before the process is killed
+        Thread.sleep(forTimeInterval: 0.5)
         #endif
     }
 

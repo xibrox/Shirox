@@ -359,6 +359,12 @@ final class CastManager: NSObject, ObservableObject {
         #endif
     }
     
+    func stopCasting() {
+        #if canImport(GoogleCast)
+        GCKCastContext.sharedInstance().sessionManager.endSessionAndStopCasting(true)
+        #endif
+    }
+    
     func castMedia(url: URL, title: String, posterUrl: String?, subtitleURL: URL? = nil, startTime: Double = 0) {
         #if canImport(GoogleCast)
         guard let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession else { return }

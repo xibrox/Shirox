@@ -39,8 +39,33 @@ struct AniListTitle: Codable {
     let english: String?
     let native: String?
 
-    var displayTitle: String { english ?? romaji ?? native ?? "Unknown" }
-    var searchTitle: String { romaji ?? english ?? native ?? "" }
+    var displayTitle: String {
+        let priority = UserDefaults.standard.string(forKey: "titleLanguagePriority") ?? "english,romaji,native"
+        let ordered = priority.components(separatedBy: ",")
+        for lang in ordered {
+            switch lang {
+            case "english": if let e = english, !e.isEmpty { return e }
+            case "romaji":  if let r = romaji, !r.isEmpty { return r }
+            case "native":  if let n = native, !n.isEmpty { return n }
+            default: break
+            }
+        }
+        return english ?? romaji ?? native ?? "Unknown"
+    }
+
+    var searchTitle: String {
+        let priority = UserDefaults.standard.string(forKey: "titleLanguagePriority") ?? "english,romaji,native"
+        let ordered = priority.components(separatedBy: ",")
+        for lang in ordered {
+            switch lang {
+            case "english": if let e = english, !e.isEmpty { return e }
+            case "romaji":  if let r = romaji, !r.isEmpty { return r }
+            case "native":  if let n = native, !n.isEmpty { return n }
+            default: break
+            }
+        }
+        return romaji ?? english ?? native ?? ""
+    }
 }
 
 struct AniListCoverImage: Codable {

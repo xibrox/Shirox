@@ -31,16 +31,18 @@ struct LibraryEntryEditSheet: View {
                     .pickerStyle(.menu)
                 }
 
-                Section("Progress") {
-                    Stepper(
-                        "\(progress) episode\(progress == 1 ? "" : "s") watched",
-                        value: $progress,
-                        in: 0...(media.episodes ?? 9999)
-                    )
-                    if let total = media.episodes {
-                        Text("of \(total) total")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                if status != .completed {
+                    Section("Progress") {
+                        Stepper(
+                            "\(progress) episode\(progress == 1 ? "" : "s") watched",
+                            value: $progress,
+                            in: 0...(media.episodes ?? 9999)
+                        )
+                        if let total = media.episodes {
+                            Text("of \(total) total")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -61,9 +63,15 @@ struct LibraryEntryEditSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(status, progress, score)
+                        let finalProgress = status == .completed ? (media.episodes ?? progress) : progress
+                        onSave(status, finalProgress, score)
                         dismiss()
                     }
+                }
+            }
+            .onChange(of: status) { newStatus in
+                if newStatus == .completed, let total = media.episodes {
+                    progress = total
                 }
             }
         }

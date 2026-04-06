@@ -17,7 +17,7 @@ enum MediaListStatus: String, Codable, CaseIterable, Identifiable {
         case .completed: return "Completed"
         case .dropped:   return "Dropped"
         case .paused:    return "Paused"
-        case .repeating: return "Repeating"
+        case .repeating: return "Rewatching"
         }
     }
 }
@@ -28,4 +28,6 @@ struct LibraryEntry: Identifiable, Codable {
     var status: MediaListStatus
     var progress: Int     // episodes watched
     var score: Double     // 0–10
+    var updatedAt: Int?   // Unix timestamp
+    var customListName: String? // non-nil when entry belongs to a custom list
 }

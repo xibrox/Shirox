@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
     @AppStorage("autoNextEpisode") private var autoNextEpisode = false
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
+    @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @State private var showResetConfirmation = false
     #if os(iOS)
     @State private var imageCacheSize = CachedAsyncImage.totalBytes
@@ -13,6 +14,10 @@ struct SettingsView: View {
 
     private let shortOptions = [5, 10, 15, 30]
     private let longOptions  = [30, 60, 85, 90, 120, 150, 180]
+
+    private var orderedLanguages: [String] {
+        titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
+    }
 
     var body: some View {
         NavigationStack {
@@ -40,6 +45,27 @@ struct SettingsView: View {
                         value: $watchedPercentage, in: 50...99, step: 5
                     )
                 }
+                
+                Section("Display") {
+                    ForEach(orderedLanguages, id: \.self) { lang in
+                        HStack {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            Text(lang.capitalized)
+                        }
+                    }
+                    .onMove { from, to in
+                        var langs = orderedLanguages
+                        langs.move(fromOffsets: from, toOffset: to)
+                        titlePriority = langs.joined(separator: ",")
+                    }
+                    Text("Drag to reorder title priority for matching with anilist.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .environment(\.editMode, .constant(.active))
+
                 #if os(iOS)
                 Section("Cache") {
                     Button {

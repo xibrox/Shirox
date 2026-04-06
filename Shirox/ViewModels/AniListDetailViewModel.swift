@@ -52,6 +52,7 @@ final class AniListDetailViewModel: ObservableObject {
     func dismissFinalPicker() {
         showFinalStreamPicker = false
         pendingStreams = []
+        selectedEpisodeNumber = nil
     }
 
     func onStreamsLoaded(_ streams: [StreamResult]) {
@@ -70,7 +71,7 @@ final class AniListDetailViewModel: ObservableObject {
         selectedStream = stream
         guard let media else { return }
         let currentEpNum = selectedEpisodeNumber ?? 1
-        let mediaTitle = media.title.english ?? media.title.romaji ?? ""
+        let mediaTitle = media.title.displayTitle
         let totalEpisodes = media.episodes
         let context = PlayerContext(
             mediaTitle: mediaTitle,
@@ -113,5 +114,6 @@ final class AniListDetailViewModel: ObservableObject {
         }()
 
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, from: sourceView)
+        selectedEpisodeNumber = nil
     }
 }

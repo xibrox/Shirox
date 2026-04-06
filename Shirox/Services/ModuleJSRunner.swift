@@ -25,13 +25,20 @@ final class ModuleJSRunner {
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
         NetworkFetchManager.clearCookies()
 
-        guard let url = URL(string: module.scriptUrl) else {
-            throw URLError(.badURL)
+        let script: String
+        if let cached = module.scriptContent {
+            script = cached
+        } else {
+            guard let url = URL(string: module.scriptUrl) else {
+                throw URLError(.badURL)
+            }
+            let (data, _) = try await session.data(from: url)
+            guard let fetched = String(data: data, encoding: .utf8) else {
+                throw URLError(.cannotDecodeContentData)
+            }
+            script = fetched
         }
-        let (data, _) = try await session.data(from: url)
-        guard let script = String(data: data, encoding: .utf8) else {
-            throw URLError(.cannotDecodeContentData)
-        }
+        
         let ctx = JSContext()!
         setupContext(ctx)
         ctx.evaluateScript(script)

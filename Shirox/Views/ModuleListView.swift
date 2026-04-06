@@ -243,26 +243,11 @@ struct ModuleListView: View {
         } label: {
             HStack(spacing: 14) {
                 Group {
-                    if let iconUrl = module.iconUrl, let url = URL(string: iconUrl) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let img):
-                                img.resizable().aspectRatio(contentMode: .fill)
-                            default:
-                                Image(systemName: "puzzlepiece.extension")
-                                    .font(.title2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    } else {
-                        Image(systemName: "puzzlepiece.extension")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    }
+                    CachedAsyncImage(urlString: module.iconUrl ?? "", base64String: module.iconData)
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                 }
-                .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(module.sourceName).font(.headline)

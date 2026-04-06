@@ -11,6 +11,7 @@ typealias PlatformImage = NSImage
 /// Cross-platform URLSession + NSCache image loader.
 struct CachedAsyncImage: View {
     let urlString: String
+    var base64String: String? = nil
     @State private var platformImage: PlatformImage?
     @State private var loadFailed = false
 
@@ -59,6 +60,15 @@ struct CachedAsyncImage: View {
         }
         .task(id: urlString) {
             loadFailed = false
+            
+            // Check Base64 first
+            if let base64 = base64String, !base64.isEmpty,
+               let data = Data(base64Encoded: base64),
+               let loaded = PlatformImage(data: data) {
+                platformImage = loaded
+                return
+            }
+
             guard !urlString.isEmpty, let url = URL(string: urlString) else { return }
             
             if Self.cache.object(forKey: urlString as NSString) != nil {

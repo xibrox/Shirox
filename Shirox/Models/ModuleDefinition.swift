@@ -16,6 +16,8 @@ struct ModuleDefinition: Codable, Identifiable {
     let language: String?
     let softsub: Bool?
     var jsonUrl: String?     // stored client-side; not present in module JSON
+    var scriptContent: String? // cached script content
+    var iconData: String?      // cached icon data (Base64)
 }
 
 struct ModuleAuthor: Codable {
