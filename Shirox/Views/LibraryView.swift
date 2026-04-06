@@ -65,15 +65,13 @@ struct LibraryView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
             Button {
-                Task {
-                    #if os(iOS)
-                    let anchor = UIApplication.shared.connectedScenes
-                        .compactMap { $0 as? UIWindowScene }
-                        .flatMap { $0.windows }
-                        .first { $0.isKeyWindow } ?? UIWindow()
-                    await auth.login(presentationAnchor: anchor)
-                    #endif
-                }
+                #if os(iOS)
+                let anchor = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first { $0.isKeyWindow } ?? UIWindow()
+                auth.login(presentationAnchor: anchor)
+                #endif
             } label: {
                 Text("Sign in with AniList")
                     .font(.headline)

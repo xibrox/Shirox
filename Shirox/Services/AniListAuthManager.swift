@@ -16,6 +16,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
     private let clientSecret = Bundle.main.infoDictionary?["ANILIST_CLIENT_SECRET"] as? String ?? ""
     private let keychainKey = "anilist_access_token"
     private var authSession: ASWebAuthenticationSession?
+    nonisolated(unsafe) var presentationAnchorWindow: ASPresentationAnchor?
 
     private override init() {
         super.init()
@@ -66,7 +67,8 @@ final class AniListAuthManager: NSObject, ObservableObject {
 
     // MARK: - OAuth
 
-    func login(presentationAnchor: ASPresentationAnchor) async {
+    func login(presentationAnchor: ASPresentationAnchor) {
+        presentationAnchorWindow = presentationAnchor
         guard var components = URLComponents(string: "https://anilist.co/api/v2/oauth/authorize") else { return }
         components.queryItems = [
             URLQueryItem(name: "client_id", value: clientId),
@@ -195,13 +197,6 @@ final class AniListAuthManager: NSObject, ObservableObject {
 
 extension AniListAuthManager: ASWebAuthenticationPresentationContextProviding {
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        #if os(iOS)
-        return UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
-        #else
-        return ASPresentationAnchor()
-        #endif
+        presentationAnchorWindow ?? ASPresentationAnchor()
     }
 }
