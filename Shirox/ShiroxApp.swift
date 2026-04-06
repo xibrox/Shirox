@@ -66,10 +66,12 @@ struct ShiroxApp: App {
     var body: some Scene {
         WindowGroup {
             if #available(iOS 18, *) {
-                // iOS 18+ version using the new Tab API
                 TabView {
                     Tab("Home", systemImage: "house.fill") {
                         HomeView()
+                    }
+                    Tab("Library", systemImage: "books.vertical.fill") {
+                        LibraryView()
                     }
                     Tab("Settings", systemImage: "gearshape.fill") {
                         SettingsView()
@@ -80,31 +82,40 @@ struct ShiroxApp: App {
                 }
                 .tint(.red)
                 .environmentObject(moduleManager)
+                .onOpenURL { url in
+                    guard url.scheme == "shirox" else { return }
+                    AniListAuthManager.shared.handleCallback(url: url)
+                }
                 .task {
                     await moduleManager.restoreActiveModule()
                     await moduleManager.checkForUpdates()
+                    if AniListAuthManager.shared.isLoggedIn {
+                        await AniListAuthManager.shared.fetchViewer()
+                    }
                 }
             } else {
-                // Fallback for iOS 17 and earlier
                 TabView {
                     HomeView()
-                        .tabItem {
-                            Label("Home", systemImage: "house.fill")
-                        }
+                        .tabItem { Label("Home", systemImage: "house.fill") }
+                    LibraryView()
+                        .tabItem { Label("Library", systemImage: "books.vertical.fill") }
                     SettingsView()
-                        .tabItem {
-                            Label("Settings", systemImage: "gearshape.fill")
-                        }
+                        .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     SearchView()
-                        .tabItem {
-                            Label("Search", systemImage: "magnifyingglass")
-                        }
+                        .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 }
                 .tint(.red)
                 .environmentObject(moduleManager)
+                .onOpenURL { url in
+                    guard url.scheme == "shirox" else { return }
+                    AniListAuthManager.shared.handleCallback(url: url)
+                }
                 .task {
                     await moduleManager.restoreActiveModule()
                     await moduleManager.checkForUpdates()
+                    if AniListAuthManager.shared.isLoggedIn {
+                        await AniListAuthManager.shared.fetchViewer()
+                    }
                 }
             }
         }
