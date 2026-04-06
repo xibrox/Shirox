@@ -15,6 +15,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
     private let clientId = "38624"
     private let clientSecret = Bundle.main.infoDictionary?["ANILIST_CLIENT_SECRET"] as? String ?? ""
     private let keychainKey = "anilist_access_token"
+    private var authSession: ASWebAuthenticationSession?
 
     private override init() {
         super.init()
@@ -83,6 +84,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
         }
         session.presentationContextProvider = self
         session.prefersEphemeralWebBrowserSession = false
+        authSession = session
         session.start()
     }
 
