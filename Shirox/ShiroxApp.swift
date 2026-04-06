@@ -89,9 +89,7 @@ struct ShiroxApp: App {
                 .task {
                     await moduleManager.restoreActiveModule()
                     await moduleManager.checkForUpdates()
-                    if AniListAuthManager.shared.isLoggedIn {
-                        await AniListAuthManager.shared.fetchViewer()
-                    }
+                    await AniListAuthManager.shared.fetchViewer()
                 }
             } else {
                 TabView {
@@ -113,9 +111,7 @@ struct ShiroxApp: App {
                 .task {
                     await moduleManager.restoreActiveModule()
                     await moduleManager.checkForUpdates()
-                    if AniListAuthManager.shared.isLoggedIn {
-                        await AniListAuthManager.shared.fetchViewer()
-                    }
+                    await AniListAuthManager.shared.fetchViewer()
                 }
             }
         }

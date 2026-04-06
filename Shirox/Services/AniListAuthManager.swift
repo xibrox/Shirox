@@ -79,6 +79,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             url: authURL,
             callbackURLScheme: "shirox"
         ) { [weak self] callbackURL, error in
+            print("[AniList] callback fired — url: \(callbackURL?.absoluteString ?? "nil"), error: \(error?.localizedDescription ?? "nil")")
             guard let self, let url = callbackURL, error == nil else { return }
             Task { @MainActor in self.handleCallback(url: url) }
         }
@@ -89,10 +90,15 @@ final class AniListAuthManager: NSObject, ObservableObject {
     }
 
     func handleCallback(url: URL) {
+        print("[AniList] handleCallback url: \(url.absoluteString)")
         // AniList returns authorization code as query param: shirox://auth?code=...
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let code = components.queryItems?.first(where: { $0.name == "code" })?.value
-        else { return }
+        else {
+            print("[AniList] handleCallback: no code found in URL")
+            return
+        }
+        print("[AniList] exchanging code: \(code.prefix(8))...")
         Task { await exchangeCode(code) }
     }
 
@@ -155,7 +161,11 @@ final class AniListAuthManager: NSObject, ObservableObject {
         let body: [String: Any] = ["query": query]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        guard let (data, _) = try? await URLSession.shared.data(for: request) else { return }
+        guard let (data, response) = try? await URLSession.shared.data(for: request) else { return }
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            logout()
+            return
+        }
 
         struct ViewerResponse: Decodable {
             struct ResponseData: Decodable {
@@ -171,10 +181,14 @@ final class AniListAuthManager: NSObject, ObservableObject {
             }
             let data: ResponseData?
         }
-        if let response = try? JSONDecoder().decode(ViewerResponse.self, from: data) {
-            userId = response.data?.Viewer.id
-            username = response.data?.Viewer.name
-            avatarURL = response.data?.Viewer.avatar.large
+        if let response = try? JSONDecoder().decode(ViewerResponse.self, from: data),
+           let viewer = response.data?.Viewer {
+            userId = viewer.id
+            username = viewer.name
+            avatarURL = viewer.avatar.large
+        } else {
+            // Token is present but invalid — clear it
+            logout()
         }
     }
 }
