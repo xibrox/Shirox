@@ -138,7 +138,7 @@ struct LibraryView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(vm.entries) { entry in
+                        ForEach(vm.entries, id: \.media.id) { entry in
                             NavigationLink(destination: AniListDetailView(
                                 mediaId: entry.media.id,
                                 preloadedMedia: entry.media
