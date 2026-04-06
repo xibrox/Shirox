@@ -10,8 +10,11 @@ struct AniListDetailView: View {
     @StateObject private var vm = AniListDetailViewModel()
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    @ObservedObject private var auth = AniListAuthManager.shared
+    @StateObject private var libraryVM = LibraryViewModel()
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
+    @State private var showLibraryEdit = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -53,6 +56,20 @@ struct AniListDetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         #endif
         .navigationTitle("")
+        #if os(iOS)
+        .toolbar {
+            if auth.isLoggedIn {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showLibraryEdit = true
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 17, weight: .medium))
+                    }
+                }
+            }
+        }
+        #endif
         .task {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             await vm.load(id: mediaId, preloaded: preloadedMedia)
@@ -103,6 +120,29 @@ struct AniListDetailView: View {
                 }
             )
         }
+        #if os(iOS)
+        .sheet(isPresented: $showLibraryEdit) {
+            if let media = vm.media {
+                let existingEntry = libraryVM.entries.first { $0.media.id == media.id }
+                LibraryEntryEditSheet(entry: existingEntry, media: media) { status, progress, score in
+                    Task {
+                        if let existing = existingEntry {
+                            await libraryVM.update(entry: existing, status: status, progress: progress, score: score)
+                        } else {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: media.id, status: status, progress: progress, score: score
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        .task(id: showLibraryEdit) {
+            if showLibraryEdit, vm.media != nil, auth.isLoggedIn {
+                await libraryVM.load()
+            }
+        }
+        #endif
     }
 
     // MARK: - Content
