@@ -7,8 +7,16 @@ struct PlayerCenterControls: View {
     var onPlayPause: () -> Void
     var onForward: () -> Void
 
+    private var isPad: Bool {
+        #if os(iOS)
+        return UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        return false
+        #endif
+    }
+
     var body: some View {
-        HStack(spacing: 40) {
+        HStack(spacing: isPad ? 60 : 40) {
             backwardButton
             playPauseButton
             forwardButton
@@ -16,24 +24,30 @@ struct PlayerCenterControls: View {
     }
 
     private var backwardButton: some View {
-        circleButton(size: 60, iconSize: 32) {
+        let size: CGFloat = isPad ? 80 : 60
+        let iconSize: CGFloat = isPad ? 44 : 32
+        return circleButton(size: size, iconSize: iconSize) {
             Image(systemName: "gobackward.\(Int(skipAmount))")
-                .font(.system(size: 32))
+                .font(.system(size: iconSize))
         } action: { onBackward() }
     }
 
     private var playPauseButton: some View {
-        circleButton(size: 72, iconSize: 40) {
+        let size: CGFloat = isPad ? 100 : 72
+        let iconSize: CGFloat = isPad ? 56 : 40
+        return circleButton(size: size, iconSize: iconSize) {
             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 40))
+                .font(.system(size: iconSize))
                 .animation(nil, value: isPlaying)
         } action: { onPlayPause() }
     }
 
     private var forwardButton: some View {
-        circleButton(size: 60, iconSize: 32) {
+        let size: CGFloat = isPad ? 80 : 60
+        let iconSize: CGFloat = isPad ? 44 : 32
+        return circleButton(size: size, iconSize: iconSize) {
             Image(systemName: "goforward.\(Int(skipAmount))")
-                .font(.system(size: 32))
+                .font(.system(size: iconSize))
         } action: { onForward() }
     }
 

@@ -7,6 +7,8 @@ struct SettingsView: View {
     @AppStorage("autoNextEpisode") private var autoNextEpisode = false
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
+    @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
+    @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @State private var showResetConfirmation = false
     #if os(iOS)
     @State private var imageCacheSize = CachedAsyncImage.totalBytes
@@ -21,7 +23,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            List {                
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
                         #if os(iOS)
@@ -45,8 +47,17 @@ struct SettingsView: View {
                         value: $watchedPercentage, in: 50...99, step: 5
                     )
                 }
+
+                if aniListAuth.isLoggedIn {
+                    Section("AniList") {
+                        Toggle("Track Watching Progress", isOn: $aniListTrackingEnabled)
+                        Text("Automatically update your AniList progress as you watch.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 
-                Section("Display") {
+                Section("Matching") {
                     ForEach(orderedLanguages, id: \.self) { lang in
                         HStack {
                             Image(systemName: "line.3.horizontal")
@@ -60,7 +71,7 @@ struct SettingsView: View {
                         langs.move(fromOffsets: from, toOffset: to)
                         titlePriority = langs.joined(separator: ",")
                     }
-                    Text("Drag to reorder title priority for matching with anilist.")
+                    Text("Drag to reorder title priority for display and matching.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

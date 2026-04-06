@@ -9,32 +9,40 @@ struct PlayerTopBar: View {
     var isLandscape: Bool = true
     var showDismiss: Bool = true
 
+    private var isPad: Bool {
+        #if os(iOS)
+        return UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        return false
+        #endif
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             // Title pinned to top to stay level with buttons
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(isPad ? .title3.weight(.semibold) : .subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 100)
-                .frame(height: 44) // match dismiss button height
+                .padding(.horizontal, isPad ? 140 : 100)
+                .frame(height: isPad ? 56 : 44) // match dismiss button height
 
             HStack(alignment: .top) {
                 // Dismiss button (left)
                 if showDismiss {
                     Button(action: onDismiss) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: isPad ? 24 : 18, weight: .semibold))
                             .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
+                            .frame(width: isPad ? 56 : 44, height: isPad ? 56 : 44)
                             .background(Color.white.opacity(0.25))
                             .clipShape(Circle())
                             .shadow(color: .black.opacity(0.3), radius: 6)
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Color.clear.frame(width: 44, height: 44)
+                    Color.clear.frame(width: isPad ? 56 : 44, height: isPad ? 56 : 44)
                 }
 
                 Spacer()
@@ -42,36 +50,39 @@ struct PlayerTopBar: View {
                 // Right capsule group: AirPlay | PiP | Lock
                 Group {
                     if isLandscape {
-                        HStack(spacing: 8) { rightButtons }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
+                        HStack(spacing: isPad ? 14 : 8) { rightButtons }
+                            .padding(.horizontal, isPad ? 12 : 8)
+                            .padding(.vertical, isPad ? 6 : 4)
                     } else {
-                        VStack(spacing: 8) { rightButtons }
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 8)
+                        VStack(spacing: isPad ? 14 : 8) { rightButtons }
+                            .padding(.horizontal, isPad ? 6 : 4)
+                            .padding(.vertical, isPad ? 12 : 8)
                     }
                 }
                 .background(Color.white.opacity(0.2), in: Capsule())
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, topPadding)
+        .padding(.horizontal, isPad ? 30 : 20)
+        .padding(.top, isPad ? topPadding + 10 : topPadding)
         .padding(.bottom, 16)
     }
 
     @ViewBuilder
     private var rightButtons: some View {
+        let iconSize: CGFloat = isPad ? 20 : 15
+        let frameSize: CGFloat = isPad ? 44 : 32
+        
         #if os(iOS)
         CastButton()
-            .frame(width: 32, height: 32)
+            .frame(width: frameSize, height: frameSize)
         AirPlayButton()
-            .frame(width: 32, height: 32)
+            .frame(width: frameSize, height: frameSize)
         if onPiP != nil {
             Button { onPiP?() } label: {
                 Image(systemName: "pip.enter")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: iconSize, weight: .medium))
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: frameSize, height: frameSize)
             }
             .buttonStyle(.plain)
         }
@@ -80,9 +91,9 @@ struct PlayerTopBar: View {
             withAnimation(.easeInOut(duration: 0.2)) { isLocked.toggle() }
         } label: {
             Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: iconSize, weight: .medium))
                 .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
+                .frame(width: frameSize, height: frameSize)
         }
         .buttonStyle(.plain)
     }

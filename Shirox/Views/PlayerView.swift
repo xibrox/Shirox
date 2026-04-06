@@ -80,6 +80,14 @@ struct PlayerView: View {
     @ObservedObject var subtitleSettings = SubtitleSettingsManager.shared
     @ObservedObject var castManager = CastManager.shared
 
+    private var isPad: Bool {
+        #if os(iOS)
+        return UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        return false
+        #endif
+    }
+
     // PiP (iOS only)
     #if os(iOS)
     @State private var pipTrigger = 0
@@ -498,7 +506,7 @@ struct PlayerView: View {
     @ViewBuilder
     private var playPauseButtonView: some View {
         Button(action: togglePlayPause) {
-            Color.clear.frame(width: 72, height: 72).contentShape(Rectangle())
+            Color.clear.frame(width: isPad ? 100 : 72, height: isPad ? 100 : 72).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -511,11 +519,11 @@ struct PlayerView: View {
                     withAnimation(.easeInOut(duration: 0.2)) { isLocked = false }
                 } label: {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white).padding(12)
+                        .font(.system(size: isPad ? 24 : 18, weight: .semibold))
+                        .foregroundStyle(.white).padding(isPad ? 16 : 12)
                         .background(.ultraThinMaterial, in: Circle())
                 }
-                .buttonStyle(.plain).padding(.leading, 20).padding(.top, 20)
+                .buttonStyle(.plain).padding(.leading, isPad ? 30 : 20).padding(.top, isPad ? 30 : 20)
                 Spacer()
             }
             Spacer()
@@ -528,15 +536,15 @@ struct PlayerView: View {
         GeometryReader { geo in
             let isLandscape = geo.size.width > geo.size.height
             let uiInsets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets ?? .zero
-            let topPad: CGFloat = max(16, uiInsets.top + 8)
+            let topPad: CGFloat = max(16, uiInsets.top + (isPad ? 16 : 8))
             let hSafe: CGFloat = isLandscape ? max(uiInsets.left, uiInsets.right) : 0
-            let hPad: CGFloat = max(16, hSafe) + 20
+            let hPad: CGFloat = max(16, hSafe) + (isPad ? 30 : 20)
             VStack {
                 HStack {
                     Button(action: castManager.isConnected ? exitCastMode : handleDismiss) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
-                            .frame(width: 44, height: 44).background(Color.white.opacity(0.25))
+                            .font(.system(size: isPad ? 24 : 18, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: isPad ? 56 : 44, height: isPad ? 56 : 44).background(Color.white.opacity(0.25))
                             .clipShape(Circle()).shadow(color: .black.opacity(0.3), radius: 6)
                     }
                     .buttonStyle(.plain)
@@ -571,8 +579,11 @@ struct PlayerView: View {
 
     // MARK: - AniList Tracking
 
+    @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
+
     private func trackAniListProgress() {
         guard aniListAuth.isLoggedIn,
+              aniListTrackingEnabled,
               let aniListID = currentContext?.aniListID,
               let episodeNumber = currentContext?.episodeNumber else { return }
         Task {

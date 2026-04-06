@@ -21,10 +21,18 @@ struct PlayerBottomBar: View {
     var onNextEpisodeTap: (() -> Void)? = nil
     var showNextEpisodeButton: Bool = false
 
+    private var isPad: Bool {
+        #if os(iOS)
+        return UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        return false
+        #endif
+    }
+
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: isPad ? 12 : 4) {
             // Action buttons row
-            HStack(spacing: 8) {
+            HStack(spacing: isPad ? 16 : 8) {
                 skip85Button
 
                 Spacer()
@@ -39,7 +47,7 @@ struct PlayerBottomBar: View {
 
                 rightButtonGroup
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, isPad ? 30 : 20)
 
             // Progress slider
             PlayerProgressSlider(
@@ -50,9 +58,9 @@ struct PlayerBottomBar: View {
                 onDragStart: onSliderDragStart,
                 onDragEnd: onSliderDragEnd
             )
-            .padding(.horizontal, 20)
+            .padding(.horizontal, isPad ? 30 : 20)
         }
-        .padding(.bottom, bottomPadding)
+        .padding(.bottom, isPad ? bottomPadding + 10 : bottomPadding)
     }
 
     // MARK: - Subviews
@@ -60,15 +68,15 @@ struct PlayerBottomBar: View {
     @ViewBuilder
     private func nextEpisodeButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: isPad ? 8 : 5) {
                 Image(systemName: "forward.end.fill")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: isPad ? 18 : 14, weight: .medium))
                 Text("Next")
-                    .font(.subheadline.weight(.semibold))
+                    .font(isPad ? .body.weight(.semibold) : .subheadline.weight(.semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .frame(height: 36)
+            .padding(.horizontal, isPad ? 20 : 14)
+            .frame(height: isPad ? 48 : 36)
             .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)
@@ -76,57 +84,61 @@ struct PlayerBottomBar: View {
 
     private var skip85Button: some View {
         Button(action: onSkip85) {
-            HStack(spacing: 5) {
+            HStack(spacing: isPad ? 8 : 5) {
                 Image(systemName: "goforward")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: isPad ? 18 : 15, weight: .medium))
                 Text("\(skipLongAmount)s")
-                    .font(.subheadline.weight(.semibold))
+                    .font(isPad ? .body.weight(.semibold) : .subheadline.weight(.semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .frame(height: 36)
+            .padding(.horizontal, isPad ? 20 : 14)
+            .frame(height: isPad ? 48 : 36)
             .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)
     }
 
     @ViewBuilder private var rightButtonGroup: some View {
+        let buttonWidth: CGFloat = isPad ? 50 : 36
+        let height: CGFloat = isPad ? 46 : 34
+        let iconSize: CGFloat = isPad ? 20 : 15
+
         HStack(spacing: 0) {
             if audioTrackCount > 1 {
                 Button(action: onAudioTap) {
                     Image(systemName: "waveform")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: iconSize, weight: .medium))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 34)
+                        .frame(width: buttonWidth, height: height)
                 }
                 .buttonStyle(.plain)
             }
             if hasSubtitles {
                 Button(action: onSubtitleSettingsTap) {
                     Image(systemName: "captions.bubble.fill")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: iconSize, weight: .medium))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 34)
+                        .frame(width: buttonWidth, height: height)
                 }
                 .buttonStyle(.plain)
             }
             Button(action: onFillTap) {
                 Image(systemName: isFilled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: iconSize - 1, weight: .medium))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 34)
+                    .frame(width: buttonWidth, height: height)
             }
             .buttonStyle(.plain)
             Button(action: onSpeedTap) {
                 Text(speedLabel)
-                    .font(.subheadline.weight(.semibold))
+                    .font(isPad ? .body.weight(.semibold) : .subheadline.weight(.semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .frame(height: 34)
+                    .padding(.horizontal, isPad ? 14 : 10)
+                    .frame(height: height)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, isPad ? 6 : 4)
         .padding(.vertical, 1)
         .background(Color.white.opacity(0.2), in: Capsule())
     }
