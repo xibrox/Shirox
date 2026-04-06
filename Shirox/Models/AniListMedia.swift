@@ -12,6 +12,7 @@ struct AniListMedia: Identifiable, Codable {
     let genres: [String]?
     let season: String?
     let seasonYear: Int?
+    let nextAiringEpisode: AniListAiringEpisode?
 
     var plainDescription: String? {
         guard let desc = description else { return nil }
@@ -73,6 +74,10 @@ struct AniListCoverImage: Codable {
     let extraLarge: String?
 
     var best: String? { extraLarge ?? large }
+}
+
+struct AniListAiringEpisode: Codable {
+    let episode: Int
 }
 
 enum AniListSeason: String {

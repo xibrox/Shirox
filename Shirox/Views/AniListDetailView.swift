@@ -228,7 +228,7 @@ struct AniListDetailView: View {
             .foregroundStyle(Color.accentColor)
         }
         .buttonStyle(.plain)
-        .disabled(media.episodes == nil || media.episodes == 0)
+        .disabled((media.episodes ?? media.nextAiringEpisode?.episode ?? 0) == 0)
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
@@ -435,6 +435,8 @@ private func heroSection(media: AniListMedia) -> some View {
 
     @ViewBuilder
     private func episodesSection(media: AniListMedia) -> some View {
+        let totalEpisodes = media.episodes ?? (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : 0)
+
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
                 Capsule()
@@ -442,13 +444,11 @@ private func heroSection(media: AniListMedia) -> some View {
                     .frame(width: 3, height: 22)
                 Text("Episodes")
                     .font(.title3.weight(.bold))
-                if let count = media.episodes {
-                    Text("\(count)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.accentColor, in: Capsule())
-                }
+                Text("\(totalEpisodes)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(Color.accentColor, in: Capsule())
                 Spacer()
                 if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
                     Button {
@@ -483,15 +483,15 @@ private func heroSection(media: AniListMedia) -> some View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-            } else if let count = media.episodes, count > 0 {
+            } else if totalEpisodes > 0 {
                 LazyVStack(spacing: 8) {
-                    ForEach(1...count, id: \.self) { ep in
+                    ForEach(1...totalEpisodes, id: \.self) { ep in
                         AniListEpisodeRowContainer(
                             ep: ep,
                             mediaId: media.id,
                             mediaTitle: media.title.searchTitle,
                             coverImage: media.coverImage.best,
-                            totalEpisodes: media.episodes,
+                            totalEpisodes: totalEpisodes,
                             onTap: { vm.watchEpisode(ep) }
                         )
                     }

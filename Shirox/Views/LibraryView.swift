@@ -111,6 +111,7 @@ struct LibraryView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+                            .padding(.trailing, 8)
                         }
                     }
                 }
@@ -520,9 +521,6 @@ private struct LibrarySettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
                 }
             }
             .environment(\.editMode, .constant(.active))

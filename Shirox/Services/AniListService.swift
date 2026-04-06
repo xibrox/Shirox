@@ -230,6 +230,9 @@ final class AniListService {
             description(asHtml: false)
             episodes
             status
+            nextAiringEpisode {
+              episode
+            }
             averageScore
             genres
             season

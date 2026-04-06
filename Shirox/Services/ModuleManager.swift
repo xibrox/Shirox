@@ -38,7 +38,7 @@ final class ModuleManager: ObservableObject {
 
             // Auto-select if it's the first module
             if activeModule == nil {
-                try await selectModule(module)
+                selectModule(module)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -58,13 +58,25 @@ final class ModuleManager: ObservableObject {
 
     // MARK: - Select Module
 
-    func selectModule(_ module: ModuleDefinition) async throws {
-        try await JSEngine.shared.loadModule(module)
+    func selectModule(_ module: ModuleDefinition) {
         activeModule = module
         UserDefaults.standard.set(module.id, forKey: activeKey)
+        
+        Task {
+            do {
+                try await JSEngine.shared.loadModule(module)
+            } catch {
+                print("[ModuleManager] Failed to load JS for module \(module.sourceName): \(error.localizedDescription)")
+            }
+        }
     }
 
-    // MARK: - Deselect Module (revert to AniList built-in)
+    // MARK: - Reorder Modules
+
+    func moveModules(from source: IndexSet, to destination: Int) {
+        modules.move(fromOffsets: source, toOffset: destination)
+        saveToStorage()
+    }
 
     func deselectModule() {
         activeModule = nil
@@ -76,7 +88,7 @@ final class ModuleManager: ObservableObject {
     func restoreActiveModule() async {
         guard let savedId = UserDefaults.standard.string(forKey: activeKey),
               let module = modules.first(where: { $0.id == savedId }) else { return }
-        try? await selectModule(module)
+        selectModule(module)
     }
 
     // MARK: - Auto-Update
@@ -96,7 +108,7 @@ final class ModuleManager: ObservableObject {
             
             let wasActive = activeModule?.id == modules[i].id
             modules[i] = fresh
-            if wasActive { try? await selectModule(fresh) }
+            if wasActive { selectModule(fresh) }
             didUpdate = true
         }
         if didUpdate { saveToStorage() }

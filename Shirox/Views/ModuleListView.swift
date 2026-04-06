@@ -56,6 +56,7 @@ struct ModuleListView: View {
                                     }
                                 }
                         }
+                        .onMove(perform: moduleManager.moveModules)
                     }
                 } header: {
                     Text("Sources")
@@ -94,11 +95,7 @@ struct ModuleListView: View {
                 //     }
                 // }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.red)
+                    EditButton()
                 }
             }
         }
@@ -233,12 +230,10 @@ struct ModuleListView: View {
         let isActive = moduleManager.activeModule?.id == module.id
         return Button {
             if !isActive {
-                Task {
-                    try? await moduleManager.selectModule(module)
-                    #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
-                }
+                moduleManager.selectModule(module)
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
             }
         } label: {
             HStack(spacing: 14) {
