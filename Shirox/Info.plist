@@ -27,6 +27,9 @@
     <key>UILaunchScreen</key>
     <dict/>
 
+    <key>ANILIST_CLIENT_SECRET</key>
+    <string>$(ANILIST_CLIENT_SECRET)</string>
+
     <!-- AniList OAuth URL scheme -->
     <key>CFBundleURLTypes</key>
     <array>

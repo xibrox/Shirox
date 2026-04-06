@@ -193,7 +193,7 @@
 		AA000001000000000000BB62 /* AniListAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListAuthManager.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB64 /* AniListLibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListLibraryService.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB66 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
-		AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Library/LibraryEntryEditSheet.swift"; sourceTree = "<group>"; };
+		AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library/LibraryEntryEditSheet.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB70 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
@@ -532,13 +532,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

@@ -11,9 +11,9 @@ final class AniListAuthManager: NSObject, ObservableObject {
     @Published var avatarURL: String?
     @Published var userId: Int?
 
-    // Replace with your AniList API client ID from https://anilist.co/settings/developer
-    // Redirect URI must be set to: shirox://auth
-    private let clientId = "YOUR_ANILIST_CLIENT_ID"
+    // From https://anilist.co/settings/developer — Redirect URI: shirox://auth
+    private let clientId = "38624"
+    private let clientSecret = Bundle.main.infoDictionary?["ANILIST_CLIENT_SECRET"] as? String ?? ""
     private let keychainKey = "anilist_access_token"
 
     private override init() {
@@ -69,7 +69,8 @@ final class AniListAuthManager: NSObject, ObservableObject {
         guard var components = URLComponents(string: "https://anilist.co/api/v2/oauth/authorize") else { return }
         components.queryItems = [
             URLQueryItem(name: "client_id", value: clientId),
-            URLQueryItem(name: "response_type", value: "token")
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "redirect_uri", value: "shirox://auth")
         ]
         guard let authURL = components.url else { return }
 
@@ -86,17 +87,41 @@ final class AniListAuthManager: NSObject, ObservableObject {
     }
 
     func handleCallback(url: URL) {
-        // AniList returns token in fragment: shirox://auth#access_token=...&token_type=Bearer&expires_in=...
-        guard let fragment = url.fragment else { return }
-        var params: [String: String] = [:]
-        for part in fragment.components(separatedBy: "&") {
-            let kv = part.components(separatedBy: "=")
-            if kv.count == 2 { params[kv[0]] = kv[1] }
+        // AniList returns authorization code as query param: shirox://auth?code=...
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let code = components.queryItems?.first(where: { $0.name == "code" })?.value
+        else { return }
+        Task { await exchangeCode(code) }
+    }
+
+    private func exchangeCode(_ code: String) async {
+        guard let url = URL(string: "https://anilist.co/api/v2/oauth/token") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let body: [String: Any] = [
+            "grant_type": "authorization_code",
+            "client_id": clientId,
+            "client_secret": clientSecret,
+            "redirect_uri": "shirox://auth",
+            "code": code
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        guard let (data, _) = try? await URLSession.shared.data(for: request) else { return }
+
+        struct TokenResponse: Decodable {
+            let access_token: String?
         }
-        guard let token = params["access_token"] else { return }
-        saveToken(token)
-        isLoggedIn = true
-        Task { await fetchViewer() }
+        if let response = try? JSONDecoder().decode(TokenResponse.self, from: data),
+           let token = response.access_token {
+            saveToken(token)
+            isLoggedIn = true
+            await fetchViewer()
+        } else {
+            print("[AniList] Token exchange failed: \(String(data: data, encoding: .utf8) ?? "")")
+        }
     }
 
     func logout() {

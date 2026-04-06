@@ -9,6 +9,8 @@ struct PlayerBottomBar: View {
     var onSliderDragStart: (() -> Void)? = nil
     var onSliderDragEnd: (() -> Void)? = nil
     var onSpeedTap: () -> Void
+    var onFillTap: () -> Void = {}
+    var isFilled: Bool = false
     var onSkip85: () -> Void
     var skipLongAmount: Int = 85
     var onSubtitleSettingsTap: () -> Void
@@ -108,6 +110,13 @@ struct PlayerBottomBar: View {
                 }
                 .buttonStyle(.plain)
             }
+            Button(action: onFillTap) {
+                Image(systemName: isFilled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 34)
+            }
+            .buttonStyle(.plain)
             Button(action: onSpeedTap) {
                 Text(speedLabel)
                     .font(.subheadline.weight(.semibold))

@@ -38,6 +38,7 @@ struct PlayerView: View {
     @State private var duration: Double = 0
     @State private var showControls = true
     @State private var isLocked = false
+    @State private var isFilled = false
     @State private var isScrubbing = false
     @State private var hideTask: Task<Void, Never>? = nil
     @State private var timeObserver: Any? = nil
@@ -106,7 +107,8 @@ struct PlayerView: View {
                 .ignoresSafeArea()
             } else if let player {
                 #if os(iOS)
-                VideoLayerView(player: player, pipTrigger: pipTrigger)
+                VideoLayerView(player: player, pipTrigger: pipTrigger,
+                               videoGravity: isFilled ? .resizeAspectFill : .resizeAspect)
                     .ignoresSafeArea()
                     .overlay { videoLoadingOverlay }
                 #else
@@ -462,6 +464,8 @@ struct PlayerView: View {
             onSliderDragStart: { hideTask?.cancel() },
             onSliderDragEnd: { scheduleHide() },
             onSpeedTap: { showSpeedPicker = true },
+            onFillTap: { isFilled.toggle() },
+            isFilled: isFilled,
             onSkip85: { skip(by: Double(skipLong)) },
             skipLongAmount: skipLong,
             onSubtitleSettingsTap: { showSubtitleSettings = true },
@@ -1005,6 +1009,7 @@ struct PlayerView: View {
 struct VideoLayerView: UIViewRepresentable {
     let player: AVPlayer
     var pipTrigger: Int = 0
+    var videoGravity: AVLayerVideoGravity = .resizeAspect
 
     class Coordinator: NSObject, AVPictureInPictureControllerDelegate {
         var pipController: AVPictureInPictureController?
@@ -1045,6 +1050,7 @@ struct VideoLayerView: UIViewRepresentable {
 
     func updateUIView(_ uiView: PlayerLayerUIView, context: Context) {
         uiView.player = player
+        uiView.playerLayer.videoGravity = videoGravity
         if pipTrigger > context.coordinator.lastPipTrigger {
             context.coordinator.lastPipTrigger = pipTrigger
             if context.coordinator.pipController?.isPictureInPictureActive == true {

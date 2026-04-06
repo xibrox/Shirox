@@ -90,7 +90,7 @@ final class AniListLibraryService {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = AniListAuthManager.shared.accessToken {
+        if let token = await AniListAuthManager.shared.accessToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         let body: [String: Any] = ["query": query, "variables": variables]
