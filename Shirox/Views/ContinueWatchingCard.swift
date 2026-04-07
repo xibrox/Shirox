@@ -71,6 +71,12 @@ struct ContinueWatchingSection: View {
 
     private func resume(_ item: ContinueWatchingItem) {
         guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
+        
+        // Ensure the correct module is active
+        if let mid = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
+            ModuleManager.shared.selectModule(module)
+        }
+        
         let stream = StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,

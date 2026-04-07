@@ -125,6 +125,13 @@ struct DetailView: View {
             return
         }
         guard let url = URL(string: item.streamUrl) else { return }
+        
+        // Ensure the correct module is active
+        if let mid = item.moduleId, ModuleManager.shared.activeModule?.id != mid,
+           let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
+            ModuleManager.shared.selectModule(module)
+        }
+        
         let stream = StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,

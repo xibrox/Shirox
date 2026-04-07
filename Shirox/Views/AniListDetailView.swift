@@ -56,7 +56,7 @@ struct AniListDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         #endif
-        .navigationTitle("")
+        .navigationTitle(vm.media?.title.displayTitle ?? "")
         #if os(iOS)
         .toolbar {
             if auth.isLoggedIn {
@@ -237,6 +237,12 @@ struct AniListDetailView: View {
             return
         }
         guard let url = URL(string: item.streamUrl) else { return }
+        
+        // Before starting player, ensure the correct module is active
+        if let mid = item.moduleId, let module = moduleManager.modules.first(where: { $0.id == mid }) {
+            moduleManager.selectModule(module)
+        }
+        
         let stream = StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,

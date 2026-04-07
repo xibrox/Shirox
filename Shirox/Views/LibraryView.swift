@@ -86,7 +86,7 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle("Library")
-            .searchable(text: $searchText, prompt: "Search library")
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search library")
             .toolbar {
                 if auth.isLoggedIn {
                     ToolbarItem(placement: .topBarTrailing) {

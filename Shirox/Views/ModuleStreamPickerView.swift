@@ -19,6 +19,7 @@ struct ModuleStreamPickerView: View {
                         animeTitle: animeTitle,
                         episodeNumber: episodeNumber
                     ) { streams in
+                        moduleManager.selectModule(module)
                         onDismiss()
                         onStreamsLoaded(streams)
                     }

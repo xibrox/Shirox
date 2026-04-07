@@ -72,7 +72,7 @@ final class AniListDetailViewModel: ObservableObject {
         guard let media else { return }
         let currentEpNum = selectedEpisodeNumber ?? 1
         let mediaTitle = media.title.displayTitle
-        let totalEpisodes = media.episodes
+        let totalEpisodes = media.episodes ?? (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : 0)
         let context = PlayerContext(
             mediaTitle: mediaTitle,
             episodeNumber: currentEpNum,
@@ -80,7 +80,7 @@ final class AniListDetailViewModel: ObservableObject {
             imageUrl: media.coverImage.extraLarge ?? media.coverImage.large ?? "",
             aniListID: media.id,
             moduleId: nil,
-            totalEpisodes: totalEpisodes,
+            totalEpisodes: media.episodes,
             resumeFrom: resumeWatchedSeconds,
             detailHref: nil
         )
@@ -90,12 +90,12 @@ final class AniListDetailViewModel: ObservableObject {
         // search result when AnimePahe (and similar) lists sub and dub as separate entries.
         let streamIsDub = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub")
         let onWatchNext: WatchNextLoader? = {
-            guard let module = ModuleManager.shared.activeModule,
-                  let total = totalEpisodes else { return nil }
+            guard let module = ModuleManager.shared.activeModule else { return nil }
             let searchTitle = media.title.searchTitle
+            let total = totalEpisodes
             return { currentEpNum in
                 let nextEpNum = currentEpNum + 1
-                guard nextEpNum <= total else { return nil }
+                if total > 0, nextEpNum > total { return nil }
                 let runner = ModuleJSRunner()
                 try await runner.load(module: module)
                 let results = try await runner.search(keyword: searchTitle)
