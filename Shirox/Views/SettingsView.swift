@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    @EnvironmentObject private var moduleManager: ModuleManager
     @State private var showResetConfirmation = false
     #if os(iOS)
     @State private var imageCacheSize = CachedAsyncImage.totalBytes
@@ -24,6 +25,42 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {                
+                Section("Modules") {
+                    NavigationLink {
+                        ModuleListView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            // Icon
+                            Group {
+                                if let active = moduleManager.activeModule {
+                                    CachedAsyncImage(urlString: active.iconUrl ?? "", base64String: active.iconData)
+                                } else {
+                                    AsyncImage(url: URL(string: "https://anilist.co/img/icons/apple-touch-icon.png")) { phase in
+                                        if case .success(let image) = phase {
+                                            image.resizable().aspectRatio(contentMode: .fit)
+                                        } else {
+                                            Image(systemName: "list.bullet")
+                                                .font(.title)
+                                                .foregroundStyle(Color.red)
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(width: 48, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(moduleManager.activeModule?.sourceName ?? "AniList")
+                                    .font(.headline)
+                                Text("Manage your modules")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
                         #if os(iOS)

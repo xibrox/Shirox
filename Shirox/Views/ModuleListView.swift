@@ -218,10 +218,11 @@ struct ModuleListView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(isActive ? Color.red.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(isActive ? Color.red.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .contentShape(Rectangle())
         .animation(.easeOut(duration: 0.2), value: isActive)
     }
 
@@ -249,7 +250,7 @@ struct ModuleListView: View {
                     HStack(spacing: 6) {
                         Text("v\(module.version)").font(.caption).foregroundStyle(.secondary)
                         if let author = module.author, !author.name.isEmpty {
-                            Text("·").font(.caption).foregroundStyle(.tertiary)
+                            Text("·").font(.caption).foregroundStyle(.secondary)
                             Text(author.name).font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -263,10 +264,11 @@ struct ModuleListView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(isActive ? Color.red.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(isActive ? Color.red.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .contentShape(Rectangle())
         .animation(.easeOut(duration: 0.2), value: isActive)
     }
 

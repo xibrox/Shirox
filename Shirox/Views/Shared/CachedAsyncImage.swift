@@ -58,7 +58,8 @@ struct CachedAsyncImage: View {
                 Color.gray.opacity(0.15)
             }
         }
-        .task(id: urlString) {
+        .task(id: urlString + (base64String ?? "")) {
+            platformImage = nil
             loadFailed = false
             
             // Check Base64 first

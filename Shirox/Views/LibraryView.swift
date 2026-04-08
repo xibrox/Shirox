@@ -78,64 +78,10 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if !auth.isLoggedIn {
-                    loginPrompt
-                } else {
-                    libraryContent
-                }
-            }
-            .navigationTitle("Library")
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search library")
-            .toolbar {
-                if auth.isLoggedIn {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { showSettings = true } label: {
-                            Image(systemName: "slider.horizontal.3")
-                        }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        if let name = auth.username {
-                            Button { showLogoutAlert = true } label: {
-                                HStack(spacing: 6) {
-                                    if let urlStr = auth.avatarURL, let url = URL(string: urlStr) {
-                                        AsyncImage(url: url) { img in
-                                            img.resizable().scaledToFill()
-                                        } placeholder: {
-                                            Circle().fill(Color.secondary.opacity(0.3))
-                                        }
-                                        .frame(width: 28, height: 28)
-                                        .clipShape(Circle())
-                                    }
-                                    Text(name).font(.subheadline)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.trailing, 8)
-                        }
-                    }
-                }
-            }
-            .alert("Log out?", isPresented: $showLogoutAlert) {
-                Button("Log out", role: .destructive) { auth.logout() }
-                Button("Cancel", role: .cancel) {}
-            }
-            .sheet(item: $selectedEntry) { entry in
-                LibraryEntryEditSheet(entry: entry, media: entry.media) { status, progress, score in
-                    if status == .completed {
-                        ContinueWatchingManager.shared.resetProgress(
-                            aniListID: entry.media.id, moduleId: nil, mediaTitle: entry.media.title.searchTitle
-                        )
-                    }
-
-                    Task {
-                        await vm.update(entry: entry, status: status, progress: progress, score: score)
-                    }
-                }
-
-            }
-            .sheet(isPresented: $showSettings) {
-                LibrarySettingsView(statusOrderRaw: $statusOrderRaw)
+            if !auth.isLoggedIn {
+                loginPrompt
+            } else {
+                libraryContent
             }
         }
     }
@@ -201,6 +147,7 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             Spacer()
         }
+        .navigationTitle("Library")
     }
 
     // MARK: - Library content
@@ -368,10 +315,57 @@ struct LibraryView: View {
             ToolbarItem(placement: .topBarLeading) {
                 sortMenu
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showSettings = true } label: {
+                    Image(systemName: "slider.horizontal.3")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                if let name = auth.username {
+                    Button { showLogoutAlert = true } label: {
+                        HStack(spacing: 6) {
+                            if let urlStr = auth.avatarURL, let url = URL(string: urlStr) {
+                                AsyncImage(url: url) { img in
+                                    img.resizable().scaledToFill()
+                                } placeholder: {
+                                    Circle().fill(Color.secondary.opacity(0.3))
+                                }
+                                .frame(width: 28, height: 28)
+                                .clipShape(Circle())
+                            }
+                            Text(name).font(.subheadline)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 8)
+                }
+            }
         }
         .task { await vm.load() }
         .onChange(of: auth.isLoggedIn) { loggedIn in
             if loggedIn { Task { await vm.load() } }
+        }
+        .navigationTitle("Library")
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search library")
+        .alert("Log out?", isPresented: $showLogoutAlert) {
+            Button("Log out", role: .destructive) { auth.logout() }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: $selectedEntry) { entry in
+            LibraryEntryEditSheet(entry: entry, media: entry.media) { status, progress, score in
+                if status == .completed {
+                    ContinueWatchingManager.shared.resetProgress(
+                        aniListID: entry.media.id, moduleId: nil, mediaTitle: entry.media.title.searchTitle
+                    )
+                }
+
+                Task {
+                    await vm.update(entry: entry, status: status, progress: progress, score: score)
+                }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            LibrarySettingsView(statusOrderRaw: $statusOrderRaw)
         }
     }
 }

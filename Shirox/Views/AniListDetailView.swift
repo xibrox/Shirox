@@ -441,7 +441,7 @@ private func heroSection(media: AniListMedia) -> some View {
 
     @ViewBuilder
     private func episodesSection(media: AniListMedia) -> some View {
-        let totalEpisodes = media.episodes ?? (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : 0)
+        let totalEpisodes = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
 
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
