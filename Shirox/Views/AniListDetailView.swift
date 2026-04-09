@@ -397,56 +397,39 @@ private func heroSection(media: AniListMedia) -> some View {
 
     @ViewBuilder
     private func metadataSection(media: AniListMedia) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
                 if let score = media.averageScore {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.yellow)
-                        Text("\(score)%")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.primary)
-                    }
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(.yellow.opacity(0.12), in: Capsule())
-                    .overlay(Capsule().strokeBorder(.yellow.opacity(0.35), lineWidth: 0.5))
-                }
-                if let status = media.statusDisplay {
-                    Text(status)
-                        .font(.caption).fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
+                    Label("\(score)%", systemImage: "star.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(.yellow.opacity(0.1), in: Capsule())
                 }
                 if let eps = media.episodes {
-                    Text("\(eps) ep")
-                        .font(.caption).fontWeight(.semibold)
+                    Label("\(eps) Episodes", systemImage: "play.rectangle.fill")
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color.primary.opacity(0.08), in: Capsule())
                 }
             }
 
             if let genres = media.genres, !genres.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(genres.prefix(6), id: \.self) { genre in
+                    HStack(spacing: 8) {
+                        ForEach(genres, id: \.self) { genre in
                             Text(genre)
-                                .font(.caption.weight(.medium))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(Color.accentColor)
-                                .padding(.horizontal, 10).padding(.vertical, 4)
-                                .background(Color.accentColor.opacity(0.1), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 0.5))
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
                 }
-                .frame(maxWidth: .infinity)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Episodes
@@ -533,33 +516,44 @@ private func heroSection(media: AniListMedia) -> some View {
 private struct SynopsisSection: View {
     let text: String
     @State private var expanded = false
+    
+    private var platformBackground: Color {
+        #if os(iOS)
+        Color(UIColor.systemBackground)
+        #else
+        Color(NSColor.windowBackgroundColor)
+        #endif
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: 18)
-                Text("Synopsis")
-                    .font(.headline.weight(.bold))
-            }
+            Text("Synopsis")
+                .font(.headline.weight(.bold))
+
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(expanded ? nil : 4)
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(4)
+                .overlay(alignment: .bottom) {
+                    if !expanded && text.count > 200 {
+                        LinearGradient(
+                            colors: [.clear, platformBackground.opacity(0.8), platformBackground],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 40)
+                    }
+                }
+
             if text.count > 200 {
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { expanded.toggle() }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { expanded.toggle() }
                 } label: {
-                    HStack(spacing: 4) {
-                        Text(expanded ? "Less" : "More")
-                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                    Text(expanded ? "Show Less" : "Read More")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.vertical, 4)
                 }
                 .buttonStyle(.plain)
             }
