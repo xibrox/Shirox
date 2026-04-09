@@ -216,9 +216,9 @@ struct ContinueWatchingCardDisplay: View {
                             .frame(height: 4)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 10)
                     .padding(.bottom, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
