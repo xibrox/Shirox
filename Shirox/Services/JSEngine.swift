@@ -57,6 +57,8 @@ final class JSEngine: ObservableObject {
         setupConsoleLogging()
         setupBase64()
         setupFetchV2()
+        setupFetchAliases()
+        setupSoraCompat()
         setupScrapingUtilities()
         context.setupNetworkFetch()
         context.setupNetworkFetchSimple()
@@ -192,6 +194,38 @@ final class JSEngine: ObservableObject {
         }
         """
         context.evaluateScript(fetchv2JS)
+    }
+
+    // MARK: - Fetch Aliases (Sora compatibility)
+
+    private func setupFetchAliases() {
+        context.evaluateScript("""
+        function soraFetch(url, options) {
+            var headers = {}, method = 'GET', body = null;
+            if (options) {
+                headers = options.headers || {};
+                method  = options.method  || 'GET';
+                body    = options.body    || null;
+            }
+            return fetchv2(url, headers, method, body);
+        }
+        function fetch(url, options) {
+            return soraFetch(url, options);
+        }
+        """)
+    }
+
+    private func setupSoraCompat() {
+        // _0xB4F2 is a module validation function required by some Sora modules.
+        // It must return a 16-char string whose lowercase chars contain c,r,a,n,c,i.
+        let tokenBlock: @convention(block) () -> String = { "shirox-cranci-10" }
+        context.setObject(tokenBlock, forKeyedSubscript: "_0xB4F2" as NSString)
+
+        context.evaluateScript("""
+        if (typeof sendLog === 'undefined') {
+            function sendLog(msg) { console.log('[Module] ' + msg); }
+        }
+        """)
     }
 
     // MARK: - Scraping Utilities

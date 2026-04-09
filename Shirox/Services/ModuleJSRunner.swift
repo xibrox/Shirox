@@ -169,6 +169,8 @@ final class ModuleJSRunner {
         setupConsole(ctx)
         setupBase64(ctx)
         setupFetchV2(ctx)
+        setupFetchAliases(ctx)
+        setupSoraCompat(ctx)
         setupScrapingUtilities(ctx)
         ctx.setupNetworkFetch()
         ctx.setupNetworkFetchSimple()
@@ -272,6 +274,45 @@ final class ModuleJSRunner {
             return new Promise(function(resolve, reject) {
                 fetchv2Native(url, headers || {}, method || 'GET', body || null, resolve, reject);
             });
+        }
+        """)
+    }
+
+    /// Bridges `fetch` and `soraFetch` to `fetchv2`, properly unwrapping the
+    /// Sora-style options object `{ headers, method, body }` into the positional
+    /// arguments that `fetchv2` expects.
+    private func setupFetchAliases(_ ctx: JSContext) {
+        ctx.evaluateScript("""
+        function soraFetch(url, options) {
+            var headers = {}, method = 'GET', body = null;
+            if (options) {
+                headers = options.headers || {};
+                method  = options.method  || 'GET';
+                body    = options.body    || null;
+            }
+            return fetchv2(url, headers, method, body);
+        }
+        function fetch(url, options) {
+            return soraFetch(url, options);
+        }
+        """)
+    }
+
+    /// Injects Sora-specific compatibility shims expected by some modules:
+    ///   • `_0xB4F2` — module validation function; must return a 16-char string
+    ///     whose lowercase form contains every letter in "cranci" (including both c's).
+    ///   • `sendLog` — no-op logger fallback in case modules call it before
+    ///     the module script defines its own version.
+    private func setupSoraCompat(_ ctx: JSContext) {
+        // 16-char string that satisfies _0x7E9A's cranci-character check
+        let validationToken = "shirox-cranci-10"  // length=16, contains c,r,a,n,c,i
+        let tokenBlock: @convention(block) () -> String = { validationToken }
+        ctx.setObject(tokenBlock, forKeyedSubscript: "_0xB4F2" as NSString)
+
+        // Fallback sendLog so early calls before module defines its own don't throw
+        ctx.evaluateScript("""
+        if (typeof sendLog === 'undefined') {
+            function sendLog(msg) { console.log('[Module] ' + msg); }
         }
         """)
     }
