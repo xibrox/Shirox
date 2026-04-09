@@ -203,7 +203,9 @@ struct AniListDetailView: View {
     @ViewBuilder
     private func watchButton(media: AniListMedia) -> some View {
         let item = continueWatchingItem(for: media)
-        let label = item.map { "Continue Watching Ep \($0.episodeNumber)" } ?? "Start Watching"
+        let label = item.map { "Resume Episode \($0.episodeNumber)" } ?? "Start Watching"
+        let progress = item.map { min($0.watchedSeconds / $0.totalSeconds, 1.0) } ?? 0
+
         Button {
             if let item {
                 resumeWatching(item: item)
@@ -211,19 +213,31 @@ struct AniListDetailView: View {
                 vm.watchEpisode(1)
             }
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 13, weight: .bold))
-                Text(label)
-                    .font(.system(size: 15, weight: .bold))
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 14, weight: .bold))
+                    Text(label)
+                        .font(.system(size: 16, weight: .bold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                
+                if progress > 0 && progress < 1 {
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(Color.primary.opacity(0.1))
+                        Rectangle().fill(Color.accentColor)
+                            .frame(width: (UIScreen.main.bounds.width - 40) * progress)
+                    }
+                    .frame(height: 3)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 46)
-            .background(Color.accentColor.opacity(0.12), in: Capsule())
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(Color.accentColor.opacity(0.15))
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
-                Capsule()
-                    .strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 1)
             )
             .foregroundStyle(Color.accentColor)
         }
@@ -322,17 +336,11 @@ private func heroSection(media: AniListMedia) -> some View {
             let imageH = 420 + stretch + scrollDown * 0.5
             let imageY = scrollDown * 0.5 - stretch
 
-            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().scaledToFill()
-                default:
-                    Rectangle().fill(Color.gray.opacity(0.25))
-                }
-            }
-            .frame(width: proxy.size.width, height: imageH)
-            .clipped()
-            .offset(y: imageY)
+            CachedAsyncImage(urlString: media.bannerImage ?? media.coverImage.best ?? "")
+                .frame(width: proxy.size.width, height: imageH)
+                .clipped()
+                .offset(y: imageY)
+                .blur(radius: media.bannerImage == nil ? 10 : 0) // Blur if falling back to cover
         }
         .frame(height: 420)
         .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
@@ -340,7 +348,7 @@ private func heroSection(media: AniListMedia) -> some View {
         LinearGradient(
             stops: [
                 .init(color: .clear, location: 0),
-                .init(color: platformBackground.opacity(0.2), location: 0.45),
+                .init(color: platformBackground.opacity(0.35), location: 0.5),
                 .init(color: platformBackground, location: 1.0)
             ],
             startPoint: .top,
@@ -349,36 +357,40 @@ private func heroSection(media: AniListMedia) -> some View {
         .frame(height: 420)
 
         // Floating poster + title
-        HStack(alignment: .bottom, spacing: 14) {
-            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                switch phase {
-                case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
-                default: Rectangle().fill(Color.gray.opacity(0.3))
-                }
-            }
-            .frame(width: 110, height: 165)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
+        HStack(alignment: .bottom, spacing: 16) {
+            CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                .frame(width: 110, height: 165)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(media.title.displayTitle)
-                    .font(.title3.weight(.bold))
+                    .font(.title2.weight(.bold))
                     .lineLimit(3)
+                    .shadow(color: .black.opacity(0.2), radius: 4)
 
-                if let year = media.seasonYear {
-                    Text(String(year))
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                HStack(spacing: 8) {
+                    if let year = media.seasonYear {
+                        Text(String(year))
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.08), in: Capsule())
+                    }
+                    if let status = media.statusDisplay {
+                        Text(status)
+                            .font(.caption).fontWeight(.bold)
+                            .foregroundStyle(status == "RELEASING" ? .green : .secondary)
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background((status == "RELEASING" ? Color.green : Color.primary).opacity(0.1), in: Capsule())
+                    }
                 }
             }
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 20)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 24)
     }
 }
     // MARK: - Metadata
