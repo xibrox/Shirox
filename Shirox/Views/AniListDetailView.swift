@@ -459,9 +459,9 @@ private func heroSection(media: AniListMedia) -> some View {
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.accentColor, in: Capsule())
                     }
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accentColor.opacity(0.9))
-                        .frame(width: 36, height: 3)
+                    // RoundedRectangle(cornerRadius: 2)
+                    //     .fill(Color.accentColor.opacity(0.9))
+                    //     .frame(width: 36, height: 3)
                 }
                 Spacer()
                 if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
@@ -535,9 +535,9 @@ private struct SynopsisSection: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("Synopsis")
                     .font(.title3.weight(.bold))
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.accentColor.opacity(0.9))
-                    .frame(width: 28, height: 3)
+                // RoundedRectangle(cornerRadius: 2)
+                //     .fill(Color.accentColor.opacity(0.9))
+                //     .frame(width: 28, height: 3)
             }
 
             Text(text)
