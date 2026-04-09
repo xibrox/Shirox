@@ -173,8 +173,9 @@ struct ContinueWatchingCardDisplay: View {
                     // Gradient + labels (same style as AniListCardView)
                     LinearGradient(
                         stops: [
-                            .init(color: .clear, location: 0.5),
-                            .init(color: .black.opacity(0.92), location: 1)
+                            .init(color: .clear, location: 0.4),
+                            .init(color: .black.opacity(0.6), location: 0.7),
+                            .init(color: .black.opacity(0.95), location: 1)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -203,13 +204,16 @@ struct ContinueWatchingCardDisplay: View {
                         } else {
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
-                                    Capsule().fill(Color.white.opacity(0.3))
-                                    Capsule().fill(Color.accentColor)
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.2))
+                                    
+                                    Capsule()
+                                        .fill(Color.accentColor)
                                         .frame(width: geo.size.width * progress)
+                                        .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
                                 }
-                                .frame(height: 3)
                             }
-                            .frame(height: 3)
+                            .frame(height: 4)
                         }
                     }
                     .padding(.horizontal, 10)
