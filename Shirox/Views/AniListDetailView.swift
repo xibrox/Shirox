@@ -645,57 +645,51 @@ private struct AniListEpisodeRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 0) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(isComplete ? Color.green : Color.accentColor)
-                            .frame(width: 40, height: 40)
-                        if isComplete {
-                            Image(systemName: "checkmark")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                        } else {
-                            Text("\(number)")
-                                .font(.footnote.weight(.bold))
-                                .foregroundStyle(.white)
-                        }
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isComplete ? Color.green.opacity(0.15) : Color.accentColor.opacity(0.1))
+                        .frame(width: 48, height: 48)
+                    
+                    if isComplete {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.green)
+                    } else {
+                        Text("\(number)")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Color.accentColor)
                     }
-                    .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
-                            radius: 4, y: 2)
+                }
 
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Episode \(number)")
-                        .font(.callout.weight(.medium))
-
-                    Spacer()
-
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(8)
-                        .background(Color.accentColor.opacity(0.1), in: Circle())
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 12)
-
-                if let p = progress, p > 0, !isComplete {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.secondary.opacity(0.15))
-                            Capsule()
-                                .fill(Color.accentColor)
-                                .frame(width: geo.size.width * p)
-                        }
-                        .frame(height: 3)
+                        .font(.callout.weight(.bold))
+                    
+                    if let p = progress, p > 0, !isComplete {
+                        ProgressView(value: p)
+                            .tint(Color.accentColor)
+                            .frame(width: 100)
+                            .scaleEffect(x: 1, y: 0.5, anchor: .center)
+                    } else if isComplete {
+                        Text("Watched")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.green)
                     }
-                    .frame(height: 3)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
                 }
+
+                Spacer()
+
+                Image(systemName: "play.fill")
+                    .font(.caption)
+                    .foregroundStyle(.white)
+                    .padding(10)
+                    .background(Color.accentColor, in: Circle())
+                    .shadow(color: Color.accentColor.opacity(0.3), radius: 4)
             }
-            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
-            .contentShape(RoundedRectangle(cornerRadius: 14))
+            .padding(12)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(AniListEpisodePressStyle())
         .contextMenu {
