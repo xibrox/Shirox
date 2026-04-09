@@ -165,64 +165,63 @@ struct ContinueWatchingCardDisplay: View {
         Color.clear
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
-                ZStack(alignment: .bottom) {
-                    CachedAsyncImage(urlString: item.imageUrl)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-
-                    // Gradient (same as AniListCardView)
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.5),
-                            .init(color: .black.opacity(0.92), location: 1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                CachedAsyncImage(urlString: item.imageUrl)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(item.mediaTitle)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                        
-                        HStack(spacing: 4) {
-                            if !item.streamUrl.isEmpty {
-                                Image(systemName: "play.fill")
-                                    .font(.system(size: 8, weight: .bold))
-                                
-                                Text(item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)")
-                                    .font(.caption2.weight(.medium))
-                            } else {
-                                Image(systemName: "arrow.right.circle.fill")
-                                    .font(.system(size: 10, weight: .bold))
-                                
-                                Text("Up Next")
-                                    .font(.caption2.weight(.bold))
-                            }
-                        }
-                        .foregroundStyle(.white.opacity(0.85))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, item.streamUrl.isEmpty ? 12 : 16)
-                    
-                    // Progress Bar at the absolute bottom
-                    if !item.streamUrl.isEmpty {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Color.white.opacity(0.2)
-                                Color.accentColor
-                                    .frame(width: geo.size.width * progress)
-                                    .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
-                            }
-                        }
-                        .frame(height: 4)
-                    }
-                }
+                    .clipped()
             )
+            .overlay(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.5),
+                        .init(color: .black.opacity(0.92), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.mediaTitle)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    
+                    HStack(spacing: 4) {
+                        if !item.streamUrl.isEmpty {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 8, weight: .bold))
+                            
+                            Text(item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)")
+                                .font(.caption2.weight(.medium))
+                        } else {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            
+                            Text("Up Next")
+                                .font(.caption2.weight(.bold))
+                        }
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.bottom, item.streamUrl.isEmpty ? 12 : 16)
+            }
+            .overlay(alignment: .bottom) {
+                if !item.streamUrl.isEmpty {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Color.white.opacity(0.2)
+                            Color.accentColor
+                                .frame(width: geo.size.width * progress)
+                                .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
+                        }
+                    }
+                    .frame(height: 4)
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
     }
