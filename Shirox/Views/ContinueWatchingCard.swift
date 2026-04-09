@@ -208,7 +208,7 @@ struct ContinueWatchingCardDisplay: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
-                .padding(.bottom, item.streamUrl.isEmpty ? 12 : 16)
+                .padding(.bottom, 16)
             }
             .overlay(alignment: .bottom) {
                 if !item.streamUrl.isEmpty {
