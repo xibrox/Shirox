@@ -399,14 +399,14 @@ private func heroSection(media: AniListMedia) -> some View {
                             .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
                     }
 
-                    if let eps = media.episodes {
-                        Text("\(eps) ep")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.secondary.opacity(0.12), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
-                    }
+                    // if let eps = media.episodes {
+                    //     Text("\(eps) ep")
+                    //         .font(.caption2.weight(.medium))
+                    //         .foregroundStyle(.secondary)
+                    //         .padding(.horizontal, 8).padding(.vertical, 3)
+                    //         .background(Color.secondary.opacity(0.12), in: Capsule())
+                    //         .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                    // }
                 }
             }
             Spacer()
@@ -448,17 +448,21 @@ private func heroSection(media: AniListMedia) -> some View {
         let totalEpisodes = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
 
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 10) {
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: 22)
-                Text("Episodes")
-                    .font(.title3.weight(.bold))
-                Text("\(totalEpisodes)")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Color.accentColor, in: Capsule())
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 8) {
+                        Text("Episodes")
+                            .font(.title3.weight(.bold))
+                        Text("\(totalEpisodes)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.accentColor, in: Capsule())
+                    }
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor.opacity(0.9))
+                        .frame(width: 36, height: 3)
+                }
                 Spacer()
                 if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
                     Button {
@@ -527,14 +531,15 @@ private struct SynopsisSection: View {
     @State private var expanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: 18)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text("Synopsis")
-                    .font(.headline.weight(.bold))
+                    .font(.title3.weight(.bold))
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.accentColor.opacity(0.9))
+                    .frame(width: 28, height: 3)
             }
+
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
