@@ -199,7 +199,8 @@ struct ContinueWatchingCardDisplay: View {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.system(size: 10, weight: .bold))
                             
-                            Text("Up Next")
+                            let epText = item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)"
+                            Text("Up Next • \(epText)")
                                 .font(.caption2.weight(.bold))
                         }
                     }
