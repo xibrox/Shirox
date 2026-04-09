@@ -166,7 +166,7 @@ struct ContinueWatchingCardDisplay: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
                 ZStack(alignment: .bottom) {
-                    CardThumbnail(urlString: item.imageUrl)
+                    CachedAsyncImage(urlString: item.imageUrl)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
 
@@ -183,24 +183,27 @@ struct ContinueWatchingCardDisplay: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.mediaTitle)
-                            .font(.caption.weight(.bold))
+                            .font(.caption)
+                            .fontWeight(.semibold)
                             .foregroundStyle(.white)
                             .lineLimit(2)
                         
                         HStack(spacing: 4) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 8, weight: .bold))
-                            
-                            Text(item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)")
-                                .font(.caption2.weight(.medium))
+                            if !item.streamUrl.isEmpty {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 8, weight: .bold))
+                                
+                                Text(item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)")
+                                    .font(.caption2.weight(.medium))
+                            } else {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                
+                                Text("Up Next")
+                                    .font(.caption2.weight(.bold))
+                            }
                         }
                         .foregroundStyle(.white.opacity(0.85))
-
-                        if item.streamUrl.isEmpty {
-                            Text("Up Next")
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.white.opacity(0.85))
-                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
