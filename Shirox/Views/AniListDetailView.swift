@@ -173,13 +173,13 @@ struct AniListDetailView: View {
                 if let desc = media.plainDescription, !desc.isEmpty {
                     SynopsisSection(text: desc)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
                 }
                 #if os(iOS)
                 watchButton(media: media)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
                 #endif
                 episodesSection(media: media)
                     .frame(maxWidth: .infinity)

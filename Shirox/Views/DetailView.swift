@@ -299,6 +299,9 @@ struct DetailView: View {
 
             if let detail = vm.detail {
                 synopsisSection(detail: detail)
+                #if os(iOS)
+                watchButton(detail: detail)
+                #endif
                 episodesSection(detail: detail)
             }
         }
@@ -434,10 +437,6 @@ struct DetailView: View {
                     .padding(.vertical, 2)
                 }
             }
-
-            #if os(iOS)
-            watchButton(detail: detail)
-            #endif
 
             if detail.episodes.isEmpty && !vm.isLoadingEpisodes {
                 Text("No episodes found.")
