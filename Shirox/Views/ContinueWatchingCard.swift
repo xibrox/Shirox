@@ -170,12 +170,11 @@ struct ContinueWatchingCardDisplay: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
 
-                    // Gradient + labels (same style as AniListCardView)
+                    // Gradient (same as AniListCardView)
                     LinearGradient(
                         stops: [
-                            .init(color: .clear, location: 0.4),
-                            .init(color: .black.opacity(0.6), location: 0.7),
-                            .init(color: .black.opacity(0.95), location: 1)
+                            .init(color: .clear, location: 0.5),
+                            .init(color: .black.opacity(0.92), location: 1)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -201,24 +200,24 @@ struct ContinueWatchingCardDisplay: View {
                             Text("Up Next")
                                 .font(.caption2.weight(.medium))
                                 .foregroundStyle(.white.opacity(0.85))
-                        } else {
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule()
-                                        .fill(Color.white.opacity(0.2))
-                                    
-                                    Capsule()
-                                        .fill(Color.accentColor)
-                                        .frame(width: geo.size.width * progress)
-                                        .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
-                                }
-                            }
-                            .frame(height: 4)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, item.streamUrl.isEmpty ? 12 : 16)
+                    
+                    // Progress Bar at the absolute bottom
+                    if !item.streamUrl.isEmpty {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Color.white.opacity(0.2)
+                                Color.accentColor
+                                    .frame(width: geo.size.width * progress)
+                                    .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
+                            }
+                        }
+                        .frame(height: 4)
+                    }
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
