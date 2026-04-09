@@ -173,13 +173,13 @@ struct AniListDetailView: View {
                 if let desc = media.plainDescription, !desc.isEmpty {
                     SynopsisSection(text: desc)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
                 }
                 #if os(iOS)
                 watchButton(media: media)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 #endif
                 episodesSection(media: media)
                     .frame(maxWidth: .infinity)
@@ -203,9 +203,7 @@ struct AniListDetailView: View {
     @ViewBuilder
     private func watchButton(media: AniListMedia) -> some View {
         let item = continueWatchingItem(for: media)
-        let label = item.map { "Resume Episode \($0.episodeNumber)" } ?? "Start Watching"
-        let progress = item.map { min($0.watchedSeconds / $0.totalSeconds, 1.0) } ?? 0
-
+        let label = item.map { "Continue Watching Ep \($0.episodeNumber)" } ?? "Start Watching"
         Button {
             if let item {
                 resumeWatching(item: item)
@@ -213,31 +211,19 @@ struct AniListDetailView: View {
                 vm.watchEpisode(1)
             }
         } label: {
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 14, weight: .bold))
-                    Text(label)
-                        .font(.system(size: 16, weight: .bold))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                
-                if progress > 0 && progress < 1 {
-                    ZStack(alignment: .leading) {
-                        Rectangle().fill(Color.primary.opacity(0.1))
-                        Rectangle().fill(Color.accentColor)
-                            .frame(width: (UIScreen.main.bounds.width - 40) * progress)
-                    }
-                    .frame(height: 3)
-                }
+            HStack(spacing: 10) {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 13, weight: .bold))
+                Text(label)
+                    .font(.system(size: 15, weight: .bold))
             }
-            .background(Color.accentColor.opacity(0.15))
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background(Color.accentColor.opacity(0.12), in: Capsule())
+            .background(.ultraThinMaterial, in: Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 1)
+                Capsule()
+                    .strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1)
             )
             .foregroundStyle(Color.accentColor)
         }
@@ -336,11 +322,17 @@ private func heroSection(media: AniListMedia) -> some View {
             let imageH = 420 + stretch + scrollDown * 0.5
             let imageY = scrollDown * 0.5 - stretch
 
-            CachedAsyncImage(urlString: media.bannerImage ?? media.coverImage.best ?? "")
-                .frame(width: proxy.size.width, height: imageH)
-                .clipped()
-                .offset(y: imageY)
-                .blur(radius: media.bannerImage == nil ? 10 : 0) // Blur if falling back to cover
+            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                switch phase {
+                case .success(let img):
+                    img.resizable().scaledToFill()
+                default:
+                    Rectangle().fill(Color.gray.opacity(0.25))
+                }
+            }
+            .frame(width: proxy.size.width, height: imageH)
+            .clipped()
+            .offset(y: imageY)
         }
         .frame(height: 420)
         .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
@@ -348,7 +340,7 @@ private func heroSection(media: AniListMedia) -> some View {
         LinearGradient(
             stops: [
                 .init(color: .clear, location: 0),
-                .init(color: platformBackground.opacity(0.35), location: 0.5),
+                .init(color: platformBackground.opacity(0.2), location: 0.45),
                 .init(color: platformBackground, location: 1.0)
             ],
             startPoint: .top,
@@ -357,79 +349,97 @@ private func heroSection(media: AniListMedia) -> some View {
         .frame(height: 420)
 
         // Floating poster + title
-        HStack(alignment: .bottom, spacing: 16) {
-            CachedAsyncImage(urlString: media.coverImage.best ?? "")
-                .frame(width: 110, height: 165)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
+        HStack(alignment: .bottom, spacing: 14) {
+            AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
+                switch phase {
+                case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
+                default: Rectangle().fill(Color.gray.opacity(0.3))
+                }
+            }
+            .frame(width: 110, height: 165)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(media.title.displayTitle)
-                    .font(.title2.weight(.bold))
+                    .font(.title3.weight(.bold))
                     .lineLimit(3)
-                    .shadow(color: .black.opacity(0.2), radius: 4)
 
                 HStack(spacing: 8) {
-                    if let year = media.seasonYear {
-                        Text(String(year))
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Color.primary.opacity(0.08), in: Capsule())
+                    if let score = media.averageScore {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.yellow)
+                            Text("\(score)%")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(.yellow.opacity(0.12), in: Capsule())
+                        .overlay(Capsule().strokeBorder(.yellow.opacity(0.35), lineWidth: 0.5))
                     }
+
                     if let status = media.statusDisplay {
                         Text(status)
-                            .font(.caption).fontWeight(.bold)
-                            .foregroundStyle(status == "RELEASING" ? .green : .secondary)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background((status == "RELEASING" ? Color.green : Color.primary).opacity(0.1), in: Capsule())
+                            .font(.caption2).fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                    }
+
+                    if let year = media.seasonYear {
+                        Text(String(year))
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
                     }
                 }
             }
             Spacer()
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 24)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 20)
     }
 }
     // MARK: - Metadata
 
     @ViewBuilder
     private func metadataSection(media: AniListMedia) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                if let score = media.averageScore {
-                    Label("\(score)%", systemImage: "star.fill")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.yellow)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(.yellow.opacity(0.1), in: Capsule())
-                }
-                if let eps = media.episodes {
-                    Label("\(eps) Episodes", systemImage: "play.rectangle.fill")
-                        .font(.subheadline.weight(.bold))
+        VStack(alignment: .leading, spacing: 10) {
+            if let eps = media.episodes {
+                HStack(spacing: 8) {
+                    Text("\(eps) ep")
+                        .font(.caption).fontWeight(.semibold)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(Color.primary.opacity(0.08), in: Capsule())
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.12), in: Capsule())
                 }
             }
 
             if let genres = media.genres, !genres.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(genres, id: \.self) { genre in
+                    HStack(spacing: 6) {
+                        ForEach(genres.prefix(6), id: \.self) { genre in
                             Text(genre)
-                                .font(.caption.weight(.bold))
+                                .font(.caption.weight(.medium))
                                 .foregroundStyle(Color.accentColor)
-                                .padding(.horizontal, 12).padding(.vertical, 6)
-                                .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                                .padding(.horizontal, 10).padding(.vertical, 4)
+                                .background(Color.accentColor.opacity(0.1), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 0.5))
                         }
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Episodes
@@ -516,44 +526,33 @@ private func heroSection(media: AniListMedia) -> some View {
 private struct SynopsisSection: View {
     let text: String
     @State private var expanded = false
-    
-    private var platformBackground: Color {
-        #if os(iOS)
-        Color(UIColor.systemBackground)
-        #else
-        Color(NSColor.windowBackgroundColor)
-        #endif
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Synopsis")
-                .font(.headline.weight(.bold))
-
+            HStack(spacing: 8) {
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 18)
+                Text("Synopsis")
+                    .font(.headline.weight(.bold))
+            }
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(expanded ? nil : 4)
-                .lineSpacing(4)
-                .overlay(alignment: .bottom) {
-                    if !expanded && text.count > 200 {
-                        LinearGradient(
-                            colors: [.clear, platformBackground.opacity(0.8), platformBackground],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 40)
-                    }
-                }
-
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
             if text.count > 200 {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { expanded.toggle() }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { expanded.toggle() }
                 } label: {
-                    Text(expanded ? "Show Less" : "Read More")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.vertical, 4)
+                    HStack(spacing: 4) {
+                        Text(expanded ? "Less" : "More")
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
             }
@@ -645,51 +644,57 @@ private struct AniListEpisodeRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(isComplete ? Color.green.opacity(0.15) : Color.accentColor.opacity(0.1))
-                        .frame(width: 48, height: 48)
-                    
-                    if isComplete {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.green)
-                    } else {
-                        Text("\(number)")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Color.accentColor)
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(isComplete ? Color.green : Color.accentColor)
+                            .frame(width: 40, height: 40)
+                        if isComplete {
+                            Image(systemName: "checkmark")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                        } else {
+                            Text("\(number)")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(.white)
+                        }
                     }
-                }
+                    .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
+                            radius: 4, y: 2)
 
-                VStack(alignment: .leading, spacing: 4) {
                     Text("Episode \(number)")
-                        .font(.callout.weight(.bold))
-                    
-                    if let p = progress, p > 0, !isComplete {
-                        ProgressView(value: p)
-                            .tint(Color.accentColor)
-                            .frame(width: 100)
-                            .scaleEffect(x: 1, y: 0.5, anchor: .center)
-                    } else if isComplete {
-                        Text("Watched")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.green)
-                    }
+                        .font(.callout.weight(.medium))
+
+                    Spacer()
+
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(8)
+                        .background(Color.accentColor.opacity(0.1), in: Circle())
                 }
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 12)
 
-                Spacer()
-
-                Image(systemName: "play.fill")
-                    .font(.caption)
-                    .foregroundStyle(.white)
-                    .padding(10)
-                    .background(Color.accentColor, in: Circle())
-                    .shadow(color: Color.accentColor.opacity(0.3), radius: 4)
+                if let p = progress, p > 0, !isComplete {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.secondary.opacity(0.15))
+                            Capsule()
+                                .fill(Color.accentColor)
+                                .frame(width: geo.size.width * p)
+                        }
+                        .frame(height: 3)
+                    }
+                    .frame(height: 3)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 8)
+                }
             }
-            .padding(12)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
-            .contentShape(RoundedRectangle(cornerRadius: 16))
+            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(AniListEpisodePressStyle())
         .contextMenu {
