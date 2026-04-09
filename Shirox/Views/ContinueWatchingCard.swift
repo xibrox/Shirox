@@ -183,12 +183,18 @@ struct ContinueWatchingCardDisplay: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.mediaTitle)
-                            .font(.caption.weight(.semibold))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                             .lineLimit(2)
-                        Text("Ep \(item.episodeNumber)")
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.7))
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 8, weight: .bold))
+                            
+                            Text(item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)")
+                                .font(.caption2.weight(.medium))
+                        }
+                        .foregroundStyle(.white.opacity(0.85))
 
                         if item.streamUrl.isEmpty {
                             Text("Up Next")
