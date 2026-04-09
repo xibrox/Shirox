@@ -89,7 +89,9 @@ struct DetailView: View {
     @ViewBuilder
     private func watchButton(detail: MediaDetail) -> some View {
         let item = continueWatchingItem(for: detail)
-        let label = item.map { "Continue Watching Ep \($0.episodeNumber)" } ?? "Start Watching"
+        let label = item.map { "Resume Episode \($0.episodeNumber)" } ?? "Start Watching"
+        let progress = item.map { min($0.watchedSeconds / $0.totalSeconds, 1.0) } ?? 0
+
         Button {
             if let item {
                 resumeWatching(item: item)
@@ -97,19 +99,31 @@ struct DetailView: View {
                 vm.loadStreams(for: first)
             }
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 13, weight: .bold))
-                Text(label)
-                    .font(.system(size: 15, weight: .bold))
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 14, weight: .bold))
+                    Text(label)
+                        .font(.system(size: 16, weight: .bold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                
+                if progress > 0 && progress < 1 {
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(Color.primary.opacity(0.1))
+                        Rectangle().fill(Color.accentColor)
+                            .frame(width: (UIScreen.main.bounds.width - 40) * progress)
+                    }
+                    .frame(height: 3)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 46)
-            .background(Color.accentColor.opacity(0.12), in: Capsule())
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(Color.accentColor.opacity(0.15))
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
-                Capsule()
-                    .strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 1)
             )
             .foregroundStyle(Color.accentColor)
         }
@@ -190,8 +204,6 @@ struct DetailView: View {
                     switch phase {
                     case .success(let img):
                         img.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Rectangle().fill(Color.secondary.opacity(0.2))
                     default:
                         Rectangle().fill(Color.secondary.opacity(0.15))
                     }
@@ -199,6 +211,7 @@ struct DetailView: View {
                 .frame(width: proxy.size.width, height: imageH)
                 .clipped()
                 .offset(y: imageY)
+                .blur(radius: 10)
             }
             .frame(height: 420)
             .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
@@ -206,7 +219,7 @@ struct DetailView: View {
             LinearGradient(
                 stops: [
                     .init(color: .clear, location: 0),
-                    .init(color: platformBackground.opacity(0.2), location: 0.45),
+                    .init(color: platformBackground.opacity(0.35), location: 0.5),
                     .init(color: platformBackground, location: 1.0)
                 ],
                 startPoint: .top,
@@ -215,14 +228,12 @@ struct DetailView: View {
             .frame(height: 420)
 
             // Floating poster + metadata
-            HStack(alignment: .bottom, spacing: 14) {
+            HStack(alignment: .bottom, spacing: 16) {
                 // Poster
                 AsyncImage(url: URL(string: item.image)) { phase in
                     switch phase {
                     case .success(let img):
                         img.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Rectangle().fill(Color.secondary.opacity(0.3))
                     default:
                         Rectangle().fill(Color.secondary.opacity(0.15))
                             .overlay(ProgressView())
@@ -230,13 +241,14 @@ struct DetailView: View {
                 }
                 .frame(width: 110, height: 165)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(item.title)
-                        .font(.title3.weight(.bold))
+                        .font(.title2.weight(.bold))
                         .lineLimit(3)
+                        .shadow(color: .black.opacity(0.2), radius: 4)
 
                     if let detail = vm.detail, detail.aliases != "N/A" {
                         Text(detail.aliases)
@@ -247,25 +259,24 @@ struct DetailView: View {
 
                     if let detail = vm.detail, detail.airdate != "N/A" {
                         Text(detail.airdate)
-                            .font(.caption2.weight(.medium))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.secondary.opacity(0.12), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.08), in: Capsule())
                     }
                 }
                 Spacer()
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 20)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
         }
     }
 
     // MARK: - Body
 
     private var bodySection: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
             if vm.isLoadingDetail {
                 HStack {
                     ProgressView()
@@ -291,8 +302,8 @@ struct DetailView: View {
                 episodesSection(detail: detail)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
         .padding(.bottom, 32)
     }
 
@@ -300,34 +311,35 @@ struct DetailView: View {
 
     private func synopsisSection(detail: MediaDetail) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: 18)
-                Text("Synopsis")
-                    .font(.headline.weight(.bold))
-            }
+            Text("Synopsis")
+                .font(.headline.weight(.bold))
 
             Text(detail.description)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(synopsisExpanded ? nil : 4)
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(4)
+                .overlay(alignment: .bottom) {
+                    if !synopsisExpanded && detail.description.count > 200 {
+                        LinearGradient(
+                            colors: [.clear, platformBackground.opacity(0.8), platformBackground],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 40)
+                    }
+                }
 
             if detail.description.count > 200 {
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         synopsisExpanded.toggle()
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Text(synopsisExpanded ? "Less" : "More")
-                        Image(systemName: synopsisExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color.accentColor)
+                    Text(synopsisExpanded ? "Show Less" : "Read More")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.vertical, 4)
                 }
                 .buttonStyle(.plain)
             }
