@@ -398,6 +398,15 @@ private func heroSection(media: AniListMedia) -> some View {
                             .background(Color.secondary.opacity(0.12), in: Capsule())
                             .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
                     }
+
+                    if let eps = media.episodes {
+                        Text("\(eps) ep")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                    }
                 }
             }
             Spacer()
@@ -411,16 +420,6 @@ private func heroSection(media: AniListMedia) -> some View {
     @ViewBuilder
     private func metadataSection(media: AniListMedia) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let eps = media.episodes {
-                HStack(spacing: 8) {
-                    Text("\(eps) ep")
-                        .font(.caption).fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.12), in: Capsule())
-                }
-            }
-
             if let genres = media.genres, !genres.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
