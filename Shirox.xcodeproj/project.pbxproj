@@ -112,8 +112,8 @@
 		AA000001000000000000AA65 /* AniListLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB64 /* AniListLibraryService.swift */; };
 		AA000001000000000000AA66 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB66 /* LibraryViewModel.swift */; };
 		AA000001000000000000AA67 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB66 /* LibraryViewModel.swift */; };
-		AA000001000000000000AA68 /* Library/LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */; };
-		AA000001000000000000AA69 /* Library/LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */; };
+		AA000001000000000000AA68 /* LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */; };
+		AA000001000000000000AA69 /* LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */; };
 		AA000001000000000000AA70 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB70 /* LibraryView.swift */; };
 		AA000001000000000000AA71 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB70 /* LibraryView.swift */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
@@ -122,6 +122,8 @@
 		AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
 		AFD909B8E23B2E6F048F0869 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD942143248855B7D74F9E0C /* SettingsView.swift */; };
 		B28F4CA7C301FB3448693046 /* ModuleJSRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */; };
+		B6B720E10D4EE0F2136F17C4 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
+		B6B720E10D4EE0F2136F17C6 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
 		B85FDAB9BAB5CFDC3F324ACD /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
 		B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
 		C513DCB66EC4AFC34A15DC7A /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
@@ -193,13 +195,14 @@
 		AA000001000000000000BB62 /* AniListAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListAuthManager.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB64 /* AniListLibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListLibraryService.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB66 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
-		AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library/LibraryEntryEditSheet.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library/LibraryEntryEditSheet.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB70 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		B371AE47E8FD36A0C11174AC /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
 		B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamResult.swift; sourceTree = "<group>"; };
+		B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchAliasManager.swift; sourceTree = "<group>"; };
 		BCAB52C5F226579CA37CC9E5 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
 		BECC2087556541BAE47BDA6B /* DetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailViewModel.swift; sourceTree = "<group>"; };
 		D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeCardView.swift; sourceTree = "<group>"; };
@@ -249,7 +252,7 @@
 				142A89C42F58E804008652D9 /* ViewTracker.swift */,
 				AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */,
 				AA000001000000000000BB70 /* LibraryView.swift */,
-				AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */,
+				AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */,
 				D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */,
 				71374A74E55E4B9BB0555C59 /* BrowseView.swift */,
 				4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */,
@@ -305,6 +308,7 @@
 				51053A55A3C1D2682EB7719D /* JSEngine+Streams.swift */,
 				2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */,
 				FA54E15EA936A28D42B73886 /* ModuleManager.swift */,
+				B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */,
 				5E45F91C732C2601421713C8 /* NetworkFetch.swift */,
 				AA000001000000000000BB01 /* SubtitleSettingsManager.swift */,
 				AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */,
@@ -532,13 +536,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -575,6 +575,7 @@
 				142A89C52F58E805008652D9 /* ViewTracker.swift in Sources */,
 				EA5B1C17081C02D59196F61C /* ModuleListView.swift in Sources */,
 				72D5458BF7DD94A53658F64C /* ModuleManager.swift in Sources */,
+				B6B720E10D4EE0F2136F17C4 /* ModuleSearchAliasManager.swift in Sources */,
 				AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */,
 				142A89C32F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
 				B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */,
@@ -594,7 +595,7 @@
 				AA000001000000000000AA63 /* AniListAuthManager.swift in Sources */,
 				AA000001000000000000AA65 /* AniListLibraryService.swift in Sources */,
 				AA000001000000000000AA67 /* LibraryViewModel.swift in Sources */,
-				AA000001000000000000AA69 /* Library/LibraryEntryEditSheet.swift in Sources */,
+				AA000001000000000000AA69 /* LibraryEntryEditSheet.swift in Sources */,
 				AA000001000000000000AA71 /* LibraryView.swift in Sources */,
 				AA000001000000000000AA06 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA08 /* PlayerBottomBar.swift in Sources */,
@@ -645,6 +646,7 @@
 				142A89C62F58E805008652D9 /* ViewTracker.swift in Sources */,
 				2655381CCFCFAC0158241F3C /* ModuleListView.swift in Sources */,
 				959D35AAA4791E5B4B9DB7D3 /* ModuleManager.swift in Sources */,
+				B6B720E10D4EE0F2136F17C6 /* ModuleSearchAliasManager.swift in Sources */,
 				AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */,
 				142A89C22F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
 				F9E24C2C4FF74E1EAC5BFD9B /* NetworkFetch.swift in Sources */,
@@ -664,7 +666,7 @@
 				AA000001000000000000AA62 /* AniListAuthManager.swift in Sources */,
 				AA000001000000000000AA64 /* AniListLibraryService.swift in Sources */,
 				AA000001000000000000AA66 /* LibraryViewModel.swift in Sources */,
-				AA000001000000000000AA68 /* Library/LibraryEntryEditSheet.swift in Sources */,
+				AA000001000000000000AA68 /* LibraryEntryEditSheet.swift in Sources */,
 				AA000001000000000000AA70 /* LibraryView.swift in Sources */,
 				AA000001000000000000AA05 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA07 /* PlayerBottomBar.swift in Sources */,

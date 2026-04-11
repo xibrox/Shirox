@@ -71,12 +71,12 @@ struct ContinueWatchingSection: View {
 
     private func resume(_ item: ContinueWatchingItem) {
         guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
-        
+
         // Ensure the correct module is active
         if let mid = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
             ModuleManager.shared.selectModule(module)
         }
-        
+
         let stream = StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,
@@ -94,51 +94,53 @@ struct ContinueWatchingSection: View {
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref
         )
-        let epNum = item.episodeNumber
-        let detailHref = item.detailHref
-        let mediaTitle = item.mediaTitle
-        let mid = item.moduleId
 
-        // Helper to get episodes list (either via href or search fallback)
-        let fetchEpisodes: () async throws -> [EpisodeLink] = {
-            if let href = detailHref {
-                return try await JSEngine.shared.fetchEpisodes(url: href)
-            } else if item.moduleId != nil {
-                // AniList fallback: find the item in the module by title
-                let results = try await JSEngine.shared.search(keyword: mediaTitle)
-                // Try exact match then fuzzy
-                let match = results.first { $0.title.lowercased() == mediaTitle.lowercased() } ?? results.first
-                if let href = match?.href {
-                    return try await JSEngine.shared.fetchEpisodes(url: href)
+        // Setup Next Episode loader using ModuleJSRunner
+        let onWatchNext: WatchNextLoader? = { currentEpNum in
+            guard let moduleId = item.moduleId,
+                  let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) else {
+                return nil
+            }
+
+            do {
+                let runner = ModuleJSRunner()
+                try await runner.load(module: module)
+
+                // Fetch episodes via detailHref or search
+                var episodes: [EpisodeLink] = []
+                if let href = item.detailHref {
+                    episodes = try await runner.fetchEpisodes(url: href)
+                } else {
+                    let results = try await runner.search(keyword: item.mediaTitle)
+                    if let match = results.first {
+                        episodes = try await runner.fetchEpisodes(url: match.href)
+                    }
                 }
-            }
-            return []
-        }
 
-        // Re-fetch current episode streams when stored URL expires
-        let onExpired: StreamRefetchLoader? = {
-            return {
-                let episodes = try await fetchEpisodes()
-                guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
-                return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
-            }
-        }()
+                guard !episodes.isEmpty else { return nil }
 
-        // Load next episode streams (enables the Next Episode button)
-        let onWatchNext: WatchNextLoader? = {
-            return { currentEpNum in
-                let episodes = try await fetchEpisodes()
-                guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                      idx + 1 < episodes.count else { return nil }
-                let nextEp = episodes[idx + 1]
-                let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+                // Find current episode
+                var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
+                if idx == nil {
+                    idx = episodes.enumerated().min(by: {
+                        abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
+                    })?.offset
+                }
+
+                guard let currentIdx = idx, currentIdx + 1 < episodes.count else { return nil }
+                let nextEp = episodes[currentIdx + 1]
+                let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+
                 guard !streams.isEmpty else { return nil }
                 return (streams: streams, episodeNumber: Int(nextEp.number))
+            } catch {
+                print("[ContinueWatching] Next episode failed: \(error)")
+                return nil
             }
-        }()
+        }
 
         #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: nil)
         #endif
     }
 
@@ -262,3 +264,4 @@ private struct CardThumbnail: View {
         }
     }
 }
+

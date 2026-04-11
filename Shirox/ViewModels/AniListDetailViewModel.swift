@@ -19,6 +19,7 @@ final class AniListDetailViewModel: ObservableObject {
 
     /// Deferred streams waiting to be presented after a sheet fully dismisses.
     var pendingModuleStream: StreamResult?   // single-stream from ModuleStreamPickerView
+    var pendingModuleStreamEpisodeHref: String?  // episode href for Next Episode
     var pendingFinalStream: StreamResult?    // chosen stream from AniListStreamResultSheet
 
     /// Resume position if navigated from Continue Watching
@@ -55,11 +56,12 @@ final class AniListDetailViewModel: ObservableObject {
         selectedEpisodeNumber = nil
     }
 
-    func onStreamsLoaded(_ streams: [StreamResult]) {
+    func onStreamsLoaded(_ streams: [StreamResult], episodeHref: String? = nil) {
         let sorted = streams.sorted { $0.title < $1.title }
         if sorted.count == 1 {
             // Store and let onDismiss present after the sheet fully clears.
             pendingModuleStream = sorted[0]
+            pendingModuleStreamEpisodeHref = episodeHref
         } else {
             pendingStreams = sorted
             showFinalStreamPicker = true
@@ -67,7 +69,7 @@ final class AniListDetailViewModel: ObservableObject {
         showStreamPicker = false
     }
 
-    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
+    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil, searchResultHref: String? = nil) {
         selectedStream = stream
         guard let media else { return }
         let currentEpNum = selectedEpisodeNumber ?? 1
@@ -93,18 +95,30 @@ final class AniListDetailViewModel: ObservableObject {
             guard let module = ModuleManager.shared.activeModule else { return nil }
             let searchTitle = media.title.searchTitle
             let total = totalEpisodes
+            // Use provided searchResultHref if available (from ModuleStreamPickerView), otherwise search
+            let resultHref = searchResultHref
             return { currentEpNum in
                 let nextEpNum = currentEpNum + 1
                 if total > 0, nextEpNum > total { return nil }
                 let runner = ModuleJSRunner()
                 try await runner.load(module: module)
-                let results = try await runner.search(keyword: searchTitle)
-                // Prefer the result matching sub/dub type of the original stream.
-                let chosen = streamIsDub
-                    ? results.first(where: { $0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
-                    : results.first(where: { !$0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
-                guard let first = chosen else { return nil }
-                let episodes = try await runner.fetchEpisodes(url: first.href)
+
+                let targetHref: String
+                if let resultHref {
+                    // Direct href provided from stream picker
+                    targetHref = resultHref
+                } else {
+                    // Search for the anime
+                    let results = try await runner.search(keyword: searchTitle)
+                    // Prefer the result matching sub/dub type of the original stream.
+                    let chosen = streamIsDub
+                        ? results.first(where: { $0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
+                        : results.first(where: { !$0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
+                    guard let first = chosen else { return nil }
+                    targetHref = first.href
+                }
+
+                let episodes = try await runner.fetchEpisodes(url: targetHref)
                 guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else { return nil }
                 let streams = try await runner.fetchStreams(episodeUrl: ep.href)
                     .sorted { $0.title < $1.title }

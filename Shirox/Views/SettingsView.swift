@@ -79,10 +79,16 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Auto Next Episode", isOn: $autoNextEpisode)
-                    Stepper(
-                        "Next episode at \(Int(watchedPercentage))%",
-                        value: $watchedPercentage, in: 50...99, step: 5
-                    )
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Show Button At")
+                            Spacer()
+                            Text("\(Int(watchedPercentage))%")
+                                .font(.headline)
+                                .monospacedDigit()
+                        }
+                        Slider(value: $watchedPercentage, in: 50...100, step: 1)
+                    }
                 }
 
                 if aniListAuth.isLoggedIn {

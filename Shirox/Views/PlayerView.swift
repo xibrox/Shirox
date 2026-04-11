@@ -587,9 +587,11 @@ struct PlayerView: View {
               let aniListID = currentContext?.aniListID,
               let episodeNumber = currentContext?.episodeNumber else { return }
         Task {
+            let isCompleted = currentContext?.totalEpisodes != nil && currentContext?.totalEpisodes == Int(episodeNumber)
+            let status: MediaListStatus = isCompleted ? .completed : .current
             try? await AniListLibraryService.shared.updateEntry(
                 mediaId: aniListID,
-                status: .current,
+                status: status,
                 progress: episodeNumber
             )
         }

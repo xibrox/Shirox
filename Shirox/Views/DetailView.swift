@@ -125,19 +125,23 @@ struct DetailView: View {
             return
         }
         guard let url = URL(string: item.streamUrl) else { return }
-        
+
         // Ensure the correct module is active
         if let mid = item.moduleId, ModuleManager.shared.activeModule?.id != mid,
            let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
             ModuleManager.shared.selectModule(module)
         }
-        
+
         let stream = StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,
             headers: item.headers ?? [:],
             subtitle: item.subtitle
         )
+
+        // Use the current detail view's href if available, otherwise fall back to saved href
+        let href = vm.detailHref ?? item.detailHref
+
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
             episodeNumber: item.episodeNumber,
@@ -147,20 +151,19 @@ struct DetailView: View {
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
-            detailHref: item.detailHref
+            detailHref: href
         )
         let epNum = item.episodeNumber
-        let detailHref = item.detailHref
 
         // Re-fetch current episode streams when stored URL expires
-        let onExpired: StreamRefetchLoader? = detailHref.map { href in {
+        let onExpired: StreamRefetchLoader? = href.map { href in {
             let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
             guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
             return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
         }}
 
         // Load next episode streams (enables the Next Episode button)
-        let onWatchNext: WatchNextLoader? = detailHref.map { href in { currentEpNum in
+        let onWatchNext: WatchNextLoader? = href.map { href in { currentEpNum in
             let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
             guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
                   idx + 1 < episodes.count else { return nil }

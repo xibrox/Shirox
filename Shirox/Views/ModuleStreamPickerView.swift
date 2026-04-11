@@ -3,10 +3,11 @@ import SwiftUI
 // MARK: - Sheet
 
 struct ModuleStreamPickerView: View {
+    let mediaId: Int?
     let animeTitle: String
     let episodeNumber: Int
     let onDismiss: () -> Void
-    let onStreamsLoaded: ([StreamResult]) -> Void
+    let onStreamsLoaded: ([StreamResult], String?) -> Void  // Streams + episode href
 
     @EnvironmentObject private var moduleManager: ModuleManager
 
@@ -16,12 +17,13 @@ struct ModuleStreamPickerView: View {
                 ForEach(moduleManager.modules) { module in
                     ModuleStreamRow(
                         module: module,
+                        mediaId: mediaId,
                         animeTitle: animeTitle,
                         episodeNumber: episodeNumber
-                    ) { streams in
+                    ) { streams, episodeHref in
                         moduleManager.selectModule(module)
                         onDismiss()
-                        onStreamsLoaded(streams)
+                        onStreamsLoaded(streams, episodeHref)
                     }
                 }
             }
@@ -56,14 +58,26 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     @Published var state: State = .idle
     @Published var searchTitle: String
     @Published var readyStreams: [StreamResult]?
+    @Published var selectedEpisodeHref: String?  // Track the href for Next Episode
 
     let module: ModuleDefinition
+    let mediaId: Int?
+    let originalAnimeTitle: String
+
     private var runner: ModuleJSRunner?
     private var currentTask: Task<Void, Never>?
 
-    init(module: ModuleDefinition, initialTitle: String) {
+    init(module: ModuleDefinition, mediaId: Int?, animeTitle: String) {
         self.module = module
-        self.searchTitle = initialTitle
+        self.mediaId = mediaId
+        self.originalAnimeTitle = animeTitle
+        
+        // Load custom alias if available, otherwise fallback to original title
+        if let alias = ModuleSearchAliasManager.shared.getAlias(mediaId: mediaId, animeTitle: animeTitle, moduleId: module.id) {
+            self.searchTitle = alias
+        } else {
+            self.searchTitle = animeTitle
+        }
     }
 
     func cancel() {
@@ -73,11 +87,24 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     }
 
     func startFind() {
+        // Save search title before searching so it's persisted for this module
+        persistSearchTitle()
         currentTask = Task { await find() }
     }
 
     func startSelectResult(_ item: SearchItem, targetEpisodeNumber: Int) {
+        // Also save when selecting a result, in case they typed something new
+        persistSearchTitle()
         currentTask = Task { await selectResult(item, targetEpisodeNumber: targetEpisodeNumber) }
+    }
+
+    private func persistSearchTitle() {
+        ModuleSearchAliasManager.shared.setAlias(
+            mediaId: mediaId,
+            animeTitle: originalAnimeTitle,
+            moduleId: module.id,
+            alias: searchTitle
+        )
     }
 
     func startSelectEpisode(_ episode: EpisodeLink) {
@@ -119,6 +146,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             let targetDouble = Double(targetEpisodeNumber)
             if let matched = episodes.first(where: { $0.number == targetDouble }) {
                 state = .loadingStreams
+                selectedEpisodeHref = item.href  // Store for Next Episode
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
                 if streams.isEmpty {
                     state = .error("No streams found for episode \(targetEpisodeNumber)")
@@ -143,6 +171,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
                 state = .error("No streams found")
             } else {
                 readyStreams = streams
+                // selectedEpisodeHref will be set from the parent context if needed
             }
         } catch {
             if (error as? CancellationError) != nil { return }
@@ -163,24 +192,27 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
 private struct ModuleStreamRow: View {
     let module: ModuleDefinition
+    let mediaId: Int?
     let animeTitle: String
     let episodeNumber: Int
-    let onStreamsLoaded: ([StreamResult]) -> Void
+    let onStreamsLoaded: ([StreamResult], String?) -> Void
 
     @StateObject private var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
 
     init(
         module: ModuleDefinition,
+        mediaId: Int?,
         animeTitle: String,
         episodeNumber: Int,
-        onStreamsLoaded: @escaping ([StreamResult]) -> Void
+        onStreamsLoaded: @escaping ([StreamResult], String?) -> Void
     ) {
         self.module = module
+        self.mediaId = mediaId
         self.animeTitle = animeTitle
         self.episodeNumber = episodeNumber
         self.onStreamsLoaded = onStreamsLoaded
-        _rowVm = StateObject(wrappedValue: ModuleStreamRowViewModel(module: module, initialTitle: animeTitle))
+        _rowVm = StateObject(wrappedValue: ModuleStreamRowViewModel(module: module, mediaId: mediaId, animeTitle: animeTitle))
     }
 
     var body: some View {
@@ -191,7 +223,7 @@ private struct ModuleStreamRow: View {
         .padding(.vertical, 6)
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
-            onStreamsLoaded(streams)
+            onStreamsLoaded(streams, rowVm.selectedEpisodeHref)
         }
         .sheet(isPresented: $showAllResults) {
             if case .searchResults(let items) = rowVm.state {

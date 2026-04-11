@@ -40,10 +40,11 @@
         </dict>
     </array>
 
-    <!-- Background modes for PiP and audio playback -->
+    <!-- Background modes for PiP, audio playback, and casting -->
     <key>UIBackgroundModes</key>
     <array>
         <string>audio</string>
+        <string>airplay</string>
     </array>
 
     <!-- Orientation support -->

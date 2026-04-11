@@ -1,6 +1,9 @@
 import Foundation
 import Network
 import Darwin
+#if os(iOS)
+import UIKit
+#endif
 
 /// Minimal local HTTP proxy that forwards HLS requests with custom headers.
 /// Chromecast fetches the rewritten m3u8 from the phone; the phone fetches
@@ -12,6 +15,12 @@ final class HLSProxyServer {
     private let port: NWEndpoint.Port = 8765
     private var proxyHeaders: [String: String] = [:]
     private(set) var isRunning = false
+    private let listenerQueue = DispatchQueue(
+        label: "com.shirox.hlsproxy",
+        qos: .default,
+        attributes: [],
+        autoreleaseFrequency: .workItem
+    )
 
     private init() {}
 
@@ -24,7 +33,7 @@ final class HLSProxyServer {
         params.allowLocalEndpointReuse = true
         guard let l = try? NWListener(using: params, on: port) else { return }
         l.newConnectionHandler = { [weak self] conn in self?.handle(conn) }
-        l.start(queue: .global(qos: .userInitiated))
+        l.start(queue: listenerQueue)
         listener = l
         isRunning = true
     }
@@ -50,7 +59,7 @@ final class HLSProxyServer {
     // MARK: - Connection handling
 
     private func handle(_ connection: NWConnection) {
-        connection.start(queue: .global(qos: .userInitiated))
+        connection.start(queue: listenerQueue)
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, _, _ in
             guard let self, let data, let requestText = String(data: data, encoding: .utf8) else { return }
             guard let urlString = self.parsePath(from: requestText),
@@ -58,7 +67,15 @@ final class HLSProxyServer {
                 self.respond(connection, status: 400, body: Data())
                 return
             }
-            Task { await self.fetchAndForward(url: targetURL, connection: connection) }
+            #if os(iOS)
+            let bgTask = UIApplication.shared.beginBackgroundTask { }
+            #endif
+            Task {
+                await self.fetchAndForward(url: targetURL, connection: connection)
+                #if os(iOS)
+                UIApplication.shared.endBackgroundTask(bgTask)
+                #endif
+            }
         }
     }
 

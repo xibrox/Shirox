@@ -9,6 +9,7 @@ import GoogleCast
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         configureAudioSession()
+        configureURLSession()
         return true
     }
 
@@ -44,6 +45,27 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         } catch {
             print("Failed to configure audio session: \(error)")
         }
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        // Request background task to keep casting alive while screen is locked
+        #if canImport(GoogleCast)
+        let bgTask = application.beginBackgroundTask { }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 27) {
+            application.endBackgroundTask(bgTask)
+        }
+        #endif
+    }
+
+    private func configureURLSession() {
+        let config = URLSessionConfiguration.default
+        // Allow network transfers in background
+        config.waitsForConnectivity = true
+        config.shouldUseExtendedBackgroundIdleMode = true
+        config.timeoutIntervalForRequest = 60
+        config.timeoutIntervalForResource = 3600
+        // Create a default session with this config for general use
+        _ = URLSession(configuration: config)
     }
 }
 #endif
