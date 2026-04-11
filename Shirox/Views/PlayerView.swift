@@ -1023,7 +1023,7 @@ struct PlayerView: View {
         didSeekToResume = true
         currentStream = next
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, resumeFrom: nil, detailHref: ctx.detailHref, streamSubtitle: ctx.streamSubtitle)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, resumeFrom: nil, detailHref: ctx.detailHref, streamSubtitle: ctx.streamSubtitle, workingDetailHref: ctx.workingDetailHref)
         }
         audioGroup = nil
         Task {

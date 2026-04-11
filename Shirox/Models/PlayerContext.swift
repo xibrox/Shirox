@@ -8,7 +8,8 @@ struct PlayerContext {
     let aniListID: Int?
     let moduleId: String?
     let totalEpisodes: Int?
-    let resumeFrom: Double?        // seconds to seek to on start (nil = from beginning)
-    let detailHref: String?        // module detail page URL, used for Up Next navigation
-    let streamSubtitle: String?    // "SUB" or "DUB" - preference for selecting same type for next episode
+    let resumeFrom: Double?           // seconds to seek to on start (nil = from beginning)
+    let detailHref: String?           // module detail page URL, used for Up Next navigation
+    let streamSubtitle: String?       // "SUB" or "DUB" preference
+    let workingDetailHref: String?    // actual working search result href that has full episode data
 }

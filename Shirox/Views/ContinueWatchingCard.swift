@@ -96,7 +96,8 @@ struct ContinueWatchingSection: View {
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
-            streamSubtitle: streamType
+            streamSubtitle: streamType,
+            workingDetailHref: item.detailHref  // Use saved detailHref for next episode
         )
 
         // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList)

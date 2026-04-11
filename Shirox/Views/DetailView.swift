@@ -142,9 +142,7 @@ struct DetailView: View {
         // Use the current detail view's href if available, otherwise fall back to saved href
         let href = vm.detailHref ?? item.detailHref
 
-        // Determine stream type from subtitle
         let streamType = item.subtitle == nil ? "DUB" : "SUB"
-
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
             episodeNumber: item.episodeNumber,
@@ -155,7 +153,8 @@ struct DetailView: View {
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
             detailHref: href,
-            streamSubtitle: streamType
+            streamSubtitle: streamType,
+            workingDetailHref: href
         )
         let epNum = item.episodeNumber
 

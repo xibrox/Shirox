@@ -75,7 +75,6 @@ final class AniListDetailViewModel: ObservableObject {
         let currentEpNum = selectedEpisodeNumber ?? 1
         let mediaTitle = media.title.displayTitle
         let totalEpisodes = media.episodes ?? (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : 0)
-
         // Determine stream type (SUB or DUB)
         let streamType = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub") ? "DUB" : "SUB"
 
@@ -89,7 +88,8 @@ final class AniListDetailViewModel: ObservableObject {
             totalEpisodes: media.episodes,
             resumeFrom: resumeWatchedSeconds,
             detailHref: nil,
-            streamSubtitle: streamType
+            streamSubtitle: streamType,
+            workingDetailHref: searchResultHref  // Store the working search result href
         )
 
         // Build next-episode loader using ModuleJSRunner (same path as ModuleStreamPickerView)
@@ -97,98 +97,39 @@ final class AniListDetailViewModel: ObservableObject {
         // search result when AnimePahe (and similar) lists sub and dub as separate entries.
         let streamIsDub = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub")
         let onWatchNext: WatchNextLoader? = {
-            print("[AniListDetailVM] selectStream building onWatchNext, searchResultHref=\(searchResultHref ?? "nil")")
-            guard let module = ModuleManager.shared.activeModule else {
-                print("[AniListDetailVM] No active module")
+            guard let module = ModuleManager.shared.activeModule, let resultHref = searchResultHref else {
+                print("[AniListDetailVM] No module or working href available")
                 return nil
             }
-            let searchTitle = media.title.searchTitle
             let total = totalEpisodes
-            // Use provided searchResultHref if available (from ModuleStreamPickerView), otherwise search
-            let resultHref = searchResultHref
             return { currentEpNum in
-                print("[AniListDetailVM] onWatchNext called for episode \(currentEpNum), resultHref=\(resultHref ?? "nil")")
+                print("[AniListDetailVM] onWatchNext called for episode \(currentEpNum) using stored href: \(resultHref)")
                 let nextEpNum = currentEpNum + 1
                 if total > 0, nextEpNum > total { return nil }
-                let runner = ModuleJSRunner()
-                try await runner.load(module: module)
 
-                var episodes: [EpisodeLink] = []
-                var targetHref = ""
+                do {
+                    let runner = ModuleJSRunner()
+                    try await runner.load(module: module)
 
-                // Try provided resultHref first
-                if let resultHref {
-                    print("[AniListDetailVM] Using provided resultHref: \(resultHref)")
-                    targetHref = resultHref
-                    episodes = try await runner.fetchEpisodes(url: targetHref)
-                    print("[AniListDetailVM] Got \(episodes.count) episodes from resultHref")
+                    // Use the stored working href - this is the search result that was proven to work
+                    let episodes = try await runner.fetchEpisodes(url: resultHref)
+                    print("[AniListDetailVM] Got \(episodes.count) episodes from stored href")
 
-                    // If resultHref didn't have the target episode, fall back to search
-                    if !episodes.contains(where: { $0.number == Double(nextEpNum) }) {
-                        print("[AniListDetailVM] ResultHref didn't have episode \(nextEpNum), trying search")
-                        episodes = []
-                    }
-                }
-
-                // If we still don't have episodes, search and try multiple results
-                if episodes.isEmpty {
-                    print("[AniListDetailVM] Searching for: \(searchTitle)")
-                    let results = try await runner.search(keyword: searchTitle)
-                    print("[AniListDetailVM] Search returned \(results.count) results")
-
-                    // Try first 5 results, preferring ones matching sub/dub type
-                    let sortedResults = results.prefix(10).sorted { a, b in
-                        let aIsDub = a.title.localizedCaseInsensitiveContains("dub")
-                        let bIsDub = b.title.localizedCaseInsensitiveContains("dub")
-                        let targetIsDub = streamIsDub
-
-                        // Prefer results matching current stream type
-                        if aIsDub == targetIsDub && bIsDub != targetIsDub { return true }
-                        if aIsDub != targetIsDub && bIsDub == targetIsDub { return false }
-                        return false
+                    guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else {
+                        print("[AniListDetailVM] Episode \(nextEpNum) not found")
+                        return nil
                     }
 
-                    for result in sortedResults.prefix(5) {
-                        let candidateEpisodes = try await runner.fetchEpisodes(url: result.href)
-                        print("[AniListDetailVM] Result '\(result.title)' has \(candidateEpisodes.count) episodes")
+                    let streams = try await runner.fetchStreams(episodeUrl: ep.href)
+                        .sorted { $0.title < $1.title }
+                    print("[AniListDetailVM] Got \(streams.count) streams for episode \(nextEpNum)")
 
-                        if candidateEpisodes.contains(where: { $0.number == Double(nextEpNum) }) {
-                            episodes = candidateEpisodes
-                            targetHref = result.href
-                            print("[AniListDetailVM] Using '\(result.title)' as it has episode \(nextEpNum)")
-                            break
-                        }
-                    }
-
-                    // If no result had the exact episode, use first with multiple episodes
-                    if episodes.isEmpty {
-                        for result in sortedResults.prefix(5) {
-                            let candidateEpisodes = try await runner.fetchEpisodes(url: result.href)
-                            if candidateEpisodes.count > 1 {
-                                episodes = candidateEpisodes
-                                targetHref = result.href
-                                print("[AniListDetailVM] Using '\(result.title)' as fallback (has \(candidateEpisodes.count) episodes)")
-                                break
-                            }
-                        }
-                    }
-                }
-
-                guard !episodes.isEmpty else {
-                    print("[AniListDetailVM] No suitable episodes found")
+                    guard !streams.isEmpty else { return nil }
+                    return (streams: streams, episodeNumber: nextEpNum)
+                } catch {
+                    print("[AniListDetailVM] Error loading next episode: \(error)")
                     return nil
                 }
-
-                guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else {
-                    print("[AniListDetailVM] Episode \(nextEpNum) not found in available episodes")
-                    return nil
-                }
-                print("[AniListDetailVM] Fetching streams for episode \(nextEpNum)")
-                let streams = try await runner.fetchStreams(episodeUrl: ep.href)
-                    .sorted { $0.title < $1.title }
-                print("[AniListDetailVM] Got \(streams.count) streams")
-                guard !streams.isEmpty else { return nil }
-                return (streams: streams, episodeNumber: nextEpNum)
             }
         }()
 

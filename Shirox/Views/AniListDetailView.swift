@@ -265,36 +265,24 @@ struct AniListDetailView: View {
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
             detailHref: nil,
-            streamSubtitle: streamType
+            streamSubtitle: streamType,
+            workingDetailHref: item.detailHref  // Use saved detailHref for next episode
         )
 
         // Setup Next Episode loader using ModuleJSRunner
         let onWatchNext: WatchNextLoader? = { currentEpNum in
             print("[AniListDetail] onWatchNext called for episode \(currentEpNum)")
-            guard let module = ModuleManager.shared.activeModule else {
-                print("[AniListDetail] No active module")
+            guard let module = ModuleManager.shared.activeModule, let href = item.detailHref else {
+                print("[AniListDetail] No active module or detailHref")
                 return nil
             }
 
-            print("[AniListDetail] Using active module: \(module.sourceName)")
             do {
                 let runner = ModuleJSRunner()
                 try await runner.load(module: module)
 
-                // Fetch episodes via detailHref or search
-                var episodes: [EpisodeLink] = []
-                if let href = item.detailHref {
-                    print("[AniListDetail] Fetching episodes from detailHref: \(href)")
-                    episodes = try await runner.fetchEpisodes(url: href)
-                } else {
-                    print("[AniListDetail] Searching for: \(item.mediaTitle)")
-                    let results = try await runner.search(keyword: item.mediaTitle)
-                    print("[AniListDetail] Search returned \(results.count) results")
-                    if let match = results.first {
-                        episodes = try await runner.fetchEpisodes(url: match.href)
-                    }
-                }
-
+                print("[AniListDetail] Fetching episodes from detailHref: \(href)")
+                let episodes = try await runner.fetchEpisodes(url: href)
                 print("[AniListDetail] Got \(episodes.count) episodes")
                 guard !episodes.isEmpty else { return nil }
 
