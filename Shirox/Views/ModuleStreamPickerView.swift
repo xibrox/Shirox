@@ -66,6 +66,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
     private var runner: ModuleJSRunner?
     private var currentTask: Task<Void, Never>?
+    private var currentSearchResultHref: String?  // Track active search result for manual episode selection
 
     init(module: ModuleDefinition, mediaId: Int?, animeTitle: String) {
         self.module = module
@@ -139,6 +140,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     func selectResult(_ item: SearchItem, targetEpisodeNumber: Int) async {
         guard let r = runner else { return }
         state = .loadingEpisodes(item)
+        currentSearchResultHref = item.href  // Save for manual episode selection
 
         do {
             let episodes = try await r.fetchEpisodes(url: item.href)
@@ -171,7 +173,10 @@ private final class ModuleStreamRowViewModel: ObservableObject {
                 state = .error("No streams found")
             } else {
                 readyStreams = streams
-                // selectedEpisodeHref will be set from the parent context if needed
+                // Use the current search result href if available (from manual episode selection)
+                if let href = currentSearchResultHref {
+                    selectedEpisodeHref = href
+                }
             }
         } catch {
             if (error as? CancellationError) != nil { return }
@@ -185,6 +190,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
         state = .idle
         readyStreams = nil
         runner = nil
+        currentSearchResultHref = nil
     }
 }
 

@@ -264,10 +264,51 @@ struct AniListDetailView: View {
             detailHref: nil
         )
 
-        // For Continue Watching resume, disable Next Episode and Refetch features
-        // since we lack a proper detailHref for reliable episode fetching
-        // The player will work fine without these features
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: nil, onStreamExpired: nil)
+        // Setup Next Episode loader using ModuleJSRunner
+        let onWatchNext: WatchNextLoader? = { currentEpNum in
+            guard let moduleId = item.moduleId,
+                  let module = moduleManager.modules.first(where: { $0.id == moduleId }) else {
+                return nil
+            }
+
+            do {
+                let runner = ModuleJSRunner()
+                try await runner.load(module: module)
+
+                // Fetch episodes via detailHref or search
+                var episodes: [EpisodeLink] = []
+                if let href = item.detailHref {
+                    episodes = try await runner.fetchEpisodes(url: href)
+                } else {
+                    let results = try await runner.search(keyword: item.mediaTitle)
+                    if let match = results.first {
+                        episodes = try await runner.fetchEpisodes(url: match.href)
+                    }
+                }
+
+                guard !episodes.isEmpty else { return nil }
+
+                // Find current episode
+                var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
+                if idx == nil {
+                    idx = episodes.enumerated().min(by: {
+                        abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
+                    })?.offset
+                }
+
+                guard let currentIdx = idx, currentIdx + 1 < episodes.count else { return nil }
+                let nextEp = episodes[currentIdx + 1]
+                let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+
+                guard !streams.isEmpty else { return nil }
+                return (streams: streams, episodeNumber: Int(nextEp.number))
+            } catch {
+                print("[AniListDetail] Next episode failed: \(error)")
+                return nil
+            }
+        }
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: nil)
     }
     #endif
 
