@@ -285,7 +285,7 @@ import Foundation
         return ContinueWatchingItem(
             id: UUID(), mediaTitle: srcMediaTitle, episodeNumber: episodeNumber,
             episodeTitle: nil, imageUrl: srcImageUrl, streamUrl: "",
-            headers: nil, subtitle: nil, aniListID: srcAniListID,
+            headers: nil, subtitle: nil, streamTitle: nil, aniListID: srcAniListID,
             moduleId: srcModuleId, detailHref: srcDetailHref,
             watchedSeconds: 0, totalSeconds: 0, totalEpisodes: srcTotalEps,
             lastWatchedAt: .now

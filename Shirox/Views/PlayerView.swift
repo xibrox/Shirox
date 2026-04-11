@@ -614,6 +614,7 @@ struct PlayerView: View {
             streamUrl: currentStream.url.absoluteString,
             headers: currentStream.headers.isEmpty ? nil : currentStream.headers,
             subtitle: currentStream.subtitle,
+            streamTitle: context.streamTitle,
             aniListID: context.aniListID,
             moduleId: context.moduleId,
             detailHref: context.detailHref,
@@ -968,6 +969,14 @@ struct PlayerView: View {
 
             let isSub = currentStream.subtitle != nil
 
+            // Prefer stream with same title as selected stream (e.g., "SUB" -> "SUB", "DUB" -> "DUB")
+            let exactTitleMatch = result.streams.first { $0.title == currentContext?.streamTitle }
+            if let exactMatch = exactTitleMatch {
+                print("[PlayerView] Found exact stream title match: \(exactMatch.title)")
+                swapStream(exactMatch, episodeNumber: result.episodeNumber)
+                return
+            }
+
             // Break down complex expression for compiler
             let matchingStreams = result.streams.filter { $0.title == currentStream.title && ($0.subtitle != nil) == isSub }
             let fallbackStreams = result.streams.filter { ($0.subtitle != nil) == isSub }
@@ -977,7 +986,7 @@ struct PlayerView: View {
                 ?? fallbackStreams.first
                 ?? titleMatchingStreams.first
 
-            print("[PlayerView] Stream matching: matching=\(matchingStreams.count), fallback=\(fallbackStreams.count), titleMatch=\(titleMatchingStreams.count), selected=\(match != nil ? match!.title : "picker")")
+            print("[PlayerView] Stream matching: saved=\(currentContext?.streamTitle ?? "nil"), matching=\(matchingStreams.count), fallback=\(fallbackStreams.count), titleMatch=\(titleMatchingStreams.count), selected=\(match != nil ? match!.title : "picker")")
 
             if let match {
                 print("[PlayerView] Auto-selected stream: \(match.title)")
@@ -1023,7 +1032,7 @@ struct PlayerView: View {
         didSeekToResume = true
         currentStream = next
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, resumeFrom: nil, detailHref: ctx.detailHref, streamSubtitle: ctx.streamSubtitle, workingDetailHref: ctx.workingDetailHref)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref)
         }
         audioGroup = nil
         Task {

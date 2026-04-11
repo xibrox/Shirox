@@ -119,7 +119,9 @@ struct AniListDetailView: View {
             if let stream = vm.pendingFinalStream {
                 vm.pendingFinalStream = nil
                 let s = stream
-                DispatchQueue.main.async { vm.selectStream(s) }
+                let href = vm.pendingFinalStreamEpisodeHref
+                vm.pendingFinalStreamEpisodeHref = nil
+                DispatchQueue.main.async { vm.selectStream(s, searchResultHref: href) }
             } else {
                 vm.dismissFinalPicker()
             }
@@ -252,8 +254,6 @@ struct AniListDetailView: View {
             headers: item.headers ?? [:],
             subtitle: item.subtitle
         )
-        // Determine stream type from subtitle
-        let streamType = item.subtitle == nil ? "DUB" : "SUB"
 
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
@@ -264,8 +264,8 @@ struct AniListDetailView: View {
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
-            detailHref: nil,
-            streamSubtitle: streamType,
+            detailHref: item.detailHref,
+            streamTitle: item.streamTitle,
             workingDetailHref: item.detailHref  // Use saved detailHref for next episode
         )
 

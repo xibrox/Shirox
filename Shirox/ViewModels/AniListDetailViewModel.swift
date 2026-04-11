@@ -21,6 +21,7 @@ final class AniListDetailViewModel: ObservableObject {
     var pendingModuleStream: StreamResult?   // single-stream from ModuleStreamPickerView
     var pendingModuleStreamEpisodeHref: String?  // episode href for Next Episode
     var pendingFinalStream: StreamResult?    // chosen stream from AniListStreamResultSheet
+    var pendingFinalStreamEpisodeHref: String?  // episode href when selecting from final picker
 
     /// Resume position if navigated from Continue Watching
     var resumeWatchedSeconds: Double?
@@ -64,6 +65,7 @@ final class AniListDetailViewModel: ObservableObject {
             pendingModuleStreamEpisodeHref = episodeHref
         } else {
             pendingStreams = sorted
+            pendingFinalStreamEpisodeHref = episodeHref  // Save href for final picker
             showFinalStreamPicker = true
         }
         showStreamPicker = false
@@ -75,27 +77,21 @@ final class AniListDetailViewModel: ObservableObject {
         let currentEpNum = selectedEpisodeNumber ?? 1
         let mediaTitle = media.title.displayTitle
         let totalEpisodes = media.episodes ?? (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : 0)
-        // Determine stream type (SUB or DUB)
-        let streamType = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub") ? "DUB" : "SUB"
-
         let context = PlayerContext(
             mediaTitle: mediaTitle,
             episodeNumber: currentEpNum,
             episodeTitle: nil,
             imageUrl: media.coverImage.extraLarge ?? media.coverImage.large ?? "",
             aniListID: media.id,
-            moduleId: nil,
+            moduleId: ModuleManager.shared.activeModule?.id,
             totalEpisodes: media.episodes,
             resumeFrom: resumeWatchedSeconds,
-            detailHref: nil,
-            streamSubtitle: streamType,
+            detailHref: searchResultHref,  // Use searchResultHref for persistence
+            streamTitle: stream.title,  // Remember the stream title (SUB, DUB, etc.)
             workingDetailHref: searchResultHref  // Store the working search result href
         )
 
         // Build next-episode loader using ModuleJSRunner (same path as ModuleStreamPickerView)
-        // Capture whether the initial stream is sub or dub so we can pick the matching
-        // search result when AnimePahe (and similar) lists sub and dub as separate entries.
-        let streamIsDub = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub")
         let onWatchNext: WatchNextLoader? = {
             guard let module = ModuleManager.shared.activeModule, let resultHref = searchResultHref else {
                 print("[AniListDetailVM] No module or working href available")

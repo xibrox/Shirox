@@ -83,8 +83,6 @@ struct ContinueWatchingSection: View {
             headers: item.headers ?? [:],
             subtitle: item.subtitle
         )
-        // Determine stream type from subtitle
-        let streamType = item.subtitle == nil ? "DUB" : "SUB"
 
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
@@ -96,7 +94,7 @@ struct ContinueWatchingSection: View {
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
-            streamSubtitle: streamType,
+            streamTitle: item.streamTitle,
             workingDetailHref: item.detailHref  // Use saved detailHref for next episode
         )
 

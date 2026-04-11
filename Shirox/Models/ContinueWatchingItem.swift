@@ -9,6 +9,7 @@ struct ContinueWatchingItem: Identifiable, Codable {
     let streamUrl: String
     let headers: [String: String]?
     let subtitle: String?
+    let streamTitle: String?  // the selected stream's title (e.g., "SUB", "DUB", "pahe")
     let aniListID: Int?
     let moduleId: String?
     let detailHref: String?
