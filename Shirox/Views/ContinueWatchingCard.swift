@@ -106,24 +106,34 @@ struct ContinueWatchingSection: View {
                     let runner = ModuleJSRunner()
                     try await runner.load(module: module)
 
-                    // Fetch episodes via detailHref or search
+                    // Try to fetch episodes via detailHref first
                     var episodes: [EpisodeLink] = []
                     if let href = item.detailHref {
                         print("[ContinueWatching] Fetching episodes from detailHref: \(href)")
                         episodes = try await runner.fetchEpisodes(url: href)
-                    } else {
-                        print("[ContinueWatching] Searching for: \(item.mediaTitle)")
+                        print("[ContinueWatching] Got \(episodes.count) episodes from detailHref")
+                    }
+
+                    // If detailHref didn't work or doesn't exist, try searching
+                    if episodes.isEmpty {
+                        print("[ContinueWatching] Falling back to search for: \(item.mediaTitle)")
                         let results = try await runner.search(keyword: item.mediaTitle)
                         print("[ContinueWatching] Search returned \(results.count) results")
-                        if let match = results.first {
-                            print("[ContinueWatching] Fetching episodes from first search result")
-                            episodes = try await runner.fetchEpisodes(url: match.href)
+
+                        // Try first few results to find one with episodes
+                        for result in results.prefix(3) {
+                            let episodesFromResult = try await runner.fetchEpisodes(url: result.href)
+                            print("[ContinueWatching] Result '\(result.title)' has \(episodesFromResult.count) episodes")
+                            if episodesFromResult.count > 1 {  // Need multiple episodes for a series
+                                episodes = episodesFromResult
+                                print("[ContinueWatching] Using '\(result.title)' as it has multiple episodes")
+                                break
+                            }
                         }
                     }
 
-                    print("[ContinueWatching] Got \(episodes.count) episodes")
                     guard !episodes.isEmpty else {
-                        print("[ContinueWatching] No episodes found")
+                        print("[ContinueWatching] No episodes found from any source")
                         return nil
                     }
 

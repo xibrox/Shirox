@@ -277,22 +277,37 @@ struct AniListDetailView: View {
                 let runner = ModuleJSRunner()
                 try await runner.load(module: module)
 
-                // Fetch episodes via detailHref or search
+                // Try to fetch episodes - first from detailHref, then via search
                 var episodes: [EpisodeLink] = []
+
                 if let href = item.detailHref {
                     print("[AniListDetail] Fetching episodes from detailHref: \(href)")
                     episodes = try await runner.fetchEpisodes(url: href)
-                } else {
-                    print("[AniListDetail] Searching for: \(item.mediaTitle)")
+                    print("[AniListDetail] Got \(episodes.count) episodes from detailHref")
+                }
+
+                // If detailHref didn't work, search and try multiple results
+                if episodes.isEmpty {
+                    print("[AniListDetail] Falling back to search for: \(item.mediaTitle)")
                     let results = try await runner.search(keyword: item.mediaTitle)
                     print("[AniListDetail] Search returned \(results.count) results")
-                    if let match = results.first {
-                        episodes = try await runner.fetchEpisodes(url: match.href)
+
+                    // Try first few results to find one with episodes
+                    for result in results.prefix(5) {
+                        let episodesFromResult = try await runner.fetchEpisodes(url: result.href)
+                        print("[AniListDetail] Result '\(result.title)' has \(episodesFromResult.count) episodes")
+                        if episodesFromResult.count > 1 {  // Need multiple episodes for a series
+                            episodes = episodesFromResult
+                            print("[AniListDetail] Using '\(result.title)' as it has multiple episodes")
+                            break
+                        }
                     }
                 }
 
-                print("[AniListDetail] Got \(episodes.count) episodes")
-                guard !episodes.isEmpty else { return nil }
+                guard !episodes.isEmpty else {
+                    print("[AniListDetail] No episodes found from any source")
+                    return nil
+                }
 
                 // Find current episode
                 var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })

@@ -168,16 +168,26 @@ struct DetailView: View {
             do {
                 let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
                 print("[DetailView] Got \(episodes.count) episodes")
-                guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                      idx + 1 < episodes.count else {
-                    print("[DetailView] No next episode found")
+
+                // Check if we have the target episode and a next episode
+                guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }) else {
+                    print("[DetailView] Current episode \(currentEpNum) not found")
                     return nil
                 }
+
+                guard idx + 1 < episodes.count else {
+                    print("[DetailView] No next episode after episode \(currentEpNum)")
+                    return nil
+                }
+
                 let nextEp = episodes[idx + 1]
                 print("[DetailView] Fetching streams for next episode \(nextEp.number)")
                 let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
                 print("[DetailView] Got \(streams.count) streams")
-                guard !streams.isEmpty else { return nil }
+                guard !streams.isEmpty else {
+                    print("[DetailView] No streams found for next episode")
+                    return nil
+                }
                 return (streams: streams, episodeNumber: Int(nextEp.number))
             } catch {
                 print("[DetailView] Error loading next episode: \(error)")
