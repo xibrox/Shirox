@@ -935,31 +935,68 @@ struct PlayerView: View {
     }
 
     private func loadAndAdvance() async {
-        guard let loader = onWatchNext, let epNum = currentContext?.episodeNumber else { return }
+        print("[PlayerView] loadAndAdvance() called")
+        print("[PlayerView] onWatchNext: \(onWatchNext != nil ? "set" : "nil")")
+        print("[PlayerView] currentContext: \(currentContext != nil ? "set" : "nil")")
+        print("[PlayerView] currentContext?.episodeNumber: \(currentContext?.episodeNumber ?? -1)")
+
+        guard let loader = onWatchNext, let epNum = currentContext?.episodeNumber else {
+            print("[PlayerView] Guard failed: loader=\(onWatchNext != nil), epNum=\(currentContext?.episodeNumber ?? -1)")
+            return
+        }
+
+        print("[PlayerView] Starting next episode load for episode \(epNum)")
         isLoadingNextEpisode = true
         do {
-            guard let result = try await loader(epNum) else { isLoadingNextEpisode = false; return }
+            print("[PlayerView] Calling loader closure...")
+            let result = try await loader(epNum)
+            print("[PlayerView] Loader returned: \(result != nil ? "result with \(result?.streams.count ?? 0) streams" : "nil")")
+
+            guard let result = result else {
+                print("[PlayerView] Loader returned nil")
+                isLoadingNextEpisode = false
+                return
+            }
+
             isLoadingNextEpisode = false
-            guard !result.streams.isEmpty else { return }
+            print("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)")
+
+            guard !result.streams.isEmpty else {
+                print("[PlayerView] No streams available")
+                return
+            }
+
             let isSub = currentStream.subtitle != nil
-            
+
             // Break down complex expression for compiler
             let matchingStreams = result.streams.filter { $0.title == currentStream.title && ($0.subtitle != nil) == isSub }
             let fallbackStreams = result.streams.filter { ($0.subtitle != nil) == isSub }
             let titleMatchingStreams = result.streams.filter { $0.title == currentStream.title }
-            
+
             let match = matchingStreams.first
                 ?? fallbackStreams.first
                 ?? titleMatchingStreams.first
-            
-            if let match { swapStream(match, episodeNumber: result.episodeNumber) }
-            else if result.streams.count == 1 { swapStream(result.streams[0], episodeNumber: result.episodeNumber) }
+
+            print("[PlayerView] Stream matching: matching=\(matchingStreams.count), fallback=\(fallbackStreams.count), titleMatch=\(titleMatchingStreams.count), selected=\(match != nil ? match!.title : "picker")")
+
+            if let match {
+                print("[PlayerView] Auto-selected stream: \(match.title)")
+                swapStream(match, episodeNumber: result.episodeNumber)
+            }
+            else if result.streams.count == 1 {
+                print("[PlayerView] Auto-selected single stream: \(result.streams[0].title)")
+                swapStream(result.streams[0], episodeNumber: result.episodeNumber)
+            }
             else {
+                print("[PlayerView] Showing stream picker with \(result.streams.count) streams")
                 nextEpisodeNumber = result.episodeNumber
                 nextEpisodeStreams = result.streams
                 showNextEpisodePicker = true
             }
-        } catch { isLoadingNextEpisode = false }
+        } catch {
+            print("[PlayerView] Error in loadAndAdvance: \(error)")
+            isLoadingNextEpisode = false
+        }
     }
 
     @MainActor

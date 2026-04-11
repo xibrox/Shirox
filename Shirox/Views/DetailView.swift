@@ -164,13 +164,25 @@ struct DetailView: View {
 
         // Load next episode streams (enables the Next Episode button)
         let onWatchNext: WatchNextLoader? = href.map { href in { currentEpNum in
-            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-            guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                  idx + 1 < episodes.count else { return nil }
-            let nextEp = episodes[idx + 1]
-            let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
-            guard !streams.isEmpty else { return nil }
-            return (streams: streams, episodeNumber: Int(nextEp.number))
+            print("[DetailView] onWatchNext called for episode \(currentEpNum) with href: \(href)")
+            do {
+                let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+                print("[DetailView] Got \(episodes.count) episodes")
+                guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                      idx + 1 < episodes.count else {
+                    print("[DetailView] No next episode found")
+                    return nil
+                }
+                let nextEp = episodes[idx + 1]
+                print("[DetailView] Fetching streams for next episode \(nextEp.number)")
+                let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+                print("[DetailView] Got \(streams.count) streams")
+                guard !streams.isEmpty else { return nil }
+                return (streams: streams, episodeNumber: Int(nextEp.number))
+            } catch {
+                print("[DetailView] Error loading next episode: \(error)")
+                return nil
+            }
         }}
 
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)

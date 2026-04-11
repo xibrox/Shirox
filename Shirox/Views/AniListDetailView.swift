@@ -266,10 +266,13 @@ struct AniListDetailView: View {
 
         // Setup Next Episode loader using ModuleJSRunner
         let onWatchNext: WatchNextLoader? = { currentEpNum in
+            print("[AniListDetail] onWatchNext called for episode \(currentEpNum)")
             guard let module = ModuleManager.shared.activeModule else {
+                print("[AniListDetail] No active module")
                 return nil
             }
 
+            print("[AniListDetail] Using active module: \(module.sourceName)")
             do {
                 let runner = ModuleJSRunner()
                 try await runner.load(module: module)
@@ -277,14 +280,18 @@ struct AniListDetailView: View {
                 // Fetch episodes via detailHref or search
                 var episodes: [EpisodeLink] = []
                 if let href = item.detailHref {
+                    print("[AniListDetail] Fetching episodes from detailHref: \(href)")
                     episodes = try await runner.fetchEpisodes(url: href)
                 } else {
+                    print("[AniListDetail] Searching for: \(item.mediaTitle)")
                     let results = try await runner.search(keyword: item.mediaTitle)
+                    print("[AniListDetail] Search returned \(results.count) results")
                     if let match = results.first {
                         episodes = try await runner.fetchEpisodes(url: match.href)
                     }
                 }
 
+                print("[AniListDetail] Got \(episodes.count) episodes")
                 guard !episodes.isEmpty else { return nil }
 
                 // Find current episode
@@ -295,10 +302,13 @@ struct AniListDetailView: View {
                     })?.offset
                 }
 
+                print("[AniListDetail] Current episode index: \(idx ?? -1)")
                 guard let currentIdx = idx, currentIdx + 1 < episodes.count else { return nil }
                 let nextEp = episodes[currentIdx + 1]
+                print("[AniListDetail] Fetching streams for next episode \(nextEp.number)")
                 let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
 
+                print("[AniListDetail] Got \(streams.count) streams")
                 guard !streams.isEmpty else { return nil }
                 return (streams: streams, episodeNumber: Int(nextEp.number))
             } catch {

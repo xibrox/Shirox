@@ -92,12 +92,17 @@ final class AniListDetailViewModel: ObservableObject {
         // search result when AnimePahe (and similar) lists sub and dub as separate entries.
         let streamIsDub = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub")
         let onWatchNext: WatchNextLoader? = {
-            guard let module = ModuleManager.shared.activeModule else { return nil }
+            print("[AniListDetailVM] selectStream building onWatchNext, searchResultHref=\(searchResultHref ?? "nil")")
+            guard let module = ModuleManager.shared.activeModule else {
+                print("[AniListDetailVM] No active module")
+                return nil
+            }
             let searchTitle = media.title.searchTitle
             let total = totalEpisodes
             // Use provided searchResultHref if available (from ModuleStreamPickerView), otherwise search
             let resultHref = searchResultHref
             return { currentEpNum in
+                print("[AniListDetailVM] onWatchNext called for episode \(currentEpNum), resultHref=\(resultHref ?? "nil")")
                 let nextEpNum = currentEpNum + 1
                 if total > 0, nextEpNum > total { return nil }
                 let runner = ModuleJSRunner()
@@ -106,22 +111,36 @@ final class AniListDetailViewModel: ObservableObject {
                 let targetHref: String
                 if let resultHref {
                     // Direct href provided from stream picker
+                    print("[AniListDetailVM] Using provided resultHref: \(resultHref)")
                     targetHref = resultHref
                 } else {
                     // Search for the anime
+                    print("[AniListDetailVM] Searching for: \(searchTitle)")
                     let results = try await runner.search(keyword: searchTitle)
+                    print("[AniListDetailVM] Search returned \(results.count) results")
                     // Prefer the result matching sub/dub type of the original stream.
                     let chosen = streamIsDub
                         ? results.first(where: { $0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
                         : results.first(where: { !$0.title.localizedCaseInsensitiveContains("dub") }) ?? results.first
-                    guard let first = chosen else { return nil }
+                    guard let first = chosen else {
+                        print("[AniListDetailVM] No matching result found")
+                        return nil
+                    }
+                    print("[AniListDetailVM] Using search result: \(first.title)")
                     targetHref = first.href
                 }
 
+                print("[AniListDetailVM] Fetching episodes for next ep \(nextEpNum) from \(targetHref)")
                 let episodes = try await runner.fetchEpisodes(url: targetHref)
-                guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else { return nil }
+                print("[AniListDetailVM] Got \(episodes.count) episodes")
+                guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else {
+                    print("[AniListDetailVM] Episode \(nextEpNum) not found")
+                    return nil
+                }
+                print("[AniListDetailVM] Fetching streams for episode \(nextEpNum)")
                 let streams = try await runner.fetchStreams(episodeUrl: ep.href)
                     .sorted { $0.title < $1.title }
+                print("[AniListDetailVM] Got \(streams.count) streams")
                 guard !streams.isEmpty else { return nil }
                 return (streams: streams, episodeNumber: nextEpNum)
             }
