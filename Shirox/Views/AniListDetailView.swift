@@ -266,8 +266,7 @@ struct AniListDetailView: View {
 
         // Setup Next Episode loader using ModuleJSRunner
         let onWatchNext: WatchNextLoader? = { currentEpNum in
-            guard let moduleId = item.moduleId,
-                  let module = moduleManager.modules.first(where: { $0.id == moduleId }) else {
+            guard let module = ModuleManager.shared.activeModule else {
                 return nil
             }
 

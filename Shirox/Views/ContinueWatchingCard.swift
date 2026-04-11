@@ -95,46 +95,63 @@ struct ContinueWatchingSection: View {
             detailHref: item.detailHref
         )
 
-        // Setup Next Episode loader using ModuleJSRunner
+        // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList)
         let onWatchNext: WatchNextLoader? = { currentEpNum in
-            guard let moduleId = item.moduleId,
-                  let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) else {
-                return nil
-            }
+            // For module-sourced items
+            if let moduleId = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
+                do {
+                    let runner = ModuleJSRunner()
+                    try await runner.load(module: module)
 
-            do {
-                let runner = ModuleJSRunner()
-                try await runner.load(module: module)
-
-                // Fetch episodes via detailHref or search
-                var episodes: [EpisodeLink] = []
-                if let href = item.detailHref {
-                    episodes = try await runner.fetchEpisodes(url: href)
-                } else {
-                    let results = try await runner.search(keyword: item.mediaTitle)
-                    if let match = results.first {
-                        episodes = try await runner.fetchEpisodes(url: match.href)
+                    // Fetch episodes via detailHref or search
+                    var episodes: [EpisodeLink] = []
+                    if let href = item.detailHref {
+                        episodes = try await runner.fetchEpisodes(url: href)
+                    } else {
+                        let results = try await runner.search(keyword: item.mediaTitle)
+                        if let match = results.first {
+                            episodes = try await runner.fetchEpisodes(url: match.href)
+                        }
                     }
+
+                    guard !episodes.isEmpty else { return nil }
+
+                    // Find current episode
+                    var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
+                    if idx == nil {
+                        idx = episodes.enumerated().min(by: {
+                            abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
+                        })?.offset
+                    }
+
+                    guard let currentIdx = idx, currentIdx + 1 < episodes.count else { return nil }
+                    let nextEp = episodes[currentIdx + 1]
+                    let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+
+                    guard !streams.isEmpty else { return nil }
+                    return (streams: streams, episodeNumber: Int(nextEp.number))
+                } catch {
+                    print("[ContinueWatching] Next episode failed (module): \(error)")
+                    return nil
                 }
-
-                guard !episodes.isEmpty else { return nil }
-
-                // Find current episode
-                var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
-                if idx == nil {
-                    idx = episodes.enumerated().min(by: {
-                        abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
-                    })?.offset
+            }
+            // For AniList-sourced items with detailHref
+            else if let href = item.detailHref {
+                do {
+                    let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+                    guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                          idx + 1 < episodes.count else { return nil }
+                    let nextEp = episodes[idx + 1]
+                    let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+                    guard !streams.isEmpty else { return nil }
+                    return (streams: streams, episodeNumber: Int(nextEp.number))
+                } catch {
+                    print("[ContinueWatching] Next episode failed (anilist): \(error)")
+                    return nil
                 }
-
-                guard let currentIdx = idx, currentIdx + 1 < episodes.count else { return nil }
-                let nextEp = episodes[currentIdx + 1]
-                let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
-
-                guard !streams.isEmpty else { return nil }
-                return (streams: streams, episodeNumber: Int(nextEp.number))
-            } catch {
-                print("[ContinueWatching] Next episode failed: \(error)")
+            }
+            // No way to fetch next episode
+            else {
                 return nil
             }
         }
