@@ -100,6 +100,10 @@ final class DetailViewModel: ObservableObject {
 
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
         selectedStream = stream
+
+        // Determine stream type from subtitle
+        let streamType = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub") ? "DUB" : "SUB"
+
         let context = PlayerContext(
             mediaTitle: detail?.title ?? "",
             episodeNumber: Int(selectedEpisode?.number ?? 1),
@@ -109,7 +113,8 @@ final class DetailViewModel: ObservableObject {
             moduleId: ModuleManager.shared.activeModule?.id,
             totalEpisodes: detail?.episodes.count,
             resumeFrom: resumeWatchedSeconds,
-            detailHref: detailHref
+            detailHref: detailHref,
+            streamSubtitle: streamType
         )
 
         // Build a WatchNextLoader that dynamically finds the next episode by current episode number

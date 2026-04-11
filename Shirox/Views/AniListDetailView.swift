@@ -252,6 +252,9 @@ struct AniListDetailView: View {
             headers: item.headers ?? [:],
             subtitle: item.subtitle
         )
+        // Determine stream type from subtitle
+        let streamType = item.subtitle == nil ? "DUB" : "SUB"
+
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
             episodeNumber: item.episodeNumber,
@@ -261,7 +264,8 @@ struct AniListDetailView: View {
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
-            detailHref: nil
+            detailHref: nil,
+            streamSubtitle: streamType
         )
 
         // Setup Next Episode loader using ModuleJSRunner
@@ -277,37 +281,22 @@ struct AniListDetailView: View {
                 let runner = ModuleJSRunner()
                 try await runner.load(module: module)
 
-                // Try to fetch episodes - first from detailHref, then via search
+                // Fetch episodes via detailHref or search
                 var episodes: [EpisodeLink] = []
-
                 if let href = item.detailHref {
                     print("[AniListDetail] Fetching episodes from detailHref: \(href)")
                     episodes = try await runner.fetchEpisodes(url: href)
-                    print("[AniListDetail] Got \(episodes.count) episodes from detailHref")
-                }
-
-                // If detailHref didn't work, search and try multiple results
-                if episodes.isEmpty {
-                    print("[AniListDetail] Falling back to search for: \(item.mediaTitle)")
+                } else {
+                    print("[AniListDetail] Searching for: \(item.mediaTitle)")
                     let results = try await runner.search(keyword: item.mediaTitle)
                     print("[AniListDetail] Search returned \(results.count) results")
-
-                    // Try first few results to find one with episodes
-                    for result in results.prefix(5) {
-                        let episodesFromResult = try await runner.fetchEpisodes(url: result.href)
-                        print("[AniListDetail] Result '\(result.title)' has \(episodesFromResult.count) episodes")
-                        if episodesFromResult.count > 1 {  // Need multiple episodes for a series
-                            episodes = episodesFromResult
-                            print("[AniListDetail] Using '\(result.title)' as it has multiple episodes")
-                            break
-                        }
+                    if let match = results.first {
+                        episodes = try await runner.fetchEpisodes(url: match.href)
                     }
                 }
 
-                guard !episodes.isEmpty else {
-                    print("[AniListDetail] No episodes found from any source")
-                    return nil
-                }
+                print("[AniListDetail] Got \(episodes.count) episodes")
+                guard !episodes.isEmpty else { return nil }
 
                 // Find current episode
                 var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })

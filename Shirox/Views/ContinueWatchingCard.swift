@@ -83,6 +83,9 @@ struct ContinueWatchingSection: View {
             headers: item.headers ?? [:],
             subtitle: item.subtitle
         )
+        // Determine stream type from subtitle
+        let streamType = item.subtitle == nil ? "DUB" : "SUB"
+
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
             episodeNumber: item.episodeNumber,
@@ -92,7 +95,8 @@ struct ContinueWatchingSection: View {
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
-            detailHref: item.detailHref
+            detailHref: item.detailHref,
+            streamSubtitle: streamType
         )
 
         // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList)
@@ -106,34 +110,24 @@ struct ContinueWatchingSection: View {
                     let runner = ModuleJSRunner()
                     try await runner.load(module: module)
 
-                    // Try to fetch episodes via detailHref first
+                    // Fetch episodes via detailHref or search
                     var episodes: [EpisodeLink] = []
                     if let href = item.detailHref {
                         print("[ContinueWatching] Fetching episodes from detailHref: \(href)")
                         episodes = try await runner.fetchEpisodes(url: href)
-                        print("[ContinueWatching] Got \(episodes.count) episodes from detailHref")
-                    }
-
-                    // If detailHref didn't work or doesn't exist, try searching
-                    if episodes.isEmpty {
-                        print("[ContinueWatching] Falling back to search for: \(item.mediaTitle)")
+                    } else {
+                        print("[ContinueWatching] Searching for: \(item.mediaTitle)")
                         let results = try await runner.search(keyword: item.mediaTitle)
                         print("[ContinueWatching] Search returned \(results.count) results")
-
-                        // Try first few results to find one with episodes
-                        for result in results.prefix(3) {
-                            let episodesFromResult = try await runner.fetchEpisodes(url: result.href)
-                            print("[ContinueWatching] Result '\(result.title)' has \(episodesFromResult.count) episodes")
-                            if episodesFromResult.count > 1 {  // Need multiple episodes for a series
-                                episodes = episodesFromResult
-                                print("[ContinueWatching] Using '\(result.title)' as it has multiple episodes")
-                                break
-                            }
+                        if let match = results.first {
+                            print("[ContinueWatching] Fetching episodes from first search result")
+                            episodes = try await runner.fetchEpisodes(url: match.href)
                         }
                     }
 
+                    print("[ContinueWatching] Got \(episodes.count) episodes")
                     guard !episodes.isEmpty else {
-                        print("[ContinueWatching] No episodes found from any source")
+                        print("[ContinueWatching] No episodes found")
                         return nil
                     }
 

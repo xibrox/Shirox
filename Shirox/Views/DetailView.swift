@@ -142,6 +142,9 @@ struct DetailView: View {
         // Use the current detail view's href if available, otherwise fall back to saved href
         let href = vm.detailHref ?? item.detailHref
 
+        // Determine stream type from subtitle
+        let streamType = item.subtitle == nil ? "DUB" : "SUB"
+
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
             episodeNumber: item.episodeNumber,
@@ -151,7 +154,8 @@ struct DetailView: View {
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
             resumeFrom: item.watchedSeconds,
-            detailHref: href
+            detailHref: href,
+            streamSubtitle: streamType
         )
         let epNum = item.episodeNumber
 
@@ -168,26 +172,16 @@ struct DetailView: View {
             do {
                 let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
                 print("[DetailView] Got \(episodes.count) episodes")
-
-                // Check if we have the target episode and a next episode
-                guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }) else {
-                    print("[DetailView] Current episode \(currentEpNum) not found")
+                guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                      idx + 1 < episodes.count else {
+                    print("[DetailView] No next episode found")
                     return nil
                 }
-
-                guard idx + 1 < episodes.count else {
-                    print("[DetailView] No next episode after episode \(currentEpNum)")
-                    return nil
-                }
-
                 let nextEp = episodes[idx + 1]
                 print("[DetailView] Fetching streams for next episode \(nextEp.number)")
                 let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
                 print("[DetailView] Got \(streams.count) streams")
-                guard !streams.isEmpty else {
-                    print("[DetailView] No streams found for next episode")
-                    return nil
-                }
+                guard !streams.isEmpty else { return nil }
                 return (streams: streams, episodeNumber: Int(nextEp.number))
             } catch {
                 print("[DetailView] Error loading next episode: \(error)")

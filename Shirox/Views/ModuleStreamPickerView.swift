@@ -148,15 +148,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             let targetDouble = Double(targetEpisodeNumber)
             if let matched = episodes.first(where: { $0.number == targetDouble }) {
                 state = .loadingStreams
-                // Only store href if it has multiple episodes (not just the one we need)
-                // This ensures we have a valid detail page with full episode listings for Next Episode
-                if episodes.count > 1 {
-                    selectedEpisodeHref = item.href  // Store for Next Episode
-                    print("[ModuleStreamPicker] Stored href for Next Episode: \(episodes.count) episodes available")
-                } else {
-                    print("[ModuleStreamPicker] Not storing href - only 1 episode found (might be movie or incomplete page)")
-                    selectedEpisodeHref = nil
-                }
+                selectedEpisodeHref = item.href  // Store for Next Episode
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
                 if streams.isEmpty {
                     state = .error("No streams found for episode \(targetEpisodeNumber)")

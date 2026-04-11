@@ -75,6 +75,10 @@ final class AniListDetailViewModel: ObservableObject {
         let currentEpNum = selectedEpisodeNumber ?? 1
         let mediaTitle = media.title.displayTitle
         let totalEpisodes = media.episodes ?? (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : 0)
+
+        // Determine stream type (SUB or DUB)
+        let streamType = stream.subtitle == nil && stream.title.localizedCaseInsensitiveContains("dub") ? "DUB" : "SUB"
+
         let context = PlayerContext(
             mediaTitle: mediaTitle,
             episodeNumber: currentEpNum,
@@ -84,7 +88,8 @@ final class AniListDetailViewModel: ObservableObject {
             moduleId: nil,
             totalEpisodes: media.episodes,
             resumeFrom: resumeWatchedSeconds,
-            detailHref: nil
+            detailHref: nil,
+            streamSubtitle: streamType
         )
 
         // Build next-episode loader using ModuleJSRunner (same path as ModuleStreamPickerView)
@@ -111,28 +116,39 @@ final class AniListDetailViewModel: ObservableObject {
                 var episodes: [EpisodeLink] = []
                 var targetHref = ""
 
-                // Try provided resultHref first, but fall back to search if it doesn't work
+                // Try provided resultHref first
                 if let resultHref {
                     print("[AniListDetailVM] Using provided resultHref: \(resultHref)")
                     targetHref = resultHref
                     episodes = try await runner.fetchEpisodes(url: targetHref)
                     print("[AniListDetailVM] Got \(episodes.count) episodes from resultHref")
 
-                    // If resultHref didn't have episodes (might be movie or incomplete), fall back to search
-                    if episodes.isEmpty || !episodes.contains(where: { $0.number == Double(nextEpNum) }) {
+                    // If resultHref didn't have the target episode, fall back to search
+                    if !episodes.contains(where: { $0.number == Double(nextEpNum) }) {
                         print("[AniListDetailVM] ResultHref didn't have episode \(nextEpNum), trying search")
                         episodes = []
                     }
                 }
 
-                // If we still don't have episodes, search
+                // If we still don't have episodes, search and try multiple results
                 if episodes.isEmpty {
                     print("[AniListDetailVM] Searching for: \(searchTitle)")
                     let results = try await runner.search(keyword: searchTitle)
                     print("[AniListDetailVM] Search returned \(results.count) results")
 
-                    // Try multiple results to find one with the episode we need
-                    for result in results.prefix(5) {
+                    // Try first 5 results, preferring ones matching sub/dub type
+                    let sortedResults = results.prefix(10).sorted { a, b in
+                        let aIsDub = a.title.localizedCaseInsensitiveContains("dub")
+                        let bIsDub = b.title.localizedCaseInsensitiveContains("dub")
+                        let targetIsDub = streamIsDub
+
+                        // Prefer results matching current stream type
+                        if aIsDub == targetIsDub && bIsDub != targetIsDub { return true }
+                        if aIsDub != targetIsDub && bIsDub == targetIsDub { return false }
+                        return false
+                    }
+
+                    for result in sortedResults.prefix(5) {
                         let candidateEpisodes = try await runner.fetchEpisodes(url: result.href)
                         print("[AniListDetailVM] Result '\(result.title)' has \(candidateEpisodes.count) episodes")
 
@@ -146,12 +162,12 @@ final class AniListDetailViewModel: ObservableObject {
 
                     // If no result had the exact episode, use first with multiple episodes
                     if episodes.isEmpty {
-                        for result in results.prefix(5) {
+                        for result in sortedResults.prefix(5) {
                             let candidateEpisodes = try await runner.fetchEpisodes(url: result.href)
                             if candidateEpisodes.count > 1 {
                                 episodes = candidateEpisodes
                                 targetHref = result.href
-                                print("[AniListDetailVM] Using '\(result.title)' as fallback")
+                                print("[AniListDetailVM] Using '\(result.title)' as fallback (has \(candidateEpisodes.count) episodes)")
                                 break
                             }
                         }
@@ -159,12 +175,12 @@ final class AniListDetailViewModel: ObservableObject {
                 }
 
                 guard !episodes.isEmpty else {
-                    print("[AniListDetailVM] No episodes found from any source")
+                    print("[AniListDetailVM] No suitable episodes found")
                     return nil
                 }
 
                 guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else {
-                    print("[AniListDetailVM] Episode \(nextEpNum) not found in episodes")
+                    print("[AniListDetailVM] Episode \(nextEpNum) not found in available episodes")
                     return nil
                 }
                 print("[AniListDetailVM] Fetching streams for episode \(nextEpNum)")
