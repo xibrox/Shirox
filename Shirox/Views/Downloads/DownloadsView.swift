@@ -129,8 +129,9 @@ struct DownloadsView: View {
     // MARK: - Playback
 
     private func play(_ item: DownloadItem) {
-        guard let stream = dm.getStream(for: item) else { return }
-        let context = PlayerContext(
+        Task {
+            guard let stream = await dm.getStream(for: item) else { return }
+            let context = PlayerContext(
             mediaTitle: item.mediaTitle,
             episodeNumber: item.episodeNumber,
             episodeTitle: item.episodeTitle,
@@ -143,7 +144,8 @@ struct DownloadsView: View {
             streamTitle: item.streamTitle,
             workingDetailHref: item.detailHref
         )
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+            PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+        }
     }
 }
 

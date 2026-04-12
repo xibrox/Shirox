@@ -10,27 +10,65 @@ final class HLSProxyServer {
     private var proxyHeaders: [String: String] = [:]
     private(set) var isRunning = false
     private let listenerQueue = DispatchQueue(label: "com.shirox.hlsproxy", qos: .userInitiated)
+    private var readyContinuations: [CheckedContinuation<Void, Never>] = []
 
     private init() {}
 
+    /// Starts the server (if not already running) and suspends until the listener is ready.
+    func startAndWait(headers: [String: String]) async {
+        self.proxyHeaders = headers
+        if isRunning { return }
+        await withCheckedContinuation { continuation in
+            readyContinuations.append(continuation)
+            guard listener == nil else { return }
+            startListener()
+        }
+    }
+
     func start(headers: [String: String]) {
         self.proxyHeaders = headers
-        guard !isRunning else { return }
-        
+        guard !isRunning, listener == nil else { return }
+        startListener()
+    }
+
+    private func startListener() {
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
-        
+
         do {
             let l = try NWListener(using: params, on: port)
+            l.stateUpdateHandler = { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .ready:
+                    self.isRunning = true
+                    print("[Proxy] Ready on 127.0.0.1:\(self.port.rawValue)")
+                    let waiting = self.readyContinuations
+                    self.readyContinuations.removeAll()
+                    waiting.forEach { $0.resume() }
+                case .failed(let error):
+                    print("[Proxy] Listener failed: \(error)")
+                    self.isRunning = false
+                    self.listener = nil
+                    let waiting = self.readyContinuations
+                    self.readyContinuations.removeAll()
+                    waiting.forEach { $0.resume() }
+                case .cancelled:
+                    self.isRunning = false
+                default:
+                    break
+                }
+            }
             l.newConnectionHandler = { [weak self] conn in
                 self?.handle(conn)
             }
             l.start(queue: listenerQueue)
             self.listener = l
-            self.isRunning = true
-            print("[Proxy] Started on 127.0.0.1:\(port)")
         } catch {
             print("[Proxy] Start failed: \(error)")
+            let waiting = readyContinuations
+            readyContinuations.removeAll()
+            waiting.forEach { $0.resume() }
         }
     }
 

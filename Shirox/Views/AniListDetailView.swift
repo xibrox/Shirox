@@ -25,6 +25,9 @@ struct AniListDetailView: View {
     @State private var isLoadingEntry = false
     #if os(iOS)
     @State private var pendingDownloadEpisodeNumber: DownloadEpisodeItem? = nil
+    @State private var isSelectionMode = false
+    @State private var selectedEpisodeNumbers: Set<Int> = []
+    @State private var showBatchDownloadPicker = false
     #endif
 
     private var platformBackground: Color {
@@ -146,11 +149,6 @@ struct AniListDetailView: View {
                 }
             )
         }
-        .sheet(isPresented: $vm.showDownloadStreamPicker) {
-            DownloadStreamPickerView(streams: vm.pendingDownloadStreams) { stream in
-                vm.downloadWithSelectedStream(stream)
-            }
-        }
         #if os(iOS)
         .sheet(item: $pendingDownloadEpisodeNumber) { item in
             let media = vm.media!
@@ -160,16 +158,32 @@ struct AniListDetailView: View {
                 episodeNumber: item.episodeNumber,
                 onDismiss: { pendingDownloadEpisodeNumber = nil },
                 onStreamsLoaded: { streams, episodeHref in
-                    DispatchQueue.main.async {
-                        vm.pendingDownloadStreams = streams
-                        vm.pendingDownloadEpisode = (EpisodeLink(number: Double(item.episodeNumber), href: episodeHref ?? ""), item.episodeNumber)
-                        vm.pendingDownloadMedia = media
-                        vm.showDownloadStreamPicker = true
-                    }
+                    guard let stream = streams.first else { return }
+                    vm.pendingDownloadEpisode = (EpisodeLink(number: Double(item.episodeNumber), href: episodeHref ?? ""), item.episodeNumber)
+                    vm.pendingDownloadMedia = media
+                    vm.pendingDownloadModule = moduleManager.activeModule
+                    vm.downloadWithSelectedStream(stream)
                 }
             )
             .environmentObject(moduleManager)
         }
+        .sheet(isPresented: $showBatchDownloadPicker) {
+            if let media = vm.media {
+                BatchDownloadModulePickerView(
+                    mediaId: media.id,
+                    animeTitle: media.title.searchTitle,
+                    episodeNumbers: Array(selectedEpisodeNumbers).sorted(),
+                    imageUrl: media.coverImage.best ?? "",
+                    onDismiss: {
+                        showBatchDownloadPicker = false
+                        isSelectionMode = false
+                        selectedEpisodeNumbers.removeAll()
+                    }
+                )
+                .environmentObject(moduleManager)
+            }
+        }
+        #endif
         .sheet(isPresented: $showLibraryEdit) {
             if let media = vm.media {
                 LibraryEntryEditSheet(entry: existingEntry, media: media) { status, progress, score in
@@ -195,7 +209,6 @@ struct AniListDetailView: View {
                 }
             }
         }
-        #endif
     }
 
     // MARK: - Content
@@ -215,9 +228,42 @@ struct AniListDetailView: View {
                         .padding(.top, 8)
                 }
                 #if os(iOS)
-                watchButton(media: media)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
+                HStack(spacing: 10) {
+                    watchButton(media: media)
+                    if media.episodes ?? 0 > 0 {
+                        if isSelectionMode {
+                            Button {
+                                isSelectionMode = false
+                                selectedEpisodeNumbers.removeAll()
+                            } label: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 46, height: 46)
+                                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button {
+                                isSelectionMode = true
+                                selectedEpisodeNumbers.removeAll()
+                            } label: {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 46, height: 46)
+                                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
                 #endif
                 episodesSection(media: media)
                     .frame(maxWidth: .infinity)
@@ -490,17 +536,61 @@ private func heroSection(media: AniListMedia) -> some View {
                     HStack(spacing: 8) {
                         Text("Episodes")
                             .font(.title3.weight(.bold))
+                        #if os(iOS)
+                        if !isSelectionMode {
+                            Text("\(totalEpisodes)")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Color.accentColor, in: Capsule())
+                        }
+                        #else
                         Text("\(totalEpisodes)")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.accentColor, in: Capsule())
+                        #endif
                     }
-                    // RoundedRectangle(cornerRadius: 2)
-                    //     .fill(Color.accentColor.opacity(0.9))
-                    //     .frame(width: 36, height: 3)
                 }
                 Spacer()
+                #if os(iOS)
+                if isSelectionMode {
+                    if !selectedEpisodeNumbers.isEmpty {
+                        Button {
+                            showBatchDownloadPicker = true
+                        } label: {
+                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    let allSelected = totalEpisodes > 0 && selectedEpisodeNumbers.count == totalEpisodes
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        if allSelected {
+                            selectedEpisodeNumbers.removeAll()
+                        } else {
+                            selectedEpisodeNumbers = Set(1...totalEpisodes)
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(Color.accentColor)
+                } else {
+                    if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
+                        Button {
+                            showResetConfirmation = true
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                #else
                 if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
                     Button {
                         showResetConfirmation = true
@@ -511,6 +601,7 @@ private func heroSection(media: AniListMedia) -> some View {
                     }
                     .buttonStyle(.plain)
                 }
+                #endif
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -537,19 +628,38 @@ private func heroSection(media: AniListMedia) -> some View {
             } else if totalEpisodes > 0 {
                 LazyVStack(spacing: 8) {
                     ForEach(1...totalEpisodes, id: \.self) { ep in
+                        #if os(iOS)
+                        let sel = isSelectionMode
+                        let selected = selectedEpisodeNumbers.contains(ep)
                         AniListEpisodeRowContainer(
                             ep: ep,
                             mediaId: media.id,
                             mediaTitle: media.title.searchTitle,
                             coverImage: media.coverImage.best,
                             totalEpisodes: totalEpisodes,
-                            onTap: { vm.watchEpisode(ep) },
-                            onDownload: {
-                                #if os(iOS)
+                            onTap: sel ? {
+                                if selectedEpisodeNumbers.contains(ep) {
+                                    selectedEpisodeNumbers.remove(ep)
+                                } else {
+                                    selectedEpisodeNumbers.insert(ep)
+                                }
+                            } : { vm.watchEpisode(ep) },
+                            onDownload: sel ? nil : {
                                 pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep)
-                                #endif
-                            }
+                            },
+                            isSelectionMode: sel,
+                            isSelected: selected
                         )
+                        #else
+                        AniListEpisodeRowContainer(
+                            ep: ep,
+                            mediaId: media.id,
+                            mediaTitle: media.title.searchTitle,
+                            coverImage: media.coverImage.best,
+                            totalEpisodes: totalEpisodes,
+                            onTap: { vm.watchEpisode(ep) }
+                        )
+                        #endif
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -616,6 +726,8 @@ private struct AniListEpisodeRowContainer: View {
     let totalEpisodes: Int?
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     private var progress: Double? {
@@ -671,7 +783,9 @@ private struct AniListEpisodeRowContainer: View {
                         imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
                 }
             } : nil,
-            onDownload: onDownload
+            onDownload: onDownload,
+            isSelectionMode: isSelectionMode,
+            isSelected: isSelected
         )
     }
 }
@@ -688,45 +802,65 @@ private struct AniListEpisodeRow: View {
     var allPreviousWatched: Bool = false
     var onTogglePreviousWatched: (() -> Void)? = nil
     var onDownload: (() -> Void)? = nil
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(isComplete ? Color.green : Color.accentColor)
-                        .frame(width: 40, height: 40)
-                    if isComplete {
-                        Image(systemName: "checkmark")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                    } else {
-                        Text("\(number)")
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(.white)
+                if isSelectionMode {
+                    ZStack {
+                        Circle()
+                            .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: 2)
+                            .frame(width: 40, height: 40)
+                        if isSelected {
+                            Circle()
+                                .fill(Color.accentColor)
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "checkmark")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                        }
                     }
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(isComplete ? Color.green : Color.accentColor)
+                            .frame(width: 40, height: 40)
+                        if isComplete {
+                            Image(systemName: "checkmark")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                        } else {
+                            Text("\(number)")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
+                            radius: 4, y: 2)
                 }
-                .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
-                        radius: 4, y: 2)
 
                 Text("Episode \(number)")
                     .font(.callout.weight(.medium))
 
                 Spacer()
 
-                Image(systemName: "play.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .padding(8)
-                    .background(Color.accentColor.opacity(0.1), in: Circle())
+                if !isSelectionMode {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(8)
+                        .background(Color.accentColor.opacity(0.1), in: Circle())
+                }
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
-            .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 12)
+            .padding(.bottom, (progress ?? 0) > 0 && !isComplete && !isSelectionMode ? 6 : 12)
 
-            if let p = progress, p > 0, !isComplete {
+            if let p = progress, p > 0, !isComplete, !isSelectionMode {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.secondary.opacity(0.15))
@@ -741,40 +875,45 @@ private struct AniListEpisodeRow: View {
                 .padding(.bottom, 8)
             }
         }
-        .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+        .background(
+            isSelectionMode && isSelected
+                ? Color.accentColor.opacity(0.08)
+                : Color.secondary.opacity(0.07),
+            in: RoundedRectangle(cornerRadius: 14)
+        )
         .contentShape(RoundedRectangle(cornerRadius: 14))
-        .onTapGesture {
-            onTap()
-        }
+        .onTapGesture { onTap() }
         .contextMenu {
-            if isComplete {
-                Button { onMarkUnwatched?() } label: {
-                    Label("Mark as Unwatched", systemImage: "xmark.circle")
+            if !isSelectionMode {
+                if isComplete {
+                    Button { onMarkUnwatched?() } label: {
+                        Label("Mark as Unwatched", systemImage: "xmark.circle")
+                    }
+                } else {
+                    Button { onMarkWatched?() } label: {
+                        Label("Mark as Watched", systemImage: "checkmark.circle")
+                    }
                 }
-            } else {
-                Button { onMarkWatched?() } label: {
-                    Label("Mark as Watched", systemImage: "checkmark.circle")
+                if let onTogglePreviousWatched {
+                    Divider()
+                    Button { onTogglePreviousWatched() } label: {
+                        Label(
+                            allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
+                            systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
+                        )
+                    }
                 }
-            }
-            if let onTogglePreviousWatched {
-                Divider()
-                Button { onTogglePreviousWatched() } label: {
-                    Label(
-                        allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
-                        systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
-                    )
+                if let onResetProgress, progress != nil {
+                    Divider()
+                    Button(role: .destructive) { onResetProgress() } label: {
+                        Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                    }
                 }
-            }
-            if let onResetProgress, progress != nil {
-                Divider()
-                Button(role: .destructive) { onResetProgress() } label: {
-                    Label("Reset Progress", systemImage: "arrow.counterclockwise")
-                }
-            }
-            if let onDownload {
-                Divider()
-                Button { onDownload() } label: {
-                    Label("Download Episode", systemImage: "arrow.down.circle")
+                if let onDownload {
+                    Divider()
+                    Button { onDownload() } label: {
+                        Label("Download Episode", systemImage: "arrow.down.circle")
+                    }
                 }
             }
         }

@@ -10,6 +10,8 @@ struct EpisodeRowView: View {
     var allPreviousWatched: Bool = false
     var onTogglePreviousWatched: (() -> Void)? = nil
     var onDownload: (() -> Void)? = nil
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
@@ -17,22 +19,38 @@ struct EpisodeRowView: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 HStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(isComplete ? Color.green : Color.accentColor)
-                            .frame(width: 40, height: 40)
-                        if isComplete {
-                            Image(systemName: "checkmark")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                        } else {
-                            Text(episode.displayNumber)
-                                .font(.footnote.weight(.bold))
-                                .foregroundStyle(.white)
+                    if isSelectionMode {
+                        ZStack {
+                            Circle()
+                                .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: 2)
+                                .frame(width: 40, height: 40)
+                            if isSelected {
+                                Circle()
+                                    .fill(Color.accentColor)
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                            }
                         }
+                    } else {
+                        ZStack {
+                            Circle()
+                                .fill(isComplete ? Color.green : Color.accentColor)
+                                .frame(width: 40, height: 40)
+                            if isComplete {
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Text(episode.displayNumber)
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                        .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
+                                radius: 4, y: 2)
                     }
-                    .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
-                            radius: 4, y: 2)
 
                     Text("Episode \(episode.displayNumber)")
                         .font(.callout.weight(.medium))
@@ -40,17 +58,19 @@ struct EpisodeRowView: View {
 
                     Spacer()
 
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(8)
-                        .background(Color.accentColor.opacity(0.1), in: Circle())
+                    if !isSelectionMode {
+                        Image(systemName: "play.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .padding(8)
+                            .background(Color.accentColor.opacity(0.1), in: Circle())
+                    }
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 12)
-                .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 12)
+                .padding(.bottom, (progress ?? 0) > 0 && !isComplete && !isSelectionMode ? 6 : 12)
 
-                if let p = progress, p > 0, !isComplete {
+                if let p = progress, p > 0, !isComplete, !isSelectionMode {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.secondary.opacity(0.15))
@@ -65,39 +85,46 @@ struct EpisodeRowView: View {
                     .padding(.bottom, 8)
                 }
             }
-            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+            .background(
+                isSelectionMode && isSelected
+                    ? Color.accentColor.opacity(0.08)
+                    : Color.secondary.opacity(0.07),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
             .contentShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(EpisodePressStyle())
         .contextMenu {
-            if isComplete {
-                Button { onMarkUnwatched?() } label: {
-                    Label("Mark as Unwatched", systemImage: "xmark.circle")
+            if !isSelectionMode {
+                if isComplete {
+                    Button { onMarkUnwatched?() } label: {
+                        Label("Mark as Unwatched", systemImage: "xmark.circle")
+                    }
+                } else {
+                    Button { onMarkWatched?() } label: {
+                        Label("Mark as Watched", systemImage: "checkmark.circle")
+                    }
                 }
-            } else {
-                Button { onMarkWatched?() } label: {
-                    Label("Mark as Watched", systemImage: "checkmark.circle")
+                if let onTogglePreviousWatched {
+                    Divider()
+                    Button { onTogglePreviousWatched() } label: {
+                        Label(
+                            allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
+                            systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
+                        )
+                    }
                 }
-            }
-            if let onTogglePreviousWatched {
-                Divider()
-                Button { onTogglePreviousWatched() } label: {
-                    Label(
-                        allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
-                        systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
-                    )
+                if let onResetProgress, progress != nil {
+                    Divider()
+                    Button(role: .destructive) { onResetProgress() } label: {
+                        Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                    }
                 }
-            }
-            if let onResetProgress, progress != nil {
-                Divider()
-                Button(role: .destructive) { onResetProgress() } label: {
-                    Label("Reset Progress", systemImage: "arrow.counterclockwise")
-                }
-            }
-            if let onDownload {
-                Divider()
-                Button { onDownload() } label: {
-                    Label("Download Episode", systemImage: "arrow.down.circle")
+                if let onDownload {
+                    Divider()
+                    Button { onDownload() } label: {
+                        Label("Download Episode", systemImage: "arrow.down.circle")
+                    }
                 }
             }
         }

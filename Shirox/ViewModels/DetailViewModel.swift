@@ -104,6 +104,25 @@ final class DetailViewModel: ObservableObject {
         streamOptions = []
     }
 
+    func loadDownloadStreams(for episode: EpisodeLink) {
+        pendingEpisode = episode
+        pendingEpisodeTitle = nil
+        pendingStreams = []
+        showDownloadStreamPicker = false
+        isLoadingStreams = true
+        streamsTask = Task {
+            do {
+                let streams = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
+                pendingStreams = streams.sorted { $0.title < $1.title }
+                isLoadingStreams = false
+                showDownloadStreamPicker = true
+            } catch {
+                if (error as? CancellationError) != nil { return }
+                isLoadingStreams = false
+            }
+        }
+    }
+
     func downloadWithSelectedStream(_ stream: StreamResult) {
         guard let episode = pendingEpisode, let detail = detail else { return }
 

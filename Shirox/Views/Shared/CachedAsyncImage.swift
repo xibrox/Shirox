@@ -9,6 +9,8 @@ typealias PlatformImage = NSImage
 #endif
 
 /// Cross-platform URLSession + NSCache image loader.
+/// Uses a dedicated ephemeral session so images are NOT written to
+/// URLCache.shared on disk — all caching is handled by NSCache in RAM.
 struct CachedAsyncImage: View {
     let urlString: String
     var base64String: String? = nil
@@ -19,20 +21,27 @@ struct CachedAsyncImage: View {
         let c = NSCache<NSString, PlatformImage>()
         c.countLimit = 350
         return c
-    } ()
+    }()
+
+    /// Ephemeral session: no disk caching, no credential storage.
+    private static let session: URLSession = {
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.urlCache = nil
+        return URLSession(configuration: cfg)
+    }()
 
     private var cachedImage: PlatformImage? {
         guard !urlString.isEmpty else { return nil }
         return Self.cache.object(forKey: urlString as NSString)
     }
 
-    /// Total compressed bytes currently stored in the shared cache.
-    private(set) static var totalBytes: Int = 0
+    /// Disk bytes used by URLCache.shared (the main source of the ~100 MB).
+    static var diskCacheBytes: Int { URLCache.shared.currentDiskUsage }
 
-    /// Evicts all cached images and resets the size counter.
+    /// Evicts in-memory NSCache + flushes URLCache.shared disk cache.
     static func resetCache() {
         cache.removeAllObjects()
-        totalBytes = 0
+        URLCache.shared.removeAllCachedResponses()
     }
 
     var body: some View {
@@ -76,14 +85,13 @@ struct CachedAsyncImage: View {
                 return
             }
             
-            guard let (data, _) = try? await URLSession.shared.data(from: url),
+            guard let (data, _) = try? await Self.session.data(from: url),
                   let loaded = PlatformImage(data: data) else {
                 loadFailed = true
                 return
             }
-            
+
             Self.cache.setObject(loaded, forKey: urlString as NSString)
-            Self.totalBytes += data.count
             platformImage = loaded
         }
     }

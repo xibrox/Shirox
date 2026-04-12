@@ -17,15 +17,30 @@ final class CastProxyServer {
     private(set) var isRunning = false
     private let listenerQueue = DispatchQueue(label: "com.shirox.castproxy", qos: .userInitiated)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    private var readyContinuations: [CheckedContinuation<Void, Never>] = []
 
     private init() {}
+
+    /// Starts the server (if not already running) and suspends until the listener is ready.
+    func startAndWait(headers: [String: String]) async {
+        proxyHeaders = headers
+        if isRunning { return }
+        await withCheckedContinuation { continuation in
+            readyContinuations.append(continuation)
+            guard listener == nil else { return }
+            startListener(headers: headers)
+        }
+    }
 
     // MARK: - Public API
 
     func start(headers: [String: String]) {
         proxyHeaders = headers
-        guard !isRunning else { return }
+        guard !isRunning, listener == nil else { return }
+        startListener(headers: headers)
+    }
 
+    private func startListener(headers: [String: String]) {
         beginBackgroundTask()
 
         let params = NWParameters.tcp
@@ -33,14 +48,38 @@ final class CastProxyServer {
 
         do {
             let l = try NWListener(using: params, on: port)
+            l.stateUpdateHandler = { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .ready:
+                    self.isRunning = true
+                    print("[CastProxy] Ready on \(self.localIP()):\(self.port.rawValue)")
+                    let waiting = self.readyContinuations
+                    self.readyContinuations.removeAll()
+                    waiting.forEach { $0.resume() }
+                case .failed(let error):
+                    print("[CastProxy] Listener failed: \(error)")
+                    self.isRunning = false
+                    self.listener = nil
+                    self.endBackgroundTask()
+                    let waiting = self.readyContinuations
+                    self.readyContinuations.removeAll()
+                    waiting.forEach { $0.resume() }
+                case .cancelled:
+                    self.isRunning = false
+                default:
+                    break
+                }
+            }
             l.newConnectionHandler = { [weak self] conn in self?.handle(conn) }
             l.start(queue: listenerQueue)
             listener = l
-            isRunning = true
-            print("[CastProxy] Started on \(localIP()):\(port.rawValue)")
         } catch {
             print("[CastProxy] Start failed: \(error)")
             endBackgroundTask()
+            let waiting = readyContinuations
+            readyContinuations.removeAll()
+            waiting.forEach { $0.resume() }
         }
     }
 

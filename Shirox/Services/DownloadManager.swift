@@ -100,14 +100,14 @@ final class DownloadManager: NSObject, ObservableObject {
         persist()
     }
     
-    func getStream(for item: DownloadItem) -> StreamResult? {
+    func getStream(for item: DownloadItem) async -> StreamResult? {
         guard item.state == .completed, let fileName = item.fileName else { return nil }
         let fileURL = downloadDir.appendingPathComponent(fileName)
-        
+
         let playURL: URL
         if item.isHLS {
             // Local HLS manifest MUST be served through proxy to work in AVPlayer
-            HLSProxyServer.shared.start(headers: ["User-Agent": URLSession.randomUserAgent])
+            await HLSProxyServer.shared.startAndWait(headers: ["User-Agent": URLSession.randomUserAgent])
             playURL = HLSProxyServer.shared.proxyURL(for: fileURL) ?? fileURL
             print("[Downloads] Routing Local HLS through proxy: \(playURL)")
         } else {

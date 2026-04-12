@@ -12,7 +12,7 @@ struct SettingsView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @State private var showResetConfirmation = false
     #if os(iOS)
-    @State private var imageCacheSize = CachedAsyncImage.totalBytes
+    @State private var imageCacheSize = CachedAsyncImage.diskCacheBytes
     #endif
 
     private let shortOptions = [5, 10, 15, 30]
@@ -124,7 +124,7 @@ struct SettingsView: View {
                 Section("Cache") {
                     Button {
                         CachedAsyncImage.resetCache()
-                        imageCacheSize = 0
+                        imageCacheSize = CachedAsyncImage.diskCacheBytes
                     } label: {
                         LabeledContent("Reset Image Cache") {
                             Text(Self.formattedBytes(imageCacheSize))
@@ -157,7 +157,7 @@ struct SettingsView: View {
         .onAppear {
             PlayerPresenter.shared.resetToAppOrientation()
             #if os(iOS)
-            imageCacheSize = CachedAsyncImage.totalBytes
+            imageCacheSize = CachedAsyncImage.diskCacheBytes
             #endif
         }
     }

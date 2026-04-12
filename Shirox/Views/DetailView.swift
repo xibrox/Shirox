@@ -1,5 +1,6 @@
 import SwiftUI
 
+
 struct DetailView: View {
     let item: SearchItem
     var resumeEpisodeNumber: Int?
@@ -11,6 +12,11 @@ struct DetailView: View {
     @State private var selectedSeason = 0
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
+    #if os(iOS)
+    @State private var isSelectionMode = false
+    @State private var selectedEpisodeNumbers: Set<Int> = []
+    @State private var showBatchDownloadPicker = false
+    #endif
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -78,6 +84,24 @@ struct DetailView: View {
                 vm.downloadWithSelectedStream(stream)
             }
         }
+        #if os(iOS)
+        .sheet(isPresented: $showBatchDownloadPicker) {
+            if let detail = vm.detail {
+                BatchDownloadStreamPickerView(
+                    mediaTitle: item.title,
+                    imageUrl: detail.image,
+                    moduleId: ModuleManager.shared.activeModule?.id,
+                    episodes: detail.episodes,
+                    episodeNumbers: Array(selectedEpisodeNumbers).sorted(),
+                    onDismiss: {
+                        showBatchDownloadPicker = false
+                        isSelectionMode = false
+                        selectedEpisodeNumbers.removeAll()
+                    }
+                )
+            }
+        }
+        #endif
     }
 
     // MARK: - Continue Watching Helpers
@@ -385,9 +409,21 @@ struct DetailView: View {
                     .frame(width: 3, height: 22)
                 Text("Episodes")
                     .font(.title3.weight(.bold))
+                #if os(iOS)
+                if !isSelectionMode {
+                    if vm.isLoadingEpisodes {
+                        ProgressView().scaleEffect(0.75)
+                    } else if !detail.episodes.isEmpty {
+                        Text("\(detail.episodes.count)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.accentColor, in: Capsule())
+                    }
+                }
+                #else
                 if vm.isLoadingEpisodes {
-                    ProgressView()
-                        .scaleEffect(0.75)
+                    ProgressView().scaleEffect(0.75)
                 } else if !detail.episodes.isEmpty {
                     Text("\(detail.episodes.count)")
                         .font(.caption.weight(.bold))
@@ -395,7 +431,46 @@ struct DetailView: View {
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.accentColor, in: Capsule())
                 }
+                #endif
                 Spacer()
+                #if os(iOS)
+                if isSelectionMode {
+                    if !selectedEpisodeNumbers.isEmpty {
+                        Button {
+                            showBatchDownloadPicker = true
+                        } label: {
+                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    let allSelected = selectedEpisodeNumbers.count == visibleEpisodes.count
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        if allSelected {
+                            selectedEpisodeNumbers.removeAll()
+                        } else {
+                            selectedEpisodeNumbers = Set(visibleEpisodes.map { Int($0.number) })
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(Color.accentColor)
+                } else {
+                    let moduleId = ModuleManager.shared.activeModule?.id
+                    if continueWatching.hasProgress(aniListID: nil, moduleId: moduleId, mediaTitle: detail.title) {
+                        Button {
+                            showResetConfirmation = true
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                #else
                 let moduleId = ModuleManager.shared.activeModule?.id
                 if continueWatching.hasProgress(aniListID: nil, moduleId: moduleId, mediaTitle: detail.title) {
                     Button {
@@ -407,6 +482,7 @@ struct DetailView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                #endif
             }
             .alert("Reset Progress", isPresented: $showResetConfirmation) {
                 Button("Reset", role: .destructive) {
@@ -446,7 +522,40 @@ struct DetailView: View {
             }
 
             #if os(iOS)
-            watchButton(detail: detail)
+            HStack(spacing: 10) {
+                watchButton(detail: detail)
+                if !detail.episodes.isEmpty {
+                    if isSelectionMode {
+                        Button {
+                            isSelectionMode = false
+                            selectedEpisodeNumbers.removeAll()
+                        } label: {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 46, height: 46)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            isSelectionMode = true
+                            selectedEpisodeNumbers.removeAll()
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 46, height: 46)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
             #endif
 
             if detail.episodes.isEmpty && !vm.isLoadingEpisodes {
@@ -456,46 +565,39 @@ struct DetailView: View {
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(visibleEpisodes) { episode in
+                        let epNum = Int(episode.number)
+                        #if os(iOS)
+                        let sel = isSelectionMode
+                        let selected = selectedEpisodeNumbers.contains(epNum)
                         ModuleEpisodeRowContainer(
                             episode: episode,
                             mediaTitle: detail.title,
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
-                            onTap: { vm.loadStreams(for: episode) },
-                            onDownload: {
-                                Task {
-                                    guard let streams = try? await JSEngine.shared.fetchStreams(episodeUrl: episode.href),
-                                          !streams.isEmpty else { return }
-
-                                    // If multiple streams, show picker
-                                    if streams.count > 1 {
-                                        DispatchQueue.main.async {
-                                            vm.pendingStreams = streams
-                                            vm.pendingEpisode = episode
-                                            vm.pendingEpisodeTitle = nil
-                                            vm.showDownloadStreamPicker = true
-                                        }
-                                    } else {
-                                        // Single stream, download immediately
-                                        let stream = streams[0]
-                                        let ctx = DownloadContext(
-                                            mediaTitle: detail.title,
-                                            episodeNumber: Int(episode.number),
-                                            episodeTitle: nil,
-                                            imageUrl: item.image,
-                                            aniListID: nil,
-                                            moduleId: ModuleManager.shared.activeModule?.id,
-                                            detailHref: vm.detailHref,
-                                            episodeHref: episode.href,
-                                            streamTitle: stream.title,
-                                            totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count
-                                        )
-                                        DownloadManager.shared.download(stream: stream, episodeHref: episode.href, context: ctx)
-                                    }
+                            onTap: sel ? {
+                                if selectedEpisodeNumbers.contains(epNum) {
+                                    selectedEpisodeNumbers.remove(epNum)
+                                } else {
+                                    selectedEpisodeNumbers.insert(epNum)
                                 }
-                            }
+                            } : { vm.loadStreams(for: episode) },
+                            onDownload: sel ? nil : {
+                                vm.loadDownloadStreams(for: episode)
+                            },
+                            isSelectionMode: sel,
+                            isSelected: selected
                         )
+                        #else
+                        ModuleEpisodeRowContainer(
+                            episode: episode,
+                            mediaTitle: detail.title,
+                            itemImage: item.image,
+                            totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
+                            detailHref: vm.detailHref,
+                            onTap: { vm.loadStreams(for: episode) }
+                        )
+                        #endif
                     }
                 }
             }
@@ -513,6 +615,8 @@ private struct ModuleEpisodeRowContainer: View {
     let detailHref: String?
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     private var moduleId: String? { ModuleManager.shared.activeModule?.id }
@@ -577,7 +681,9 @@ private struct ModuleEpisodeRowContainer: View {
                         imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
                 }
             } : nil,
-            onDownload: onDownload
+            onDownload: onDownload,
+            isSelectionMode: isSelectionMode,
+            isSelected: isSelected
         )
     }
 }

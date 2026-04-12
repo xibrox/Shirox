@@ -644,28 +644,34 @@ struct PlayerView: View {
     }
 
     private func castCurrentMedia() {
-        // Keep app alive when screen locks while casting. AVPlayer is paused
-        // during cast so the audio session needs explicit reactivation.
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        #endif
+        Task {
+            // Keep app alive when screen locks while casting. AVPlayer is paused
+            // during cast so the audio session needs explicit reactivation.
+            #if os(iOS)
+            try? AVAudioSession.sharedInstance().setActive(true)
+            #endif
 
-        let subtitleURL = currentStream.subtitle.flatMap { URL(string: $0) }
-        let castURL: URL
-        if !currentStream.headers.isEmpty {
-            CastProxyServer.shared.start(headers: currentStream.headers)
-            castURL = CastProxyServer.shared.proxyURL(for: currentStream.url) ?? currentStream.url
-            print("[Cast] proxy URL: \(castURL)")
-        } else {
-            castURL = currentStream.url
+            let subtitleURL = currentStream.subtitle.flatMap { URL(string: $0) }
+            let castURL: URL
+            if !currentStream.headers.isEmpty {
+                #if os(iOS)
+                await CastProxyServer.shared.startAndWait(headers: currentStream.headers)
+                castURL = CastProxyServer.shared.proxyURL(for: currentStream.url) ?? currentStream.url
+                #else
+                castURL = currentStream.url
+                #endif
+                print("[Cast] proxy URL: \(castURL)")
+            } else {
+                castURL = currentStream.url
+            }
+            CastManager.shared.castMedia(
+                url: castURL,
+                title: currentContext?.mediaTitle ?? currentStream.title,
+                posterUrl: currentContext?.imageUrl,
+                subtitleURL: subtitleURL,
+                startTime: currentTime
+            )
         }
-        CastManager.shared.castMedia(
-            url: castURL,
-            title: currentContext?.mediaTitle ?? currentStream.title,
-            posterUrl: currentContext?.imageUrl,
-            subtitleURL: subtitleURL,
-            startTime: currentTime
-        )
     }
 
     private func togglePlayPause() {
