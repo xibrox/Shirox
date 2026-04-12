@@ -14,6 +14,12 @@ final class DetailViewModel: ObservableObject {
     @Published var selectedEpisode: EpisodeLink?
     @Published var showStreamPicker = false
 
+    // Download stream picker state
+    @Published var pendingStreams: [StreamResult] = []
+    @Published var pendingEpisode: EpisodeLink?
+    @Published var pendingEpisodeTitle: String?
+    @Published var showDownloadStreamPicker = false
+
     // Player state
     @Published var selectedStream: StreamResult?
     @Published var showPlayer = false
@@ -96,6 +102,30 @@ final class DetailViewModel: ObservableObject {
         isLoadingStreams = false
         showStreamPicker = false
         streamOptions = []
+    }
+
+    func downloadWithSelectedStream(_ stream: StreamResult) {
+        guard let episode = pendingEpisode, let detail = detail else { return }
+
+        let ctx = DownloadContext(
+            mediaTitle: detail.title,
+            episodeNumber: Int(episode.number),
+            episodeTitle: pendingEpisodeTitle,
+            imageUrl: detail.image,
+            aniListID: nil,
+            moduleId: ModuleManager.shared.activeModule?.id,
+            detailHref: detailHref,
+            episodeHref: episode.href,
+            streamTitle: stream.title,
+            totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count
+        )
+        DownloadManager.shared.download(stream: stream, episodeHref: episode.href, context: ctx)
+
+        // Clear pending state
+        showDownloadStreamPicker = false
+        pendingStreams = []
+        pendingEpisode = nil
+        pendingEpisodeTitle = nil
     }
 
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {

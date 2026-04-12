@@ -9,6 +9,7 @@ struct EpisodeRowView: View {
     var onResetProgress: (() -> Void)? = nil
     var allPreviousWatched: Bool = false
     var onTogglePreviousWatched: (() -> Void)? = nil
+    var onDownload: (() -> Void)? = nil
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
@@ -91,6 +92,12 @@ struct EpisodeRowView: View {
                 Divider()
                 Button(role: .destructive) { onResetProgress() } label: {
                     Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                }
+            }
+            if let onDownload {
+                Divider()
+                Button { onDownload() } label: {
+                    Label("Download Episode", systemImage: "arrow.down.circle")
                 }
             }
         }

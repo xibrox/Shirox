@@ -17,6 +17,13 @@ final class AniListDetailViewModel: ObservableObject {
     @Published var selectedStream: StreamResult?
     @Published var showPlayer = false
 
+    // Download stream picker state
+    @Published var pendingDownloadStreams: [StreamResult] = []
+    @Published var pendingDownloadEpisode: (EpisodeLink, Int)?
+    @Published var pendingDownloadModule: ModuleDefinition?
+    @Published var pendingDownloadMedia: AniListMedia?
+    @Published var showDownloadStreamPicker = false
+
     /// Deferred streams waiting to be presented after a sheet fully dismisses.
     var pendingModuleStream: StreamResult?   // single-stream from ModuleStreamPickerView
     var pendingModuleStreamEpisodeHref: String?  // episode href for Next Episode
@@ -131,5 +138,32 @@ final class AniListDetailViewModel: ObservableObject {
 
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, from: sourceView)
         selectedEpisodeNumber = nil
+    }
+
+    func downloadWithSelectedStream(_ stream: StreamResult) {
+        guard let (episodeLink, epNum) = pendingDownloadEpisode,
+              let module = pendingDownloadModule,
+              let media = pendingDownloadMedia else { return }
+
+        let ctx = DownloadContext(
+            mediaTitle: media.title.displayTitle,
+            episodeNumber: epNum,
+            episodeTitle: nil,
+            imageUrl: media.coverImage.extraLarge ?? media.coverImage.large ?? "",
+            aniListID: media.id,
+            moduleId: module.id,
+            detailHref: "https://anilist.co/anime/\(media.id)",
+            episodeHref: episodeLink.href,
+            streamTitle: stream.title,
+            totalEpisodes: media.episodes
+        )
+        DownloadManager.shared.download(stream: stream, episodeHref: episodeLink.href, context: ctx)
+
+        // Clear pending state
+        showDownloadStreamPicker = false
+        pendingDownloadStreams = []
+        pendingDownloadEpisode = nil
+        pendingDownloadModule = nil
+        pendingDownloadMedia = nil
     }
 }

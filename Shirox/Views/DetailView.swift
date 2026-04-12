@@ -73,6 +73,11 @@ struct DetailView: View {
         }) {
             StreamPickerView(vm: vm)
         }
+        .sheet(isPresented: $vm.showDownloadStreamPicker) {
+            DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
+                vm.downloadWithSelectedStream(stream)
+            }
+        }
     }
 
     // MARK: - Continue Watching Helpers
@@ -457,7 +462,39 @@ struct DetailView: View {
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
-                            onTap: { vm.loadStreams(for: episode) }
+                            onTap: { vm.loadStreams(for: episode) },
+                            onDownload: {
+                                Task {
+                                    guard let streams = try? await JSEngine.shared.fetchStreams(episodeUrl: episode.href),
+                                          !streams.isEmpty else { return }
+
+                                    // If multiple streams, show picker
+                                    if streams.count > 1 {
+                                        DispatchQueue.main.async {
+                                            vm.pendingStreams = streams
+                                            vm.pendingEpisode = episode
+                                            vm.pendingEpisodeTitle = nil
+                                            vm.showDownloadStreamPicker = true
+                                        }
+                                    } else {
+                                        // Single stream, download immediately
+                                        let stream = streams[0]
+                                        let ctx = DownloadContext(
+                                            mediaTitle: detail.title,
+                                            episodeNumber: Int(episode.number),
+                                            episodeTitle: nil,
+                                            imageUrl: item.image,
+                                            aniListID: nil,
+                                            moduleId: ModuleManager.shared.activeModule?.id,
+                                            detailHref: vm.detailHref,
+                                            episodeHref: episode.href,
+                                            streamTitle: stream.title,
+                                            totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count
+                                        )
+                                        DownloadManager.shared.download(stream: stream, episodeHref: episode.href, context: ctx)
+                                    }
+                                }
+                            }
                         )
                     }
                 }
@@ -475,6 +512,7 @@ private struct ModuleEpisodeRowContainer: View {
     let totalEpisodes: Int?
     let detailHref: String?
     let onTap: () -> Void
+    var onDownload: (() -> Void)? = nil
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     private var moduleId: String? { ModuleManager.shared.activeModule?.id }
@@ -538,7 +576,8 @@ private struct ModuleEpisodeRowContainer: View {
                         upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle,
                         imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
                 }
-            } : nil
+            } : nil,
+            onDownload: onDownload
         )
     }
 }

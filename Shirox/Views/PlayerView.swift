@@ -2,6 +2,7 @@ import SwiftUI
 import AVKit
 #if os(iOS)
 import MediaPlayer
+import AVFoundation
 #endif
 #if canImport(GoogleCast)
 import GoogleCast
@@ -633,7 +634,7 @@ struct PlayerView: View {
     private func exitCastMode() {
         let resumeAt = castManager.currentPosition
         castManager.disconnect()
-        HLSProxyServer.shared.stop()
+        CastProxyServer.shared.stop()
         guard let player else { return }
         player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600))
         player.rate = Float(playbackSpeed)
@@ -643,11 +644,17 @@ struct PlayerView: View {
     }
 
     private func castCurrentMedia() {
+        // Keep app alive when screen locks while casting. AVPlayer is paused
+        // during cast so the audio session needs explicit reactivation.
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
+
         let subtitleURL = currentStream.subtitle.flatMap { URL(string: $0) }
         let castURL: URL
         if !currentStream.headers.isEmpty {
-            HLSProxyServer.shared.start(headers: currentStream.headers)
-            castURL = HLSProxyServer.shared.proxyURL(for: currentStream.url) ?? currentStream.url
+            CastProxyServer.shared.start(headers: currentStream.headers)
+            castURL = CastProxyServer.shared.proxyURL(for: currentStream.url) ?? currentStream.url
             print("[Cast] proxy URL: \(castURL)")
         } else {
             castURL = currentStream.url
@@ -731,13 +738,33 @@ struct PlayerView: View {
         #endif
 
         let asset: AVURLAsset
-        if !currentStream.headers.isEmpty {
+        if currentStream.url.isFileURL {
+            asset = AVURLAsset(url: currentStream.url)
+        } else if !currentStream.headers.isEmpty {
             let opts: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": currentStream.headers]
             asset = AVURLAsset(url: currentStream.url, options: opts)
         } else {
             asset = AVURLAsset(url: currentStream.url)
         }
         let item = AVPlayerItem(asset: asset)
+        
+        // Fix: Local files and fast streams might already be ready or need a status observer
+        Task { @MainActor in
+            for await status in item.publisher(for: \.status).values {
+                print("[Player] Item status: \(status.rawValue)")
+                if status == .readyToPlay {
+                    if currentContext?.resumeFrom == nil {
+                        videoReady = true
+                    }
+                    break
+                } else if status == .failed {
+                    print("[Player] Item failed: \(item.error?.localizedDescription ?? "unknown error")")
+                    videoReady = true // Show player so user can see error state
+                    break
+                }
+            }
+        }
+
         Task {
             guard let group = try? await asset.loadMediaSelectionGroup(for: .audible) else { return }
             await MainActor.run { audioGroup = group }
@@ -752,6 +779,7 @@ struct PlayerView: View {
         p.volume = volume
         p.usesExternalPlaybackWhileExternalScreenIsActive = true
         p.rate = Float(playbackSpeed)
+        p.play() // Ensure player starts
         isPlaying = true
         player = p
         bufferProgress = 0
@@ -766,6 +794,15 @@ struct PlayerView: View {
                     videoReady = true
                 }
                 #endif
+            }
+        }
+
+        // Add a fallback to ensure we don't load forever
+        Task {
+            try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+            if !videoReady {
+                print("[Player] Loading timeout reached, forcing ready state")
+                await MainActor.run { videoReady = true }
             }
         }
 
@@ -809,11 +846,10 @@ struct PlayerView: View {
             }
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
-                p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600), toleranceBefore: CMTime(seconds: 2, preferredTimescale: 600), toleranceAfter: .zero) { completed in
-                    guard completed else { return }
-                    #if os(iOS)
+                print("[Player] Resuming from \(resumeFrom)s")
+                p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                    // Always set ready, even if seek was interrupted
                     DispatchQueue.main.async { videoReady = true }
-                    #endif
                 }
             }
             #if os(iOS)

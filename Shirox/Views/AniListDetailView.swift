@@ -1,6 +1,13 @@
 import SwiftUI
 import AVKit
 
+#if os(iOS)
+private struct DownloadEpisodeItem: Identifiable {
+    let id = UUID()
+    let episodeNumber: Int
+}
+#endif
+
 struct AniListDetailView: View {
     let mediaId: Int
     let preloadedMedia: AniListMedia?
@@ -16,6 +23,9 @@ struct AniListDetailView: View {
     @State private var showLibraryEdit = false
     @State private var existingEntry: LibraryEntry? = nil
     @State private var isLoadingEntry = false
+    #if os(iOS)
+    @State private var pendingDownloadEpisodeNumber: DownloadEpisodeItem? = nil
+    #endif
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -136,7 +146,30 @@ struct AniListDetailView: View {
                 }
             )
         }
+        .sheet(isPresented: $vm.showDownloadStreamPicker) {
+            DownloadStreamPickerView(streams: vm.pendingDownloadStreams) { stream in
+                vm.downloadWithSelectedStream(stream)
+            }
+        }
         #if os(iOS)
+        .sheet(item: $pendingDownloadEpisodeNumber) { item in
+            let media = vm.media!
+            DownloadModulePickerView(
+                mediaId: media.id,
+                animeTitle: media.title.searchTitle,
+                episodeNumber: item.episodeNumber,
+                onDismiss: { pendingDownloadEpisodeNumber = nil },
+                onStreamsLoaded: { streams, episodeHref in
+                    DispatchQueue.main.async {
+                        vm.pendingDownloadStreams = streams
+                        vm.pendingDownloadEpisode = (EpisodeLink(number: Double(item.episodeNumber), href: episodeHref ?? ""), item.episodeNumber)
+                        vm.pendingDownloadMedia = media
+                        vm.showDownloadStreamPicker = true
+                    }
+                }
+            )
+            .environmentObject(moduleManager)
+        }
         .sheet(isPresented: $showLibraryEdit) {
             if let media = vm.media {
                 LibraryEntryEditSheet(entry: existingEntry, media: media) { status, progress, score in
@@ -147,13 +180,13 @@ struct AniListDetailView: View {
                         updated.score = score
                         existingEntry = updated
                     }
-                    
+
                     if status == .completed {
                         ContinueWatchingManager.shared.resetProgress(
                             aniListID: media.id, moduleId: nil, mediaTitle: media.title.searchTitle
                         )
                     }
-                    
+
                     Task {
                         try? await AniListLibraryService.shared.updateEntry(
                             mediaId: media.id, status: status, progress: progress, score: score
@@ -449,7 +482,7 @@ private func heroSection(media: AniListMedia) -> some View {
 
     @ViewBuilder
     private func episodesSection(media: AniListMedia) -> some View {
-        let totalEpisodes = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
+        let totalEpisodes: Int = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
 
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
@@ -510,7 +543,12 @@ private func heroSection(media: AniListMedia) -> some View {
                             mediaTitle: media.title.searchTitle,
                             coverImage: media.coverImage.best,
                             totalEpisodes: totalEpisodes,
-                            onTap: { vm.watchEpisode(ep) }
+                            onTap: { vm.watchEpisode(ep) },
+                            onDownload: {
+                                #if os(iOS)
+                                pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep)
+                                #endif
+                            }
                         )
                     }
                 }
@@ -577,6 +615,7 @@ private struct AniListEpisodeRowContainer: View {
     let coverImage: String?
     let totalEpisodes: Int?
     let onTap: () -> Void
+    var onDownload: (() -> Void)? = nil
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     private var progress: Double? {
@@ -631,7 +670,8 @@ private struct AniListEpisodeRowContainer: View {
                         upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle,
                         imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
                 }
-            } : nil
+            } : nil,
+            onDownload: onDownload
         )
     }
 }
@@ -647,64 +687,65 @@ private struct AniListEpisodeRow: View {
     var onResetProgress: (() -> Void)? = nil
     var allPreviousWatched: Bool = false
     var onTogglePreviousWatched: (() -> Void)? = nil
+    var onDownload: (() -> Void)? = nil
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 0) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(isComplete ? Color.green : Color.accentColor)
-                            .frame(width: 40, height: 40)
-                        if isComplete {
-                            Image(systemName: "checkmark")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                        } else {
-                            Text("\(number)")
-                                .font(.footnote.weight(.bold))
-                                .foregroundStyle(.white)
-                        }
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(isComplete ? Color.green : Color.accentColor)
+                        .frame(width: 40, height: 40)
+                    if isComplete {
+                        Image(systemName: "checkmark")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Text("\(number)")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(.white)
                     }
-                    .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
-                            radius: 4, y: 2)
-
-                    Text("Episode \(number)")
-                        .font(.callout.weight(.medium))
-
-                    Spacer()
-
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(8)
-                        .background(Color.accentColor.opacity(0.1), in: Circle())
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 12)
+                .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
+                        radius: 4, y: 2)
 
-                if let p = progress, p > 0, !isComplete {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.secondary.opacity(0.15))
-                            Capsule()
-                                .fill(Color.accentColor)
-                                .frame(width: geo.size.width * p)
-                        }
-                        .frame(height: 3)
+                Text("Episode \(number)")
+                    .font(.callout.weight(.medium))
+
+                Spacer()
+
+                Image(systemName: "play.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(8)
+                    .background(Color.accentColor.opacity(0.1), in: Circle())
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, (progress ?? 0) > 0 && !isComplete ? 6 : 12)
+
+            if let p = progress, p > 0, !isComplete {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.secondary.opacity(0.15))
+                        Capsule()
+                            .fill(Color.accentColor)
+                            .frame(width: geo.size.width * p)
                     }
                     .frame(height: 3)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
                 }
+                .frame(height: 3)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
             }
-            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
-            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
-        .buttonStyle(AniListEpisodePressStyle())
+        .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .onTapGesture {
+            onTap()
+        }
         .contextMenu {
             if isComplete {
                 Button { onMarkUnwatched?() } label: {
@@ -728,6 +769,12 @@ private struct AniListEpisodeRow: View {
                 Divider()
                 Button(role: .destructive) { onResetProgress() } label: {
                     Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                }
+            }
+            if let onDownload {
+                Divider()
+                Button { onDownload() } label: {
+                    Label("Download Episode", systemImage: "arrow.down.circle")
                 }
             }
         }

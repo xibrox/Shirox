@@ -10,6 +10,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         configureAudioSession()
         configureURLSession()
+        #if os(iOS)
+        DownloadManager.shared.reconnectPendingTasks()
+        #endif
         return true
     }
 
@@ -22,6 +25,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
         // Small sleep to give the network request a chance to fire before the process is killed
         Thread.sleep(forTimeInterval: 0.5)
+        #endif
+    }
+
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String, completionHandler: @escaping () -> Void) {
+        #if os(iOS)
+        DownloadManager.shared.handleBackgroundEvents(identifier: identifier, completionHandler: completionHandler)
         #endif
     }
 
@@ -97,6 +106,11 @@ struct ShiroxApp: App {
                     Tab("Library", systemImage: "books.vertical.fill") {
                         LibraryView()
                     }
+                    #if os(iOS)
+                    Tab("Downloads", systemImage: "arrow.down.circle.fill") {
+                        DownloadsView()
+                    }
+                    #endif
                     Tab("Settings", systemImage: "gearshape.fill") {
                         SettingsView()
                     }
@@ -121,6 +135,10 @@ struct ShiroxApp: App {
                         .tabItem { Label("Home", systemImage: "house.fill") }
                     LibraryView()
                         .tabItem { Label("Library", systemImage: "books.vertical.fill") }
+                    #if os(iOS)
+                    DownloadsView()
+                        .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
+                    #endif
                     SettingsView()
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     SearchView()

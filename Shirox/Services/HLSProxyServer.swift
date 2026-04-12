@@ -1,13 +1,7 @@
 import Foundation
 import Network
 import Darwin
-#if os(iOS)
-import UIKit
-#endif
 
-/// Minimal local HTTP proxy that forwards HLS requests with custom headers.
-/// Chromecast fetches the rewritten m3u8 from the phone; the phone fetches
-/// the real segments with the required Referer / User-Agent headers.
 final class HLSProxyServer {
     static let shared = HLSProxyServer()
 
@@ -15,180 +9,195 @@ final class HLSProxyServer {
     private let port: NWEndpoint.Port = 8765
     private var proxyHeaders: [String: String] = [:]
     private(set) var isRunning = false
-    private let listenerQueue = DispatchQueue(
-        label: "com.shirox.hlsproxy",
-        qos: .default,
-        attributes: [],
-        autoreleaseFrequency: .workItem
-    )
+    private let listenerQueue = DispatchQueue(label: "com.shirox.hlsproxy", qos: .userInitiated)
 
     private init() {}
 
-    // MARK: - Public API
-
     func start(headers: [String: String]) {
-        proxyHeaders = headers
+        self.proxyHeaders = headers
         guard !isRunning else { return }
+        
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
-        guard let l = try? NWListener(using: params, on: port) else { return }
-        l.newConnectionHandler = { [weak self] conn in self?.handle(conn) }
-        l.start(queue: listenerQueue)
-        listener = l
-        isRunning = true
+        
+        do {
+            let l = try NWListener(using: params, on: port)
+            l.newConnectionHandler = { [weak self] conn in
+                self?.handle(conn)
+            }
+            l.start(queue: listenerQueue)
+            self.listener = l
+            self.isRunning = true
+            print("[Proxy] Started on 127.0.0.1:\(port)")
+        } catch {
+            print("[Proxy] Start failed: \(error)")
+        }
     }
 
     func stop() {
+        print("[Proxy] Stopping server")
         listener?.cancel()
         listener = nil
         isRunning = false
     }
 
-    /// Returns a proxy URL for the given original URL, routed through this server.
     func proxyURL(for url: URL) -> URL? {
-        guard let ip = localIPAddress() else { return nil }
         var c = URLComponents()
         c.scheme = "http"
-        c.host = ip
+        c.host = "127.0.0.1"
         c.port = Int(port.rawValue)
         c.path = "/proxy"
         c.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
         return c.url
     }
 
-    // MARK: - Connection handling
-
     private func handle(_ connection: NWConnection) {
         connection.start(queue: listenerQueue)
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, _, _ in
-            guard let self, let data, let requestText = String(data: data, encoding: .utf8) else { return }
-            guard let urlString = self.parsePath(from: requestText),
-                  let targetURL = URL(string: urlString) else {
-                self.respond(connection, status: 400, body: Data())
+        receiveRequest(on: connection)
+    }
+
+    private func receiveRequest(on connection: NWConnection) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, _ in
+            guard let self = self, let data = data, let requestText = String(data: data, encoding: .utf8) else {
+                connection.cancel()
                 return
             }
-            #if os(iOS)
-            let bgTask = UIApplication.shared.beginBackgroundTask { }
-            #endif
+            
+            let lines = requestText.components(separatedBy: "\r\n")
+            guard let firstLine = lines.first else { connection.cancel(); return }
+            let parts = firstLine.components(separatedBy: " ")
+            guard parts.count >= 2 else { connection.cancel(); return }
+            
+            let method = parts[0]
+            let path = parts[1]
+            
+            guard let urlComp = URLComponents(string: "http://localhost" + path),
+                  let urlValue = urlComp.queryItems?.first(where: { $0.name == "url" })?.value,
+                  let targetURL = URL(string: urlValue) else {
+                self.sendSimpleResponse(connection, status: 400)
+                return
+            }
+            
+            var range: String?
+            for line in lines {
+                if line.lowercased().hasPrefix("range:") {
+                    range = line.components(separatedBy: ":").last?.trimmingCharacters(in: .whitespaces)
+                    break
+                }
+            }
+            
             Task {
-                await self.fetchAndForward(url: targetURL, connection: connection)
-                #if os(iOS)
-                UIApplication.shared.endBackgroundTask(bgTask)
-                #endif
+                if targetURL.isFileURL {
+                    await self.serveLocal(targetURL, connection: connection, range: range, isHead: method == "HEAD")
+                } else {
+                    await self.serveRemote(targetURL, connection: connection)
+                }
+                self.receiveRequest(on: connection)
             }
         }
     }
 
-    private func parsePath(from request: String) -> String? {
-        guard let firstLine = request.components(separatedBy: "\r\n").first else { return nil }
-        let parts = firstLine.components(separatedBy: " ")
-        guard parts.count >= 2 else { return nil }
-        let path = parts[1]
-        guard let comps = URLComponents(string: "http://localhost" + path),
-              let urlValue = comps.queryItems?.first(where: { $0.name == "url" })?.value
-        else { return nil }
-        return urlValue
-    }
-
-    // MARK: - Fetch & rewrite
-
-    private func fetchAndForward(url: URL, connection: NWConnection) async {
-        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
-        proxyHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-
-        guard let (data, response) = try? await URLSession.shared.data(for: req) else {
-            respond(connection, status: 502, body: Data())
+    private func serveLocal(_ url: URL, connection: NWConnection, range: String?, isHead: Bool) async {
+        let isManifest = url.pathExtension.lowercased() == "m3u8"
+        
+        if isManifest, let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) {
+            // Rewrite manifest to proxy local segments
+            let rewritten = rewriteLocalManifest(text, baseURL: url)
+            let body = rewritten.data(using: .utf8) ?? data
+            sendData(body, contentType: "application/x-mpegURL", connection: connection)
             return
         }
-
-        let contentType = (response as? HTTPURLResponse)?
-            .value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
-
-        let isPlaylist = contentType.contains("mpegurl")
-            || url.pathExtension.lowercased() == "m3u8"
-
-        let body: Data
-        if isPlaylist, let text = String(data: data, encoding: .utf8) {
-            body = rewriteM3U8(text, baseURL: url).data(using: .utf8) ?? data
-        } else {
-            body = data
+        
+        guard let attr = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let fileSize = attr[.size] as? Int64 else {
+            sendSimpleResponse(connection, status: 404)
+            return
         }
-
-        respond(connection, status: 200, contentType: contentType, body: body)
+        
+        var start: Int64 = 0
+        var end: Int64 = fileSize - 1
+        var isPartial = false
+        if let range = range, range.hasPrefix("bytes="), let r = parseRange(range, size: fileSize) {
+            start = r.0; end = r.1; isPartial = true
+        }
+        
+        let length = end - start + 1
+        let status = isPartial ? "206 Partial Content" : "200 OK"
+        var header = "HTTP/1.1 \(status)\r\nContent-Type: \(getMimeType(for: url.pathExtension))\r\nContent-Length: \(length)\r\nAccept-Ranges: bytes\r\nAccess-Control-Allow-Origin: *\r\n"
+        if isPartial { header += "Content-Range: bytes \(start)-\(end)/\(fileSize)\r\n" }
+        header += "\r\n"
+        
+        connection.send(content: header.data(using: .utf8), completion: .contentProcessed({ _ in
+            if isHead { return }
+            if let handle = try? FileHandle(forReadingFrom: url) {
+                try? handle.seek(toOffset: UInt64(start))
+                self.streamFile(handle, connection: connection, remaining: length)
+            }
+        }))
     }
 
-    private func rewriteM3U8(_ text: String, baseURL: URL) -> String {
-        text.components(separatedBy: "\n").map { line -> String in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { return line }
-            let resolved: URL?
-            if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
-                resolved = URL(string: trimmed)
-            } else {
-                resolved = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL
-            }
-            guard let src = resolved, let proxied = proxyURL(for: src) else { return line }
-            return proxied.absoluteString
+    private func rewriteLocalManifest(_ text: String, baseURL: URL) -> String {
+        let folderURL = baseURL.deletingLastPathComponent()
+        return text.components(separatedBy: .newlines).map { line -> String in
+            let tr = line.trimmingCharacters(in: .whitespaces)
+            guard !tr.isEmpty && !tr.hasPrefix("#") else { return line }
+            let segURL = folderURL.appendingPathComponent(tr)
+            return proxyURL(for: segURL)?.absoluteString ?? line
         }.joined(separator: "\n")
     }
 
-    // MARK: - HTTP response
-
-    private func respond(_ connection: NWConnection, status: Int,
-                         contentType: String = "application/octet-stream", body: Data) {
-        let header = "HTTP/1.1 \(status) OK\r\n" +
-            "Content-Type: \(contentType)\r\n" +
-            "Content-Length: \(body.count)\r\n" +
-            "Access-Control-Allow-Origin: *\r\n" +
-            "Connection: close\r\n\r\n"
-        var response = header.data(using: .utf8)!
-        response.append(body)
-        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+    private func streamFile(_ handle: FileHandle, connection: NWConnection, remaining: Int64) {
+        var left = remaining
+        let chunk = Int64(128 * 1024)
+        func sendNext() {
+            guard left > 0 else { try? handle.close(); return }
+            let toRead = min(left, chunk)
+            if let data = try? handle.read(upToCount: Int(toRead)), !data.isEmpty {
+                left -= Int64(data.count)
+                connection.send(content: data, isComplete: false, completion: .contentProcessed({ error in
+                    if error == nil { sendNext() } else { try? handle.close() }
+                }))
+            } else { try? handle.close() }
+        }
+        sendNext()
     }
 
-    // MARK: - Local IP
-
-    private func localIPAddress() -> String? {
-        // Prefer WiFi (en0), fall back to any active non-loopback IPv4
-        for targetIface in ["en0", "en1", "en2"] {
-            if let ip = ipForInterface(targetIface) { return ip }
+    private func serveRemote(_ url: URL, connection: NWConnection) async {
+        var req = URLRequest(url: url)
+        proxyHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        if let (data, res) = try? await URLSession.shared.data(for: req) {
+            let mime = (res as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
+            sendData(data, contentType: mime, connection: connection)
+        } else {
+            sendSimpleResponse(connection, status: 502)
         }
-        var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0 else { return nil }
-        defer { freeifaddrs(ifaddr) }
-        var ptr = ifaddr
-        while let ifa = ptr {
-            let flags = Int32(ifa.pointee.ifa_flags)
-            let addr = ifa.pointee.ifa_addr.pointee
-            if (flags & (IFF_UP | IFF_RUNNING | IFF_LOOPBACK)) == (IFF_UP | IFF_RUNNING),
-               addr.sa_family == UInt8(AF_INET) {
-                var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                getnameinfo(ifa.pointee.ifa_addr, socklen_t(addr.sa_len),
-                            &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
-                return String(cString: hostname)
-            }
-            ptr = ifa.pointee.ifa_next
-        }
-        return nil
     }
 
-    private func ipForInterface(_ name: String) -> String? {
-        var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0 else { return nil }
-        defer { freeifaddrs(ifaddr) }
-        var ptr = ifaddr
-        while let ifa = ptr {
-            let ifName = String(cString: ifa.pointee.ifa_name)
-            let addr = ifa.pointee.ifa_addr.pointee
-            if ifName == name, addr.sa_family == UInt8(AF_INET) {
-                var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                getnameinfo(ifa.pointee.ifa_addr, socklen_t(addr.sa_len),
-                            &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
-                let ip = String(cString: hostname)
-                if !ip.isEmpty { return ip }
-            }
-            ptr = ifa.pointee.ifa_next
+    private func sendData(_ data: Data, contentType: String, connection: NWConnection) {
+        let h = "HTTP/1.1 200 OK\r\nContent-Type: \(contentType)\r\nContent-Length: \(data.count)\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
+        var resp = h.data(using: .utf8)!
+        resp.append(data)
+        connection.send(content: resp, completion: .contentProcessed({ _ in }))
+    }
+
+    private func sendSimpleResponse(_ connection: NWConnection, status: Int) {
+        let r = "HTTP/1.1 \(status) Error\r\nContent-Length: 0\r\n\r\n"
+        connection.send(content: r.data(using: .utf8), completion: .contentProcessed({ _ in }))
+    }
+
+    private func parseRange(_ r: String, size: Int64) -> (Int64, Int64)? {
+        let val = r.replacingOccurrences(of: "bytes=", with: "").components(separatedBy: "-")
+        guard let s = Int64(val[0]) else { return nil }
+        let e = val.count > 1 && !val[1].isEmpty ? Int64(val[1])! : size - 1
+        return (s, e)
+    }
+
+    private func getMimeType(for ext: String) -> String {
+        switch ext.lowercased() {
+        case "mp4": return "video/mp4"
+        case "ts": return "video/mp2t"
+        case "m3u8": return "application/x-mpegURL"
+        default: return "application/octet-stream"
         }
-        return nil
     }
 }

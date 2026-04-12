@@ -21,15 +21,29 @@ struct StreamPickerView: View {
                         description: Text("Could not find any playable streams for this episode.")
                     )
                 } else {
-                    List(vm.streamOptions) { stream in
+                    List(vm.streamOptions, id: \.url) { stream in
                         Button {
                             vm.pendingStream = stream
                             vm.showStreamPicker = false
                         } label: {
-                            Label(stream.title, systemImage: "play.fill")
-                                .foregroundStyle(.primary)
+                            HStack(spacing: 12) {
+                                Image(systemName: "play.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color.accentColor)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(stream.title)
+                                        .font(.subheadline).fontWeight(.semibold)
+                                        .foregroundStyle(.primary)
+                                    Text(stream.subtitle != nil ? "Soft subtitles available" : "No soft subtitles")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 6)
                         }
+                        .buttonStyle(.plain)
                     }
+                    .listStyle(.insetGrouped)
                 }
             }
             .navigationTitle(episodeTitle)
