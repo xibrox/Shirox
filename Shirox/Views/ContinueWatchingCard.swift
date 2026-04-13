@@ -53,7 +53,7 @@ struct ContinueWatchingSection: View {
         } else if item.streamUrl.isEmpty, let href = item.detailHref, let mid = item.moduleId {
             // Module Up Next — navigate to detail, activating the correct module first
             NavigationLink {
-                DetailView(item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href), resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds, moduleId: mid)
+                DetailView(item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href), resumeEpisodeNumber: item.episodeNumber, resumeWatchedSeconds: item.watchedSeconds, moduleId: mid, aniListID: item.aniListID)
             } label: {
                 ContinueWatchingCardDisplay(item: item)
             }

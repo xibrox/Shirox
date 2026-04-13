@@ -24,6 +24,8 @@ final class DetailViewModel: ObservableObject {
     @Published var selectedStream: StreamResult?
     @Published var showPlayer = false
 
+    var aniListID: Int? // Added this
+
     /// Stream selected by user in the picker — presented after the sheet fully dismisses.
     var pendingStream: StreamResult?
 
@@ -155,7 +157,7 @@ final class DetailViewModel: ObservableObject {
             episodeNumber: Int(selectedEpisode?.number ?? 1),
             episodeTitle: nil,
             imageUrl: detail?.image ?? "",
-            aniListID: nil,
+            aniListID: aniListID, // Added this
             moduleId: ModuleManager.shared.activeModule?.id,
             totalEpisodes: detail?.episodes.count,
             resumeFrom: resumeWatchedSeconds,

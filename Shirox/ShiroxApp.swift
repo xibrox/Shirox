@@ -128,6 +128,7 @@ struct ShiroxApp: App {
                     await moduleManager.restoreActiveModule()
                     await moduleManager.checkForUpdates()
                     await AniListAuthManager.shared.fetchViewer()
+                    await ContinueWatchingManager.shared.syncWithAniList()
                 }
             } else {
                 TabView {
@@ -154,6 +155,7 @@ struct ShiroxApp: App {
                     await moduleManager.restoreActiveModule()
                     await moduleManager.checkForUpdates()
                     await AniListAuthManager.shared.fetchViewer()
+                    await ContinueWatchingManager.shared.syncWithAniList()
                 }
             }
         }

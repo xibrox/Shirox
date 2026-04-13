@@ -116,6 +116,49 @@ import Foundation
         UserDefaults.standard.set(Self.currentDataVersion, forKey: Keys.dataVersion)
     }
 
+    /// Syncs local Continue Watching with AniList's "Watching" list.
+    func syncWithAniList() async {
+        guard let userId = await AniListAuthManager.shared.userId else { return }
+        
+        do {
+            let library = try await AniListLibraryService.shared.fetchAllLists(userId: userId)
+            let watching = library.filter { $0.status == .current }
+            
+            var newItems = items
+            
+            for entry in watching {
+                let media = entry.media
+                let nextEp = entry.progress + 1
+                
+                // Only add if we don't already have progress for this show
+                let existing = newItems.first { matchesShow($0, aniListID: media.id, moduleId: nil, mediaTitle: "") }
+                
+                if existing == nil {
+                    // Create a placeholder pointing to the next episode based on AniList progress
+                    if let placeholder = makePlaceholder(
+                        episodeNumber: nextEp,
+                        from: nil,
+                        aniListID: media.id,
+                        moduleId: nil,
+                        mediaTitle: media.title.displayTitle,
+                        imageUrl: media.coverImage.best,
+                        totalEpisodes: media.episodes,
+                        detailHref: nil
+                    ) {
+                        newItems.append(placeholder)
+                    }
+                }
+            }
+            
+            // Sort by date and keep unique
+            items = Array(newItems.sorted { $0.lastWatchedAt > $1.lastWatchedAt }.prefix(maxItems))
+            persist()
+            
+        } catch {
+            print("[CW] Sync failed: \(error.localizedDescription)")
+        }
+    }
+
     /// Returns true if the episode has been watched to completion.
     func isWatched(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int) -> Bool {
         guard let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,

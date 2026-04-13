@@ -97,6 +97,11 @@ struct AniListDetailView: View {
         .task {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             await vm.load(id: mediaId, preloaded: preloadedMedia)
+            
+            // Auto-fetch library entry to show watched episodes from AniList
+            if auth.isLoggedIn {
+                existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId)
+            }
         }
         .onChange(of: vm.media?.id) { _ in
             // Auto-load streams for resume episode if specified
@@ -637,6 +642,8 @@ private func heroSection(media: AniListMedia) -> some View {
                             mediaTitle: media.title.searchTitle,
                             coverImage: media.coverImage.best,
                             totalEpisodes: totalEpisodes,
+                            aniListProgress: existingEntry?.progress,
+                            aniListStatus: existingEntry?.status,
                             onTap: sel ? {
                                 if selectedEpisodeNumbers.contains(ep) {
                                     selectedEpisodeNumbers.remove(ep)
@@ -724,6 +731,8 @@ private struct AniListEpisodeRowContainer: View {
     let mediaTitle: String
     let coverImage: String?
     let totalEpisodes: Int?
+    let aniListProgress: Int?
+    let aniListStatus: MediaListStatus?
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
     var isSelectionMode: Bool = false
@@ -731,10 +740,21 @@ private struct AniListEpisodeRowContainer: View {
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     private var progress: Double? {
+        // Check local watched history first
         if continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
                                       mediaTitle: mediaTitle, episodeNumber: ep) {
             return 1.0
         }
+        
+        // Check AniList progress
+        if let status = aniListStatus, status != .planning {
+            if status == .completed {
+                return 1.0
+            } else if let p = aniListProgress, ep <= p {
+                return 1.0
+            }
+        }
+
         guard let item = continueWatching.items
             .first(where: { $0.aniListID == mediaId && $0.episodeNumber == ep }),
               item.totalSeconds > 0

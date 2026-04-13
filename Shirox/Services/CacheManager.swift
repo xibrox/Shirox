@@ -7,39 +7,104 @@ final class CacheManager: ObservableObject {
     
     private init() {}
     
-    /// Returns total disk usage of the app's cache and data in bytes.
-    var totalDiskUsage: Int {
-        let urlCache = URLCache.shared.currentDiskUsage
-        // We could calculate more here if needed, but urlCache is the main visible one
-        return urlCache
+    // MARK: - Size Calculations
+    
+    var imageCacheSize: Int { URLCache.shared.currentDiskUsage }
+    
+    var websiteDataSize: Int {
+        let libraryDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+        let webKitFolders = ["Caches", "WebKit", "Cookies"]
+        var total = 0
+        for folder in webKitFolders {
+            let url = libraryDir.appendingPathComponent(folder)
+            total += (try? sizeOfDirectory(at: url)) ?? 0
+        }
+        return total
     }
     
-    /// Clears all temporary, WebKit, and shared network caches.
-    func clearAllCache() async {
-        print("[Cache] Starting comprehensive cleanup...")
-        
-        // 1. URLCache (Shared)
+    var tempFilesSize: Int {
+        let tempDir = FileManager.default.temporaryDirectory
+        return (try? sizeOfDirectory(at: tempDir)) ?? 0
+    }
+    
+    var continueWatchingSize: Int {
+        let keys = ["continueWatchingItems", "watchedEpisodeKeys"]
+        var total = 0
+        for key in keys {
+            if let data = UserDefaults.standard.data(forKey: key) {
+                total += data.count
+            }
+        }
+        return total
+    }
+    
+    var watchHistorySize: Int {
+        if let data = UserDefaults.standard.data(forKey: "watchHistory") {
+            return data.count
+        }
+        return 0
+    }
+    
+    var totalDiskUsage: Int {
+        imageCacheSize + websiteDataSize + tempFilesSize + continueWatchingSize + watchHistorySize
+    }
+
+    // MARK: - Individual Reset Methods
+
+    func clearImageCache() {
         URLCache.shared.removeAllCachedResponses()
-        
-        // 2. WebKit Data (The likely 300MB source)
+        NotificationCenter.default.post(name: NSNotification.Name("ClearImageCache"), object: nil)
+    }
+
+    func clearWebsiteData() async {
         let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
         let store = WKWebsiteDataStore.default()
         await store.removeData(ofTypes: dataTypes, modifiedSince: .distantPast)
-        
-        // 3. Temporary Directory
+    }
+
+    func clearTempFiles() {
         let tempDir = FileManager.default.temporaryDirectory
         if let contents = try? FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil) {
             for file in contents {
                 try? FileManager.default.removeItem(at: file)
             }
         }
-        
-        // 4. Cleanup orphaned download folders
+    }
+
+    func clearContinueWatching() {
+        ContinueWatchingManager.shared.resetAllData()
+    }
+
+    func clearWatchHistory() {
+        WatchHistoryService.shared.history = []
+        UserDefaults.standard.removeObject(forKey: "watchHistory")
+    }
+
+    func clearEverything() async {
+        clearImageCache()
+        await clearWebsiteData()
+        clearTempFiles()
+        clearContinueWatching()
+        clearWatchHistory()
         cleanupOrphanedDownloads()
-        
-        print("[Cache] Cleanup complete.")
     }
     
+    // MARK: - Helpers
+
+    private func sizeOfDirectory(at url: URL) throws -> Int {
+        let keys: [URLResourceKey] = [.fileSizeKey, .isDirectoryKey]
+        guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: keys) else { return 0 }
+        
+        var total = 0
+        for case let fileURL as URL in enumerator {
+            let resourceValues = try fileURL.resourceValues(forKeys: Set(keys))
+            if let isDirectory = resourceValues.isDirectory, !isDirectory {
+                total += resourceValues.fileSize ?? 0
+            }
+        }
+        return total
+    }
+
     private func cleanupOrphanedDownloads() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let downloadDir = docs.appendingPathComponent("Downloads", isDirectory: true)
@@ -55,19 +120,14 @@ final class CacheManager: ObservableObject {
         
         for file in contents {
             let name = file.lastPathComponent
-            
-            // If it's a folder (Local HLS), check if its ID is valid
-            // If it's a file (MP4), check if its filename is valid
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: file.path, isDirectory: &isDir) {
                 if isDir.boolValue {
                     if !validIds.contains(name) {
-                        print("[Cache] Removing orphaned download folder: \(name)")
                         try? FileManager.default.removeItem(at: file)
                     }
                 } else {
                     if !validFileNames.contains(name) {
-                        print("[Cache] Removing orphaned download file: \(name)")
                         try? FileManager.default.removeItem(at: file)
                     }
                 }

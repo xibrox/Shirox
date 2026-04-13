@@ -6,12 +6,16 @@ struct DetailView: View {
     var resumeEpisodeNumber: Int?
     var resumeWatchedSeconds: Double?
     var moduleId: String?
+    var aniListID: Int?
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var synopsisExpanded = false
     @State private var selectedSeason = 0
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
+    @State private var existingEntry: LibraryEntry? = nil
+    @State private var isLoadingEntry = false
+    @State private var showLibraryEdit = false
     #if os(iOS)
     @State private var isSelectionMode = false
     @State private var selectedEpisodeNumbers: Set<Int> = []
@@ -42,9 +46,40 @@ struct DetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task {
+                            isLoadingEntry = true
+                            existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
+                            isLoadingEntry = false
+                            showLibraryEdit = true
+                        }
+                    } label: {
+                        if isLoadingEntry {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "pencil.circle")
+                                .font(.system(size: 17, weight: .medium))
+                        }
+                    }
+                    .disabled(isLoadingEntry)
+                }
+            }
+        }
 #endif
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
+            vm.aniListID = aniListID // Added this
+            
+            // Sync with AniList if we have an ID
+            if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
+                Task {
+                    existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
+                }
+            }
+
             // If a specific module is required (e.g. from Continue Watching), activate it first
             if let mid = moduleId, ModuleManager.shared.activeModule?.id != mid,
                let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
@@ -56,11 +91,12 @@ struct DetailView: View {
                 vm.load(item: item)
             }
         }
-        .onChange(of: vm.detail?.episodes) { episodes in
+        .onChange(of: vm.detail?.episodes) {
             // Auto-load streams for resume episode if specified
-            guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber,
-                  let episode = vm.detail?.episodes.first(where: { Int($0.number) == resumeEpNum })
-            else { return }
+            guard !autoPlayOnLoad else { return }
+            guard let resumeEpNum = resumeEpisodeNumber else { return }
+            guard let episodes = vm.detail?.episodes else { return }
+            guard let episode = episodes.first(where: { Int($0.number) == resumeEpNum }) else { return }
             autoPlayOnLoad = true
             vm.loadStreams(for: episode)
         }
@@ -82,6 +118,41 @@ struct DetailView: View {
         .sheet(isPresented: $vm.showDownloadStreamPicker) {
             DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
                 vm.downloadWithSelectedStream(stream)
+            }
+        }
+        .sheet(isPresented: $showLibraryEdit) {
+            if let aid = aniListID, let detail = vm.detail {
+                // Map MediaDetail to a temporary AniListMedia for the edit sheet
+                let tempMedia = AniListMedia(
+                    id: aid,
+                    title: AniListTitle(romaji: detail.title, english: detail.title, native: detail.title),
+                    coverImage: AniListCoverImage(large: detail.image, extraLarge: detail.image),
+                    bannerImage: nil,
+                    description: detail.description,
+                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+                    status: "FINISHED",
+                    averageScore: nil,
+                    genres: nil,
+                    season: nil,
+                    seasonYear: nil,
+                    nextAiringEpisode: nil
+                )
+                
+                LibraryEntryEditSheet(entry: existingEntry, media: tempMedia) { status, progress, score in
+                    if status == .completed {
+                        ContinueWatchingManager.shared.resetProgress(
+                            aniListID: aid, moduleId: nil, mediaTitle: detail.title
+                        )
+                    }
+                    
+                    Task {
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: aid, status: status, progress: progress, score: score
+                        )
+                        // Refresh state
+                        existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
+                    }
+                }
             }
         }
         #if os(iOS)
@@ -288,7 +359,32 @@ struct DetailView: View {
                         Text(detail.aliases)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 8) {
+                        if let score = existingEntry?.score, score > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "star.fill")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.yellow)
+                                Text(String(format: "%.1f", score))
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.primary)
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(.yellow.opacity(0.12), in: Capsule())
+                            .overlay(Capsule().strokeBorder(.yellow.opacity(0.35), lineWidth: 0.5))
+                        }
+
+                        if let status = existingEntry?.status {
+                            Text(status.displayName)
+                                .font(.caption2).fontWeight(.semibold)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Color.secondary.opacity(0.12), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                        }
                     }
 
                     if let detail = vm.detail, detail.airdate != "N/A" {
@@ -575,6 +671,9 @@ struct DetailView: View {
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
+                            aniListID: aniListID,
+                            aniListProgress: existingEntry?.progress,
+                            aniListStatus: existingEntry?.status,
                             onTap: sel ? {
                                 if selectedEpisodeNumbers.contains(epNum) {
                                     selectedEpisodeNumbers.remove(epNum)
@@ -595,6 +694,9 @@ struct DetailView: View {
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
+                            aniListID: aniListID,
+                            aniListProgress: existingEntry?.progress,
+                            aniListStatus: existingEntry?.status,
                             onTap: { vm.loadStreams(for: episode) }
                         )
                         #endif
@@ -613,6 +715,9 @@ private struct ModuleEpisodeRowContainer: View {
     let itemImage: String
     let totalEpisodes: Int?
     let detailHref: String?
+    let aniListID: Int?
+    let aniListProgress: Int?
+    let aniListStatus: MediaListStatus?
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
     var isSelectionMode: Bool = false
@@ -623,14 +728,26 @@ private struct ModuleEpisodeRowContainer: View {
     private var epNum: Int { Int(episode.number) }
 
     private var progress: Double? {
-        guard let moduleId else { return nil }
-        if continueWatching.isWatched(aniListID: nil, moduleId: moduleId,
+        // Check local watched history first
+        if continueWatching.isWatched(aniListID: aniListID, moduleId: moduleId,
                                       mediaTitle: mediaTitle, episodeNumber: epNum) {
             return 1.0
         }
+        
+        // Check AniList progress
+        if let status = aniListStatus, status != .planning {
+            if status == .completed {
+                return 1.0
+            } else if let p = aniListProgress, epNum <= p {
+                return 1.0
+            }
+        }
+
+        // Fallback to local in-progress items
+        let mid = moduleId
         guard let item = continueWatching.items.first(where: {
-                  $0.moduleId == moduleId
-                  && $0.mediaTitle == mediaTitle
+                  ($0.aniListID != nil && $0.aniListID == aniListID) ||
+                  ($0.moduleId == mid && $0.mediaTitle == mediaTitle)
                   && $0.episodeNumber == epNum
               }),
               item.totalSeconds > 0

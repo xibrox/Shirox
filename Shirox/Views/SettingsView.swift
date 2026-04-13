@@ -10,9 +10,15 @@ struct SettingsView: View {
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
-    @State private var showResetConfirmation = false
+    @State private var showResetCWConfirmation = false
+    @State private var showResetHistoryConfirmation = false
     #if os(iOS)
-    @State private var imageCacheSize = CachedAsyncImage.diskCacheBytes
+    @State private var imageCacheSize = 0
+    @State private var websiteDataSize = 0
+    @State private var tempFilesSize = 0
+    @State private var continueWatchingSize = 0
+    @State private var watchHistorySize = 0
+    @State private var totalUsage = 0
     #endif
 
     private let shortOptions = [5, 10, 15, 30]
@@ -124,48 +130,123 @@ struct SettingsView: View {
                 Section("Storage & Cache") {
                     Button(role: .destructive) {
                         Task {
-                            await CacheManager.shared.clearAllCache()
-                            imageCacheSize = CacheManager.shared.totalDiskUsage
+                            await CacheManager.shared.clearEverything()
+                            updateCacheSizes()
                         }
                     } label: {
-                        LabeledContent("Clear All Cache") {
-                            Text(Self.formattedBytes(imageCacheSize))
+                        LabeledContent("Clear Everything") {
+                            Text(Self.formattedBytes(totalUsage))
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    
-                    Text("Clears images, website data, and temporary download fragments. This can free up significant space.")
+                    .foregroundStyle(.red)
+
+                    DisclosureGroup("Individual Resets") {
+                        Button {
+                            CacheManager.shared.clearImageCache()
+                            updateCacheSizes()
+                        } label: {
+                            LabeledContent("Reset Image Cache") {
+                                Text(Self.formattedBytes(imageCacheSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+
+                        Button {
+                            Task {
+                                await CacheManager.shared.clearWebsiteData()
+                                updateCacheSizes()
+                            }
+                        } label: {
+                            LabeledContent("Reset Website Data") {
+                                Text(Self.formattedBytes(websiteDataSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+
+                        Button {
+                            CacheManager.shared.clearTempFiles()
+                            updateCacheSizes()
+                        } label: {
+                            LabeledContent("Clear Temporary Files") {
+                                Text(Self.formattedBytes(tempFilesSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+
+                        Button {
+                            showResetCWConfirmation = true
+                        } label: {
+                            LabeledContent("Reset Continue Watching") {
+                                Text(Self.formattedBytes(continueWatchingSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.red)
+
+                        Button {
+                            showResetHistoryConfirmation = true
+                        } label: {
+                            LabeledContent("Reset Watch History") {
+                                Text(Self.formattedBytes(watchHistorySize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.red)
+                    }
+                    .font(.subheadline)
+
+                    Text("Website Data includes cookies and local storage from module scrapers. Watch Data includes continue watching and history.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 #endif
-                Section("Continue Watching") {
-                    Button("Reset Continue Watching Data") {
-                        showResetConfirmation = true
+                }
+                .navigationTitle("Settings")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
+                    Button("Reset", role: .destructive) {
+                        CacheManager.shared.clearContinueWatching()
+                        updateCacheSizes()
                     }
-                    .foregroundStyle(.red)
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This will clear all in-progress playback cards from the Home screen.")
                 }
-            }
-            .navigationTitle("Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .alert("Reset Continue Watching?", isPresented: $showResetConfirmation) {
-                Button("Reset", role: .destructive) {
-                    ContinueWatchingManager.shared.resetAllData()
+                .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
+                    Button("Reset", role: .destructive) {
+                        CacheManager.shared.clearWatchHistory()
+                        updateCacheSizes()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This will clear all 'Watched' checkmarks from episode lists.")
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all watched history and Continue Watching cards. This cannot be undone.")
-            }
-        }
-        .onAppear {
+                }
+                .onAppear {
+
             PlayerPresenter.shared.resetToAppOrientation()
             #if os(iOS)
-            imageCacheSize = CacheManager.shared.totalDiskUsage
+            updateCacheSizes()
             #endif
         }
     }
+
+    #if os(iOS)
+    private func updateCacheSizes() {
+        imageCacheSize = CacheManager.shared.imageCacheSize
+        websiteDataSize = CacheManager.shared.websiteDataSize
+        tempFilesSize = CacheManager.shared.tempFilesSize
+        continueWatchingSize = CacheManager.shared.continueWatchingSize
+        watchHistorySize = CacheManager.shared.watchHistorySize
+        totalUsage = CacheManager.shared.totalDiskUsage
+    }
+    #endif
 
     private static func formattedBytes(_ bytes: Int) -> String {
         guard bytes > 0 else { return "0 KB" }

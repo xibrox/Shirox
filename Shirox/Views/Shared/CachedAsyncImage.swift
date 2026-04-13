@@ -42,6 +42,7 @@ struct CachedAsyncImage: View {
     static func resetCache() {
         cache.removeAllObjects()
         URLCache.shared.removeAllCachedResponses()
+        NotificationCenter.default.post(name: NSNotification.Name("ClearImageCache"), object: nil)
     }
 
     var body: some View {
@@ -66,6 +67,9 @@ struct CachedAsyncImage: View {
             } else {
                 Color.gray.opacity(0.15)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ClearImageCache"))) { _ in
+            platformImage = nil
         }
         .task(id: urlString + (base64String ?? "")) {
             platformImage = nil
