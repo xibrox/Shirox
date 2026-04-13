@@ -39,6 +39,8 @@ final class DownloadManager: NSObject, ObservableObject {
     
     private override init() {
         super.init()
+        // Ensure download directory exists so it shows up in Files app
+        _ = downloadDir
         load()
     }
     
@@ -107,7 +109,7 @@ final class DownloadManager: NSObject, ObservableObject {
         let playURL: URL
         if item.isHLS {
             // Local HLS manifest MUST be served through proxy to work in AVPlayer
-            await HLSProxyServer.shared.startAndWait(headers: ["User-Agent": URLSession.randomUserAgent])
+            HLSProxyServer.shared.start(headers: ["User-Agent": URLSession.randomUserAgent])
             playURL = HLSProxyServer.shared.proxyURL(for: fileURL) ?? fileURL
             print("[Downloads] Routing Local HLS through proxy: \(playURL)")
         } else {

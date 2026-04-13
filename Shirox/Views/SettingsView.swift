@@ -121,17 +121,22 @@ struct SettingsView: View {
                 .environment(\.editMode, .constant(.active))
 
                 #if os(iOS)
-                Section("Cache") {
-                    Button {
-                        CachedAsyncImage.resetCache()
-                        imageCacheSize = CachedAsyncImage.diskCacheBytes
+                Section("Storage & Cache") {
+                    Button(role: .destructive) {
+                        Task {
+                            await CacheManager.shared.clearAllCache()
+                            imageCacheSize = CacheManager.shared.totalDiskUsage
+                        }
                     } label: {
-                        LabeledContent("Reset Image Cache") {
+                        LabeledContent("Clear All Cache") {
                             Text(Self.formattedBytes(imageCacheSize))
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .foregroundStyle(.red)
+                    
+                    Text("Clears images, website data, and temporary download fragments. This can free up significant space.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 #endif
                 Section("Continue Watching") {
@@ -157,7 +162,7 @@ struct SettingsView: View {
         .onAppear {
             PlayerPresenter.shared.resetToAppOrientation()
             #if os(iOS)
-            imageCacheSize = CachedAsyncImage.diskCacheBytes
+            imageCacheSize = CacheManager.shared.totalDiskUsage
             #endif
         }
     }

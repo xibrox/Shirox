@@ -136,6 +136,8 @@
 		B28F4CA7C301FB3448693046 /* ModuleJSRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */; };
 		B6B720E10D4EE0F2136F17C4 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
 		B6B720E10D4EE0F2136F17C6 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
+		B6B720E10D4EE0F2136F17C8 /* CacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */; };
+		B6B720E10D4EE0F2136F17C9 /* CacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */; };
 		B85FDAB9BAB5CFDC3F324ACD /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
 		B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
 		C513DCB66EC4AFC34A15DC7A /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
@@ -225,6 +227,7 @@
 		B371AE47E8FD36A0C11174AC /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
 		B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamResult.swift; sourceTree = "<group>"; };
 		B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchAliasManager.swift; sourceTree = "<group>"; };
+		B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
 		BCAB52C5F226579CA37CC9E5 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
 		BECC2087556541BAE47BDA6B /* DetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailViewModel.swift; sourceTree = "<group>"; };
 		D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeCardView.swift; sourceTree = "<group>"; };
@@ -334,6 +337,7 @@
 				2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */,
 				FA54E15EA936A28D42B73886 /* ModuleManager.swift */,
 				B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */,
+				B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */,
 				5E45F91C732C2601421713C8 /* NetworkFetch.swift */,
 				AA000001000000000000BB01 /* SubtitleSettingsManager.swift */,
 				AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */,
@@ -620,6 +624,7 @@
 				EA5B1C17081C02D59196F61C /* ModuleListView.swift in Sources */,
 				72D5458BF7DD94A53658F64C /* ModuleManager.swift in Sources */,
 				B6B720E10D4EE0F2136F17C4 /* ModuleSearchAliasManager.swift in Sources */,
+				B6B720E10D4EE0F2136F17C8 /* CacheManager.swift in Sources */,
 				AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */,
 				142A89C32F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
 				B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */,
@@ -693,6 +698,7 @@
 				2655381CCFCFAC0158241F3C /* ModuleListView.swift in Sources */,
 				959D35AAA4791E5B4B9DB7D3 /* ModuleManager.swift in Sources */,
 				B6B720E10D4EE0F2136F17C6 /* ModuleSearchAliasManager.swift in Sources */,
+				B6B720E10D4EE0F2136F17C9 /* CacheManager.swift in Sources */,
 				AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */,
 				142A89C22F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
 				F9E24C2C4FF74E1EAC5BFD9B /* NetworkFetch.swift in Sources */,
@@ -825,13 +831,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.38;
+				MARKETING_VERSION = 0.0.39;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -848,14 +854,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.38;
+				MARKETING_VERSION = 0.0.39;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -873,13 +879,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.38;
+				MARKETING_VERSION = 0.0.39;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -957,14 +963,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.38;
+				MARKETING_VERSION = 0.0.39;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
