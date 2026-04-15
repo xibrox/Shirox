@@ -899,21 +899,45 @@ private func heroSection(media: AniListMedia) -> some View {
 
     @ViewBuilder
     private func relationsSection(relations: [AniListRelationEdge]) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110, maximum: 130), spacing: 16)], spacing: 20) {
-                ForEach(relations) { edge in
-                    NavigationLink {
-                        AniListDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)
-                    } label: {
-                        RelationCard(edge: edge)
-                    }
-                    .buttonStyle(.plain)
+        let animeRelations = relations.filter { $0.node.type != "MANGA" }
+        guard !animeRelations.isEmpty else {
+            // Show "No anime relations" message instead of empty grid
+            return AnyView(
+                VStack(spacing: 20) {
+                    Image(systemName: "film")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                    Text("No anime relations")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-            }
-            .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 60)
+            )
         }
-        .padding(.bottom, 24)
-        .padding(.top, 8)
+        
+        let columns = [
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
+        ]
+        
+        return AnyView(
+            VStack(alignment: .leading, spacing: 16) {
+                LazyVGrid(columns: columns, spacing: 20) {
+                    ForEach(animeRelations) { edge in
+                        NavigationLink {
+                            AniListDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)
+                        } label: {
+                            RelationCard(edge: edge)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.bottom, 24)
+            .padding(.top, 8)
+        )
     }
 }
 
@@ -1268,7 +1292,6 @@ struct RelationCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 120)
     }
 }
 

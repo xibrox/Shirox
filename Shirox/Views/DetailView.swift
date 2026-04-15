@@ -134,6 +134,11 @@ struct DetailView: View {
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             vm.aniListID = aniListID
+
+            // Restore saved AniList mapping if not already provided
+            if vm.aniListID == nil {
+                vm.aniListID = AniListMappingManager.shared.getMapping(title: item.title)
+            }
             
             // Sync with AniList if we have an ID
             if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
@@ -206,7 +211,7 @@ struct DetailView: View {
             }
         }
         .sheet(isPresented: $showLibraryEdit) {
-            if let aid = aniListID, let detail = vm.detail {
+            if let aid = vm.aniListID, let detail = vm.detail {
                 let tempMedia = AniListMedia(
                     id: aid,
                     title: AniListTitle(romaji: detail.title, english: detail.title, native: detail.title),
@@ -231,7 +236,6 @@ struct DetailView: View {
                             aniListID: aid, moduleId: nil, mediaTitle: detail.title
                         )
                     } else if progress > 0 {
-                        // Advance CW to "Up Next" for the episode AFTER the latest progress
                         ContinueWatchingManager.shared.markWatched(
                             upThrough: progress,
                             aniListID: aid,
@@ -490,9 +494,14 @@ struct DetailView: View {
 
     @ViewBuilder
     private var relationsSection: some View {
-        if let relations = vm.aniListMedia?.relations?.edges, !relations.isEmpty {
+        if let relations = vm.aniListMedia?.relations?.edges.filter({ $0.node.type != "MANGA" }), !relations.isEmpty {
+            let columns = [
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ]
+            
             VStack(alignment: .leading, spacing: 20) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110, maximum: 130), spacing: 16)], spacing: 20) {
+                LazyVGrid(columns: columns, spacing: 20) {
                     ForEach(relations) { edge in
                         NavigationLink {
                             AniListDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)
