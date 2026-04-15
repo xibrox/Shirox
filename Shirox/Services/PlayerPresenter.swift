@@ -63,7 +63,7 @@ final class PlayerPresenter: ObservableObject {
             onWatchNext: onWatchNext,
             onStreamExpired: onStreamExpired
         )
-        .tint(.red)
+        .tint(.primary)
         .ignoresSafeArea()
         
         let hostingController = PlayerHostingController(rootView: playerView)

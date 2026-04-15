@@ -141,10 +141,11 @@ private struct FeaturedCarousel: View {
                                 ForEach(genres.prefix(3), id: \.self) { g in
                                     Text(g)
                                         .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.primary.opacity(0.8))
+                                        .foregroundStyle(.primary)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
                                         .background(Color.primary.opacity(0.1), in: Capsule())
+                                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                                 }
                             }
                         }
@@ -246,7 +247,7 @@ private struct PageIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<numberOfPages, id: \.self) { index in
                 Capsule()
-                    .fill(index == currentPage ? Color.accentColor : Color.primary.opacity(0.25))
+                    .fill(index == currentPage ? Color.primary : Color.primary.opacity(0.25))
                     .frame(width: index == currentPage ? 20 : 5, height: 5)
                     .animation(.easeInOut(duration: 0.25), value: currentPage)
             }
@@ -392,10 +393,11 @@ private struct FeaturedCard: View {
                     ForEach(genres.prefix(2), id: \.self) { genre in
                         Text(genre)
                             .font(.caption2.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.9))
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(.white.opacity(0.15), in: Capsule())
+                            .background(Color.primary.opacity(0.1), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                             .lineLimit(1)
                     }
                 }
@@ -442,7 +444,7 @@ private struct AnimeSection: View {
                         .font(.title2.weight(.heavy))
                         .tracking(0.3)
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accentColor.opacity(0.9))
+                        .fill(Color.primary)
                         .frame(width: 36, height: 3)
                 }
                 Spacer()
@@ -455,10 +457,14 @@ private struct AnimeSection: View {
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                     }
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.primary.opacity(0.07), in: Capsule())
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                    )
                 }
                 .buttonStyle(.plain)
             }

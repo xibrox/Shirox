@@ -154,103 +154,118 @@ struct LibraryView: View {
 
     private var libraryContent: some View {
         VStack(spacing: 0) {
-            // Status + custom list filter chips
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(orderedStatuses) { status in
-                        Button {
-                            vm.selectStatus(status)
-                        } label: {
-                            Text(status.displayName)
-                                .font(.subheadline.weight(.medium))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(
-                                    vm.selectedCustomList == nil && vm.selectedStatus == status
-                                        ? Color.primary
-                                        : Color.secondary.opacity(0.15),
-                                    in: Capsule()
-                                )
-                                .foregroundStyle(vm.selectedCustomList == nil && vm.selectedStatus == status ? .white : .primary)
+            // Combined row: Status on left, Genres on right
+            HStack {
+                // Status & Custom List Menu (left)
+                Menu {
+                    Section("Lists") {
+                        ForEach(orderedStatuses) { status in
+                            Button {
+                                vm.selectStatus(status)
+                            } label: {
+                                HStack {
+                                    Text(status.displayName)
+                                    if vm.selectedCustomList == nil && vm.selectedStatus == status {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                     if !vm.customListNames.isEmpty {
-                        Divider()
-                            .frame(height: 20)
-                            .padding(.horizontal, 2)
-                        ForEach(vm.customListNames, id: \.self) { name in
-                            Button {
-                                vm.selectCustomList(vm.selectedCustomList == name ? nil : name)
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "list.star")
-                                        .font(.caption2)
-                                    Text(name)
-                                        .font(.subheadline.weight(.medium))
+                        Section("Custom Lists") {
+                            ForEach(vm.customListNames, id: \.self) { name in
+                                Button {
+                                    vm.selectCustomList(vm.selectedCustomList == name ? nil : name)
+                                } label: {
+                                    HStack {
+                                        Label(name, systemImage: "list.star")
+                                        if vm.selectedCustomList == name {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
                                 }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(
-                                    vm.selectedCustomList == name
-                                        ? Color.orange
-                                        : Color.secondary.opacity(0.15),
-                                    in: Capsule()
-                                )
-                                .foregroundStyle(vm.selectedCustomList == name ? .white : .primary)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
-
-            // Genre filter chips (only when genres are available)
-            if !availableGenres.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        if !selectedGenres.isEmpty {
-                            Button {
-                                selectedGenres.removeAll()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "xmark")
-                                        .font(.caption2.weight(.bold))
-                                    Text("Clear")
-                                        .font(.caption.weight(.medium))
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.primary.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Color.primary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        ForEach(availableGenres, id: \.self) { genre in
-                            let active = selectedGenres.contains(genre)
-                            Button {
-                                if active { selectedGenres.remove(genre) }
-                                else { selectedGenres.insert(genre) }
-                            } label: {
-                                Text(genre)
-                                    .font(.caption.weight(.medium))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        active ? Color.accentColor : Color.secondary.opacity(0.12),
-                                        in: Capsule()
-                                    )
-                                    .foregroundStyle(active ? .white : .primary)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "line.3.horizontal.decrease")
+                            .font(.subheadline)
+                        Text(vm.selectedCustomList ?? vm.selectedStatus.displayName)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 10)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
+                    )
+                }
+                .menuOrder(.fixed)
+                .menuIndicator(.hidden)
+                .foregroundStyle(.primary)
+                .buttonStyle(.plain)
+                
+                Spacer()
+                
+                // Genre Filter Menu (right)
+                if !availableGenres.isEmpty {
+                    Menu {
+                        if !selectedGenres.isEmpty {
+                            Button(role: .destructive) {
+                                selectedGenres.removeAll()
+                            } label: {
+                                Label("Clear All Filters", systemImage: "xmark.circle")
+                            }
+                            Divider()
+                        }
+                        ForEach(availableGenres, id: \.self) { genre in
+                            Button {
+                                if selectedGenres.contains(genre) {
+                                    selectedGenres.remove(genre)
+                                } else {
+                                    selectedGenres.insert(genre)
+                                }
+                            } label: {
+                                HStack {
+                                    Text(genre)
+                                    if selectedGenres.contains(genre) {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "tag")
+                                .font(.subheadline)
+                            Text(selectedGenres.isEmpty ? "All Genres" : "\(selectedGenres.count) selected")
+                                .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .menuOrder(.fixed)
+                    .menuIndicator(.hidden)
+                    .foregroundStyle(.primary)
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
 
             if vm.isLoading {
                 Spacer()

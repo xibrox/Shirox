@@ -57,7 +57,7 @@ struct SearchView: View {
         .sheet(isPresented: $showModuleList) {
             ModuleListView()
                 .environmentObject(moduleManager)
-                .tint(.red)
+                .tint(.primary)
         }
         .background(
             GeometryReader { geo in
@@ -235,7 +235,7 @@ struct SearchView: View {
                             default:
                                 Image(systemName: "antenna.radiowaves.left.and.right")
                                     .font(.system(size: 14))
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(.primary)
                             }
                         }
                     }
@@ -243,7 +243,7 @@ struct SearchView: View {
                 .frame(width: 20, height: 20)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .background(
-                    (usingModule ? Color.secondary.opacity(0.1) : Color.red.opacity(0.1)),
+                    (usingModule ? Color.secondary.opacity(0.1) : Color.primary.opacity(0.1)),
                     in: RoundedRectangle(cornerRadius: 4)
                 )
 

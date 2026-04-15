@@ -292,11 +292,14 @@ struct AniListDetailView: View {
                                 .background(
                                     isSelectionMode
                                         ? Color.primary
-                                        : Color.primary.opacity(0.1),
+                                        : Color.clear,
                                     in: Circle()
                                 )
                                 .background(.ultraThinMaterial, in: Circle())
-                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                )
                         }
                         .buttonStyle(.plain)
                     }
@@ -392,7 +395,67 @@ struct AniListDetailView: View {
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
-        // ... unchanged ...
+        if item.streamUrl.isEmpty {
+            vm.watchEpisode(item.episodeNumber)
+            return
+        }
+        guard let url = URL(string: item.streamUrl) else { return }
+
+        if let mid = item.moduleId, let module = moduleManager.modules.first(where: { $0.id == mid }) {
+            moduleManager.selectModule(module)
+        }
+
+        let stream = StreamResult(
+            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            url: url,
+            headers: item.headers ?? [:],
+            subtitle: item.subtitle
+        )
+
+        let availableEpsCount: Int = {
+            if let airing = vm.media?.nextAiringEpisode {
+                return airing.episode - 1
+            }
+            return vm.media?.episodes ?? 0
+        }()
+        let availableEpisodes = availableEpsCount > 0 ? availableEpsCount : nil
+
+        let context = PlayerContext(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            episodeTitle: item.episodeTitle,
+            imageUrl: item.imageUrl,
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            totalEpisodes: vm.media?.episodes ?? item.totalEpisodes,
+            availableEpisodes: availableEpisodes ?? item.availableEpisodes,
+            isAiring: (vm.media?.status == "RELEASING") ?? item.isAiring,
+            resumeFrom: item.watchedSeconds,
+            detailHref: item.detailHref,
+            streamTitle: item.streamTitle,
+            workingDetailHref: item.detailHref
+        )
+
+        let onWatchNext: WatchNextLoader? = { currentEpNum in
+            guard let module = ModuleManager.shared.activeModule, let href = item.detailHref else { return nil }
+            let runner = ModuleJSRunner()
+            try await runner.load(module: module)
+            let episodes = try await runner.fetchEpisodes(url: href)
+            guard !episodes.isEmpty else { return nil }
+            var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
+            if idx == nil {
+                idx = episodes.enumerated().min(by: {
+                    abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
+                })?.offset
+            }
+            guard let currentIdx = idx, currentIdx + 1 < episodes.count else { return nil }
+            let nextEp = episodes[currentIdx + 1]
+            let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+            guard !streams.isEmpty else { return nil }
+            return (streams: streams, episodeNumber: Int(nextEp.number))
+        }
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: nil)
     }
     #endif
 
@@ -455,32 +518,32 @@ struct AniListDetailView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "star.fill")
                                     .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.yellow)
+                                    .foregroundStyle(.primary)
                                 Text("\(score)%")
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(.primary)
                             }
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(.yellow.opacity(0.12), in: Capsule())
-                            .overlay(Capsule().strokeBorder(.yellow.opacity(0.35), lineWidth: 0.5))
+                            .background(Color.primary.opacity(0.1), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                         }
 
                         if let status = media.statusDisplay {
                             Text(status)
                                 .font(.caption2).fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.secondary.opacity(0.12), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                                .background(Color.primary.opacity(0.1), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                         }
 
                         if let year = media.seasonYear {
                             Text(String(year))
                                 .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.secondary.opacity(0.12), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                                .background(Color.primary.opacity(0.1), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                         }
                     }
                 }
@@ -527,6 +590,7 @@ struct AniListDetailView: View {
         let totalEpisodes = max(metadataTotal, resumeEpisodeNumber ?? 0, historyEp)
 
         VStack(alignment: .leading, spacing: 12) {
+            // Header with Episodes count and action buttons (sort, reset)
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 8) {
@@ -536,14 +600,14 @@ struct AniListDetailView: View {
                         if !isSelectionMode {
                             Text("\(totalEpisodes)")
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(platformBackground)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.primary, in: Capsule())
                         }
                         #else
                         Text("\(totalEpisodes)")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(platformBackground)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.primary, in: Capsule())
                         #endif
@@ -567,42 +631,9 @@ struct AniListDetailView: View {
                 .buttonStyle(.plain)
                 .padding(.trailing, 4)
 
+                // Reset progress button (only when not in selection mode)
                 #if os(iOS)
-                if isSelectionMode {
-                    if !selectedEpisodeNumbers.isEmpty {
-                        Button {
-                            showBatchDownloadPicker = true
-                        } label: {
-                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .fixedSize()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-                    let currentRangeStart = selectedRangeIndex * 100 + 1
-                    let currentRangeEnd = min((selectedRangeIndex + 1) * 100, totalEpisodes)
-
-                    if currentRangeStart <= currentRangeEnd {
-                        let rangeEpisodes = Array(currentRangeStart...currentRangeEnd)
-                        let allInCurrentRangeSelected = !rangeEpisodes.isEmpty && rangeEpisodes.allSatisfy { selectedEpisodeNumbers.contains($0) }
-
-                        Button(allInCurrentRangeSelected ? "Deselect Range" : "Select Range") {
-                            if allInCurrentRangeSelected {
-                                rangeEpisodes.forEach { selectedEpisodeNumbers.remove($0) }
-                            } else {
-                                rangeEpisodes.forEach { selectedEpisodeNumbers.insert($0) }
-                            }
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                    }
-                } else {
+                if !isSelectionMode {
                     if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
                         Button {
                             showResetConfirmation = true
@@ -684,6 +715,52 @@ struct AniListDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
             }
+
+            // Selection Bar (when selection mode is active)
+            #if os(iOS)
+            if isSelectionMode {
+                HStack {
+                    let currentRangeStart = selectedRangeIndex * 100 + 1
+                    let currentRangeEnd = min((selectedRangeIndex + 1) * 100, totalEpisodes)
+                    
+                    if currentRangeStart <= currentRangeEnd {
+                        let rangeEpisodes = Array(currentRangeStart...currentRangeEnd)
+                        let allInCurrentRangeSelected = !rangeEpisodes.isEmpty && rangeEpisodes.allSatisfy { selectedEpisodeNumbers.contains($0) }
+
+                        Button(allInCurrentRangeSelected ? "Deselect Range" : "Select Range") {
+                            if allInCurrentRangeSelected {
+                                rangeEpisodes.forEach { selectedEpisodeNumbers.remove($0) }
+                            } else {
+                                rangeEpisodes.forEach { selectedEpisodeNumbers.insert($0) }
+                            }
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.primary.opacity(0.1), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                    }
+                    
+                    Spacer()
+                    
+                    if !selectedEpisodeNumbers.isEmpty {
+                        Button {
+                            showBatchDownloadPicker = true
+                        } label: {
+                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.bold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            #endif
 
             if moduleManager.modules.isEmpty {
                 HStack(spacing: 10) {
@@ -833,9 +910,6 @@ private struct SynopsisSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Capsule()
-                    .fill(Color.primary)
-                    .frame(width: 3, height: 22)
                 Text("Synopsis")
                     .font(.title3.weight(.bold))
             }
@@ -993,6 +1067,7 @@ private struct AniListEpisodeRow: View {
 
                 Text("Episode \(number)")
                     .font(.callout.weight(.medium))
+                    .foregroundStyle(.primary)
 
                 Spacer()
 

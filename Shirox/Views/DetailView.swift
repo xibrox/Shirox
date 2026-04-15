@@ -69,11 +69,14 @@ struct DetailView: View {
                                         .background(
                                             isSelectionMode
                                                 ? Color.primary
-                                                : Color.primary.opacity(0.1),
+                                                : Color.clear,
                                             in: Circle()
                                         )
                                         .background(.ultraThinMaterial, in: Circle())
-                                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                                        .overlay(
+                                            Circle()
+                                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                        )
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -289,7 +292,7 @@ struct DetailView: View {
         }
     }
 
-    // MARK: - Continue Watching Helpers (unchanged, but watchButton uses .primary)
+    // MARK: - Continue Watching Helpers
     private func continueWatchingItem(for detail: MediaDetail) -> ContinueWatchingItem? {
         let moduleId = ModuleManager.shared.activeModule?.id
         return continueWatching.items
@@ -332,7 +335,64 @@ struct DetailView: View {
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
-        // ... unchanged ...
+        if item.streamUrl.isEmpty {
+            if let episode = vm.detail?.episodes.first(where: { Int($0.number) == item.episodeNumber }) {
+                vm.loadStreams(for: episode)
+            }
+            return
+        }
+        guard let url = URL(string: item.streamUrl) else { return }
+
+        if let mid = item.moduleId, ModuleManager.shared.activeModule?.id != mid,
+        let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
+            ModuleManager.shared.selectModule(module)
+        }
+
+        let stream = StreamResult(
+            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            url: url,
+            headers: item.headers ?? [:],
+            subtitle: item.subtitle
+        )
+
+        let href = vm.detailHref ?? item.detailHref
+        let currentEpCount = vm.detail?.episodes.isEmpty == false ? vm.detail?.episodes.count : nil
+
+        let context = PlayerContext(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            episodeTitle: item.episodeTitle,
+            imageUrl: item.imageUrl,
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            totalEpisodes: currentEpCount ?? item.totalEpisodes,
+            availableEpisodes: currentEpCount ?? item.availableEpisodes,
+            isAiring: item.isAiring,
+            resumeFrom: item.watchedSeconds,
+            detailHref: href,
+            streamTitle: item.streamTitle,
+            workingDetailHref: href
+        )
+
+        let epNum = item.episodeNumber
+
+        let onExpired: StreamRefetchLoader? = href.map { href in {
+            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+            return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
+        }}
+
+        let onWatchNext: WatchNextLoader? = href.map { href in { currentEpNum in
+            let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+            guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                idx + 1 < episodes.count else { return nil }
+            let nextEp = episodes[idx + 1]
+            let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+            guard !streams.isEmpty else { return nil }
+            return (streams: streams, episodeNumber: Int(nextEp.number))
+        }}
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
     }
     #endif
 
@@ -547,9 +607,6 @@ struct DetailView: View {
     private func synopsisSection(detail: MediaDetail) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Capsule()
-                    .fill(Color.primary)
-                    .frame(width: 3, height: 22)
                 Text("Synopsis")
                     .font(.title3.weight(.bold))
             }
@@ -596,14 +653,14 @@ struct DetailView: View {
                     if !isSelectionMode {
                         Text("\(detail.episodes.count)")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(platformBackground)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.primary, in: Capsule())
                     }
                     #else
                     Text("\(detail.episodes.count)")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.primary, in: Capsule())
                     #endif

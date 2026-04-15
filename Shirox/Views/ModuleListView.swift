@@ -88,12 +88,6 @@ struct ModuleListView: View {
                     }
                     .disabled(moduleManager.modules.isEmpty || isRefreshing)
                 }
-                // --- TEST BUTTON (uncomment to test spinner) ---
-                // ToolbarItem(placement: .topBarLeading) {
-                //     Button("Test Spinner") {
-                //         isAddingModule.toggle()
-                //     }
-                // }
                 ToolbarItem(placement: .topBarTrailing) {
                     EditButton()
                 }
@@ -144,7 +138,7 @@ struct ModuleListView: View {
                     } else {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(moduleURL.isEmpty ? Color.secondary : Color.red)
+                            .foregroundStyle(moduleURL.isEmpty ? Color.secondary : Color.primary)
                     }
                 }
                 .buttonStyle(.plain)
@@ -162,7 +156,7 @@ struct ModuleListView: View {
     private func errorBanner(_ error: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "xmark.circle.fill")
-                .foregroundStyle(Color.red)
+                .foregroundStyle(Color.red)   // Error remains red for clarity
             Text(error)
                 .font(.subheadline)
                 .foregroundStyle(Color.red)
@@ -194,16 +188,16 @@ struct ModuleListView: View {
                     case .failure, .empty:
                         Image(systemName: "list.bullet")
                             .font(.title2)
-                            .foregroundStyle(Color.red)
+                            .foregroundStyle(Color.primary)
                     @unknown default:
                         Image(systemName: "list.bullet")
                             .font(.title2)
-                            .foregroundStyle(Color.red)
+                            .foregroundStyle(Color.primary)
                     }
                 }
                 .frame(width: 44, height: 44)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("AniList").font(.headline)
@@ -212,7 +206,7 @@ struct ModuleListView: View {
                 Spacer()
                 if isActive {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.red)
+                        .foregroundStyle(Color.primary)
                         .font(.title3)
                 }
             }
@@ -220,7 +214,7 @@ struct ModuleListView: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .background(isActive ? Color.red.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
+            .background(isActive ? Color.primary.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
         .animation(.easeOut(duration: 0.2), value: isActive)
@@ -258,7 +252,7 @@ struct ModuleListView: View {
                 Spacer()
                 if isActive {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.red)
+                        .foregroundStyle(Color.primary)
                         .font(.title3)
                 }
             }
@@ -266,7 +260,7 @@ struct ModuleListView: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .background(isActive ? Color.red.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
+            .background(isActive ? Color.primary.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
         .animation(.easeOut(duration: 0.2), value: isActive)
