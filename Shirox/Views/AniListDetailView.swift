@@ -1031,6 +1031,14 @@ private struct AniListEpisodeRow: View {
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
+    private var adaptiveBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .systemBackground)
+        #else
+        Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
@@ -1045,7 +1053,7 @@ private struct AniListEpisodeRow: View {
                                 .frame(width: 40, height: 40)
                             Image(systemName: "checkmark")
                                 .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(adaptiveBackground)
                         }
                     }
                 } else {
@@ -1060,7 +1068,7 @@ private struct AniListEpisodeRow: View {
                         } else {
                             Text("\(number)")
                                 .font(.footnote.weight(.bold))
-                                .foregroundStyle(platformBackground)
+                                .foregroundStyle(adaptiveBackground)
                         }
                     }
                     .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
@@ -1402,4 +1410,3 @@ struct AniListMatchingSearchView: View {
         }
     }
 }
-
