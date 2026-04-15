@@ -15,6 +15,9 @@ struct ContinueWatchingItem: Identifiable, Codable {
     let detailHref: String?
     var watchedSeconds: Double
     var totalSeconds: Double
-    let totalEpisodes: Int?
+    var totalEpisodes: Int?
+    /// Number of episodes currently aired/available (may be less than totalEpisodes for ongoing shows).
+    var availableEpisodes: Int?
+    var isAiring: Bool?
     var lastWatchedAt: Date
 }

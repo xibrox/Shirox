@@ -237,6 +237,19 @@ final class AniListService {
             genres
             season
             seasonYear
+            relations {
+              edges {
+                relationType
+                node {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  status
+                  type
+                  format
+                }
+              }
+            }
           }
         }
         """
@@ -317,6 +330,50 @@ enum AniListError: LocalizedError {
             return "No data received from AniList."
         case .decodingError(let message):
             return "Failed to parse response: \(message)"
+        }
+    }
+}
+
+// MARK: - AniList Mapping Manager
+
+/// Manages persistent mappings between standard module titles and AniList IDs.
+final class AniListMappingManager {
+    static let shared = AniListMappingManager()
+    
+    private let userDefaults = UserDefaults.standard
+    private let storageKey = "com.shirox.anilist_mappings"
+    
+    // Dictionary of moduleTitle -> aniListID
+    private var mappings: [String: Int] = [:]
+    
+    private init() {
+        loadMappings()
+    }
+    
+    func saveMapping(title: String, aniListID: Int) {
+        mappings[title.lowercased()] = aniListID
+        persist()
+    }
+    
+    func getMapping(title: String) -> Int? {
+        return mappings[title.lowercased()]
+    }
+    
+    func removeMapping(title: String) {
+        mappings.removeValue(forKey: title.lowercased())
+        persist()
+    }
+    
+    private func loadMappings() {
+        if let data = userDefaults.data(forKey: storageKey),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.mappings = decoded
+        }
+    }
+    
+    private func persist() {
+        if let encoded = try? JSONEncoder().encode(mappings) {
+            userDefaults.set(encoded, forKey: storageKey)
         }
     }
 }

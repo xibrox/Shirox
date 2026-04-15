@@ -69,7 +69,7 @@ struct LibraryEntryEditSheet: View {
                     }
                 }
             }
-            .onChange(of: status) { newStatus in
+            .onChange(of: status) { _, newStatus in
                 if newStatus == .completed, let total = media.episodes {
                     progress = total
                 }

@@ -92,6 +92,8 @@ struct ContinueWatchingSection: View {
             aniListID: item.aniListID,
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
+            availableEpisodes: item.availableEpisodes,
+            isAiring: item.isAiring,
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
             streamTitle: item.streamTitle,
@@ -212,6 +214,35 @@ struct ContinueWatchingCardDisplay: View {
         return min(item.watchedSeconds / item.totalSeconds, 1.0)
     }
 
+    /// Builds the episode label, e.g.:
+    ///   - "Ep 3"                   — no total known
+    ///   - "Ep 3 / 24"             — completed series
+    ///   - "Ep 3 / 5 • Ongoing"    — ongoing show (availableEpisodes < totalEpisodes or total unknown)
+    private func episodeLabelText(item: ContinueWatchingItem, prefix: String?) -> String {
+        let epPart: String
+        let avail = item.availableEpisodes
+        let total = item.totalEpisodes
+
+        if let avail {
+            let isOngoing = item.isAiring ?? (total == nil || avail < total!)
+            if isOngoing {
+                epPart = "Ep \(item.episodeNumber) / \(avail) • Ongoing"
+            } else {
+                // completed or single-season module show
+                epPart = "Ep \(item.episodeNumber) / \(avail)"
+            }
+        } else if let total {
+            epPart = "Ep \(item.episodeNumber) / \(total)"
+        } else {
+            epPart = "Ep \(item.episodeNumber)"
+        }
+
+        if let prefix {
+            return "\(prefix) • \(epPart)"
+        }
+        return epPart
+    }
+
     var body: some View {
         Color.clear
             .aspectRatio(2/3, contentMode: .fit)
@@ -240,18 +271,22 @@ struct ContinueWatchingCardDisplay: View {
                         .multilineTextAlignment(.leading)
                     
                     HStack(spacing: 4) {
-                        if !item.streamUrl.isEmpty {
+                        let isWatched = ContinueWatchingManager.shared.isWatched(
+                            aniListID: item.aniListID,
+                            moduleId: item.moduleId,
+                            mediaTitle: item.mediaTitle,
+                            episodeNumber: item.episodeNumber
+                        )
+                        
+                        if !item.streamUrl.isEmpty && !isWatched {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 8, weight: .bold))
-                            
-                            Text(item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)")
+                            Text(episodeLabelText(item: item, prefix: nil))
                                 .font(.caption2.weight(.medium))
                         } else {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.system(size: 10, weight: .bold))
-                            
-                            let epText = item.totalEpisodes != nil ? "Ep \(item.episodeNumber) / \(item.totalEpisodes!)" : "Ep \(item.episodeNumber)"
-                            Text("Up Next • \(epText)")
+                            Text(episodeLabelText(item: item, prefix: "Up Next"))
                                 .font(.caption2.weight(.bold))
                         }
                     }
@@ -262,7 +297,14 @@ struct ContinueWatchingCardDisplay: View {
                 .padding(.bottom, 16)
             }
             .overlay(alignment: .bottom) {
-                if !item.streamUrl.isEmpty {
+                let isWatched = ContinueWatchingManager.shared.isWatched(
+                    aniListID: item.aniListID,
+                    moduleId: item.moduleId,
+                    mediaTitle: item.mediaTitle,
+                    episodeNumber: item.episodeNumber
+                )
+                
+                if !item.streamUrl.isEmpty && !isWatched {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Color.white.opacity(0.2)

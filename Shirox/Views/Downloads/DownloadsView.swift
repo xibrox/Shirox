@@ -139,6 +139,8 @@ struct DownloadsView: View {
             aniListID: item.aniListID,
             moduleId: item.moduleId,
             totalEpisodes: nil,
+            availableEpisodes: nil,
+            isAiring: nil,
             resumeFrom: nil,
             detailHref: item.detailHref,
             streamTitle: item.streamTitle,

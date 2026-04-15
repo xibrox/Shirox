@@ -114,8 +114,8 @@
 		AA000001000000000000AA65 /* AniListLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB64 /* AniListLibraryService.swift */; };
 		AA000001000000000000AA66 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB66 /* LibraryViewModel.swift */; };
 		AA000001000000000000AA67 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB66 /* LibraryViewModel.swift */; };
-		AA000001000000000000AA68 /* LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */; };
-		AA000001000000000000AA69 /* LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */; };
+		AA000001000000000000AA68 /* Library/LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */; };
+		AA000001000000000000AA69 /* Library/LibraryEntryEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */; };
 		AA000001000000000000AA70 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB70 /* LibraryView.swift */; };
 		AA000001000000000000AA71 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB70 /* LibraryView.swift */; };
 		AA000001000000000000AA80 /* DownloadItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB80 /* DownloadItem.swift */; };
@@ -210,7 +210,7 @@
 		AA000001000000000000BB62 /* AniListAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListAuthManager.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB64 /* AniListLibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListLibraryService.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB66 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
-		AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library/LibraryEntryEditSheet.swift; sourceTree = "<group>"; };
+		AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library/LibraryEntryEditSheet.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB70 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB80 /* DownloadItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadItem.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB81 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
@@ -277,7 +277,7 @@
 				142A89C42F58E804008652D9 /* ViewTracker.swift */,
 				AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */,
 				AA000001000000000000BB70 /* LibraryView.swift */,
-				AA000001000000000000BB68 /* LibraryEntryEditSheet.swift */,
+				AA000001000000000000BB68 /* Library/LibraryEntryEditSheet.swift */,
 				D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */,
 				71374A74E55E4B9BB0555C59 /* BrowseView.swift */,
 				4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */,
@@ -580,9 +580,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -641,7 +645,7 @@
 				AA000001000000000000AA63 /* AniListAuthManager.swift in Sources */,
 				AA000001000000000000AA65 /* AniListLibraryService.swift in Sources */,
 				AA000001000000000000AA67 /* LibraryViewModel.swift in Sources */,
-				AA000001000000000000AA69 /* LibraryEntryEditSheet.swift in Sources */,
+				AA000001000000000000AA69 /* Library/LibraryEntryEditSheet.swift in Sources */,
 				AA000001000000000000AA71 /* LibraryView.swift in Sources */,
 				AA000001000000000000AA06 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA08 /* PlayerBottomBar.swift in Sources */,
@@ -715,7 +719,7 @@
 				AA000001000000000000AA62 /* AniListAuthManager.swift in Sources */,
 				AA000001000000000000AA64 /* AniListLibraryService.swift in Sources */,
 				AA000001000000000000AA66 /* LibraryViewModel.swift in Sources */,
-				AA000001000000000000AA68 /* LibraryEntryEditSheet.swift in Sources */,
+				AA000001000000000000AA68 /* Library/LibraryEntryEditSheet.swift in Sources */,
 				AA000001000000000000AA70 /* LibraryView.swift in Sources */,
 				AA000001000000000000AA05 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA07 /* PlayerBottomBar.swift in Sources */,
@@ -827,13 +831,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.40;
+				MARKETING_VERSION = 0.0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -850,14 +854,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.40;
+				MARKETING_VERSION = 0.0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -875,13 +879,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.40;
+				MARKETING_VERSION = 0.0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -959,14 +963,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.40;
+				MARKETING_VERSION = 0.0.41;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

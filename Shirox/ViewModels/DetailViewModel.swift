@@ -4,7 +4,9 @@ import UIKit
 @MainActor
 final class DetailViewModel: ObservableObject {
     @Published var detail: MediaDetail?
+    @Published var aniListMedia: AniListMedia?
     @Published var isLoadingDetail = false
+    @Published var isLoadingAniListMedia = false
     @Published var isLoadingEpisodes = false
     @Published var isLoadingStreams = false
     @Published var errorMessage: String?
@@ -24,7 +26,8 @@ final class DetailViewModel: ObservableObject {
     @Published var selectedStream: StreamResult?
     @Published var showPlayer = false
 
-    var aniListID: Int? // Added this
+    @Published var aniListID: Int?
+    @Published var isMatchingAniList = false
 
     /// Stream selected by user in the picker — presented after the sheet fully dismisses.
     var pendingStream: StreamResult?
@@ -35,11 +38,27 @@ final class DetailViewModel: ObservableObject {
     private(set) var detailHref: String?
     private var streamsTask: Task<Void, Never>?
 
-    // MARK: - Load
-
     func load(item: SearchItem) {
-        guard detail == nil && !isLoadingDetail else { return }
+        guard detail == nil && !isMatchingAniList else { return }
         detailHref = item.href
+        
+        // Check if we have a saved mapping first
+        if aniListID == nil {
+            if let savedID = AniListMappingManager.shared.getMapping(title: item.title) {
+                aniListID = savedID
+            }
+        }
+        
+        // If still no ID, try auto-matching
+        if aniListID == nil {
+            Task {
+                await autoMatch(title: item.title)
+            }
+        } else if let aid = aniListID {
+            // Already have ID (passed in or from mapping), fetch metadata
+            fetchAniListMetadata(id: aid)
+        }
+
         Task {
             isLoadingDetail = true
             errorMessage = nil
@@ -61,6 +80,36 @@ final class DetailViewModel: ObservableObject {
             isLoadingDetail = false
             isLoadingEpisodes = false
         }
+    }
+
+    private func fetchAniListMetadata(id: Int) {
+        Task {
+            isLoadingAniListMedia = true
+            self.aniListMedia = try? await AniListService.shared.detail(id: id)
+            isLoadingAniListMedia = false
+        }
+    }
+
+    private func autoMatch(title: String) async {
+        isMatchingAniList = true
+        do {
+            let results = try await AniListService.shared.search(keyword: title)
+            // Look for a perfect match (case-insensitive) in the top 3 results
+            let perfectMatch = results.prefix(3).first { media in
+                media.title.displayTitle.lowercased() == title.lowercased() ||
+                media.title.english?.lowercased() == title.lowercased() ||
+                media.title.romaji?.lowercased() == title.lowercased()
+            }
+            
+            if let match = perfectMatch {
+                aniListID = match.id
+                AniListMappingManager.shared.saveMapping(title: title, aniListID: match.id)
+                fetchAniListMetadata(id: match.id)
+            }
+        } catch {
+            print("[DetailVM] Auto-match failed: \(error)")
+        }
+        isMatchingAniList = false
     }
 
     // MARK: - Streams
@@ -152,6 +201,8 @@ final class DetailViewModel: ObservableObject {
     func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
         selectedStream = stream
 
+        // For module shows, availableEpisodes == totalEpisodes (the fetched episode list).
+        let episodeCount = detail?.episodes.isEmpty == false ? detail?.episodes.count : nil
         let context = PlayerContext(
             mediaTitle: detail?.title ?? "",
             episodeNumber: Int(selectedEpisode?.number ?? 1),
@@ -159,7 +210,9 @@ final class DetailViewModel: ObservableObject {
             imageUrl: detail?.image ?? "",
             aniListID: aniListID, // Added this
             moduleId: ModuleManager.shared.activeModule?.id,
-            totalEpisodes: detail?.episodes.count,
+            totalEpisodes: episodeCount,
+            availableEpisodes: episodeCount,
+            isAiring: nil,
             resumeFrom: resumeWatchedSeconds,
             detailHref: detailHref,
             streamTitle: stream.title,
@@ -168,17 +221,28 @@ final class DetailViewModel: ObservableObject {
 
         // Build a WatchNextLoader that dynamically finds the next episode by current episode number
         let episodes = detail?.episodes ?? []
-        let watchNextLoader: WatchNextLoader? = episodes.isEmpty ? nil : { [weak self] currentEpNum in
-            guard let self,
-                  let idx = self.detail?.episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                  let episodes = self.detail?.episodes,
-                  idx + 1 < episodes.count
-            else { return nil }
-            let nextEp = episodes[idx + 1]
-            let streams = try await self.fetchStreams(for: nextEp)
-            guard !streams.isEmpty else { return nil }
-            return (streams: streams, episodeNumber: Int(nextEp.number))
-        }
+        let watchNextLoader: WatchNextLoader? = {
+            guard !episodes.isEmpty else { return nil }
+            
+            // If current episode is the last one, don't create the loader
+            let currentEpNum = Int(selectedEpisode?.number ?? 1)
+            if let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+               idx + 1 >= episodes.count {
+                return nil
+            }
+            
+            return { [weak self] currentEpNum in
+                guard let self,
+                      let idx = self.detail?.episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
+                      let episodes = self.detail?.episodes,
+                      idx + 1 < episodes.count
+                else { return nil }
+                let nextEp = episodes[idx + 1]
+                let streams = try await self.fetchStreams(for: nextEp)
+                guard !streams.isEmpty else { return nil }
+                return (streams: streams, episodeNumber: Int(nextEp.number))
+            }
+        }()
 
         PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: watchNextLoader, from: sourceView)
     }

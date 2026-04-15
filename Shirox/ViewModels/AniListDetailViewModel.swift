@@ -27,8 +27,10 @@ final class AniListDetailViewModel: ObservableObject {
     /// Deferred streams waiting to be presented after a sheet fully dismisses.
     var pendingModuleStream: StreamResult?   // single-stream from ModuleStreamPickerView
     var pendingModuleStreamEpisodeHref: String?  // episode href for Next Episode
+    var pendingModuleStreamAvailableCount: Int?  // episode count from module search result
     var pendingFinalStream: StreamResult?    // chosen stream from AniListStreamResultSheet
     var pendingFinalStreamEpisodeHref: String?  // episode href when selecting from final picker
+    var pendingFinalStreamAvailableCount: Int?   // saved count for final picker
 
     /// Resume position if navigated from Continue Watching
     var resumeWatchedSeconds: Double?
@@ -64,26 +66,36 @@ final class AniListDetailViewModel: ObservableObject {
         selectedEpisodeNumber = nil
     }
 
-    func onStreamsLoaded(_ streams: [StreamResult], episodeHref: String? = nil) {
+    func onStreamsLoaded(_ streams: [StreamResult], episodeHref: String? = nil, availableCount: Int? = nil) {
         let sorted = streams.sorted { $0.title < $1.title }
         if sorted.count == 1 {
             // Store and let onDismiss present after the sheet fully clears.
             pendingModuleStream = sorted[0]
             pendingModuleStreamEpisodeHref = episodeHref
+            pendingModuleStreamAvailableCount = availableCount
         } else {
             pendingStreams = sorted
             pendingFinalStreamEpisodeHref = episodeHref  // Save href for final picker
+            pendingFinalStreamAvailableCount = availableCount // Save count for final picker
             showFinalStreamPicker = true
         }
         showStreamPicker = false
     }
 
-    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil, searchResultHref: String? = nil) {
+    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil, searchResultHref: String? = nil, availableEpisodes: Int? = nil) {
         selectedStream = stream
         guard let media else { return }
         let currentEpNum = selectedEpisodeNumber ?? 1
         let mediaTitle = media.title.displayTitle
-        let totalEpisodes = media.episodes ?? (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : 0)
+        // availableEpisodes = how many are currently aired (may be < series total for ongoing shows)
+        // Order of precedence:
+        // 1. AniList's nextAiringEpisode (fallback airing count)
+        // 2. The count passed from the module (best for accurate "caught up" tracking on a specific provider)
+        // 3. AniList's total episodes (general fallback)
+        let anilistAiring = media.nextAiringEpisode != nil ? (media.nextAiringEpisode!.episode - 1) : nil
+        let availEps: Int? = anilistAiring ?? availableEpisodes ?? media.episodes
+        // totalEpisodes = full series count (nil if unknown)
+        let totalEpisodes: Int? = media.episodes
         let context = PlayerContext(
             mediaTitle: mediaTitle,
             episodeNumber: currentEpNum,
@@ -91,7 +103,9 @@ final class AniListDetailViewModel: ObservableObject {
             imageUrl: media.coverImage.extraLarge ?? media.coverImage.large ?? "",
             aniListID: media.id,
             moduleId: ModuleManager.shared.activeModule?.id,
-            totalEpisodes: media.episodes,
+            totalEpisodes: totalEpisodes,
+            availableEpisodes: availEps,
+            isAiring: media.status == "RELEASING",
             resumeFrom: resumeWatchedSeconds,
             detailHref: searchResultHref,  // Use searchResultHref for persistence
             streamTitle: stream.title,  // Remember the stream title (SUB, DUB, etc.)
@@ -104,7 +118,12 @@ final class AniListDetailViewModel: ObservableObject {
                 print("[AniListDetailVM] No module or working href available")
                 return nil
             }
-            let total = totalEpisodes
+            let total = availEps ?? 0
+            // If we are at the end of what's available, don't even create the loader
+            if total > 0 && currentEpNum >= total {
+                return nil
+            }
+
             return { currentEpNum in
                 print("[AniListDetailVM] onWatchNext called for episode \(currentEpNum) using stored href: \(resultHref)")
                 let nextEpNum = currentEpNum + 1

@@ -622,6 +622,8 @@ struct PlayerView: View {
             watchedSeconds: currentTime,
             totalSeconds: duration,
             totalEpisodes: context.totalEpisodes,
+            availableEpisodes: context.availableEpisodes,
+            isAiring: context.isAiring,
             lastWatchedAt: .now
         )
         ContinueWatchingManager.shared.save(item)
@@ -753,6 +755,8 @@ struct PlayerView: View {
             asset = AVURLAsset(url: currentStream.url)
         }
         let item = AVPlayerItem(asset: asset)
+        item.preferredForwardBufferDuration = 60 // Eagerly buffer up to 60 seconds ahead
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = true // Continue buffering when paused
         
         // Fix: Local files and fast streams might already be ready or need a status observer
         Task { @MainActor in
@@ -782,6 +786,7 @@ struct PlayerView: View {
             }
         }
         let p = AVPlayer(playerItem: item)
+        p.automaticallyWaitsToMinimizeStalling = true
         p.volume = volume
         p.usesExternalPlaybackWhileExternalScreenIsActive = true
         p.rate = Float(playbackSpeed)
@@ -1058,6 +1063,8 @@ struct PlayerView: View {
         if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }
         else { asset = AVURLAsset(url: next.url) }
         let newItem = AVPlayerItem(asset: asset)
+        newItem.preferredForwardBufferDuration = 60
+        newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         setupPlaybackEndObserver(for: newItem)
         player?.replaceCurrentItem(with: newItem)
         player?.rate = Float(playbackSpeed)
@@ -1074,7 +1081,7 @@ struct PlayerView: View {
         didSeekToResume = true
         currentStream = next
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref)
         }
         audioGroup = nil
         Task {

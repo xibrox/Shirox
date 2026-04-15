@@ -9,7 +9,7 @@ struct DetailView: View {
     var aniListID: Int?
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
-    @State private var synopsisExpanded = false
+    @State private var isSynopsisExpanded = false
     @State private var selectedSeason = 0
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
@@ -21,6 +21,10 @@ struct DetailView: View {
     @State private var selectedEpisodeNumbers: Set<Int> = []
     @State private var showBatchDownloadPicker = false
     #endif
+    @State private var selectedRangeIndex = 0
+    @State private var isReversed = false
+    @State private var selectedTab = 0 // 0: Episodes, 1: Relations
+    @State private var showMatchingSearch = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -31,47 +35,105 @@ struct DetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                heroSection
-                bodySection
+        ZStack {
+            platformBackground.ignoresSafeArea()
+            
+            if vm.isLoadingDetail && vm.detail == nil {
+                loadingView
+            } else if let detail = vm.detail {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        heroSection
+                        metadataSection(detail: detail)
+                            .padding(.top, 12)
+                        
+                        #if os(iOS)
+                        VStack(alignment: .leading, spacing: 16) {
+                            synopsisSection(detail: detail)
+                                .padding(.top, 16)
+                            
+                            HStack(spacing: 12) {
+                                watchButton(detail: detail)
+                                
+                                // Selection Toggle
+                                Button {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        isSelectionMode.toggle()
+                                        if !isSelectionMode {
+                                            selectedEpisodeNumbers.removeAll()
+                                        }
+                                    }
+                                } label: {
+                                    Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundStyle(isSelectionMode ? .white : Color.accentColor)
+                                        .frame(width: 46, height: 46)
+                                        .background(isSelectionMode ? Color.accentColor : Color.accentColor.opacity(0.12), in: Circle())
+                                        .overlay(Circle().strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                        }
+                        #endif
+                        
+                        // Tab Selector
+                        tabSelector
+                            .padding(.top, 8)
+                        
+                        if selectedTab == 0 {
+                            episodesSection(detail: detail)
+                        } else {
+                            relationsSection
+                        }
+                    }
+                    .padding(.bottom, 30)
+                }
+                .coordinateSpace(name: "detailScroll")
+                .ignoresSafeArea(edges: .top)
+            } else if let error = vm.errorMessage {
+                errorView(error)
             }
         }
-        .coordinateSpace(name: "detailScroll")
-        .onAppear {
-            PlayerPresenter.shared.resetToAppOrientation()
-        }
-        .ignoresSafeArea(edges: .top)
-        .navigationTitle("")
-#if os(iOS)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
-            if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
+            if AniListAuthManager.shared.isLoggedIn {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task {
-                            isLoadingEntry = true
-                            existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
-                            isLoadingEntry = false
-                            showLibraryEdit = true
+                    if let aid = vm.aniListID {
+                        Button {
+                            Task {
+                                isLoadingEntry = true
+                                existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
+                                isLoadingEntry = false
+                                showLibraryEdit = true
+                            }
+                        } label: {
+                            if isLoadingEntry {
+                                ProgressView().scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "pencil.circle")
+                                    .font(.system(size: 17, weight: .medium))
+                            }
                         }
-                    } label: {
-                        if isLoadingEntry {
-                            ProgressView().scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "pencil.circle")
+                        .disabled(isLoadingEntry)
+                    } else {
+                        Button {
+                            showMatchingSearch = true
+                        } label: {
+                            Image(systemName: "link.badge.plus")
                                 .font(.system(size: 17, weight: .medium))
                         }
                     }
-                    .disabled(isLoadingEntry)
                 }
             }
         }
-#endif
+        #endif
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
-            vm.aniListID = aniListID // Added this
+            vm.aniListID = aniListID
             
             // Sync with AniList if we have an ID
             if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
@@ -90,10 +152,37 @@ struct DetailView: View {
             } else {
                 vm.load(item: item)
             }
+            
+            // Set initial range index based on resume episode or history
+            let moduleId = ModuleManager.shared.activeModule?.id
+            if let resumeNum = resumeEpisodeNumber {
+                selectedRangeIndex = (resumeNum - 1) / 100
+            } else {
+                let currentEp = continueWatching.items.first(where: { CW in
+                    (aniListID != nil && CW.aniListID == aniListID) || 
+                    (CW.mediaTitle == item.title && CW.moduleId == moduleId)
+                })?.episodeNumber ?? 1
+                selectedRangeIndex = (currentEp - 1) / 100
+            }
         }
         .onChange(of: vm.detail?.episodes) {
             // Auto-load streams for resume episode if specified
             guard !autoPlayOnLoad else { return }
+
+            // Notify CW about currently available episodes (enables card reappearance for ongoing shows)
+            if let detail = vm.detail, !detail.episodes.isEmpty {
+                let moduleId = ModuleManager.shared.activeModule?.id
+                ContinueWatchingManager.shared.notifyNewEpisodesAvailable(
+                    aniListID: aniListID,
+                    moduleId: moduleId,
+                    mediaTitle: detail.title,
+                    availableEpisodes: detail.episodes.count,
+                    imageUrl: detail.image,
+                    totalEpisodes: detail.episodes.count,
+                    detailHref: vm.detailHref
+                )
+            }
+
             guard let resumeEpNum = resumeEpisodeNumber else { return }
             guard let episodes = vm.detail?.episodes else { return }
             guard let episode = episodes.first(where: { Int($0.number) == resumeEpNum }) else { return }
@@ -104,10 +193,6 @@ struct DetailView: View {
             if let stream = vm.pendingStream {
                 vm.pendingStream = nil
                 let s = stream
-                // Defer presentation by one run-loop turn so UIKit fully clears the
-                // sheet's presentedViewController before we call present(_:animated:).
-                // Without this, findTopViewController may still see the dismissing sheet
-                // and present the player on it — which gets torn down with the sheet.
                 DispatchQueue.main.async { vm.selectStream(s) }
             } else {
                 vm.cancelStreamLoading()
@@ -122,7 +207,6 @@ struct DetailView: View {
         }
         .sheet(isPresented: $showLibraryEdit) {
             if let aid = aniListID, let detail = vm.detail {
-                // Map MediaDetail to a temporary AniListMedia for the edit sheet
                 let tempMedia = AniListMedia(
                     id: aid,
                     title: AniListTitle(romaji: detail.title, english: detail.title, native: detail.title),
@@ -135,7 +219,10 @@ struct DetailView: View {
                     genres: nil,
                     season: nil,
                     seasonYear: nil,
-                    nextAiringEpisode: nil
+                    nextAiringEpisode: nil,
+                    relations: nil,
+                    type: nil,
+                    format: nil
                 )
                 
                 LibraryEntryEditSheet(entry: existingEntry, media: tempMedia) { status, progress, score in
@@ -143,16 +230,28 @@ struct DetailView: View {
                         ContinueWatchingManager.shared.resetProgress(
                             aniListID: aid, moduleId: nil, mediaTitle: detail.title
                         )
+                    } else if progress > 0 {
+                        // Advance CW to "Up Next" for the episode AFTER the latest progress
+                        ContinueWatchingManager.shared.markWatched(
+                            upThrough: progress,
+                            aniListID: aid,
+                            moduleId: ModuleManager.shared.activeModule?.id,
+                            mediaTitle: detail.title,
+                            imageUrl: detail.image,
+                            totalEpisodes: detail.episodes.count,
+                            availableEpisodes: detail.episodes.count,
+                            detailHref: vm.detailHref
+                        )
                     }
                     
                     Task {
                         try? await AniListLibraryService.shared.updateEntry(
                             mediaId: aid, status: status, progress: progress, score: score
                         )
-                        // Refresh state
                         existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
                     }
                 }
+                .presentationDetents([.medium, .large])
             }
         }
         #if os(iOS)
@@ -173,6 +272,18 @@ struct DetailView: View {
             }
         }
         #endif
+        .sheet(isPresented: $showMatchingSearch) {
+            AniListMatchingSearchView(initialTitle: item.title, isLinked: vm.aniListID != nil) { matchedMedia in
+                if let media = matchedMedia {
+                    vm.aniListID = media.id
+                    AniListMappingManager.shared.saveMapping(title: item.title, aniListID: media.id)
+                } else {
+                    vm.aniListID = nil
+                    AniListMappingManager.shared.removeMapping(title: item.title)
+                }
+                showMatchingSearch = false
+            }
+        }
     }
 
     // MARK: - Continue Watching Helpers
@@ -189,11 +300,13 @@ struct DetailView: View {
     @ViewBuilder
     private func watchButton(detail: MediaDetail) -> some View {
         let item = continueWatchingItem(for: detail)
-        let label = item.map { "Continue Watching Ep \($0.episodeNumber)" } ?? "Start Watching"
+        let nextEp = item?.episodeNumber ?? 1
+        let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
+        
         Button {
             if let item {
                 resumeWatching(item: item)
-            } else if let first = detail.episodes.first {
+            } else if let first = detail.episodes.first(where: { Int($0.number) == nextEp }) ?? detail.episodes.first {
                 vm.loadStreams(for: first)
             }
         } label: {
@@ -204,7 +317,7 @@ struct DetailView: View {
                     .font(.system(size: 15, weight: .bold))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 46)
+            .frame(height: 48)
             .background(Color.accentColor.opacity(0.12), in: Capsule())
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(
@@ -226,7 +339,6 @@ struct DetailView: View {
         }
         guard let url = URL(string: item.streamUrl) else { return }
 
-        // Ensure the correct module is active
         if let mid = item.moduleId, ModuleManager.shared.activeModule?.id != mid,
            let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
             ModuleManager.shared.selectModule(module)
@@ -239,8 +351,8 @@ struct DetailView: View {
             subtitle: item.subtitle
         )
 
-        // Use the current detail view's href if available, otherwise fall back to saved href
         let href = vm.detailHref ?? item.detailHref
+        let currentEpCount = vm.detail?.episodes.isEmpty == false ? vm.detail?.episodes.count : nil
 
         let context = PlayerContext(
             mediaTitle: item.mediaTitle,
@@ -249,40 +361,33 @@ struct DetailView: View {
             imageUrl: item.imageUrl,
             aniListID: item.aniListID,
             moduleId: item.moduleId,
-            totalEpisodes: item.totalEpisodes,
+            totalEpisodes: currentEpCount ?? item.totalEpisodes,
+            availableEpisodes: currentEpCount ?? item.availableEpisodes,
+            isAiring: item.isAiring,
             resumeFrom: item.watchedSeconds,
             detailHref: href,
-            streamTitle: vm.selectedStream?.title,
+            streamTitle: item.streamTitle,
             workingDetailHref: href
         )
+
         let epNum = item.episodeNumber
 
-        // Re-fetch current episode streams when stored URL expires
         let onExpired: StreamRefetchLoader? = href.map { href in {
             let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
             guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
             return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
         }}
 
-        // Load next episode streams (enables the Next Episode button)
         let onWatchNext: WatchNextLoader? = href.map { href in { currentEpNum in
-            print("[DetailView] onWatchNext called for episode \(currentEpNum) with href: \(href)")
             do {
                 let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-                print("[DetailView] Got \(episodes.count) episodes")
                 guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                      idx + 1 < episodes.count else {
-                    print("[DetailView] No next episode found")
-                    return nil
-                }
+                      idx + 1 < episodes.count else { return nil }
                 let nextEp = episodes[idx + 1]
-                print("[DetailView] Fetching streams for next episode \(nextEp.number)")
                 let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
-                print("[DetailView] Got \(streams.count) streams")
                 guard !streams.isEmpty else { return nil }
                 return (streams: streams, episodeNumber: Int(nextEp.number))
             } catch {
-                print("[DetailView] Error loading next episode: \(error)")
                 return nil
             }
         }}
@@ -295,7 +400,6 @@ struct DetailView: View {
 
     private var heroSection: some View {
         ZStack(alignment: .bottom) {
-            // Background image with parallax
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("detailScroll")).minY
                 let stretch = max(0, scrollY)
@@ -331,9 +435,7 @@ struct DetailView: View {
             )
             .frame(height: 420)
 
-            // Floating poster + metadata
             HStack(alignment: .bottom, spacing: 14) {
-                // Poster
                 AsyncImage(url: URL(string: item.image)) { phase in
                     switch phase {
                     case .success(let img):
@@ -354,48 +456,6 @@ struct DetailView: View {
                     Text(item.title)
                         .font(.title3.weight(.bold))
                         .lineLimit(3)
-
-                    if let detail = vm.detail, detail.aliases != "N/A" {
-                        Text(detail.aliases)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    HStack(spacing: 8) {
-                        if let score = existingEntry?.score, score > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.yellow)
-                                Text(String(format: "%.1f", score))
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.primary)
-                            }
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(.yellow.opacity(0.12), in: Capsule())
-                            .overlay(Capsule().strokeBorder(.yellow.opacity(0.35), lineWidth: 0.5))
-                        }
-
-                        if let status = existingEntry?.status {
-                            Text(status.displayName)
-                                .font(.caption2).fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.secondary.opacity(0.12), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
-                        }
-                    }
-
-                    if let detail = vm.detail, detail.airdate != "N/A" {
-                        Text(detail.airdate)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.secondary.opacity(0.12), in: Capsule())
-                            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5))
-                    }
                 }
                 Spacer()
             }
@@ -406,73 +466,166 @@ struct DetailView: View {
 
     // MARK: - Body
 
-    private var bodySection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            if vm.isLoadingDetail {
-                HStack {
-                    ProgressView()
-                    Text("Loading details…")
-                        .font(.subheadline)
+    @ViewBuilder
+    private var loadingView: some View {
+        VStack(spacing: 15) {
+            ProgressView()
+            Text("Loading details…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var tabSelector: some View {
+        Picker("Section", selection: $selectedTab) {
+            Text("Episodes").tag(0)
+            Text("Relations").tag(1)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var relationsSection: some View {
+        if let relations = vm.aniListMedia?.relations?.edges, !relations.isEmpty {
+            VStack(alignment: .leading, spacing: 20) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110, maximum: 130), spacing: 16)], spacing: 20) {
+                    ForEach(relations) { edge in
+                        NavigationLink {
+                            AniListDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)
+                        } label: {
+                            RelationCard(edge: edge)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.top, 8)
+        } else if vm.isLoadingAniListMedia {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Loading relations…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
+        } else if vm.isMatchingAniList {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Searching AniList...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
+        } else {
+            VStack(spacing: 16) {
+                Image(systemName: "link.badge.plus")
+                    .font(.largeTitle)
+                    .foregroundStyle(.secondary.opacity(0.5))
+                
+                VStack(spacing: 4) {
+                    Text("Not linked to AniList")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Link this series to enable tracking and relations.")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                .padding(.top, 4)
-            }
-
-            if let err = vm.errorMessage {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
-                    Text(err)
-                        .font(.subheadline)
-                        .foregroundStyle(.red)
+                
+                Button {
+                    showMatchingSearch = true
+                } label: {
+                    Text("Link with AniList")
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor, in: Capsule())
+                        .foregroundStyle(.white)
                 }
             }
-
-            if let detail = vm.detail {
-                synopsisSection(detail: detail)
-                episodesSection(detail: detail)
-            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 32)
+    }
+
+    @ViewBuilder
+    private func errorView(_ error: String) -> some View {
+        VStack(spacing: 15) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.largeTitle)
+                .foregroundStyle(.red)
+            Text(error)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Button("Retry") {
+                vm.load(item: item)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Metadata
+
+    @ViewBuilder
+    private func metadataSection(detail: MediaDetail) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if detail.airdate != "N/A" {
+                    metadataTag(text: detail.airdate)
+                }
+                
+                if detail.aliases != "N/A" {
+                    metadataTag(text: detail.aliases)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private func metadataTag(text: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.primary.opacity(0.8))
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(.white.opacity(0.05))
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5))
     }
 
     // MARK: - Synopsis
 
+    @ViewBuilder
     private func synopsisSection(detail: MediaDetail) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
                 Capsule()
                     .fill(Color.accentColor)
-                    .frame(width: 3, height: 18)
+                    .frame(width: 3, height: 22)
                 Text("Synopsis")
-                    .font(.headline.weight(.bold))
+                    .font(.title3.weight(.bold))
             }
+            .padding(.horizontal, 16)
 
             Text(detail.description)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .lineLimit(synopsisExpanded ? nil : 4)
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if detail.description.count > 200 {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        synopsisExpanded.toggle()
+                .lineLimit(isSynopsisExpanded ? nil : 4)
+                .padding(.horizontal, 16)
+                .onTapGesture {
+                    withAnimation(.spring()) {
+                        isSynopsisExpanded.toggle()
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(synopsisExpanded ? "Less" : "More")
-                        Image(systemName: synopsisExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color.accentColor)
                 }
-                .buttonStyle(.plain)
-            }
         }
     }
 
@@ -499,104 +652,89 @@ struct DetailView: View {
         let visibleEpisodes = isMultiSeason ? seasons[min(selectedSeason, seasons.count - 1)] : detail.episodes
 
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 10) {
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: 22)
-                Text("Episodes")
-                    .font(.title3.weight(.bold))
-                #if os(iOS)
-                if !isSelectionMode {
-                    if vm.isLoadingEpisodes {
-                        ProgressView().scaleEffect(0.75)
-                    } else if !detail.episodes.isEmpty {
+            HStack(alignment: .center) {
+                HStack(spacing: 8) {
+                    Text("Episodes")
+                        .font(.title3.weight(.bold))
+                    #if os(iOS)
+                    if !isSelectionMode {
                         Text("\(detail.episodes.count)")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Color.accentColor, in: Capsule())
                     }
-                }
-                #else
-                if vm.isLoadingEpisodes {
-                    ProgressView().scaleEffect(0.75)
-                } else if !detail.episodes.isEmpty {
+                    #else
                     Text("\(detail.episodes.count)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.accentColor, in: Capsule())
+                    #endif
                 }
-                #endif
                 Spacer()
+                
+                // Sort Toggle
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isReversed.toggle()
+                    }
+                } label: {
+                    Image(systemName: isReversed ? "arrow.down" : "arrow.up")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(isReversed ? Color.accentColor : .primary.opacity(0.7))
+                        .frame(width: 36, height: 36)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay(Circle().strokeBorder(isReversed ? Color.accentColor.opacity(0.3) : .white.opacity(0.15), lineWidth: 0.5))
+                        .shadow(color: (isReversed ? Color.accentColor : Color.black).opacity(0.1), radius: 4, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 4)
+
                 #if os(iOS)
-                if isSelectionMode {
-                    if !selectedEpisodeNumbers.isEmpty {
-                        Button {
-                            showBatchDownloadPicker = true
-                        } label: {
-                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .fixedSize()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-                    let allSelected = selectedEpisodeNumbers.count == visibleEpisodes.count
-                    Button(allSelected ? "Deselect All" : "Select All") {
-                        if allSelected {
-                            selectedEpisodeNumbers.removeAll()
-                        } else {
-                            selectedEpisodeNumbers = Set(visibleEpisodes.map { Int($0.number) })
-                        }
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(Color.accentColor)
-                } else {
-                    let moduleId = ModuleManager.shared.activeModule?.id
-                    if continueWatching.hasProgress(aniListID: nil, moduleId: moduleId, mediaTitle: detail.title) {
+                if !isSelectionMode {
+                    if continueWatching.hasProgress(aniListID: aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
                         Button {
                             showResetConfirmation = true
                         } label: {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.secondary)
+                                .frame(width: 32, height: 32)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .overlay(Circle().strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
                         }
                         .buttonStyle(.plain)
                     }
                 }
                 #else
-                let moduleId = ModuleManager.shared.activeModule?.id
-                if continueWatching.hasProgress(aniListID: nil, moduleId: moduleId, mediaTitle: detail.title) {
+                if continueWatching.hasProgress(aniListID: aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
                     Button {
                         showResetConfirmation = true
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
                 }
                 #endif
             }
-            .alert("Reset Progress", isPresented: $showResetConfirmation) {
-                Button("Reset", role: .destructive) {
-                    let moduleId = ModuleManager.shared.activeModule?.id
-                    ContinueWatchingManager.shared.resetProgress(
-                        aniListID: nil, moduleId: moduleId, mediaTitle: detail.title)
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all watched history and progress for \(detail.title).")
-            }
+            .padding(.horizontal, 16)
 
+            // 1. Season Selector
             if isMultiSeason {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(0..<seasons.count, id: \.self) { i in
                             Button {
-                                selectedSeason = i
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    selectedSeason = i
+                                    selectedRangeIndex = 0
+                                }
                             } label: {
                                 Text("Season \(i + 1)")
                                     .font(.subheadline.weight(.medium))
@@ -613,44 +751,110 @@ struct DetailView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 2)
                 }
             }
 
-            #if os(iOS)
-            HStack(spacing: 10) {
-                watchButton(detail: detail)
-                if !detail.episodes.isEmpty {
-                    if isSelectionMode {
-                        Button {
-                            isSelectionMode = false
-                            selectedEpisodeNumbers.removeAll()
-                        } label: {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                                .frame(width: 46, height: 46)
-                                .background(Color.accentColor.opacity(0.12), in: Capsule())
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1))
+            // 2. Range Selector
+            if visibleEpisodes.count > 100 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollViewReader { proxy in
+                        HStack(spacing: 8) {
+                            let rangeCount = Int(ceil(Double(visibleEpisodes.count) / 100.0))
+                            ForEach(0..<rangeCount, id: \.self) { index in
+                                let start = index * 100 + 1
+                                let end = min((index + 1) * 100, visibleEpisodes.count)
+                                Button {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                        selectedRangeIndex = index
+                                    }
+                                } label: {
+                                    Text("\(start)-\(end)")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(selectedRangeIndex == index ? .white : .primary.opacity(0.7))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            selectedRangeIndex == index 
+                                            ? Color.accentColor 
+                                            : Color.primary.opacity(0.04), 
+                                            in: Capsule()
+                                        )
+                                        .background(.ultraThinMaterial, in: Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .strokeBorder(
+                                                    selectedRangeIndex == index 
+                                                    ? Color.accentColor.opacity(0.5) 
+                                                    : .white.opacity(0.15), 
+                                                    lineWidth: 0.5
+                                                )
+                                        )
+                                        .shadow(color: (selectedRangeIndex == index ? Color.accentColor : Color.black).opacity(0.1), radius: 5, x: 0, y: 2)
+                                }
+                                .buttonStyle(.plain)
+                                .id(index)
+                                .scaleEffect(selectedRangeIndex == index ? 1.05 : 1.0)
+                            }
                         }
-                        .buttonStyle(.plain)
-                    } else {
-                        Button {
-                            isSelectionMode = true
-                            selectedEpisodeNumbers.removeAll()
-                        } label: {
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                                .frame(width: 46, height: 46)
-                                .background(Color.accentColor.opacity(0.12), in: Capsule())
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 4)
+                        .onAppear {
+                            proxy.scrollTo(selectedRangeIndex, anchor: .center)
                         }
-                        .buttonStyle(.plain)
+                        .onChange(of: selectedRangeIndex) { _, newValue in
+                            withAnimation {
+                                proxy.scrollTo(newValue, anchor: .center)
+                            }
+                        }
                     }
                 }
+                .padding(.bottom, 2)
+            }
+
+            // 3. Selection Bar
+            #if os(iOS)
+            if isSelectionMode {
+                HStack {
+                    let currentRangeEpisodes: [EpisodeLink] = {
+                        let startIndex = max(0, min(selectedRangeIndex * 100, visibleEpisodes.count))
+                        let endIndex = max(startIndex, min(startIndex + 100, visibleEpisodes.count))
+                        return Array(visibleEpisodes[startIndex..<endIndex])
+                    }()
+                    
+                    let allSelected = !currentRangeEpisodes.isEmpty && currentRangeEpisodes.allSatisfy { selectedEpisodeNumbers.contains(Int($0.number)) }
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        if allSelected {
+                            currentRangeEpisodes.forEach { selectedEpisodeNumbers.remove(Int($0.number)) }
+                        } else {
+                            currentRangeEpisodes.forEach { selectedEpisodeNumbers.insert(Int($0.number)) }
+                        }
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.accentColor.opacity(0.1), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 0.5))
+                    
+                    Spacer()
+                    
+                    if !selectedEpisodeNumbers.isEmpty {
+                        Button {
+                            showBatchDownloadPicker = true
+                        } label: {
+                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.bold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
             #endif
 
@@ -658,9 +862,17 @@ struct DetailView: View {
                 Text("No episodes found.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
             } else {
+                let displayedEpisodes: [EpisodeLink] = {
+                    let startIndex = max(0, min(selectedRangeIndex * 100, visibleEpisodes.count))
+                    let endIndex = max(startIndex, min(startIndex + 100, visibleEpisodes.count))
+                    let eps = Array(visibleEpisodes[startIndex..<endIndex])
+                    return isReversed ? eps.reversed() : eps
+                }()
+
                 LazyVStack(spacing: 8) {
-                    ForEach(visibleEpisodes) { episode in
+                    ForEach(displayedEpisodes) { episode in
                         let epNum = Int(episode.number)
                         #if os(iOS)
                         let sel = isSelectionMode
@@ -702,7 +914,18 @@ struct DetailView: View {
                         #endif
                     }
                 }
+                .padding(.horizontal, 16)
             }
+        }
+        .alert("Reset Progress", isPresented: $showResetConfirmation) {
+            Button("Reset", role: .destructive) {
+                let moduleId = ModuleManager.shared.activeModule?.id
+                ContinueWatchingManager.shared.resetProgress(
+                    aniListID: nil, moduleId: moduleId, mediaTitle: detail.title)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear all watched history and progress for \(detail.title).")
         }
     }
 }
@@ -728,13 +951,11 @@ private struct ModuleEpisodeRowContainer: View {
     private var epNum: Int { Int(episode.number) }
 
     private var progress: Double? {
-        // Check local watched history first
         if continueWatching.isWatched(aniListID: aniListID, moduleId: moduleId,
                                       mediaTitle: mediaTitle, episodeNumber: epNum) {
             return 1.0
         }
         
-        // Check AniList progress
         if let status = aniListStatus, status != .planning {
             if status == .completed {
                 return 1.0
@@ -743,11 +964,10 @@ private struct ModuleEpisodeRowContainer: View {
             }
         }
 
-        // Fallback to local in-progress items
         let mid = moduleId
         guard let item = continueWatching.items.first(where: {
-                  ($0.aniListID != nil && $0.aniListID == aniListID) ||
-                  ($0.moduleId == mid && $0.mediaTitle == mediaTitle)
+                  (($0.aniListID != nil && $0.aniListID == aniListID) ||
+                  ($0.moduleId == mid && $0.mediaTitle == mediaTitle))
                   && $0.episodeNumber == epNum
               }),
               item.totalSeconds > 0

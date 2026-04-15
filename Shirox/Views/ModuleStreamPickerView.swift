@@ -7,7 +7,7 @@ struct ModuleStreamPickerView: View {
     let animeTitle: String
     let episodeNumber: Int
     let onDismiss: () -> Void
-    let onStreamsLoaded: ([StreamResult], String?) -> Void  // Streams + episode href
+    let onStreamsLoaded: ([StreamResult], String?, Int?) -> Void  // Streams + episode href + availableCount
 
     @EnvironmentObject private var moduleManager: ModuleManager
 
@@ -20,10 +20,10 @@ struct ModuleStreamPickerView: View {
                         mediaId: mediaId,
                         animeTitle: animeTitle,
                         episodeNumber: episodeNumber
-                    ) { streams, episodeHref in
+                    ) { streams, episodeHref, availableCount in
                         moduleManager.selectModule(module)
                         onDismiss()
-                        onStreamsLoaded(streams, episodeHref)
+                        onStreamsLoaded(streams, episodeHref, availableCount)
                     }
                 }
             }
@@ -59,6 +59,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     @Published var searchTitle: String
     @Published var readyStreams: [StreamResult]?
     @Published var selectedEpisodeHref: String?  // Track the href for Next Episode
+    @Published var availableCount: Int?        // Track total episodes in this module result
 
     let module: ModuleDefinition
     let mediaId: Int?
@@ -144,6 +145,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
         do {
             let episodes = try await r.fetchEpisodes(url: item.href)
+            availableCount = episodes.count
 
             let targetDouble = Double(targetEpisodeNumber)
             if let matched = episodes.first(where: { $0.number == targetDouble }) {
@@ -201,7 +203,7 @@ private struct ModuleStreamRow: View {
     let mediaId: Int?
     let animeTitle: String
     let episodeNumber: Int
-    let onStreamsLoaded: ([StreamResult], String?) -> Void
+    let onStreamsLoaded: ([StreamResult], String?, Int?) -> Void
 
     @StateObject private var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
@@ -211,7 +213,7 @@ private struct ModuleStreamRow: View {
         mediaId: Int?,
         animeTitle: String,
         episodeNumber: Int,
-        onStreamsLoaded: @escaping ([StreamResult], String?) -> Void
+        onStreamsLoaded: @escaping ([StreamResult], String?, Int?) -> Void
     ) {
         self.module = module
         self.mediaId = mediaId
@@ -229,7 +231,7 @@ private struct ModuleStreamRow: View {
         .padding(.vertical, 6)
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
-            onStreamsLoaded(streams, rowVm.selectedEpisodeHref)
+            onStreamsLoaded(streams, rowVm.selectedEpisodeHref, rowVm.availableCount)
         }
         .sheet(isPresented: $showAllResults) {
             if case .searchResults(let items) = rowVm.state {

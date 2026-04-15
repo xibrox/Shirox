@@ -13,6 +13,9 @@ struct AniListMedia: Identifiable, Codable {
     let season: String?
     let seasonYear: Int?
     let nextAiringEpisode: AniListAiringEpisode?
+    let relations: AniListRelations?
+    let type: String?
+    let format: String?
 
     var plainDescription: String? {
         guard let desc = description else { return nil }
@@ -97,5 +100,19 @@ enum AniListSeason: String {
         default: season = .fall
         }
         return (season, year)
+    }
+}
+
+struct AniListRelations: Codable {
+    let edges: [AniListRelationEdge]
+}
+
+struct AniListRelationEdge: Codable, Identifiable {
+    var id: Int { node.id }
+    let relationType: String
+    let node: AniListMedia
+
+    var formattedRelation: String {
+        relationType.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
