@@ -22,11 +22,11 @@ struct EpisodeRowView: View {
                     if isSelectionMode {
                         ZStack {
                             Circle()
-                                .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: 2)
+                                .strokeBorder(isSelected ? Color.primary : Color.secondary.opacity(0.35), lineWidth: 2)
                                 .frame(width: 40, height: 40)
                             if isSelected {
                                 Circle()
-                                    .fill(Color.accentColor)
+                                    .fill(Color.primary)
                                     .frame(width: 40, height: 40)
                                 Image(systemName: "checkmark")
                                     .font(.caption2.weight(.bold))
@@ -36,7 +36,7 @@ struct EpisodeRowView: View {
                     } else {
                         ZStack {
                             Circle()
-                                .fill(isComplete ? Color.green : Color.accentColor)
+                                .fill(isComplete ? Color.green : Color.primary)
                                 .frame(width: 40, height: 40)
                             if isComplete {
                                 Image(systemName: "checkmark")
@@ -48,7 +48,7 @@ struct EpisodeRowView: View {
                                     .foregroundStyle(.white)
                             }
                         }
-                        .shadow(color: (isComplete ? Color.green : Color.accentColor).opacity(0.3),
+                        .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
                                 radius: 4, y: 2)
                     }
 
@@ -61,9 +61,9 @@ struct EpisodeRowView: View {
                     if !isSelectionMode {
                         Image(systemName: "play.fill")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(.primary)
                             .padding(8)
-                            .background(Color.accentColor.opacity(0.1), in: Circle())
+                            .background(Color.primary.opacity(0.1), in: Circle())
                     }
                 }
                 .padding(.horizontal, 14)
@@ -75,7 +75,7 @@ struct EpisodeRowView: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.secondary.opacity(0.15))
                             Capsule()
-                                .fill(Color.accentColor)
+                                .fill(Color.primary)
                                 .frame(width: geo.size.width * p)
                         }
                         .frame(height: 3)
@@ -87,7 +87,7 @@ struct EpisodeRowView: View {
             }
             .background(
                 isSelectionMode && isSelected
-                    ? Color.accentColor.opacity(0.08)
+                    ? Color.primary.opacity(0.08)
                     : Color.secondary.opacity(0.07),
                 in: RoundedRectangle(cornerRadius: 14)
             )

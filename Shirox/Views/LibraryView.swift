@@ -118,7 +118,7 @@ struct LibraryView: View {
             Spacer()
             Image(systemName: "books.vertical.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(.red)
+                .foregroundStyle(.primary)
             Text("Track your anime with AniList")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
@@ -141,7 +141,7 @@ struct LibraryView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(Color.red, in: Capsule())
+                    .background(Color.primary, in: Capsule())
                     .padding(.horizontal, 40)
             }
             .buttonStyle(.plain)
@@ -167,7 +167,7 @@ struct LibraryView: View {
                                 .padding(.vertical, 7)
                                 .background(
                                     vm.selectedCustomList == nil && vm.selectedStatus == status
-                                        ? Color.red
+                                        ? Color.primary
                                         : Color.secondary.opacity(0.15),
                                     in: Capsule()
                                 )
@@ -223,8 +223,8 @@ struct LibraryView: View {
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(Color.red.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Color.red)
+                                .background(Color.primary.opacity(0.15), in: Capsule())
+                                .foregroundStyle(Color.primary)
                             }
                             .buttonStyle(.plain)
                         }

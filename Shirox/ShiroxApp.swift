@@ -118,7 +118,7 @@ struct ShiroxApp: App {
                         SearchView()
                     }
                 }
-                .tint(.red)
+                .tint(.primary)
                 .environmentObject(moduleManager)
                 .onOpenURL { url in
                     guard url.scheme == "shirox" else { return }
@@ -145,7 +145,7 @@ struct ShiroxApp: App {
                     SearchView()
                         .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 }
-                .tint(.red)
+                .tint(.primary)
                 .environmentObject(moduleManager)
                 .onOpenURL { url in
                     guard url.scheme == "shirox" else { return }
