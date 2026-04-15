@@ -15,6 +15,15 @@ struct EpisodeRowView: View {
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
+    // Adaptive background color that works in both light and dark mode
+    private var adaptiveBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .systemBackground)
+        #else
+        Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
@@ -30,7 +39,7 @@ struct EpisodeRowView: View {
                                     .frame(width: 40, height: 40)
                                 Image(systemName: "checkmark")
                                     .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(adaptiveBackground)   // ← white → adaptiveBackground
                             }
                         }
                     } else {
@@ -41,11 +50,11 @@ struct EpisodeRowView: View {
                             if isComplete {
                                 Image(systemName: "checkmark")
                                     .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.white)   // green is dark enough in both modes
                             } else {
                                 Text(episode.displayNumber)
                                     .font(.footnote.weight(.bold))
-                                    .foregroundStyle(platformBackground)
+                                    .foregroundStyle(adaptiveBackground)   // ← now defined locally
                             }
                         }
                         .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
