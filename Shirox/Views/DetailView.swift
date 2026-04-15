@@ -64,7 +64,7 @@ struct DetailView: View {
                                 } label: {
                                     Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
                                         .font(.system(size: 20, weight: .semibold))
-                                        .foregroundStyle(isSelectionMode ? .white : .primary)
+                                        .foregroundStyle(isSelectionMode ? platformBackground : .primary)
                                         .frame(width: 46, height: 46)
                                         .background(
                                             isSelectionMode
@@ -548,7 +548,7 @@ struct DetailView: View {
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
                         .background(Color.primary, in: Capsule())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(platformBackground)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -838,8 +838,10 @@ struct DetailView: View {
                         } label: {
                             Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
                                 .font(.subheadline.weight(.bold))
+                                .foregroundStyle(platformBackground)
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(.primary)
                         .controlSize(.small)
                         .clipShape(Capsule())
                     }

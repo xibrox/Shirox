@@ -287,7 +287,7 @@ struct AniListDetailView: View {
                         } label: {
                             Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(isSelectionMode ? .white : .primary)
+                                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
                                 .frame(width: 46, height: 46)
                                 .background(
                                     isSelectionMode
@@ -750,8 +750,10 @@ struct AniListDetailView: View {
                         } label: {
                             Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
                                 .font(.subheadline.weight(.bold))
+                                .foregroundStyle(platformBackground)
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(.primary)
                         .controlSize(.small)
                         .clipShape(Capsule())
                     }
@@ -1058,7 +1060,7 @@ private struct AniListEpisodeRow: View {
                         } else {
                             Text("\(number)")
                                 .font(.footnote.weight(.bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(platformBackground)
                         }
                     }
                     .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),

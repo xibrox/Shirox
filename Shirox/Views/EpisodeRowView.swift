@@ -45,7 +45,7 @@ struct EpisodeRowView: View {
                             } else {
                                 Text(episode.displayNumber)
                                     .font(.footnote.weight(.bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(platformBackground)
                             }
                         }
                         .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),

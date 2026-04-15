@@ -69,6 +69,7 @@ struct SettingsView: View {
 
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
+                        .tint(.secondary)
                         #if os(iOS)
                         .onChange(of: forceLandscape) { _, _ in
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
@@ -85,6 +86,7 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Auto Next Episode", isOn: $autoNextEpisode)
+                        .tint(.secondary)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Show Button At")
@@ -100,6 +102,7 @@ struct SettingsView: View {
                 if aniListAuth.isLoggedIn {
                     Section("AniList") {
                         Toggle("Track Watching Progress", isOn: $aniListTrackingEnabled)
+                            .tint(.secondary)
                         Text("Automatically update your AniList progress as you watch.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
