@@ -1,5 +1,10 @@
 import Foundation
 
+enum LikeableType: String {
+    case activity = "ACTIVITY"
+    case activityReply = "ACTIVITY_REPLY"
+}
+
 enum ActivityFeed: String, CaseIterable, Identifiable {
     case mine, following, global
     var id: String { rawValue }
@@ -385,6 +390,44 @@ final class AniListSocialService {
         }
         let q = "mutation($text: String) { SaveTextActivity(text: $text) { id } }"
         let _: Response = try await performQuery(query: q, variables: ["text": text], auth: true)
+    }
+
+    func deleteActivity(id: Int) async throws {
+        struct Response: Decodable {
+            struct Data: Decodable { let DeleteActivity: Deleted? }
+            struct Deleted: Decodable { let deleted: Bool? }
+            let data: Data?
+        }
+        let q = "mutation($id: Int) { DeleteActivity(id: $id) { deleted } }"
+        let _: Response = try await performQuery(query: q, variables: ["id": id], auth: true)
+    }
+
+    func deleteReply(id: Int) async throws {
+        struct Response: Decodable {
+            struct Data: Decodable { let DeleteActivityReply: Deleted? }
+            struct Deleted: Decodable { let deleted: Bool? }
+            let data: Data?
+        }
+        let q = "mutation($id: Int) { DeleteActivityReply(id: $id) { deleted } }"
+        let _: Response = try await performQuery(query: q, variables: ["id": id], auth: true)
+    }
+
+    func fetchLikes(id: Int, type: LikeableType) async throws -> [ActivityUser] {
+        struct Response: Decodable {
+            struct Data: Decodable { let Page: PageData }
+            let data: Data
+        }
+        struct PageData: Decodable { let likes: [ActivityUser] }
+        let q = """
+        query($id: Int, $type: LikeableType) {
+          Page(perPage: 50) {
+            likes(likeableId: $id, type: $type) { id name avatar { large } }
+          }
+        }
+        """
+        let r: Response = try await performQuery(
+            query: q, variables: ["id": id, "type": type.rawValue], auth: true)
+        return r.data.Page.likes
     }
 
     func postReply(activityId: Int, text: String) async throws -> ActivityReply {
