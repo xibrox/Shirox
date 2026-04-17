@@ -1,11 +1,15 @@
 import SwiftUI
 
+private struct ReplyLikeTarget: Identifiable { let id: Int }
+
 struct ActivityDetailView: View {
     let activity: AniListActivity
     /// Called when a reply is successfully posted, so parent can update its count
     var onReplyPosted: (() -> Void)?
     /// Called when like state changes, so parent can sync the card
     var onLikeChanged: ((Int, Bool) -> Void)?
+    /// Called when the activity is deleted, so parent can remove it from the list
+    var onDeleted: (() -> Void)?
 
     @State private var replies: [ActivityReply] = []
     @State private var isLoadingReplies = true
@@ -21,14 +25,26 @@ struct ActivityDetailView: View {
     @State private var replyLikes: [Int: (count: Int, liked: Bool)] = [:]
     @State private var togglingReplyIds: Set<Int> = []
 
+    // Delete state
+    @State private var confirmDeleteActivity = false
+    @State private var replyToDelete: ActivityReply?
+
+    // Likes sheets
+    @State private var showActivityLikes = false
+    @State private var showLikesForReply: ReplyLikeTarget?
+
     @Environment(\.dismiss) private var dismiss
+
+    private var currentUserId: Int? { AniListAuthManager.shared.userId }
 
     init(activity: AniListActivity,
          onReplyPosted: (() -> Void)? = nil,
-         onLikeChanged: ((Int, Bool) -> Void)? = nil) {
+         onLikeChanged: ((Int, Bool) -> Void)? = nil,
+         onDeleted: (() -> Void)? = nil) {
         self.activity = activity
         self.onReplyPosted = onReplyPosted
         self.onLikeChanged = onLikeChanged
+        self.onDeleted = onDeleted
         _likeCount = State(initialValue: activity.likeCount)
         _isLiked = State(initialValue: activity.isLiked)
     }
@@ -66,6 +82,35 @@ struct ActivityDetailView: View {
         }
         .task { await loadReplies() }
         .presentationDetents([.large])
+        .alert("Delete Activity?", isPresented: $confirmDeleteActivity) {
+            Button("Delete", role: .destructive) {
+                Task { await performDeleteActivity() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone.")
+        }
+        .alert("Delete Reply?", isPresented: Binding(
+            get: { replyToDelete != nil },
+            set: { if !$0 { replyToDelete = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let reply = replyToDelete {
+                    Task { await performDeleteReply(reply) }
+                }
+            }
+            Button("Cancel", role: .cancel) { replyToDelete = nil }
+        } message: {
+            Text("This cannot be undone.")
+        }
+        .sheet(isPresented: $showActivityLikes) {
+            LikesSheetView(id: activity.id, type: .activity)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $showLikesForReply) { target in
+            LikesSheetView(id: target.id, type: .activityReply)
+                .presentationDetents([.medium, .large])
+        }
     }
 
     // MARK: - Activity Header
@@ -112,23 +157,38 @@ struct ActivityDetailView: View {
             }
             .padding(.top, 2)
         }
+        .contextMenu {
+            if activity.user?.id == currentUserId {
+                Button(role: .destructive) {
+                    confirmDeleteActivity = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
     }
 
     private var likeButton: some View {
-        Button {
-            Task { await toggleActivityLike() }
-        } label: {
-            HStack(spacing: 5) {
+        HStack(spacing: 5) {
+            Button {
+                Task { await toggleActivityLike() }
+            } label: {
                 Image(systemName: isLiked ? "heart.fill" : "heart")
                     .foregroundStyle(isLiked ? .pink : .secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(isTogglingLike)
+
+            Button {
+                showActivityLikes = true
+            } label: {
                 Text("\(likeCount)")
                     .foregroundStyle(isLiked ? .pink : .secondary)
+                    .contentTransition(.numericText())
             }
-            .font(.subheadline)
-            .contentTransition(.numericText())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
-        .disabled(isTogglingLike)
+        .font(.subheadline)
     }
 
     // MARK: - Replies
@@ -175,23 +235,38 @@ struct ActivityDetailView: View {
                     Text(timeAgo(reply.createdAt)).font(.caption2).foregroundStyle(.secondary)
                 }
                 Text(reply.text ?? "").font(.callout)
-                Button {
-                    Task { await toggleReplyLike(reply: reply) }
-                } label: {
-                    HStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    Button {
+                        Task { await toggleReplyLike(reply: reply) }
+                    } label: {
                         Image(systemName: liked ? "heart.fill" : "heart")
                             .foregroundStyle(liked ? .pink : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isToggling)
+
+                    Button {
+                        showLikesForReply = ReplyLikeTarget(id: reply.id)
+                    } label: {
                         Text("\(count)")
                             .foregroundStyle(liked ? .pink : .secondary)
+                            .contentTransition(.numericText())
                     }
-                    .font(.caption)
-                    .contentTransition(.numericText())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .disabled(isToggling)
+                .font(.caption)
             }
         }
         .padding(.vertical, 10)
+        .contextMenu {
+            if reply.user?.id == currentUserId {
+                Button(role: .destructive) {
+                    replyToDelete = reply
+                } label: {
+                    Label("Delete Reply", systemImage: "trash")
+                }
+            }
+        }
     }
 
     // MARK: - Composer
@@ -245,7 +320,6 @@ struct ActivityDetailView: View {
 
     private func toggleActivityLike() async {
         isTogglingLike = true
-        // Optimistic update
         let prev = (likeCount, isLiked)
         withAnimation {
             likeCount = isLiked ? likeCount - 1 : likeCount + 1
@@ -258,7 +332,6 @@ struct ActivityDetailView: View {
             }
             onLikeChanged?(count, liked)
         } else {
-            // Revert on failure
             withAnimation { (likeCount, isLiked) = prev }
         }
         isTogglingLike = false
@@ -267,7 +340,6 @@ struct ActivityDetailView: View {
     private func toggleReplyLike(reply: ActivityReply) async {
         togglingReplyIds.insert(reply.id)
         let cur = replyLikes[reply.id] ?? (reply.likeCount, reply.isLiked)
-        // Optimistic
         withAnimation {
             replyLikes[reply.id] = (cur.liked ? cur.count - 1 : cur.count + 1, !cur.liked)
         }
@@ -277,5 +349,24 @@ struct ActivityDetailView: View {
             withAnimation { replyLikes[reply.id] = cur }
         }
         togglingReplyIds.remove(reply.id)
+    }
+
+    private func performDeleteActivity() async {
+        do {
+            try await AniListSocialService.shared.deleteActivity(id: activity.id)
+            onDeleted?()
+            dismiss()
+        } catch {}
+    }
+
+    private func performDeleteReply(_ reply: ActivityReply) async {
+        let backup = replies
+        withAnimation { replies.removeAll { $0.id == reply.id } }
+        replyToDelete = nil
+        do {
+            try await AniListSocialService.shared.deleteReply(id: reply.id)
+        } catch {
+            withAnimation { replies = backup }
+        }
     }
 }
