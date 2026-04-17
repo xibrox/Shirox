@@ -2,8 +2,8 @@ import SwiftUI
 
 // MARK: - Nav destination types
 
-private struct ActivityNavItem: Identifiable { let id: Int }
-private struct MediaNavItem: Identifiable { let id: Int }
+private struct ActivityNavItem: Identifiable, Hashable { let id: Int }
+private struct MediaNavItem: Identifiable, Hashable { let id: Int }
 
 // MARK: - Loader that fetches an activity by ID then shows ActivityDetailView
 
