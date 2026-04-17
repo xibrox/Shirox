@@ -140,7 +140,7 @@ private struct DownloadModuleRow: View {
             .buttonStyle(.plain)
         case .searchResults, .selectingEpisode, .notFound, .error:
             Button("Retry") { rowVm.reset(); rowVm.startFind() }
-                .buttonStyle(.bordered).controlSize(.small).foregroundStyle(.red)
+                .buttonStyle(.bordered).controlSize(.small).foregroundStyle(Color.accentColor)
         }
     }
 
@@ -191,7 +191,7 @@ private struct DownloadModuleRow: View {
                     HStack(spacing: 8) {
                         ForEach(episodes) { ep in
                             Button("Ep \(ep.displayNumber)") { rowVm.startSelectEpisode(ep) }
-                                .buttonStyle(.bordered).controlSize(.mini)
+                                .buttonStyle(.bordered).controlSize(.mini).foregroundStyle(Color.accentColor)
                         }
                     }
                 }
@@ -204,7 +204,7 @@ private struct DownloadModuleRow: View {
         case .error(let msg):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
-                Text(msg).font(.caption).foregroundStyle(.red)
+                Text(msg).font(.caption).foregroundStyle(.primary)
             }
         }
     }

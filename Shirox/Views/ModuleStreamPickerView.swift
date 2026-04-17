@@ -207,6 +207,7 @@ private struct ModuleStreamRow: View {
 
     @StateObject private var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
+    @State private var showStreamPicker = false
 
     init(
         module: ModuleDefinition,
@@ -231,7 +232,22 @@ private struct ModuleStreamRow: View {
         .padding(.vertical, 6)
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
-            onStreamsLoaded(streams, rowVm.selectedEpisodeHref, rowVm.availableCount)
+            showStreamPicker = true
+        }
+        .sheet(isPresented: $showStreamPicker) {
+            if let streams = rowVm.readyStreams {
+                ModuleStreamSelectionView(
+                    streams: streams,
+                    onSelect: { stream in
+                        showStreamPicker = false
+                        onStreamsLoaded([stream], rowVm.selectedEpisodeHref, rowVm.availableCount)
+                    },
+                    onDismiss: {
+                        showStreamPicker = false
+                        rowVm.reset()
+                    }
+                )
+            }
         }
         .sheet(isPresented: $showAllResults) {
             if case .searchResults(let items) = rowVm.state {
@@ -278,8 +294,9 @@ private struct ModuleStreamRow: View {
         switch rowVm.state {
         case .idle:
             Button("Find") { rowVm.startFind() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .controlSize(.small)
+                .foregroundStyle(Color.accentColor)
 
         case .loading, .loadingEpisodes, .loadingStreams:
             Button { rowVm.cancel() } label: {
@@ -291,7 +308,7 @@ private struct ModuleStreamRow: View {
             Button("Retry") { rowVm.reset(); rowVm.startFind() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.accentColor)
         }
     }
 
@@ -330,7 +347,7 @@ private struct ModuleStreamRow: View {
                     titleField
                     Button("Show All") { showAllResults = true }
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.primary)
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 10) {
@@ -360,6 +377,7 @@ private struct ModuleStreamRow: View {
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.mini)
+                            .foregroundStyle(Color.accentColor)
                         }
                     }
                 }
@@ -375,7 +393,7 @@ private struct ModuleStreamRow: View {
         case .error(let msg):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
-                Text(msg).font(.caption).foregroundStyle(.red)
+                Text(msg).font(.caption).foregroundStyle(.primary)
             }
         }
     }
@@ -482,6 +500,59 @@ private struct SearchResultsPickerSheet: View {
             }
             .navigationTitle(module.sourceName)
             .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Stream Selection View
+
+private struct ModuleStreamSelectionView: View {
+    let streams: [StreamResult]
+    let onSelect: (StreamResult) -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if streams.isEmpty {
+                    ContentUnavailableView(
+                        "No Streams Found",
+                        systemImage: "antenna.radiowaves.left.and.right.slash",
+                        description: Text("Could not find any playable streams for this episode.")
+                    )
+                } else {
+                    List(streams, id: \.url) { stream in
+                        Button {
+                            onSelect(stream)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "play.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color.accentColor)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(stream.title)
+                                        .font(.subheadline).fontWeight(.semibold)
+                                        .foregroundStyle(.primary)
+                                    Text(stream.subtitle != nil ? "Soft subtitles available" : "No soft subtitles")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listStyle(.insetGrouped)
+                }
+            }
+            .navigationTitle("Select Stream")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onDismiss)
+                }
+            }
         }
         .presentationDetents([.medium, .large])
     }

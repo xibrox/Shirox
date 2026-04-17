@@ -110,12 +110,22 @@ struct DetailView: View {
             if AniListAuthManager.shared.isLoggedIn {
                 ToolbarItem(placement: .topBarTrailing) {
                     if let aid = vm.aniListID {
-                        Button {
-                            Task {
-                                isLoadingEntry = true
-                                existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
-                                isLoadingEntry = false
-                                showLibraryEdit = true
+                        Menu {
+                            Button {
+                                Task {
+                                    isLoadingEntry = true
+                                    existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
+                                    isLoadingEntry = false
+                                    showLibraryEdit = true
+                                }
+                            } label: {
+                                Label("Edit Library Entry", systemImage: "pencil")
+                            }
+
+                            Button {
+                                showMatchingSearch = true
+                            } label: {
+                                Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
                             }
                         } label: {
                             if isLoadingEntry {
@@ -455,6 +465,18 @@ struct DetailView: View {
                     Text(item.title)
                         .font(.title3.weight(.bold))
                         .lineLimit(3)
+
+                    // Only airdate badge
+                    if let detail = vm.detail, detail.airdate != "N/A" {
+                        HStack(spacing: 8) {
+                            Text(detail.airdate)
+                                .font(.caption2).fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Color.primary.opacity(0.1), in: Capsule())
+                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                        }
+                    }
                 }
                 Spacer()
             }
@@ -569,6 +591,7 @@ struct DetailView: View {
                 vm.load(item: item)
             }
             .buttonStyle(.bordered)
+            .foregroundStyle(Color.accentColor)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -579,9 +602,6 @@ struct DetailView: View {
     private func metadataSection(detail: MediaDetail) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                if detail.airdate != "N/A" {
-                    metadataTag(text: detail.airdate)
-                }
                 if detail.aliases != "N/A" {
                     metadataTag(text: detail.aliases)
                 }

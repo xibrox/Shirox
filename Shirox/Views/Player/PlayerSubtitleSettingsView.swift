@@ -61,6 +61,7 @@ struct PlayerSubtitleSettingsView: View {
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                            .foregroundStyle(Color.accentColor)
                         }
                         Slider(value: $settings.delaySeconds, in: -5...5, step: 0.1)
                     }

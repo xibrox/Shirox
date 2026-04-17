@@ -1117,7 +1117,7 @@ struct PlayerView: View {
                         HStack {
                             Text(option.displayName).foregroundStyle(.primary)
                             Spacer()
-                            if option == selected { Image(systemName: "checkmark").foregroundStyle(.red) }
+                            if option == selected { Image(systemName: "checkmark").foregroundStyle(.primary) }
                         }
                         .padding(.horizontal, 20).frame(height: 52)
                     }

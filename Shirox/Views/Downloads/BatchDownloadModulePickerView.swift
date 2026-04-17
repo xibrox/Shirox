@@ -282,7 +282,7 @@ private struct BatchDownloadModuleRow: View {
             .buttonStyle(.plain)
         case .searchResults:
             Button("Retry") { rowVm.reset(); rowVm.startFind() }
-                .buttonStyle(.bordered).controlSize(.small).foregroundStyle(.red)
+                .buttonStyle(.bordered).controlSize(.small).foregroundStyle(Color.accentColor)
         case .done:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.title3)
         }
@@ -336,7 +336,7 @@ private struct BatchDownloadModuleRow: View {
         case .error(let msg):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
-                Text(msg).font(.caption).foregroundStyle(.red)
+                Text(msg).font(.caption).foregroundStyle(.primary)
             }
         }
     }

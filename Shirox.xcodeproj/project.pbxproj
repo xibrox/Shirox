@@ -158,6 +158,32 @@
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FEA73D829CE9CD5C2259248F /* JSEngine+Details.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECAACC04670C75AE2C8303A /* JSEngine+Details.swift */; };
 		FFEA54B867C75F75B46DD67F /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */; };
+		AA000001000000000000AC01 /* AniListUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC01 /* AniListUser.swift */; };
+		AA000001000000000000AC02 /* AniListUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC01 /* AniListUser.swift */; };
+		AA000001000000000000AC03 /* AniListActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC02 /* AniListActivity.swift */; };
+		AA000001000000000000AC04 /* AniListActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC02 /* AniListActivity.swift */; };
+		AA000001000000000000AC05 /* AniListNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC03 /* AniListNotification.swift */; };
+		AA000001000000000000AC06 /* AniListNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC03 /* AniListNotification.swift */; };
+		AA000001000000000000AC07 /* AniListSocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC04 /* AniListSocialService.swift */; };
+		AA000001000000000000AC08 /* AniListSocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC04 /* AniListSocialService.swift */; };
+		AA000001000000000000AC09 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC05 /* ProfileViewModel.swift */; };
+		AA000001000000000000AC10 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC05 /* ProfileViewModel.swift */; };
+		AA000001000000000000AC11 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC06 /* ProfileView.swift */; };
+		AA000001000000000000AC12 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC06 /* ProfileView.swift */; };
+		AA000001000000000000AC13 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC07 /* ProfileActivityView.swift */; };
+		AA000001000000000000AC14 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC07 /* ProfileActivityView.swift */; };
+		AA000001000000000000AC15 /* ProfileFavouritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC08 /* ProfileFavouritesView.swift */; };
+		AA000001000000000000AC16 /* ProfileFavouritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC08 /* ProfileFavouritesView.swift */; };
+		AA000001000000000000AC17 /* ProfileStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC09 /* ProfileStatsView.swift */; };
+		AA000001000000000000AC18 /* ProfileStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC09 /* ProfileStatsView.swift */; };
+		AA000001000000000000AC19 /* ProfileSocialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC10 /* ProfileSocialView.swift */; };
+		AA000001000000000000AC20 /* ProfileSocialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC10 /* ProfileSocialView.swift */; };
+		AA000001000000000000AC21 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC11 /* NotificationsView.swift */; };
+		AA000001000000000000AC22 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC11 /* NotificationsView.swift */; };
+		AA000001000000000000AC23 /* ComposeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC12 /* ComposeStatusView.swift */; };
+		AA000001000000000000AC24 /* ComposeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC12 /* ComposeStatusView.swift */; };
+		AA000001000000000000AC25 /* ActivityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC13 /* ActivityDetailView.swift */; };
+		AA000001000000000000AC26 /* ActivityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC13 /* ActivityDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -246,6 +272,19 @@
 		F8CB72824DE1085225EDAB47 /* MediaDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetail.swift; sourceTree = "<group>"; };
 		FA54E15EA936A28D42B73886 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
 		FD942143248855B7D74F9E0C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC01 /* AniListUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListUser.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC02 /* AniListActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListActivity.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC03 /* AniListNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListNotification.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC04 /* AniListSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListSocialService.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC05 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC06 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC07 /* ProfileActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC08 /* ProfileFavouritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileFavouritesView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC09 /* ProfileStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC10 /* ProfileSocialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC11 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC12 /* ComposeStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeStatusView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC13 /* ActivityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -283,6 +322,7 @@
 				4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */,
 				B371AE47E8FD36A0C11174AC /* DetailView.swift */,
 				AA000001000000000000DD01 /* Downloads */,
+				AA000001000000000000DC01 /* Profile */,
 				DAD914ABCC5C7C316F115FB6 /* EpisodeRowView.swift */,
 				F6221F81B7112850281B7187 /* HomeView.swift */,
 				330313A7F7AB1EF362097130 /* ModuleListView.swift */,
@@ -327,6 +367,7 @@
 			children = (
 				142A89C12F58E5FD008652D9 /* PlayerPresenter.swift */,
 				DB3FBB9F1A9B237743F4808C /* AniListService.swift */,
+				AA000001000000000000BC04 /* AniListSocialService.swift */,
 				0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */,
 				AA000001000000000000BB81 /* DownloadManager.swift */,
 				AA000001000000000000BB84 /* HLSDownloader.swift */,
@@ -363,6 +404,9 @@
 				314F4DA7D4564AA9B47E4BC2 /* PlayerContext.swift */,
 				1AAE3976E02954E212D46BD4 /* SearchItem.swift */,
 				B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */,
+				AA000001000000000000BC01 /* AniListUser.swift */,
+				AA000001000000000000BC02 /* AniListActivity.swift */,
+				AA000001000000000000BC03 /* AniListNotification.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -446,8 +490,24 @@
 				8DB2ACC14C82E1EC1E47DC2E /* HomeViewModel.swift */,
 				BCAB52C5F226579CA37CC9E5 /* SearchViewModel.swift */,
 				AA000001000000000000BB66 /* LibraryViewModel.swift */,
+				AA000001000000000000BC05 /* ProfileViewModel.swift */,
 			);
 			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		AA000001000000000000DC01 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000BC06 /* ProfileView.swift */,
+				AA000001000000000000BC07 /* ProfileActivityView.swift */,
+				AA000001000000000000BC08 /* ProfileFavouritesView.swift */,
+				AA000001000000000000BC09 /* ProfileStatsView.swift */,
+				AA000001000000000000BC10 /* ProfileSocialView.swift */,
+				AA000001000000000000BC11 /* NotificationsView.swift */,
+				AA000001000000000000BC12 /* ComposeStatusView.swift */,
+				AA000001000000000000BC13 /* ActivityDetailView.swift */,
+			);
+			path = Profile;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -667,6 +727,19 @@
 				AA000001000000000000AA81 /* DownloadItem.swift in Sources */,
 				7A2F29854EAC49CBBA429793 /* ContinueWatchingCard.swift in Sources */,
 				748517C4AE504A939CC1610F /* CachedAsyncImage.swift in Sources */,
+				AA000001000000000000AC02 /* AniListUser.swift in Sources */,
+				AA000001000000000000AC04 /* AniListActivity.swift in Sources */,
+				AA000001000000000000AC06 /* AniListNotification.swift in Sources */,
+				AA000001000000000000AC08 /* AniListSocialService.swift in Sources */,
+				AA000001000000000000AC10 /* ProfileViewModel.swift in Sources */,
+				AA000001000000000000AC12 /* ProfileView.swift in Sources */,
+				AA000001000000000000AC14 /* ProfileActivityView.swift in Sources */,
+				AA000001000000000000AC16 /* ProfileFavouritesView.swift in Sources */,
+				AA000001000000000000AC18 /* ProfileStatsView.swift in Sources */,
+				AA000001000000000000AC20 /* ProfileSocialView.swift in Sources */,
+				AA000001000000000000AC22 /* NotificationsView.swift in Sources */,
+				AA000001000000000000AC24 /* ComposeStatusView.swift in Sources */,
+				AA000001000000000000AC26 /* ActivityDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -749,6 +822,19 @@
 				AA000002000000000000AA89 /* BatchDownloadStreamPickerView.swift in Sources */,
 				C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */,
 				70F287DD43E84880B274852E /* CachedAsyncImage.swift in Sources */,
+				AA000001000000000000AC01 /* AniListUser.swift in Sources */,
+				AA000001000000000000AC03 /* AniListActivity.swift in Sources */,
+				AA000001000000000000AC05 /* AniListNotification.swift in Sources */,
+				AA000001000000000000AC07 /* AniListSocialService.swift in Sources */,
+				AA000001000000000000AC09 /* ProfileViewModel.swift in Sources */,
+				AA000001000000000000AC11 /* ProfileView.swift in Sources */,
+				AA000001000000000000AC13 /* ProfileActivityView.swift in Sources */,
+				AA000001000000000000AC15 /* ProfileFavouritesView.swift in Sources */,
+				AA000001000000000000AC17 /* ProfileStatsView.swift in Sources */,
+				AA000001000000000000AC19 /* ProfileSocialView.swift in Sources */,
+				AA000001000000000000AC21 /* NotificationsView.swift in Sources */,
+				AA000001000000000000AC23 /* ComposeStatusView.swift in Sources */,
+				AA000001000000000000AC25 /* ActivityDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -831,13 +917,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.45;
+				MARKETING_VERSION = 0.0.46;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -854,14 +940,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.45;
+				MARKETING_VERSION = 0.0.46;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -879,13 +965,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.45;
+				MARKETING_VERSION = 0.0.46;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -963,14 +1049,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.45;
+				MARKETING_VERSION = 0.0.46;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

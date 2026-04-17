@@ -285,7 +285,7 @@ struct AniListDetailView: View {
                                 if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
                             }
                         } label: {
-                            Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
+                            Image(systemName: isSelectionMode ? "arrow.down.circle.fill" : "arrow.down.circle")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(isSelectionMode ? platformBackground : .primary)
                                 .frame(width: 46, height: 46)

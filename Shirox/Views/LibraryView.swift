@@ -12,11 +12,17 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 struct LibraryView: View {
     @StateObject private var vm = LibraryViewModel()
     @ObservedObject private var auth = AniListAuthManager.shared
-    @State private var showLogoutAlert = false
     @State private var showSettings = false
+    @State private var showProfile = false
+    @State private var showNotifications = false
+    @StateObject private var profileVM = ProfileViewModel()
     @State private var searchText = ""
-    @State private var sortOrder: LibrarySortOrder = .score
-    @State private var sortAscending = false
+    @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
+    @AppStorage("librarySortAscending") private var sortAscending = false
+
+    private var sortOrder: LibrarySortOrder {
+        LibrarySortOrder(rawValue: sortOrderRaw) ?? .score
+    }
     @State private var selectedGenres: Set<String> = []
     
     // Selection state for editing
@@ -94,7 +100,7 @@ struct LibraryView: View {
                 ForEach(LibrarySortOrder.allCases) { order in
                     Button {
                         if sortOrder == order { sortAscending.toggle() }
-                        else { sortOrder = order; sortAscending = false }
+                        else { sortOrderRaw = order.rawValue; sortAscending = false }
                     } label: {
                         HStack {
                             Text(order.rawValue)
@@ -336,23 +342,30 @@ struct LibraryView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                if let name = auth.username {
-                    Button { showLogoutAlert = true } label: {
-                        HStack(spacing: 6) {
-                            if let urlStr = auth.avatarURL, let url = URL(string: urlStr) {
-                                AsyncImage(url: url) { img in
-                                    img.resizable().scaledToFill()
-                                } placeholder: {
-                                    Circle().fill(Color.secondary.opacity(0.3))
-                                }
-                                .frame(width: 28, height: 28)
-                                .clipShape(Circle())
-                            }
-                            Text(name).font(.subheadline)
+                if auth.isLoggedIn {
+                    HStack(spacing: 4) {
+                        Button {
+                            showNotifications = true
+                        } label: {
+                            Image(systemName: "bell")
+                                .font(.system(size: 17, weight: .medium))
                         }
+
+                        Button {
+                            showProfile = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                if let url = auth.avatarURL {
+                                    CachedAsyncImage(urlString: url)
+                                        .frame(width: 28, height: 28)
+                                        .clipShape(Circle())
+                                }
+                                Text(auth.username ?? "Profile")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 8)
                 }
             }
         }
@@ -362,10 +375,6 @@ struct LibraryView: View {
         }
         .navigationTitle("Library")
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search library")
-        .alert("Log out?", isPresented: $showLogoutAlert) {
-            Button("Log out", role: .destructive) { auth.logout() }
-            Button("Cancel", role: .cancel) {}
-        }
         .sheet(item: $selectedEntry) { entry in
             LibraryEntryEditSheet(entry: entry, media: entry.media) { status, progress, score in
                 if status == .completed {
@@ -381,6 +390,14 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $showSettings) {
             LibrarySettingsView(statusOrderRaw: $statusOrderRaw)
+        }
+        .sheet(isPresented: $showProfile) {
+            if let uid = auth.userId, let username = auth.username {
+                ProfileView(userId: uid, username: username, avatarURL: auth.avatarURL)
+            }
+        }
+        .sheet(isPresented: $showNotifications) {
+            NotificationsView(vm: profileVM)
         }
     }
 }
