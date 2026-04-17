@@ -183,7 +183,9 @@
 		AA000001000000000000AC23 /* ComposeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC12 /* ComposeStatusView.swift */; };
 		AA000001000000000000AC24 /* ComposeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC12 /* ComposeStatusView.swift */; };
 		AA000001000000000000AC25 /* ActivityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC13 /* ActivityDetailView.swift */; };
+		B90C71BECC504F22A35D5BA8 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC; };
 		AA000001000000000000AC26 /* ActivityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC13 /* ActivityDetailView.swift */; };
+		CFD5A40FA6E74CB3ADB60000 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -285,6 +287,7 @@
 		AA000001000000000000BC11 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		AA000001000000000000BC12 /* ComposeStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeStatusView.swift; sourceTree = "<group>"; };
 		AA000001000000000000BC13 /* ActivityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDetailView.swift; sourceTree = "<group>"; };
+		CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikesSheetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -506,6 +509,7 @@
 				AA000001000000000000BC11 /* NotificationsView.swift */,
 				AA000001000000000000BC12 /* ComposeStatusView.swift */,
 				AA000001000000000000BC13 /* ActivityDetailView.swift */,
+				CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -740,6 +744,7 @@
 				AA000001000000000000AC22 /* NotificationsView.swift in Sources */,
 				AA000001000000000000AC24 /* ComposeStatusView.swift in Sources */,
 				AA000001000000000000AC26 /* ActivityDetailView.swift in Sources */,
+				CFD5A40FA6E74CB3ADB60000 /* LikesSheetView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -835,6 +840,7 @@
 				AA000001000000000000AC21 /* NotificationsView.swift in Sources */,
 				AA000001000000000000AC23 /* ComposeStatusView.swift in Sources */,
 				AA000001000000000000AC25 /* ActivityDetailView.swift in Sources */,
+				B90C71BECC504F22A35D5BA8 /* LikesSheetView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

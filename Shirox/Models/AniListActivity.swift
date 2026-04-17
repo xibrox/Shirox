@@ -88,7 +88,7 @@ struct ListActivity: Identifiable, Codable {
     let isLiked: Bool
 }
 
-struct ActivityUser: Codable {
+struct ActivityUser: Codable, Identifiable {
     let id: Int
     let name: String
     let avatar: AniListUserAvatar?
