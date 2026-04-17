@@ -10,6 +10,7 @@ struct ProfileActivityView: View {
     @State private var likeOverrides: [Int: (count: Int, liked: Bool)] = [:]
     @State private var replyCountOverrides: [Int: Int] = [:]
     @State private var togglingIds: Set<Int> = []
+    @State private var activityToDelete: AniListActivity?
 
     private func timeAgo(_ timestamp: Int) -> String {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
@@ -46,8 +47,24 @@ struct ProfileActivityView: View {
                 },
                 onLikeChanged: { count, liked in
                     likeOverrides[activity.id] = (count, liked)
+                },
+                onDeleted: {
+                    withAnimation { vm.activity.removeAll { $0.id == activity.id } }
                 }
             )
+        }
+        .alert("Delete Activity?", isPresented: Binding(
+            get: { activityToDelete != nil },
+            set: { if !$0 { activityToDelete = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let item = activityToDelete {
+                    Task { await performDelete(item) }
+                }
+            }
+            Button("Cancel", role: .cancel) { activityToDelete = nil }
+        } message: {
+            Text("This cannot be undone.")
         }
         .sheet(isPresented: $showCompose) {
             ComposeStatusView(profileVM: vm)
@@ -209,6 +226,26 @@ struct ProfileActivityView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.secondary.opacity(0.08))
         )
+        .contextMenu {
+            if item.user?.id == AniListAuthManager.shared.userId {
+                Button(role: .destructive) {
+                    activityToDelete = item
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private func performDelete(_ item: AniListActivity) async {
+        let backup = vm.activity
+        withAnimation { vm.activity.removeAll { $0.id == item.id } }
+        activityToDelete = nil
+        do {
+            try await AniListSocialService.shared.deleteActivity(id: item.id)
+        } catch {
+            withAnimation { vm.activity = backup }
+        }
     }
 
     private func toggleLike(_ item: AniListActivity) async {
