@@ -26,6 +26,7 @@ final class AniListLibraryService {
                   coverImage { large extraLarge }
                   episodes
                   status
+                  nextAiringEpisode { episode }
                   averageScore
                   genres
                   bannerImage

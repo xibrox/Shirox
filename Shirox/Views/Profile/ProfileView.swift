@@ -10,13 +10,13 @@ struct ProfileView: View {
     @State private var showLogoutConfirm = false
     @Environment(\.dismiss) private var dismiss
 
+    @ObservedObject private var auth = AniListAuthManager.shared
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 profileHeader
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 16)
 
                 tabBar
                     .padding(.horizontal)
@@ -24,20 +24,30 @@ struct ProfileView: View {
 
                 Divider().opacity(0.4)
 
-                TabView(selection: $selectedTab) {
-                    ProfileActivityView(vm: vm, userId: userId).tag(0)
-                    ProfileFavouritesView(favourites: vm.user?.favourites).tag(1)
-                    ProfileStatsView(stats: vm.user?.statistics?.anime).tag(2)
-                    ProfileSocialView(vm: vm, userId: userId).tag(3)
+                ZStack {
+                    if selectedTab == 0 {
+                        ProfileActivityView(vm: vm, userId: userId)
+                    } else if selectedTab == 1 {
+                        ScrollView {
+                            ProfileFavouritesView(favourites: vm.user?.favourites)
+                        }
+                    } else if selectedTab == 2 {
+                        ScrollView {
+                            ProfileStatsView(stats: vm.user?.statistics?.anime)
+                        }
+                    } else if selectedTab == 3 {
+                        ProfileSocialView(vm: vm, userId: userId)
+                    }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(role: .destructive) { showLogoutConfirm = true } label: {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .foregroundStyle(.red)
+                    if userId == AniListAuthManager.shared.userId {
+                        Button(role: .destructive) { showLogoutConfirm = true } label: {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -45,7 +55,13 @@ struct ProfileView: View {
                 }
             }
         }
-        .task { await vm.loadProfile(userId: userId) }
+        .task { 
+            await vm.loadProfile(userId: userId) 
+            // If it's another user, default to their feed
+            if userId != auth.userId {
+                await vm.loadActivity(userId: userId, feed: .mine)
+            }
+        }
         .presentationDetents([.large])
         .confirmationDialog("Log out of AniList?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) {
@@ -57,28 +73,65 @@ struct ProfileView: View {
     }
 
     private var profileHeader: some View {
-        HStack(spacing: 14) {
-            if let url = avatarURL {
-                CachedAsyncImage(urlString: url)
-                    .frame(width: 72, height: 72)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 2))
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text(username).font(.title3.weight(.bold))
-                if let s = vm.user?.statistics?.anime {
-                    HStack(spacing: 6) {
-                        statChip(value: "\(s.count)", label: "anime")
-                        statChip(value: "\(s.episodesWatched)", label: "eps")
-                        if s.meanScore > 0 {
-                            statChip(value: String(format: "%.1f", s.meanScore), label: "avg")
-                        }
-                    }
-                } else if vm.isLoadingProfile {
-                    ProgressView().controlSize(.small)
+        VStack(spacing: 0) {
+            // Banner + Avatar Overlap
+            ZStack(alignment: .bottomLeading) {
+                if let banner = vm.user?.bannerImage {
+                    CachedAsyncImage(urlString: banner)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: UIScreen.main.bounds.width, height: 140)
+                        .clipped()
+                } else {
+                    Color.accentColor.opacity(0.1)
+                        .frame(width: UIScreen.main.bounds.width, height: 120)
+                }
+                
+                // Avatar
+                if let url = vm.user?.avatar?.large ?? avatarURL {
+                    CachedAsyncImage(urlString: url)
+                        .frame(width: 80, height: 80)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color(UIColor.systemBackground), lineWidth: 3))
+                        .shadow(radius: 2)
+                        .offset(x: 20, y: 30)
                 }
             }
-            Spacer()
+            .padding(.bottom, 30) // Space for the offset avatar
+            
+            HStack(alignment: .center, spacing: 10) {
+                // Username (pushed right by avatar width + leading padding)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(vm.user?.name ?? username)
+                        .font(.title3.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .padding(.leading, 105) // 20 (offset) + 80 (width) + 5 (extra spacing)
+                .layoutPriority(0)
+                
+                Spacer(minLength: 8)
+                
+                // Follow Button
+                if userId != auth.userId && auth.isLoggedIn {
+                    Button {
+                        Task { await vm.toggleFollow(userId: userId) }
+                    } label: {
+                        Text(vm.user?.isFollowing == true ? "Following" : "Follow")
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(vm.user?.isFollowing == true ? Color.primary.opacity(0.1) : Color.accentColor)
+                            .foregroundStyle(vm.user?.isFollowing == true ? Color.primary : Color.white)
+                            .clipShape(Capsule())
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.trailing, 16)
+                    .layoutPriority(1)
+                }
+            }
+            .padding(.top, 4)
+            .frame(width: UIScreen.main.bounds.width)
         }
     }
 
@@ -87,6 +140,8 @@ struct ProfileView: View {
             Text(value).font(.caption.weight(.bold)).foregroundStyle(.primary)
             Text(label).font(.caption2).foregroundStyle(.secondary)
         }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(Capsule().fill(Color.secondary.opacity(0.12)))
     }
@@ -102,9 +157,9 @@ struct ProfileView: View {
                             Image(systemName: tab.icon).font(.caption)
                             Text(tab.title).font(.caption.weight(.semibold))
                         }
-                        .foregroundStyle(selectedTab == idx ? Color.accentColor : .secondary)
+                        .foregroundStyle(selectedTab == idx ? Color.primary : .secondary)
                         Rectangle()
-                            .fill(selectedTab == idx ? Color.accentColor : Color.clear)
+                            .fill(selectedTab == idx ? Color.primary : Color.clear)
                             .frame(height: 2)
                     }
                     .frame(maxWidth: .infinity)

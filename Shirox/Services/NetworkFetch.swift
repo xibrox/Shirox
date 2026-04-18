@@ -1,6 +1,22 @@
 import WebKit
 import JavaScriptCore
 
+// MARK: - Date Formatting Extensions
+
+extension Date {
+    func timeAgo() -> String {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f.localizedString(for: self, relativeTo: Date())
+    }
+}
+
+extension Int {
+    func toTimeAgo() -> String {
+        Date(timeIntervalSince1970: TimeInterval(self)).timeAgo()
+    }
+}
+
 // MARK: - URLSession User Agent
 
 extension URLSession {

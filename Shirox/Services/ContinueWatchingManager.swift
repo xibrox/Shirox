@@ -43,8 +43,11 @@ import Foundation
         }()
         if item.totalSeconds > 0 && item.watchedSeconds / item.totalSeconds >= watchedThreshold {
             markWatched(item)
-            if let placeholder = makePlaceholder(
-                episodeNumber: item.episodeNumber + 1, from: item,
+            let nextEp = item.episodeNumber + 1
+            let effectiveCap = item.availableEpisodes ?? item.totalEpisodes
+            let isLastEpisode = effectiveCap.map { item.episodeNumber >= $0 } ?? false
+            if !isLastEpisode, let placeholder = makePlaceholder(
+                episodeNumber: nextEp, from: item,
                 aniListID: item.aniListID, moduleId: item.moduleId,
                 mediaTitle: item.mediaTitle, imageUrl: nil,
                 totalEpisodes: item.totalEpisodes,
@@ -135,10 +138,19 @@ import Foundation
             for entry in watching {
                 let media = entry.media
                 let nextEp = entry.progress + 1
-                
+
+                // availableEpisodes = how many have aired (nextAiringEpisode.episode - 1 for airing shows)
+                let availableEpisodes: Int? = media.nextAiringEpisode != nil
+                    ? (media.nextAiringEpisode!.episode - 1)
+                    : media.episodes
+                let isAiring = media.status == "RELEASING"
+
+                // Don't create a placeholder if the user is already caught up on all aired episodes
+                if let avail = availableEpisodes, nextEp > avail { continue }
+
                 // Only add if we don't already have progress for this show
                 let existing = newItems.first { matchesShow($0, aniListID: media.id, moduleId: nil, mediaTitle: "") }
-                
+
                 if existing == nil {
                     // Create a placeholder pointing to the next episode based on AniList progress
                     if let placeholder = makePlaceholder(
@@ -149,6 +161,8 @@ import Foundation
                         mediaTitle: media.title.displayTitle,
                         imageUrl: media.coverImage.best,
                         totalEpisodes: media.episodes,
+                        availableEpisodes: availableEpisodes,
+                        isAiring: isAiring,
                         detailHref: nil
                     ) {
                         newItems.append(placeholder)
@@ -194,7 +208,9 @@ import Foundation
 
         removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)
 
-        if let placeholder = makePlaceholder(
+        let effectiveCap = availableEpisodes ?? current?.availableEpisodes ?? totalEpisodes ?? current?.totalEpisodes
+        let isLastEpisode = effectiveCap.map { episodeNumber >= $0 } ?? false
+        if !isLastEpisode, let placeholder = makePlaceholder(
             episodeNumber: episodeNumber + 1, from: current,
             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle,
             imageUrl: imageUrl, totalEpisodes: totalEpisodes,
@@ -269,7 +285,9 @@ import Foundation
 
         // 2. Queue up the NEXT episode (N + 1) as a placeholder, if it exists
         let nextEp = episodeNumber + 1
-        if let placeholder = makePlaceholder(
+        let effectiveCap = availableEpisodes ?? ref?.availableEpisodes ?? totalEpisodes ?? ref?.totalEpisodes
+        let isLastEpisode = effectiveCap.map { episodeNumber >= $0 } ?? false
+        if !isLastEpisode, let placeholder = makePlaceholder(
             episodeNumber: nextEp, from: ref,
             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle,
             imageUrl: imageUrl, totalEpisodes: totalEpisodes,
@@ -355,13 +373,7 @@ import Foundation
 
         // If we've passed the currently available (aired) episode count, do not create a placeholder.
         // This makes the CW card disappear when the user is caught up on an ongoing show.
-        // ADJUSTMENT: We always allow the current episodeNumber if it's explicitly being requested,
-        // to handle cases where the user is watching an episode that AniList metadata hasn't caught up with yet.
-        var cap = srcAvailable ?? srcTotalEps
-        if let currentCap = cap {
-            cap = max(currentCap, episodeNumber)
-        }
-        
+        let cap = srcAvailable ?? srcTotalEps
         if let cap, cap > 0, episodeNumber > cap {
             print("[CW] Caught up (ep \(episodeNumber) > available \(cap)), no placeholder created.")
             return nil

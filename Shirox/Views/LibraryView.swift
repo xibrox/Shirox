@@ -363,6 +363,7 @@ struct LibraryView: View {
                                 Text(auth.username ?? "Profile")
                                     .font(.subheadline.weight(.medium))
                             }
+                            .padding(.trailing, 8)
                         }
                         .buttonStyle(.plain)
                     }

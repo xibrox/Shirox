@@ -4,6 +4,8 @@ struct AniListUser: Identifiable, Codable {
     let id: Int
     let name: String
     let avatar: AniListUserAvatar?
+    let bannerImage: String?
+    var isFollowing: Bool?
     let statistics: AniListUserStatistics?
     let favourites: AniListFavourites?
 }
@@ -21,6 +23,30 @@ struct AniListAnimeStats: Codable {
     let episodesWatched: Int
     let meanScore: Double
     let minutesWatched: Int
+    let statuses: [StatusStatistic]?
+    let formats: [FormatStatistic]?
+    let genres: [GenreStatistic]?
+    let scores: [ScoreStatistic]?
+}
+
+struct StatusStatistic: Codable {
+    let status: String
+    let count: Int
+}
+
+struct FormatStatistic: Codable {
+    let format: String
+    let count: Int
+}
+
+struct GenreStatistic: Codable {
+    let genre: String
+    let count: Int
+}
+
+struct ScoreStatistic: Codable {
+    let score: Int
+    let count: Int
 }
 
 struct AniListFavourites: Codable {

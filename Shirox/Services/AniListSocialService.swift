@@ -44,6 +44,13 @@ final class AniListSocialService {
         let body: [String: Any] = ["query": query, "variables": variables]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, _) = try await session.data(for: request)
+        
+        #if DEBUG
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            print("--- GraphQL Response ---\n\(json)")
+        }
+        #endif
+        
         return try JSONDecoder().decode(T.self, from: data)
     }
 
@@ -59,7 +66,17 @@ final class AniListSocialService {
           User(id: $id) {
             id name
             avatar { large }
-            statistics { anime { count episodesWatched meanScore minutesWatched } }
+            bannerImage
+            isFollowing
+            statistics {
+              anime {
+                count episodesWatched meanScore minutesWatched
+                statuses { status count }
+                formats { format count }
+                genres { genre count }
+                scores { score count }
+              }
+            }
             favourites { anime { nodes { id title { romaji english native } coverImage { large extraLarge } } } }
           }
         }
@@ -70,12 +87,16 @@ final class AniListSocialService {
 
     // MARK: - Activity
 
-    func fetchActivity(feed: ActivityFeed, userId: Int, page: Int = 1) async throws -> [AniListActivity] {
+    func fetchActivity(feed: ActivityFeed, userId: Int, page: Int = 1) async throws -> (activities: [AniListActivity], hasNextPage: Bool) {
         struct Response: Decodable {
             struct Data: Decodable { let Page: PageData }
             let data: Data
         }
-        struct PageData: Decodable { let activities: [ActivityUnion] }
+        struct PageData: Decodable {
+            let pageInfo: PageInfo
+            let activities: [ActivityUnion]
+        }
+        struct PageInfo: Decodable { let hasNextPage: Bool }
         struct ActivityUnion: Decodable {
             let __typename: String
             let id: Int?
@@ -106,6 +127,7 @@ final class AniListSocialService {
         let q = """
         query(\(varDecl)) {
           Page(page: $page, perPage: 25) {
+            pageInfo { hasNextPage }
             activities(\(filterFragment)) {
               __typename
               ... on TextActivity { id text createdAt likeCount replyCount isLiked user { id name avatar { large } } }
@@ -117,7 +139,7 @@ final class AniListSocialService {
         }
         """
         let r: Response = try await performQuery(query: q, variables: variables, auth: true)
-        return r.data.Page.activities.compactMap { raw in
+        let activities: [AniListActivity] = r.data.Page.activities.compactMap { raw in
             guard let id = raw.id, let createdAt = raw.createdAt else { return nil }
             switch raw.__typename {
             case "TextActivity":
@@ -132,6 +154,7 @@ final class AniListSocialService {
             default: return nil
             }
         }
+        return (activities, r.data.Page.pageInfo.hasNextPage)
     }
 
     func fetchActivityById(id: Int) async throws -> AniListActivity? {
@@ -236,38 +259,48 @@ final class AniListSocialService {
 
     // MARK: - Social
 
-    func fetchFollowers(userId: Int, page: Int = 1) async throws -> [AniListUser] {
+    func fetchFollowers(userId: Int, page: Int = 1) async throws -> (users: [AniListUser], hasNextPage: Bool) {
         struct Response: Decodable {
             struct Data: Decodable { let Page: PageData }
             let data: Data
         }
-        struct PageData: Decodable { let followers: [AniListUser] }
+        struct PageData: Decodable {
+            let pageInfo: PageInfo
+            let followers: [AniListUser]
+        }
+        struct PageInfo: Decodable { let hasNextPage: Bool }
         let q = """
         query($userId: Int!, $page: Int) {
           Page(page: $page, perPage: 50) {
+            pageInfo { hasNextPage }
             followers(userId: $userId) { id name avatar { large } }
           }
         }
         """
         let r: Response = try await performQuery(query: q, variables: ["userId": userId, "page": page], auth: true)
-        return r.data.Page.followers
+        return (r.data.Page.followers, r.data.Page.pageInfo.hasNextPage)
     }
 
-    func fetchFollowing(userId: Int, page: Int = 1) async throws -> [AniListUser] {
+    func fetchFollowing(userId: Int, page: Int = 1) async throws -> (users: [AniListUser], hasNextPage: Bool) {
         struct Response: Decodable {
             struct Data: Decodable { let Page: PageData }
             let data: Data
         }
-        struct PageData: Decodable { let following: [AniListUser] }
+        struct PageData: Decodable {
+            let pageInfo: PageInfo
+            let following: [AniListUser]
+        }
+        struct PageInfo: Decodable { let hasNextPage: Bool }
         let q = """
         query($userId: Int!, $page: Int) {
           Page(page: $page, perPage: 50) {
+            pageInfo { hasNextPage }
             following(userId: $userId) { id name avatar { large } }
           }
         }
         """
         let r: Response = try await performQuery(query: q, variables: ["userId": userId, "page": page], auth: true)
-        return r.data.Page.following
+        return (r.data.Page.following, r.data.Page.pageInfo.hasNextPage)
     }
 
     // MARK: - Notifications
@@ -392,6 +425,17 @@ final class AniListSocialService {
         let _: Response = try await performQuery(query: q, variables: ["text": text], auth: true)
     }
 
+    func toggleFollow(userId: Int) async throws -> Bool {
+        struct Response: Decodable {
+            struct Data: Decodable { let ToggleFollow: FollowResult }
+            struct FollowResult: Decodable { let isFollowing: Bool }
+            let data: Data
+        }
+        let q = "mutation($id: Int) { ToggleFollow(userId: $id) { isFollowing } }"
+        let r: Response = try await performQuery(query: q, variables: ["id": userId], auth: true)
+        return r.data.ToggleFollow.isFollowing
+    }
+
     func deleteActivity(id: Int) async throws {
         struct Response: Decodable {
             struct Data: Decodable { let DeleteActivity: Deleted? }
@@ -412,22 +456,27 @@ final class AniListSocialService {
         let _: Response = try await performQuery(query: q, variables: ["id": id], auth: true)
     }
 
-    func fetchLikes(id: Int, type: LikeableType) async throws -> [ActivityUser] {
+    func fetchLikes(id: Int, type: LikeableType, page: Int = 1) async throws -> (users: [ActivityUser], hasNextPage: Bool) {
         struct Response: Decodable {
             struct Data: Decodable { let Page: PageData }
             let data: Data
         }
-        struct PageData: Decodable { let likes: [ActivityUser] }
+        struct PageData: Decodable {
+            let pageInfo: PageInfo
+            let likes: [ActivityUser]
+        }
+        struct PageInfo: Decodable { let hasNextPage: Bool }
         let q = """
-        query($id: Int, $type: LikeableType) {
-          Page(perPage: 50) {
+        query($id: Int, $type: LikeableType, $page: Int) {
+          Page(page: $page, perPage: 50) {
+            pageInfo { hasNextPage }
             likes(likeableId: $id, type: $type) { id name avatar { large } }
           }
         }
         """
         let r: Response = try await performQuery(
-            query: q, variables: ["id": id, "type": type.rawValue], auth: true)
-        return r.data.Page.likes
+            query: q, variables: ["id": id, "type": type.rawValue, "page": page], auth: true)
+        return (r.data.Page.likes, r.data.Page.pageInfo.hasNextPage)
     }
 
     func postReply(activityId: Int, text: String) async throws -> ActivityReply {

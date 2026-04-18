@@ -6,17 +6,16 @@ struct ProfileActivityView: View {
     @State private var selectedActivity: AniListActivity?
     @State private var showCompose = false
 
-    // Local overrides so like/reply count updates are instant without reloading the list
+    // Local overrides so like/reply count updates are instant
     @State private var likeOverrides: [Int: (count: Int, liked: Bool)] = [:]
     @State private var replyCountOverrides: [Int: Int] = [:]
     @State private var togglingIds: Set<Int> = []
     @State private var activityToDelete: AniListActivity?
 
-    private func timeAgo(_ timestamp: Int) -> String {
-        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-        let f = RelativeDateTimeFormatter(); f.unitsStyle = .short
-        return f.localizedString(for: date, relativeTo: Date())
-    }
+    // Profile navigation
+    @State private var targetUserId: Int?
+    @State private var targetUsername: String?
+    @State private var targetMediaId: Int?
 
     private func likeCount(for item: AniListActivity) -> Int {
         likeOverrides[item.id]?.count ?? item.likeCount
@@ -38,7 +37,12 @@ struct ProfileActivityView: View {
 
             content
         }
-        .task { if vm.activity.isEmpty { await vm.loadActivity(userId: userId) } }
+        .task { 
+            if vm.activity.isEmpty {
+                let initialFeed: ActivityFeed = (userId == AniListAuthManager.shared.userId) ? .following : .mine
+                await vm.loadActivity(userId: userId, feed: initialFeed)
+            }
+        }
         .sheet(item: $selectedActivity) { activity in
             ActivityDetailView(
                 activity: activity,
@@ -53,6 +57,28 @@ struct ProfileActivityView: View {
                 }
             )
         }
+        .sheet(isPresented: $showCompose) {
+            ComposeStatusView(profileVM: vm)
+        }
+        .sheet(item: $targetUserId) { uid in
+            ProfileView(userId: uid, username: targetUsername ?? "Profile", avatarURL: nil)
+        }
+        .sheet(item: $targetMediaId) { mid in
+            AniListDetailView(mediaId: mid)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if userId == AniListAuthManager.shared.userId {
+                Button { showCompose = true } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Color(UIColor.systemBackground))
+                        .frame(width: 52, height: 52)
+                        .background(Circle().fill(Color.primary))
+                        .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
+                }
+                .padding(20)
+            }
+        }
         .alert("Delete Activity?", isPresented: Binding(
             get: { activityToDelete != nil },
             set: { if !$0 { activityToDelete = nil } }
@@ -66,25 +92,18 @@ struct ProfileActivityView: View {
         } message: {
             Text("This cannot be undone.")
         }
-        .sheet(isPresented: $showCompose) {
-            ComposeStatusView(profileVM: vm)
-        }
-        .overlay(alignment: .bottomTrailing) {
-            Button { showCompose = true } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 52, height: 52)
-                    .background(Circle().fill(Color.accentColor))
-                    .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
-            }
-            .padding(20)
-        }
     }
 
     private var feedPicker: some View {
         HStack(spacing: 6) {
-            ForEach(ActivityFeed.allCases) { feed in
+            let feeds = ActivityFeed.allCases.filter { feed in
+                if userId != AniListAuthManager.shared.userId {
+                    return feed != .following
+                }
+                return true
+            }
+            
+            ForEach(feeds) { feed in
                 let selected = vm.activityFeed == feed
                 Button {
                     Task { await vm.loadActivity(userId: userId, feed: feed) }
@@ -95,12 +114,12 @@ struct ProfileActivityView: View {
                     }
                     .padding(.horizontal, 12).padding(.vertical, 7)
                     .background(
-                        Capsule().fill(selected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
+                        Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
                     )
                     .overlay(
-                        Capsule().strokeBorder(selected ? Color.accentColor : Color.clear, lineWidth: 1)
+                        Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
                     )
-                    .foregroundStyle(selected ? Color.accentColor : .primary)
+                    .foregroundStyle(selected ? Color.primary : .secondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -119,23 +138,41 @@ struct ProfileActivityView: View {
                 Text(emptyText)
             }
         } else {
-            ScrollView {
-                LazyVStack(spacing: 10) {
-                    ForEach(vm.activity) { item in
-                        activityCard(item)
-                    }
+            List {
+                ForEach(vm.activity) { item in
+                    activityCard(item)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
+                        .listRowBackground(Color.clear)
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 90)
+
+                if vm.hasNextActivityPage {
+                    Button {
+                        Task { await vm.loadActivity(userId: userId, loadMore: true) }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if vm.isLoadingActivity {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text("Load More").font(.subheadline.weight(.medium))
+                            }
+                            Spacer()
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
             }
+            .listStyle(.plain)
             .refreshable { await vm.loadActivity(userId: userId) }
         }
     }
 
     private var emptyText: String {
         switch vm.activityFeed {
-        case .mine: return "You haven't posted any activity yet."
+        case .mine: return "No activity found."
         case .following: return "No recent activity from people you follow."
         case .global: return "No global activity available."
         }
@@ -149,15 +186,22 @@ struct ProfileActivityView: View {
                 if let url = item.user?.avatar?.large {
                     CachedAsyncImage(urlString: url)
                         .frame(width: 36, height: 36).clipShape(Circle())
+                        .onTapGesture {
+                            targetUsername = item.user?.name
+                            targetUserId = item.user?.id
+                        }
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.user?.name ?? "Unknown").font(.subheadline.weight(.semibold))
-                    Text(timeAgo(item.createdAt)).font(.caption2).foregroundStyle(.secondary)
+                    Text(item.user?.name ?? "Unknown")
+                        .font(.subheadline.weight(.semibold))
+                        .onTapGesture {
+                            targetUsername = item.user?.name
+                            targetUserId = item.user?.id
+                        }
+                    Text(item.createdAt.toTimeAgo()).font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
-            .contentShape(Rectangle())
-            .onTapGesture { selectedActivity = item }
 
             // Content
             Group {
@@ -165,25 +209,31 @@ struct ProfileActivityView: View {
                 case .text(let a):
                     Text(a.text ?? "")
                         .font(.callout)
-                        .lineLimit(4)
+                        .lineLimit(6)
                         .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 case .list(let a):
-                    HStack(alignment: .top, spacing: 10) {
-                        if let img = a.media?.coverImage?.large {
-                            CachedAsyncImage(urlString: img)
-                                .frame(width: 48, height: 66)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                    Button {
+                        targetMediaId = a.media?.id
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            if let img = a.media?.coverImage?.large {
+                                CachedAsyncImage(urlString: img)
+                                    .frame(width: 48, height: 66)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(a.media?.displayTitle ?? "")
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                Text("\(a.status?.capitalized ?? "") \(a.progress ?? "")")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
                         }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(a.media?.displayTitle ?? "")
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(2)
-                            Text("\(a.status?.capitalized ?? "") \(a.progress ?? "")")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .contentShape(Rectangle())
@@ -200,7 +250,6 @@ struct ProfileActivityView: View {
                             .foregroundStyle(isLiked(for: item) ? .pink : .secondary)
                         Text("\(likeCount(for: item))")
                             .foregroundStyle(isLiked(for: item) ? .pink : .secondary)
-                            .contentTransition(.numericText())
                     }
                     .font(.caption)
                 }
@@ -234,6 +283,12 @@ struct ProfileActivityView: View {
                     Label("Delete", systemImage: "trash")
                 }
             }
+            
+            Button {
+                selectedActivity = item // This will open detail which has likes sheet
+            } label: {
+                Label("View Likes", systemImage: "heart.text.square")
+            }
         }
     }
 
@@ -261,4 +316,8 @@ struct ProfileActivityView: View {
         }
         togglingIds.remove(item.id)
     }
+}
+
+extension Int: @retroactive Identifiable {
+    public var id: Int { self }
 }

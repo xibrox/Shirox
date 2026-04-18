@@ -35,6 +35,14 @@ struct ActivityDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    // Navigation
+    @State private var targetUserId: Int?
+    @State private var targetUsername: String?
+    @State private var targetMediaId: Int?
+    
+    // Likes preview
+    @State private var likePreviewUsers: [ActivityUser] = []
+
     private var currentUserId: Int? { AniListAuthManager.shared.userId }
 
     init(activity: AniListActivity,
@@ -49,13 +57,8 @@ struct ActivityDetailView: View {
         _isLiked = State(initialValue: activity.isLiked)
     }
 
-    private func timeAgo(_ ts: Int) -> String {
-        let f = RelativeDateTimeFormatter(); f.unitsStyle = .short
-        return f.localizedString(for: Date(timeIntervalSince1970: TimeInterval(ts)), relativeTo: Date())
-    }
-
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     activityHeader
@@ -66,21 +69,30 @@ struct ActivityDetailView: View {
                     repliesSection
                         .padding(.horizontal, 14)
                         .padding(.top, 12)
-
-                    replyComposer
-                        .padding(14)
-                        .padding(.bottom, 12)
                 }
             }
-            .navigationTitle("Activity")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
+            
+            replyComposer
+                .padding(14)
+                .padding(.bottom, 12)
+        }
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") { dismiss() }
             }
         }
-        .task { await loadReplies() }
+        .task { 
+            await loadReplies() 
+            await loadLikePreview()
+        }
+        .sheet(item: $targetUserId) { uid in
+            ProfileView(userId: uid, username: targetUsername ?? "Profile", avatarURL: nil)
+        }
+        .sheet(item: $targetMediaId) { mid in
+            AniListDetailView(mediaId: mid)
+        }
         .presentationDetents([.large])
         .alert("Delete Activity?", isPresented: $confirmDeleteActivity) {
             Button("Delete", role: .destructive) {
@@ -121,10 +133,19 @@ struct ActivityDetailView: View {
                 if let url = activity.user?.avatar?.large {
                     CachedAsyncImage(urlString: url)
                         .frame(width: 40, height: 40).clipShape(Circle())
+                        .onTapGesture {
+                            targetUsername = activity.user?.name
+                            targetUserId = activity.user?.id
+                        }
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(activity.user?.name ?? "Unknown").font(.subheadline.weight(.semibold))
-                    Text(timeAgo(activity.createdAt)).font(.caption2).foregroundStyle(.secondary)
+                    Text(activity.user?.name ?? "Unknown")
+                        .font(.subheadline.weight(.semibold))
+                        .onTapGesture {
+                            targetUsername = activity.user?.name
+                            targetUserId = activity.user?.id
+                        }
+                    Text(activity.createdAt.toTimeAgo()).font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -133,18 +154,28 @@ struct ActivityDetailView: View {
             case .text(let a):
                 Text(a.text ?? "").font(.body)
             case .list(let a):
-                HStack(alignment: .top, spacing: 12) {
-                    if let img = a.media?.coverImage?.large {
-                        CachedAsyncImage(urlString: img)
-                            .frame(width: 52, height: 72)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(a.media?.displayTitle ?? "").font(.subheadline.weight(.semibold))
-                        Text("\(a.status?.capitalized ?? "") \(a.progress ?? "")")
-                            .font(.callout).foregroundStyle(.secondary)
+                Button {
+                    targetMediaId = a.media?.id
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        if let img = a.media?.coverImage?.large {
+                            CachedAsyncImage(urlString: img)
+                                .frame(width: 52, height: 72)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(a.media?.displayTitle ?? "").font(.subheadline.weight(.semibold))
+                                .multilineTextAlignment(.leading)
+                            Text("\(a.status?.capitalized ?? "") \(a.progress ?? "")")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+            }
+            
+            if !likePreviewUsers.isEmpty {
+                likesPreviewRow
             }
 
             HStack(spacing: 20) {
@@ -166,6 +197,34 @@ struct ActivityDetailView: View {
                 }
             }
         }
+    }
+
+    private var likesPreviewRow: some View {
+        Button {
+            showActivityLikes = true
+        } label: {
+            HStack(spacing: -8) {
+                ForEach(likePreviewUsers.prefix(5)) { user in
+                    CachedAsyncImage(urlString: user.avatar?.large ?? "")
+                        .frame(width: 24, height: 24)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color(UIColor.systemBackground), lineWidth: 1.5))
+                }
+                
+                if likeCount > 5 {
+                    Text("+\(likeCount - 5)")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 12)
+                } else if likeCount > 0 && !likePreviewUsers.isEmpty {
+                    Text("liked this")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 12)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var likeButton: some View {
@@ -227,12 +286,21 @@ struct ActivityDetailView: View {
             if let url = reply.user?.avatar?.large {
                 CachedAsyncImage(urlString: url)
                     .frame(width: 32, height: 32).clipShape(Circle())
+                    .onTapGesture {
+                        targetUsername = reply.user?.name
+                        targetUserId = reply.user?.id
+                    }
             }
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(reply.user?.name ?? "Unknown").font(.caption.weight(.semibold))
+                    Text(reply.user?.name ?? "Unknown")
+                        .font(.caption.weight(.semibold))
+                        .onTapGesture {
+                            targetUsername = reply.user?.name
+                            targetUserId = reply.user?.id
+                        }
                     Spacer()
-                    Text(timeAgo(reply.createdAt)).font(.caption2).foregroundStyle(.secondary)
+                    Text(reply.createdAt.toTimeAgo()).font(.caption2).foregroundStyle(.secondary)
                 }
                 Text(reply.text ?? "").font(.callout)
                 HStack(spacing: 4) {
@@ -304,6 +372,12 @@ struct ActivityDetailView: View {
         isLoadingReplies = true
         replies = (try? await AniListSocialService.shared.fetchActivityReplies(activityId: activity.id)) ?? []
         isLoadingReplies = false
+    }
+
+    private func loadLikePreview() async {
+        if let result = try? await AniListSocialService.shared.fetchLikes(id: activity.id, type: .activity) {
+            likePreviewUsers = result.users
+        }
     }
 
     private func postReply() async {

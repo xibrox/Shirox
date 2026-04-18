@@ -127,37 +127,6 @@
 		AA000001000000000000AA86 /* DownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB85 /* DownloadStreamPickerView.swift */; };
 		AA000001000000000000AA87 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB86 /* DownloadModulePickerView.swift */; };
 		AA000001000000000000AA88 /* BatchDownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB88 /* BatchDownloadModulePickerView.swift */; };
-		AA000002000000000000AA89 /* BatchDownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000BB89 /* BatchDownloadStreamPickerView.swift */; };
-		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
-		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
-		AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
-		AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
-		AFD909B8E23B2E6F048F0869 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD942143248855B7D74F9E0C /* SettingsView.swift */; };
-		B28F4CA7C301FB3448693046 /* ModuleJSRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */; };
-		B6B720E10D4EE0F2136F17C4 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
-		B6B720E10D4EE0F2136F17C6 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
-		B6B720E10D4EE0F2136F17C8 /* CacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */; };
-		B6B720E10D4EE0F2136F17C9 /* CacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */; };
-		B85FDAB9BAB5CFDC3F324ACD /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
-		B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
-		C513DCB66EC4AFC34A15DC7A /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
-		C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */; };
-		CA620998EF1BCA1D9C95B49D /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
-		CC14EF9C84C3E8BE5456C77D /* SearchItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAE3976E02954E212D46BD4 /* SearchItem.swift */; };
-		CFB5FFD7B8B6D26BD966878F /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
-		D0E5AFA00D4E6868A52A1123 /* JSEngine+Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51053A55A3C1D2682EB7719D /* JSEngine+Streams.swift */; };
-		D16E18BD46A2A5ABA035EFF3 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB2ACC14C82E1EC1E47DC2E /* HomeViewModel.swift */; };
-		E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */; };
-		E2A6544D9407734FABCFD57D /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEA5105668982AD0021041F /* SearchView.swift */; };
-		E2DCF99DA506F27794A1B6CD /* Pods_Shirox_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F51FC1BEA042BB8C4C9820F9 /* Pods_Shirox_iOS.framework */; };
-		EA5B1C17081C02D59196F61C /* ModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 330313A7F7AB1EF362097130 /* ModuleListView.swift */; };
-		EADD7BDDF8A641980A2CFE35 /* WatchHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDFD568A3E8F21EA674244C /* WatchHistoryService.swift */; };
-		EB389DABE1A542FCA214B6D7 /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71374A74E55E4B9BB0555C59 /* BrowseView.swift */; };
-		F971C44DD8C1F3918A3CE985 /* StreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520D2B9F954BF05330758E81 /* StreamPickerView.swift */; };
-		F9E24C2C4FF74E1EAC5BFD9B /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
-		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
-		FEA73D829CE9CD5C2259248F /* JSEngine+Details.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECAACC04670C75AE2C8303A /* JSEngine+Details.swift */; };
-		FFEA54B867C75F75B46DD67F /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */; };
 		AA000001000000000000AC01 /* AniListUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC01 /* AniListUser.swift */; };
 		AA000001000000000000AC02 /* AniListUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC01 /* AniListUser.swift */; };
 		AA000001000000000000AC03 /* AniListActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC02 /* AniListActivity.swift */; };
@@ -183,9 +152,40 @@
 		AA000001000000000000AC23 /* ComposeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC12 /* ComposeStatusView.swift */; };
 		AA000001000000000000AC24 /* ComposeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC12 /* ComposeStatusView.swift */; };
 		AA000001000000000000AC25 /* ActivityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC13 /* ActivityDetailView.swift */; };
-		B90C71BECC504F22A35D5BA8 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC; };
 		AA000001000000000000AC26 /* ActivityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC13 /* ActivityDetailView.swift */; };
-		CFD5A40FA6E74CB3ADB60000 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC; };
+		AA000002000000000000AA89 /* BatchDownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000BB89 /* BatchDownloadStreamPickerView.swift */; };
+		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
+		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
+		AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
+		AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
+		AFD909B8E23B2E6F048F0869 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD942143248855B7D74F9E0C /* SettingsView.swift */; };
+		B28F4CA7C301FB3448693046 /* ModuleJSRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */; };
+		B6B720E10D4EE0F2136F17C4 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
+		B6B720E10D4EE0F2136F17C6 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */; };
+		B6B720E10D4EE0F2136F17C8 /* CacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */; };
+		B6B720E10D4EE0F2136F17C9 /* CacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */; };
+		B85FDAB9BAB5CFDC3F324ACD /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
+		B90C71BECC504F22A35D5BA8 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */; };
+		B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
+		C513DCB66EC4AFC34A15DC7A /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
+		C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDDE52DB1044841AA459444 /* ContinueWatchingCard.swift */; };
+		CA620998EF1BCA1D9C95B49D /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
+		CC14EF9C84C3E8BE5456C77D /* SearchItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAE3976E02954E212D46BD4 /* SearchItem.swift */; };
+		CFB5FFD7B8B6D26BD966878F /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
+		CFD5A40FA6E74CB3ADB60000 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */; };
+		D0E5AFA00D4E6868A52A1123 /* JSEngine+Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51053A55A3C1D2682EB7719D /* JSEngine+Streams.swift */; };
+		D16E18BD46A2A5ABA035EFF3 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB2ACC14C82E1EC1E47DC2E /* HomeViewModel.swift */; };
+		E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */; };
+		E2A6544D9407734FABCFD57D /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEA5105668982AD0021041F /* SearchView.swift */; };
+		E2DCF99DA506F27794A1B6CD /* Pods_Shirox_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F51FC1BEA042BB8C4C9820F9 /* Pods_Shirox_iOS.framework */; };
+		EA5B1C17081C02D59196F61C /* ModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 330313A7F7AB1EF362097130 /* ModuleListView.swift */; };
+		EADD7BDDF8A641980A2CFE35 /* WatchHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDFD568A3E8F21EA674244C /* WatchHistoryService.swift */; };
+		EB389DABE1A542FCA214B6D7 /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71374A74E55E4B9BB0555C59 /* BrowseView.swift */; };
+		F971C44DD8C1F3918A3CE985 /* StreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520D2B9F954BF05330758E81 /* StreamPickerView.swift */; };
+		F9E24C2C4FF74E1EAC5BFD9B /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
+		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
+		FEA73D829CE9CD5C2259248F /* JSEngine+Details.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECAACC04670C75AE2C8303A /* JSEngine+Details.swift */; };
+		FFEA54B867C75F75B46DD67F /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B720E10D4EE0F2136F17C3 /* StreamResult.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -248,6 +248,19 @@
 		AA000001000000000000BB85 /* DownloadStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadStreamPickerView.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB86 /* DownloadModulePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadModulePickerView.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB88 /* BatchDownloadModulePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchDownloadModulePickerView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC01 /* AniListUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListUser.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC02 /* AniListActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListActivity.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC03 /* AniListNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListNotification.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC04 /* AniListSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListSocialService.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC05 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC06 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC07 /* ProfileActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC08 /* ProfileFavouritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileFavouritesView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC09 /* ProfileStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC10 /* ProfileSocialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC11 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC12 /* ComposeStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeStatusView.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC13 /* ActivityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDetailView.swift; sourceTree = "<group>"; };
 		AA000002000000000000BB89 /* BatchDownloadStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchDownloadStreamPickerView.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
@@ -258,6 +271,7 @@
 		B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
 		BCAB52C5F226579CA37CC9E5 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
 		BECC2087556541BAE47BDA6B /* DetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailViewModel.swift; sourceTree = "<group>"; };
+		CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikesSheetView.swift; sourceTree = "<group>"; };
 		D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeCardView.swift; sourceTree = "<group>"; };
 		DAD914ABCC5C7C316F115FB6 /* EpisodeRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeRowView.swift; sourceTree = "<group>"; };
 		DB3FBB9F1A9B237743F4808C /* AniListService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListService.swift; sourceTree = "<group>"; };
@@ -274,20 +288,6 @@
 		F8CB72824DE1085225EDAB47 /* MediaDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetail.swift; sourceTree = "<group>"; };
 		FA54E15EA936A28D42B73886 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
 		FD942143248855B7D74F9E0C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC01 /* AniListUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListUser.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC02 /* AniListActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListActivity.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC03 /* AniListNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListNotification.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC04 /* AniListSocialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListSocialService.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC05 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC06 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC07 /* ProfileActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileActivityView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC08 /* ProfileFavouritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileFavouritesView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC09 /* ProfileStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC10 /* ProfileSocialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSocialView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC11 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC12 /* ComposeStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeStatusView.swift; sourceTree = "<group>"; };
-		AA000001000000000000BC13 /* ActivityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDetailView.swift; sourceTree = "<group>"; };
-		CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikesSheetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -471,6 +471,22 @@
 			path = Player;
 			sourceTree = "<group>";
 		};
+		AA000001000000000000DC01 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				AA000001000000000000BC06 /* ProfileView.swift */,
+				AA000001000000000000BC07 /* ProfileActivityView.swift */,
+				AA000001000000000000BC08 /* ProfileFavouritesView.swift */,
+				AA000001000000000000BC09 /* ProfileStatsView.swift */,
+				AA000001000000000000BC10 /* ProfileSocialView.swift */,
+				AA000001000000000000BC11 /* NotificationsView.swift */,
+				AA000001000000000000BC12 /* ComposeStatusView.swift */,
+				AA000001000000000000BC13 /* ActivityDetailView.swift */,
+				CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
 		AA000001000000000000DD01 /* Downloads */ = {
 			isa = PBXGroup;
 			children = (
@@ -496,22 +512,6 @@
 				AA000001000000000000BC05 /* ProfileViewModel.swift */,
 			);
 			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		AA000001000000000000DC01 /* Profile */ = {
-			isa = PBXGroup;
-			children = (
-				AA000001000000000000BC06 /* ProfileView.swift */,
-				AA000001000000000000BC07 /* ProfileActivityView.swift */,
-				AA000001000000000000BC08 /* ProfileFavouritesView.swift */,
-				AA000001000000000000BC09 /* ProfileStatsView.swift */,
-				AA000001000000000000BC10 /* ProfileSocialView.swift */,
-				AA000001000000000000BC11 /* NotificationsView.swift */,
-				AA000001000000000000BC12 /* ComposeStatusView.swift */,
-				AA000001000000000000BC13 /* ActivityDetailView.swift */,
-				CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */,
-			);
-			path = Profile;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -923,13 +923,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 42;
+				CURRENT_PROJECT_VERSION = 43;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.46;
+				MARKETING_VERSION = 0.0.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -946,14 +946,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 42;
+				CURRENT_PROJECT_VERSION = 43;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.46;
+				MARKETING_VERSION = 0.0.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -971,13 +971,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 42;
+				CURRENT_PROJECT_VERSION = 43;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.46;
+				MARKETING_VERSION = 0.0.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1055,14 +1055,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 42;
+				CURRENT_PROJECT_VERSION = 43;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.46;
+				MARKETING_VERSION = 0.0.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

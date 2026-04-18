@@ -37,14 +37,10 @@ private struct ActivityFetchView: View {
 
 struct NotificationsView: View {
     @ObservedObject var vm: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
 
     @State private var navActivity: ActivityNavItem?
     @State private var navMedia: MediaNavItem?
-
-    private func timeAgo(_ ts: Int) -> String {
-        let f = RelativeDateTimeFormatter(); f.unitsStyle = .short
-        return f.localizedString(for: Date(timeIntervalSince1970: TimeInterval(ts)), relativeTo: Date())
-    }
 
     var body: some View {
         NavigationStack {
@@ -59,6 +55,11 @@ struct NotificationsView: View {
             }
             .navigationTitle("Notifications")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .navigationDestination(item: $navActivity) { item in
                 ActivityFetchView(activityId: item.id)
             }
@@ -137,7 +138,7 @@ struct NotificationsView: View {
                     .font(.subheadline)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
-                Text(timeAgo(notif.createdAt))
+                Text(notif.createdAt.toTimeAgo())
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
