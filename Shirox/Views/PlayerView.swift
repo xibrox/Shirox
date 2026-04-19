@@ -624,7 +624,8 @@ struct PlayerView: View {
             totalEpisodes: context.totalEpisodes,
             availableEpisodes: context.availableEpisodes,
             isAiring: context.isAiring,
-            lastWatchedAt: .now
+            lastWatchedAt: .now,
+            thumbnailUrl: context.thumbnailUrl
         )
         ContinueWatchingManager.shared.save(item)
     }
@@ -1081,7 +1082,7 @@ struct PlayerView: View {
         didSeekToResume = true
         currentStream = next
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
         }
         audioGroup = nil
         Task {

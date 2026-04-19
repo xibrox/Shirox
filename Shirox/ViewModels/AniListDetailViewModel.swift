@@ -96,6 +96,7 @@ final class AniListDetailViewModel: ObservableObject {
         let availEps: Int? = anilistAiring ?? availableEpisodes ?? media.episodes
         // totalEpisodes = full series count (nil if unknown)
         let totalEpisodes: Int? = media.episodes
+        let episodeThumbnail = TVDBMappingService.shared.getCachedEpisode(for: media.id, episodeNumber: currentEpNum)?.thumbnail
         let context = PlayerContext(
             mediaTitle: mediaTitle,
             episodeNumber: currentEpNum,
@@ -107,9 +108,10 @@ final class AniListDetailViewModel: ObservableObject {
             availableEpisodes: availEps,
             isAiring: media.status == "RELEASING",
             resumeFrom: resumeWatchedSeconds,
-            detailHref: searchResultHref,  // Use searchResultHref for persistence
-            streamTitle: stream.title,  // Remember the stream title (SUB, DUB, etc.)
-            workingDetailHref: searchResultHref  // Store the working search result href
+            detailHref: searchResultHref,
+            streamTitle: stream.title,
+            workingDetailHref: searchResultHref,
+            thumbnailUrl: episodeThumbnail
         )
 
         // Build next-episode loader using ModuleJSRunner (same path as ModuleStreamPickerView)

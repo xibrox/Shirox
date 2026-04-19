@@ -387,7 +387,8 @@ import Foundation
             watchedSeconds: 0, totalSeconds: 0, totalEpisodes: srcTotalEps,
             availableEpisodes: srcAvailable,
             isAiring: srcIsAiring,
-            lastWatchedAt: .now
+            lastWatchedAt: .now,
+            thumbnailUrl: nil
         )
     }
 

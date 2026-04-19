@@ -352,6 +352,7 @@ struct AniListDetailView: View {
         let item = continueWatchingItem(for: media)
         let total = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
         let isCaughtUp: Bool = {
+            guard media.status != "FINISHED" else { return false }
             if let entry = existingEntry, let totalKnown = media.episodes, entry.progress >= totalKnown {
                 return true
             }
@@ -360,8 +361,8 @@ struct AniListDetailView: View {
             }
             return false
         }()
-        
-        if isCaughtUp && media.status == "FINISHED" {
+
+        if isCaughtUp {
             EmptyView()
         } else {
             let nextEp = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
@@ -433,7 +434,8 @@ struct AniListDetailView: View {
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
             streamTitle: item.streamTitle,
-            workingDetailHref: item.detailHref
+            workingDetailHref: item.detailHref,
+            thumbnailUrl: item.thumbnailUrl
         )
 
         let onWatchNext: WatchNextLoader? = { currentEpNum in
@@ -470,17 +472,10 @@ struct AniListDetailView: View {
                 let imageH = 420 + stretch + scrollDown * 0.5
                 let imageY = scrollDown * 0.5 - stretch
 
-                AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                    default:
-                        Rectangle().fill(Color.gray.opacity(0.25))
-                    }
-                }
-                .frame(width: proxy.size.width, height: imageH)
-                .clipped()
-                .offset(y: imageY)
+                TVDBPosterImage(media: media, type: .fanart)
+                    .frame(width: proxy.size.width, height: imageH)
+                    .clipped()
+                    .offset(y: imageY)
             }
             .frame(height: 420)
             .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
@@ -497,16 +492,11 @@ struct AniListDetailView: View {
             .frame(height: 420)
 
             HStack(alignment: .bottom, spacing: 14) {
-                AsyncImage(url: URL(string: media.coverImage.best ?? "")) { phase in
-                    switch phase {
-                    case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
-                    default: Rectangle().fill(Color.gray.opacity(0.3))
-                    }
-                }
-                .frame(width: 110, height: 165)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
+                TVDBPosterImage(media: media)
+                    .frame(width: 110, height: 165)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(media.title.displayTitle)
@@ -947,6 +937,8 @@ private struct AniListEpisodeRowContainer: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    
+    @State private var aniMapEpisode: AniMapEpisode?
 
     private var progress: Double? {
         if continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
@@ -977,6 +969,8 @@ private struct AniListEpisodeRowContainer: View {
     var body: some View {
         AniListEpisodeRow(
             number: ep,
+            thumbnail: aniMapEpisode?.thumbnail,
+            title: aniMapEpisode?.title,
             progress: progress,
             onTap: onTap,
             onMarkWatched: {
@@ -1012,12 +1006,23 @@ private struct AniListEpisodeRowContainer: View {
             isSelectionMode: isSelectionMode,
             isSelected: isSelected
         )
+        .task {
+            if aniMapEpisode == nil {
+                aniMapEpisode = TVDBMappingService.shared.getCachedEpisode(for: mediaId, episodeNumber: ep)
+                if aniMapEpisode == nil {
+                    let eps = await TVDBMappingService.shared.getEpisodes(for: mediaId)
+                    aniMapEpisode = eps.first(where: { $0.episode == ep })
+                }
+            }
+        }
     }
 }
 
 // MARK: - Episode Row
 private struct AniListEpisodeRow: View {
     let number: Int
+    var thumbnail: String? = nil
+    var title: String? = nil
     var progress: Double? = nil
     let onTap: () -> Void
     var onMarkWatched: (() -> Void)? = nil
@@ -1057,27 +1062,58 @@ private struct AniListEpisodeRow: View {
                         }
                     }
                 } else {
-                    ZStack {
-                        Circle()
-                            .fill(isComplete ? Color.green : Color.primary)
-                            .frame(width: 40, height: 40)
-                        if isComplete {
-                            Image(systemName: "checkmark")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                        } else {
-                            Text("\(number)")
-                                .font(.footnote.weight(.bold))
-                                .foregroundStyle(adaptiveBackground)
+                    if let thumb = thumbnail {
+                        CachedAsyncImage(urlString: thumb)
+                            .aspectRatio(16/9, contentMode: .fill)
+                            .frame(width: 100, height: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                ZStack {
+                                    if isComplete {
+                                        Color.black.opacity(0.3)
+                                        Image(systemName: "checkmark")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                            )
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.secondary.opacity(0.07))
+                                .frame(width: 100, height: 56)
+                            
+                            Circle()
+                                .fill(isComplete ? Color.green : Color.primary)
+                                .frame(width: 40, height: 40)
+                            
+                            if isComplete {
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Text("\(number)")
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(adaptiveBackground)
+                            }
                         }
+                        .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
+                                radius: 4, y: 2)
                     }
-                    .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
-                            radius: 4, y: 2)
                 }
 
-                Text("Episode \(number)")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Episode \(number)")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    
+                    if let t = title, !t.isEmpty {
+                        Text(t)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
 
                 Spacer()
 
@@ -1202,7 +1238,7 @@ struct RelationCard: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
                 ZStack {
-                    CachedAsyncImage(urlString: edge.node.coverImage.best ?? "")
+                    TVDBPosterImage(media: edge.node)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
 

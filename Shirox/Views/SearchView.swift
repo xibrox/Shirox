@@ -311,7 +311,7 @@ struct AniListCardView: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
                 ZStack {
-                    CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                    TVDBPosterImage(media: media)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
 

@@ -7,7 +7,7 @@ struct ContinueWatchingSection: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var cardWidth: CGFloat {
-        sizeClass == .regular ? 190 : 155
+        sizeClass == .regular ? 260 : 210
     }
 
     var body: some View {
@@ -97,7 +97,8 @@ struct ContinueWatchingSection: View {
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
             streamTitle: item.streamTitle,
-            workingDetailHref: item.detailHref  // Use saved detailHref for next episode
+            workingDetailHref: item.detailHref,
+            thumbnailUrl: item.thumbnailUrl
         )
 
         // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList)
@@ -208,6 +209,7 @@ struct ContinueWatchingSection: View {
 
 struct ContinueWatchingCardDisplay: View {
     let item: ContinueWatchingItem
+    @State private var episodeThumbnail: String?
 
     private var progress: Double {
         guard item.totalSeconds > 0 else { return 0 }
@@ -243,41 +245,41 @@ struct ContinueWatchingCardDisplay: View {
         return epPart
     }
 
+    private var isWatched: Bool {
+        ContinueWatchingManager.shared.isWatched(
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber
+        )
+    }
+
+    private var displayImageUrl: String {
+        episodeThumbnail ?? item.thumbnailUrl ?? item.imageUrl
+    }
+
     var body: some View {
-        Color.clear
-            .aspectRatio(2/3, contentMode: .fit)
-            .overlay(
-                CachedAsyncImage(urlString: item.imageUrl)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-            )
-            .overlay(
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0.5),
-                        .init(color: .black.opacity(0.92), location: 1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
+        VStack(alignment: .leading, spacing: 6) {
+            // Thumbnail (16:9)
+            Color.clear
+                .aspectRatio(16/9, contentMode: .fit)
+                .overlay(
+                    CachedAsyncImage(urlString: displayImageUrl)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
                 )
-            )
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.mediaTitle)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    
+                .overlay(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.5),
+                            .init(color: .black.opacity(0.75), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 4) {
-                        let isWatched = ContinueWatchingManager.shared.isWatched(
-                            aniListID: item.aniListID,
-                            moduleId: item.moduleId,
-                            mediaTitle: item.mediaTitle,
-                            episodeNumber: item.episodeNumber
-                        )
-                        
                         if !item.streamUrl.isEmpty && !isWatched {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 8, weight: .bold))
@@ -290,34 +292,50 @@ struct ContinueWatchingCardDisplay: View {
                                 .font(.caption2.weight(.bold))
                         }
                     }
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 16)
-            }
-            .overlay(alignment: .bottom) {
-                let isWatched = ContinueWatchingManager.shared.isWatched(
-                    aniListID: item.aniListID,
-                    moduleId: item.moduleId,
-                    mediaTitle: item.mediaTitle,
-                    episodeNumber: item.episodeNumber
-                )
-                
-                if !item.streamUrl.isEmpty && !isWatched {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Color.white.opacity(0.2)
-                            Color.accentColor
-                                .frame(width: geo.size.width * progress)
-                                .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
+                .overlay(alignment: .bottom) {
+                    if !item.streamUrl.isEmpty && !isWatched {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Color.white.opacity(0.2)
+                                Color.accentColor
+                                    .frame(width: geo.size.width * progress)
+                                    .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
+                            }
                         }
+                        .frame(height: 3)
                     }
-                    .frame(height: 4)
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
+
+            // Title below thumbnail
+            Text(item.mediaTitle)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+        }
+        .task(id: item.id) {
+            guard let aid = item.aniListID else { return }
+            // 1. Use cached episode thumbnail immediately if available
+            if let cached = TVDBMappingService.shared.getCachedEpisode(for: aid, episodeNumber: item.episodeNumber)?.thumbnail {
+                episodeThumbnail = cached
+                return
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
+            // 2. Fetch from animap episodes endpoint
+            let episodes = await TVDBMappingService.shared.getEpisodes(for: aid)
+            if let thumb = episodes.first(where: { $0.episode == item.episodeNumber })?.thumbnail {
+                episodeThumbnail = thumb
+                return
+            }
+            // 3. Fall back to TVDB series banner/fanart
+            let artwork = await TVDBMappingService.shared.getArtwork(for: aid)
+            episodeThumbnail = artwork.fanart ?? artwork.poster
+        }
     }
 }
 

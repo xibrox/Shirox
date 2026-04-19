@@ -216,7 +216,8 @@ final class DetailViewModel: ObservableObject {
             resumeFrom: resumeWatchedSeconds,
             detailHref: detailHref,
             streamTitle: stream.title,
-            workingDetailHref: detailHref
+            workingDetailHref: detailHref,
+            thumbnailUrl: nil
         )
 
         // Build a WatchNextLoader that dynamically finds the next episode by current episode number

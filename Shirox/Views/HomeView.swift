@@ -120,6 +120,12 @@ private struct FeaturedCarousel: View {
             .frame(height: imageHeight + overscrollY)
             .onPreferenceChange(CarouselOverscrollKey.self) { y in overscrollY = max(0, y) }
             .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
+            .background {
+                if !realItems.isEmpty {
+                    TVDBPosterImage(media: realItems[currentIndex], type: .fanart)
+                        .ignoresSafeArea()
+                }
+            }
             .overlay(alignment: .bottom) {
                 ZStack(alignment: .bottom) {
                     LinearGradient(
@@ -283,17 +289,10 @@ private struct FeaturedCard: View {
                                 let extra: CGFloat = 80
                                 let px = -(extra / 2) - minX * (extra / (2 * screenW))
 
-                                if let banner = media.bannerImage {
-                                    CachedAsyncImage(urlString: banner)
-                                        .frame(width: geo.size.width + extra, height: geo.size.height)
-                                        .offset(x: px)
-                                        .clipped()
-                                } else {
-                                    coverFallback
-                                        .frame(width: geo.size.width + extra, height: geo.size.height)
-                                        .offset(x: px)
-                                        .clipped()
-                                }
+                                TVDBPosterImage(media: media, type: .fanart)
+                                    .frame(width: geo.size.width + extra, height: geo.size.height)
+                                    .offset(x: px)
+                                    .clipped()
                             }
 
                             LinearGradient(
@@ -314,7 +313,7 @@ private struct FeaturedCard: View {
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
                     let buffer: CGFloat = 100
-                    CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                    TVDBPosterImage(media: media)
                         .frame(width: geo.size.width + buffer, height: geo.size.height)
                         .offset(x: -(buffer / 2) - pageOffset * 0.25)
                 }
@@ -408,7 +407,7 @@ private struct FeaturedCard: View {
 
     @ViewBuilder
     private var coverFallback: some View {
-        CachedAsyncImage(urlString: media.coverImage.best ?? "")
+        TVDBPosterImage(media: media)
     }
 
     private var gradientPlaceholder: some View {

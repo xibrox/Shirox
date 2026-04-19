@@ -381,7 +381,8 @@ struct DetailView: View {
             resumeFrom: item.watchedSeconds,
             detailHref: href,
             streamTitle: item.streamTitle,
-            workingDetailHref: href
+            workingDetailHref: href,
+            thumbnailUrl: item.thumbnailUrl
         )
 
         let epNum = item.episodeNumber

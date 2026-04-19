@@ -100,3 +100,42 @@ struct CachedAsyncImage: View {
         }
     }
 }
+
+// MARK: - TVDB Poster Image Wrapper
+
+struct TVDBPosterImage: View {
+    let media: AniListMedia
+    var type: TVDBArtworkType = .poster
+    @State private var finalURL: String?
+    
+    enum TVDBArtworkType {
+        case poster, fanart
+    }
+
+    private var anilistFallback: String {
+        type == .fanart
+            ? (media.bannerImage ?? media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+            : (media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+    }
+
+    init(media: AniListMedia, type: TVDBArtworkType = .poster) {
+        self.media = media
+        self.type = type
+        // If TVDB artwork is already cached, use it immediately (no flicker)
+        let cached = TVDBMappingService.shared.getCachedArtwork(for: media.id)
+        let cachedURL = (type == .poster) ? cached.poster : cached.fanart
+        _finalURL = State(initialValue: cachedURL)
+    }
+
+    var body: some View {
+        // Show finalURL (TVDB) when available; show placeholder while resolving;
+        // fall back to AniList only after TVDB returns nothing
+        CachedAsyncImage(urlString: finalURL ?? "")
+            .task(id: media.id) {
+                guard finalURL == nil else { return } // already resolved from cache
+                let artwork = await TVDBMappingService.shared.getArtwork(for: media.id)
+                let tvdbURL = (type == .poster) ? artwork.poster : artwork.fanart
+                finalURL = tvdbURL ?? anilistFallback
+            }
+    }
+}

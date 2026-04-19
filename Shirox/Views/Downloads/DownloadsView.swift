@@ -144,7 +144,8 @@ struct DownloadsView: View {
             resumeFrom: nil,
             detailHref: item.detailHref,
             streamTitle: item.streamTitle,
-            workingDetailHref: item.detailHref
+            workingDetailHref: item.detailHref,
+            thumbnailUrl: nil
         )
             PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
         }
