@@ -567,20 +567,16 @@ final class TVDBMappingService: ObservableObject {
                 }
                 if let seasonId = officialSeasons?.first(where: { $0.number == targetSeason })?.id {
                     let seasonArtworks = await fetchSeasonArtwork(seasonId: seasonId)
-                    // type 7 = season poster; fallback to any artwork if none typed 7
-                    poster = seasonArtworks.filter { $0.type == 7 }
-                        .sorted { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
-                        .first?.image
-                        ?? seasonArtworks.sorted { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
-                        .first?.image
+                    let bySize: (Artwork, Artwork) -> Bool = { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
+                    let seasonPosters = seasonArtworks.filter { $0.type == 7 }.sorted(by: bySize)
+                    poster = seasonPosters.first?.image ?? seasonArtworks.sorted(by: bySize).first?.image
                 }
             }
 
             // Fallback to series-level poster (type 2)
             if poster == nil {
-                poster = artworks.filter { $0.type == 2 }
-                    .sorted { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
-                    .first?.image
+                let bySize: (Artwork, Artwork) -> Bool = { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
+                poster = artworks.filter { $0.type == 2 }.sorted(by: bySize).first?.image
             }
 
             cache[aniListId]?.posterPath = poster
