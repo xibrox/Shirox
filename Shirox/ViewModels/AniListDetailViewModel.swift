@@ -66,17 +66,24 @@ final class AniListDetailViewModel: ObservableObject {
         selectedEpisodeNumber = nil
     }
 
-    func onStreamsLoaded(_ streams: [StreamResult], episodeHref: String? = nil, availableCount: Int? = nil) {
+    func onStreamsLoaded(_ streams: [StreamResult], selectedStream: StreamResult? = nil, episodeHref: String? = nil, availableCount: Int? = nil) {
         let sorted = streams.sorted { $0.title < $1.title }
-        if sorted.count == 1 {
+        if let selected = selectedStream {
+            // User already picked from quality picker — auto-play, but keep all streams for in-player switching
+            pendingStreams = sorted
+            pendingModuleStream = selected
+            pendingModuleStreamEpisodeHref = episodeHref
+            pendingModuleStreamAvailableCount = availableCount
+        } else if sorted.count == 1 {
             // Store and let onDismiss present after the sheet fully clears.
+            pendingStreams = sorted
             pendingModuleStream = sorted[0]
             pendingModuleStreamEpisodeHref = episodeHref
             pendingModuleStreamAvailableCount = availableCount
         } else {
             pendingStreams = sorted
-            pendingFinalStreamEpisodeHref = episodeHref  // Save href for final picker
-            pendingFinalStreamAvailableCount = availableCount // Save count for final picker
+            pendingFinalStreamEpisodeHref = episodeHref
+            pendingFinalStreamAvailableCount = availableCount
             showFinalStreamPicker = true
         }
         showStreamPicker = false
@@ -157,7 +164,7 @@ final class AniListDetailViewModel: ObservableObject {
             }
         }()
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, from: sourceView)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext, from: sourceView)
         selectedEpisodeNumber = nil
     }
 

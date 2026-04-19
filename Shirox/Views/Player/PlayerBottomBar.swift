@@ -17,9 +17,14 @@ struct PlayerBottomBar: View {
     var onAudioTap: () -> Void = {}
     var hasSubtitles: Bool = false
     var audioTrackCount: Int = 0
+    var streamCount: Int = 1
+    var onStreamPickerTap: () -> Void = {}
     var bottomPadding: CGFloat = 24
     var onNextEpisodeTap: (() -> Void)? = nil
     var showNextEpisodeButton: Bool = false
+    var episodeNumber: Int? = nil
+    var tvdbEpisodeTitle: String? = nil
+    var mediaTitle: String? = nil
 
     private var isPad: Bool {
         #if os(iOS)
@@ -31,9 +36,26 @@ struct PlayerBottomBar: View {
 
     var body: some View {
         VStack(spacing: isPad ? 12 : 4) {
-            // Action buttons row
-            HStack(spacing: isPad ? 16 : 8) {
-                skip85Button
+            // Episode info + action buttons row
+            HStack(alignment: .bottom, spacing: isPad ? 16 : 8) {
+                VStack(alignment: .leading, spacing: isPad ? 10 : 6) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        if let ep = episodeNumber {
+                            let epLine = tvdbEpisodeTitle.flatMap { $0.isEmpty ? nil : "EP\(ep): \($0)" } ?? "EP\(ep)"
+                            Text(epLine)
+                                .font(.system(size: isPad ? 16 : 14, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .lineLimit(1)
+                        }
+                        if let title = mediaTitle, !title.isEmpty {
+                            Text(title)
+                                .font(.system(size: isPad ? 24 : 20, weight: .heavy))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                        }
+                    }
+                    skip85Button
+                }
 
                 Spacer()
 
@@ -104,6 +126,15 @@ struct PlayerBottomBar: View {
         let iconSize: CGFloat = isPad ? 20 : 15
 
         HStack(spacing: 0) {
+            if streamCount > 1 {
+                Button(action: onStreamPickerTap) {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: iconSize, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: buttonWidth, height: height)
+                }
+                .buttonStyle(.plain)
+            }
             if audioTrackCount > 1 {
                 Button(action: onAudioTap) {
                     Image(systemName: "waveform")

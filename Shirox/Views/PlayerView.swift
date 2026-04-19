@@ -31,6 +31,7 @@ struct PlayerView: View {
     let customDismiss: (() -> Void)?
     let onWatchNext: WatchNextLoader?
     let onStreamExpired: StreamRefetchLoader?
+    let initialStreams: [StreamResult]
 
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer? = nil
@@ -54,10 +55,12 @@ struct PlayerView: View {
     // Multi-stream / Next episode state
     @State private var currentStream: StreamResult
     @State private var currentContext: PlayerContext?
+    @State private var availableStreams: [StreamResult]
     @State private var isLoadingNextEpisode = false
     @State private var isRefetchingStream = false
     @State private var showNextEpisodeButton = false
     @State private var showNextEpisodePicker = false
+    @State private var showInPlayerStreamPicker = false
     @State private var nextEpisodeStreams: [StreamResult] = []
     @State private var nextEpisodeNumber: Int = 0
 
@@ -75,6 +78,9 @@ struct PlayerView: View {
     @State private var isBuffering = false
     @State private var audioGroup: AVMediaSelectionGroup? = nil
     @State private var bufferProgress: Double = 0
+
+    // TVDB episode title
+    @State private var tvdbEpisodeTitle: String? = nil
 
     // Subtitles
     @State private var subtitleCues: [SubtitleCue] = []
@@ -95,10 +101,12 @@ struct PlayerView: View {
     @State private var isSpeedBoosted = false
     #endif
 
-    init(stream: StreamResult, customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil) {
+    init(stream: StreamResult, streams: [StreamResult] = [], customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil) {
         self.currentStreamInitial = stream
         self._currentStream = State(initialValue: stream)
         self._currentContext = State(initialValue: context)
+        self.initialStreams = streams
+        self._availableStreams = State(initialValue: streams.isEmpty ? [stream] : streams)
         self.customDismiss = customDismiss
         self.onWatchNext = onWatchNext
         self.onStreamExpired = onStreamExpired
@@ -177,6 +185,14 @@ struct PlayerView: View {
         .onAppear {
             setupPlayer()
             loadSubtitles()
+            loadTVDBTitle()
+            if availableStreams.count == 1, let loader = onStreamExpired {
+                Task {
+                    if let streams = try? await loader(), !streams.isEmpty {
+                        await MainActor.run { availableStreams = streams }
+                    }
+                }
+            }
         }
         .onDisappear {
             hideTask?.cancel()
@@ -257,6 +273,12 @@ struct PlayerView: View {
                 swapStream(selected, episodeNumber: nextEpisodeNumber)
             }
             .presentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
+        }
+        .sheet(isPresented: $showInPlayerStreamPicker) {
+            PlayerNextEpisodePicker(streams: availableStreams, title: "Choose Quality") { selected in
+                switchQuality(selected)
+            }
+            .presentationDetents([.height(CGFloat(60 + 56 * max(1, availableStreams.count)))])
         }
     }
 
@@ -485,9 +507,14 @@ struct PlayerView: View {
             onAudioTap: { showAudioPicker = true },
             hasSubtitles: currentStream.subtitle != nil,
             audioTrackCount: audioGroup?.options.count ?? 0,
+            streamCount: availableStreams.count,
+            onStreamPickerTap: { showInPlayerStreamPicker = true },
             bottomPadding: bottomPad,
             onNextEpisodeTap: onWatchNext != nil ? { Task { @MainActor in await loadAndAdvance() } } : nil,
-            showNextEpisodeButton: showNextEpisodeButton
+            showNextEpisodeButton: showNextEpisodeButton,
+            episodeNumber: currentContext?.episodeNumber,
+            tvdbEpisodeTitle: tvdbEpisodeTitle,
+            mediaTitle: currentContext?.mediaTitle
         )
         .buttonStyle(CircularButtonStyle())
     }
@@ -616,6 +643,9 @@ struct PlayerView: View {
             headers: currentStream.headers.isEmpty ? nil : currentStream.headers,
             subtitle: currentStream.subtitle,
             streamTitle: context.streamTitle,
+            allStreams: availableStreams.count > 1 ? availableStreams.map {
+                StoredStream(title: $0.title, url: $0.url.absoluteString, headers: $0.headers, subtitle: $0.subtitle)
+            } : nil,
             aniListID: context.aniListID,
             moduleId: context.moduleId,
             detailHref: context.detailHref,
@@ -876,6 +906,19 @@ struct PlayerView: View {
         #endif
     }
 
+    private func loadTVDBTitle() {
+        guard let aniListID = currentContext?.aniListID,
+              let ep = currentContext?.episodeNumber else { return }
+        tvdbEpisodeTitle = TVDBMappingService.shared.getCachedEpisode(for: aniListID, episodeNumber: ep)?.title
+        guard tvdbEpisodeTitle == nil else { return }
+        Task {
+            let eps = await TVDBMappingService.shared.getEpisodes(for: aniListID)
+            await MainActor.run {
+                tvdbEpisodeTitle = eps.first(where: { $0.episode == ep })?.title
+            }
+        }
+    }
+
     private func loadSubtitles() {
         guard let urlString = currentStream.subtitle, !urlString.isEmpty else { return }
         Task {
@@ -1057,6 +1100,48 @@ struct PlayerView: View {
     }
 
     @MainActor
+    private func switchQuality(_ next: StreamResult) {
+        guard next.url != currentStream.url else { return }
+        let resumeAt = currentTime
+        let asset: AVURLAsset
+        if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }
+        else { asset = AVURLAsset(url: next.url) }
+        let newItem = AVPlayerItem(asset: asset)
+        newItem.preferredForwardBufferDuration = 60
+        newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+        setupPlaybackEndObserver(for: newItem)
+        player?.replaceCurrentItem(with: newItem)
+        currentStream = next
+        if let ctx = currentContext {
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
+        }
+        subtitleCues = []
+        if let urlString = next.subtitle, !urlString.isEmpty {
+            Task { do { subtitleCues = try await VTTSubtitlesLoader.load(from: urlString) } catch {} }
+        }
+        Task {
+            guard let group = try? await asset.loadMediaSelectionGroup(for: .audible) else { return }
+            await MainActor.run { audioGroup = group }
+        }
+        // Seek to same position after item is ready
+        Task { @MainActor in
+            for _ in 0..<20 {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                if let item = player?.currentItem, item.status == .readyToPlay {
+                    await player?.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                    player?.rate = Float(playbackSpeed)
+                    isPlaying = true
+                    break
+                }
+            }
+        }
+        showInPlayerStreamPicker = false
+        #if os(iOS)
+        if let p = player { updateNowPlaying(player: p) }
+        #endif
+        scheduleHide()
+    }
+
     private func swapStream(_ next: StreamResult, episodeNumber: Int) {
         didTrackEpisode = false
         saveProgress()
@@ -1097,6 +1182,8 @@ struct PlayerView: View {
         if let urlString = next.subtitle, !urlString.isEmpty {
             Task { do { subtitleCues = try await VTTSubtitlesLoader.load(from: urlString) } catch { print("[Subtitles] Failed to load: \(error)") } }
         }
+        tvdbEpisodeTitle = nil
+        loadTVDBTitle()
         #if os(iOS)
         if let p = player { updateNowPlaying(player: p) }
         #endif

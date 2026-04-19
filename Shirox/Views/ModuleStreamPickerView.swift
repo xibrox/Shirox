@@ -7,7 +7,7 @@ struct ModuleStreamPickerView: View {
     let animeTitle: String
     let episodeNumber: Int
     let onDismiss: () -> Void
-    let onStreamsLoaded: ([StreamResult], String?, Int?) -> Void  // Streams + episode href + availableCount
+    let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?) -> Void  // allStreams, selectedStream, href, availableCount
 
     @EnvironmentObject private var moduleManager: ModuleManager
 
@@ -20,10 +20,10 @@ struct ModuleStreamPickerView: View {
                         mediaId: mediaId,
                         animeTitle: animeTitle,
                         episodeNumber: episodeNumber
-                    ) { streams, episodeHref, availableCount in
+                    ) { streams, selectedStream, episodeHref, availableCount in
                         moduleManager.selectModule(module)
                         onDismiss()
-                        onStreamsLoaded(streams, episodeHref, availableCount)
+                        onStreamsLoaded(streams, selectedStream, episodeHref, availableCount)
                     }
                 }
             }
@@ -203,7 +203,7 @@ private struct ModuleStreamRow: View {
     let mediaId: Int?
     let animeTitle: String
     let episodeNumber: Int
-    let onStreamsLoaded: ([StreamResult], String?, Int?) -> Void
+    let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?) -> Void
 
     @StateObject private var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
@@ -214,7 +214,7 @@ private struct ModuleStreamRow: View {
         mediaId: Int?,
         animeTitle: String,
         episodeNumber: Int,
-        onStreamsLoaded: @escaping ([StreamResult], String?, Int?) -> Void
+        onStreamsLoaded: @escaping ([StreamResult], StreamResult?, String?, Int?) -> Void
     ) {
         self.module = module
         self.mediaId = mediaId
@@ -240,7 +240,8 @@ private struct ModuleStreamRow: View {
                     streams: streams,
                     onSelect: { stream in
                         showStreamPicker = false
-                        onStreamsLoaded([stream], rowVm.selectedEpisodeHref, rowVm.availableCount)
+                        let allStreams = rowVm.readyStreams ?? [stream]
+                        onStreamsLoaded(allStreams, stream, rowVm.selectedEpisodeHref, rowVm.availableCount)
                     },
                     onDismiss: {
                         showStreamPicker = false

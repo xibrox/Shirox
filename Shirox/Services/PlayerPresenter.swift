@@ -52,12 +52,13 @@ final class PlayerPresenter: ObservableObject {
         return root
     }
 
-    func presentPlayer(stream: StreamResult, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, from sourceView: UIView? = nil) {
+    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, from sourceView: UIView? = nil) {
         guard let topVC = Self.findTopViewController() else { return }
         self.sourceView = sourceView
 
         let playerView = PlayerView(
             stream: stream,
+            streams: streams,
             customDismiss: { [weak self] in self?.dismissPlayer() },
             context: context,
             onWatchNext: onWatchNext,

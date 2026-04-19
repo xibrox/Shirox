@@ -596,68 +596,48 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         }
         
         // 1. Try the AniMap media episodes endpoint first (highly detailed)
+        var aniMapResults: [AniMapEpisode] = []
         do {
             let urlString = "https://animap.s0n1c.ca/media/\(aniListId)/episodes?mapping_key=anilist"
             guard let url = URL(string: urlString) else { throw URLError(.badURL) }
-            
             let (data, _) = try await URLSession.shared.data(for: URLRequest(url: url))
-            let results = try JSONDecoder().decode([AniMapEpisode].self, from: data)
-            
-            if !results.isEmpty {
-                episodeCache[aniListId] = results
-                return results
-            }
+            aniMapResults = try JSONDecoder().decode([AniMapEpisode].self, from: data)
         } catch {
             print("AniMap Media EP Error: \(error)")
+        }
+
+        if !aniMapResults.isEmpty {
+            // If any episode is missing a thumbnail, merge in TVDB images
+            let missingThumbnails = aniMapResults.contains { $0.thumbnail == nil }
+            if missingThumbnails, let mapping = await getTVDBId(for: aniListId), mapping.id > 0 {
+                let tvdbEps = await fetchTVDBEpisodes(tid: mapping.id, season: mapping.season ?? 1)
+                if !tvdbEps.isEmpty {
+                    let tvdbByNumber = Dictionary(uniqueKeysWithValues: tvdbEps.map { ($0.number, $0.image) })
+                    let merged = aniMapResults.map { ep -> AniMapEpisode in
+                        guard ep.thumbnail == nil, let img = tvdbByNumber[ep.episode] ?? tvdbByNumber[ep.absolute ?? -1] else { return ep }
+                        return AniMapEpisode(absolute: ep.absolute, airdate: ep.airdate, description: ep.description,
+                                            episode: ep.episode, filler_type: ep.filler_type, mal_id: ep.mal_id,
+                                            season: ep.season, thumbnail: formatURL(img), title: ep.title)
+                    }
+                    episodeCache[aniListId] = merged
+                    return merged
+                }
+            }
+            episodeCache[aniListId] = aniMapResults
+            return aniMapResults
         }
         
         // 2. Fallback to TVDB extended series data (direct API access)
         if let mapping = await getTVDBId(for: aniListId), mapping.id > 0 {
-            let tid = mapping.id
-            let targetSeason = mapping.season ?? 1
-            
-            do {
-                let token = try await authenticate()
-                let url = URL(string: "\(tvdbEndpoint)/series/\(tid)/extended")!
-                var request = URLRequest(url: url)
-                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                
-                let (data, _) = try await URLSession.shared.data(for: request)
-                
-                struct TVDBEpisode: Decodable {
-                    let number: Int
-                    let seasonNumber: Int
-                    let image: String?
-                    let name: String?
-                    let overview: String?
+            let tvdbEps = await fetchTVDBEpisodes(tid: mapping.id, season: mapping.season ?? 1)
+            if !tvdbEps.isEmpty {
+                let mapped = tvdbEps.map { te in
+                    AniMapEpisode(absolute: te.number, airdate: nil, description: te.overview,
+                                  episode: te.number, filler_type: nil, mal_id: nil,
+                                  season: te.seasonNumber, thumbnail: formatURL(te.image), title: te.name)
                 }
-                struct TVDBExtendedResponse: Decodable {
-                    struct Data: Decodable { let episodes: [TVDBEpisode]? }
-                    let data: Data
-                }
-                
-                let res = try JSONDecoder().decode(TVDBExtendedResponse.self, from: data)
-                let filtered = (res.data.episodes ?? []).filter { $0.seasonNumber == targetSeason }
-                
-                if !filtered.isEmpty {
-                    let mapped = filtered.map { te in
-                        AniMapEpisode(
-                            absolute: te.number,
-                            airdate: nil,
-                            description: te.overview,
-                            episode: te.number,
-                            filler_type: nil,
-                            mal_id: nil,
-                            season: te.seasonNumber,
-                            thumbnail: formatURL(te.image),
-                            title: te.name
-                        )
-                    }
-                    episodeCache[aniListId] = mapped
-                    return mapped
-                }
-            } catch {
-                print("TVDB Fallback EP Error: \(error)")
+                episodeCache[aniListId] = mapped
+                return mapped
             }
         }
         
@@ -676,8 +656,47 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         return []
     }
 
+    private struct TVDBRawEpisode {
+        let number: Int
+        let seasonNumber: Int
+        let image: String?
+        let name: String?
+        let overview: String?
+    }
+
+    private func fetchTVDBEpisodes(tid: Int, season: Int) async -> [TVDBRawEpisode] {
+        struct TVDBEpisode: Decodable {
+            let number: Int
+            let seasonNumber: Int
+            let image: String?
+            let name: String?
+            let overview: String?
+        }
+        struct TVDBExtendedResponse: Decodable {
+            struct Data: Decodable { let episodes: [TVDBEpisode]? }
+            let data: Data
+        }
+        do {
+            let token = try await authenticate()
+            let url = URL(string: "\(tvdbEndpoint)/series/\(tid)/extended")!
+            var req = URLRequest(url: url)
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            let (data, _) = try await URLSession.shared.data(for: req)
+            let res = try JSONDecoder().decode(TVDBExtendedResponse.self, from: data)
+            return (res.data.episodes ?? [])
+                .filter { $0.seasonNumber == season }
+                .map { TVDBRawEpisode(number: $0.number, seasonNumber: $0.seasonNumber,
+                                     image: $0.image, name: $0.name, overview: $0.overview) }
+        } catch {
+            print("TVDB EP fetch error: \(error)")
+            return []
+        }
+    }
+
     func getCachedEpisode(for aniListId: Int, episodeNumber: Int) -> AniMapEpisode? {
-        return episodeCache[aniListId]?.first(where: { $0.episode == episodeNumber })
+        let eps = episodeCache[aniListId]
+        return eps?.first(where: { $0.episode == episodeNumber })
+            ?? eps?.first(where: { $0.absolute == episodeNumber })
     }
 
     private func formatURL(_ path: String?) -> String? {

@@ -78,7 +78,7 @@ struct ContinueWatchingSection: View {
         }
 
         let stream = StreamResult(
-            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            title: item.streamTitle ?? item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,
             headers: item.headers ?? [:],
             subtitle: item.subtitle
@@ -191,8 +191,28 @@ struct ContinueWatchingSection: View {
             }
         }
 
+        let epNum = item.episodeNumber
+        let onExpired: StreamRefetchLoader? = {
+            if let moduleId = item.moduleId,
+               let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }),
+               let href = item.detailHref {
+                let runner = ModuleJSRunner()
+                try await runner.load(module: module)
+                let episodes = try await runner.fetchEpisodes(url: href)
+                guard let ep = episodes.first(where: { $0.number == Double(epNum) }) else { return [] }
+                return try await runner.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
+            } else if let href = item.detailHref {
+                let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+                guard let ep = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+                return try await JSEngine.shared.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
+            }
+            return []
+        }
+
+        let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
+
         #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: nil)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired)
         #endif
     }
 

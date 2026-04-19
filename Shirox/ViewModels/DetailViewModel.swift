@@ -245,6 +245,6 @@ final class DetailViewModel: ObservableObject {
             }
         }()
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: watchNextLoader, from: sourceView)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, from: sourceView)
     }
 }

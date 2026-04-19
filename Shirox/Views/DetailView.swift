@@ -359,7 +359,7 @@ struct DetailView: View {
         }
 
         let stream = StreamResult(
-            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            title: item.streamTitle ?? item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,
             headers: item.headers ?? [:],
             subtitle: item.subtitle
@@ -403,7 +403,9 @@ struct DetailView: View {
             return (streams: streams, episodeNumber: Int(nextEp.number))
         }}
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
+        let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired)
     }
     #endif
 

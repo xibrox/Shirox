@@ -1,5 +1,17 @@
 import Foundation
 
+struct StoredStream: Codable {
+    let title: String
+    let url: String
+    let headers: [String: String]
+    let subtitle: String?
+
+    var asStreamResult: StreamResult? {
+        guard let url = URL(string: url) else { return nil }
+        return StreamResult(title: title, url: url, headers: headers, subtitle: subtitle)
+    }
+}
+
 struct ContinueWatchingItem: Identifiable, Codable {
     let id: UUID
     let mediaTitle: String
@@ -10,6 +22,7 @@ struct ContinueWatchingItem: Identifiable, Codable {
     let headers: [String: String]?
     let subtitle: String?
     let streamTitle: String?  // the selected stream's title (e.g., "SUB", "DUB", "pahe")
+    var allStreams: [StoredStream]?
     let aniListID: Int?
     let moduleId: String?
     let detailHref: String?

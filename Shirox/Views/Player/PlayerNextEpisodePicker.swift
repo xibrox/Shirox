@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerNextEpisodePicker: View {
     let streams: [StreamResult]
+    var title: String = "Choose Quality"
     let onSelect: (StreamResult) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -14,10 +15,12 @@ struct PlayerNextEpisodePicker: View {
                 } label: {
                     Text(stream.title)
                         .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            .navigationTitle("Choose Quality")
+            .navigationTitle(title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

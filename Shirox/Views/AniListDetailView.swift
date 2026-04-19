@@ -158,8 +158,8 @@ struct AniListDetailView: View {
                     animeTitle: media.title.searchTitle,
                     episodeNumber: ep,
                     onDismiss: { vm.showStreamPicker = false }
-                ) { streams, episodeHref, availableCount in
-                    vm.onStreamsLoaded(streams, episodeHref: episodeHref, availableCount: availableCount)
+                ) { streams, selectedStream, episodeHref, availableCount in
+                    vm.onStreamsLoaded(streams, selectedStream: selectedStream, episodeHref: episodeHref, availableCount: availableCount)
                 }
                 .environmentObject(moduleManager)
             }
@@ -351,48 +351,34 @@ struct AniListDetailView: View {
     private func watchButton(media: AniListMedia) -> some View {
         let item = continueWatchingItem(for: media)
         let total = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
-        let isCaughtUp: Bool = {
-            guard media.status != "FINISHED" else { return false }
-            if let entry = existingEntry, let totalKnown = media.episodes, entry.progress >= totalKnown {
-                return true
-            }
-            if item == nil, let entry = existingEntry, entry.progress > 0 {
-                return true
-            }
-            return false
-        }()
+        let rawNext = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
+        let nextEp = rawNext > total && total > 0 ? 1 : rawNext
+        let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
 
-        if isCaughtUp {
-            EmptyView()
-        } else {
-            let nextEp = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
-            let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
-            
-            Button {
-                if let item {
-                    resumeWatching(item: item)
-                } else {
-                    vm.watchEpisode(nextEp)
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 13, weight: .bold))
-                    Text(label)
-                        .font(.system(size: 15, weight: .bold))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                )
-                .foregroundStyle(.primary)
+        Button {
+            if let item {
+                resumeWatching(item: item)
+            } else {
+                vm.watchEpisode(nextEp)
             }
-            .buttonStyle(.plain)
-            .disabled(total == 0 || (item == nil && nextEp > total))
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 13, weight: .bold))
+                Text(label)
+                    .font(.system(size: 15, weight: .bold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+            )
+            .foregroundStyle(.primary)
         }
+        .buttonStyle(.plain)
+        .disabled(total == 0)
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {
@@ -407,7 +393,7 @@ struct AniListDetailView: View {
         }
 
         let stream = StreamResult(
-            title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            title: item.streamTitle ?? item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,
             headers: item.headers ?? [:],
             subtitle: item.subtitle
@@ -457,7 +443,22 @@ struct AniListDetailView: View {
             return (streams: streams, episodeNumber: Int(nextEp.number))
         }
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext, onStreamExpired: nil)
+        let epNum = item.episodeNumber
+        let onExpired: StreamRefetchLoader? = {
+            guard let moduleId = item.moduleId,
+                  let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }),
+                  let href = item.detailHref
+            else { return [] }
+            let runner = ModuleJSRunner()
+            try await runner.load(module: module)
+            let episodes = try await runner.fetchEpisodes(url: href)
+            guard let ep = episodes.first(where: { $0.number == Double(epNum) }) else { return [] }
+            return try await runner.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
+        }
+
+        let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired)
     }
     #endif
 
@@ -939,6 +940,7 @@ private struct AniListEpisodeRowContainer: View {
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     
     @State private var aniMapEpisode: AniMapEpisode?
+    @State private var fallbackThumbnail: String?
 
     private var progress: Double? {
         if continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
@@ -969,7 +971,7 @@ private struct AniListEpisodeRowContainer: View {
     var body: some View {
         AniListEpisodeRow(
             number: ep,
-            thumbnail: aniMapEpisode?.thumbnail,
+            thumbnail: aniMapEpisode?.thumbnail ?? fallbackThumbnail,
             title: aniMapEpisode?.title,
             progress: progress,
             onTap: onTap,
@@ -1013,6 +1015,11 @@ private struct AniListEpisodeRowContainer: View {
                     let eps = await TVDBMappingService.shared.getEpisodes(for: mediaId)
                     aniMapEpisode = eps.first(where: { $0.episode == ep })
                 }
+            }
+            // If episode was found but has no thumbnail, fall back to series fanart
+            if aniMapEpisode?.thumbnail == nil {
+                let artwork = await TVDBMappingService.shared.getArtwork(for: mediaId)
+                fallbackThumbnail = artwork.fanart ?? artwork.poster
             }
         }
     }
