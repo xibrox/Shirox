@@ -398,7 +398,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
 
 // MARK: - TVDB Mapping Service
 
-final class TVDBMappingService: ObservableObject {
+@MainActor final class TVDBMappingService: ObservableObject {
     static let shared = TVDBMappingService()
     private let mappingEndpoint = "https://animap.s0n1c.ca/mappings/"
     private let tvdbEndpoint = "https://api4.thetvdb.com/v4"
