@@ -2,7 +2,7 @@
 
 Shirox is a free, open-source anime streaming application for iOS 17+, designed with a focus on modern aesthetics.
 
-## 🌟 Features
+## Features
 
 -   **Community Modules**: Browse and watch content powered by modular, community-built source providers.
 -   **AniList Integration**: Seamlessly sync your watch history, discover new titles, and manage your lists with AniList integration.
@@ -11,7 +11,7 @@ Shirox is a free, open-source anime streaming application for iOS 17+, designed 
 -   **Modern Player**: Full support for Picture-in-Picture (PiP), AirPlay, Chromecast and customizable subtitles.
 -   **Clean UI**: A native SwiftUI interface that supports both Light and Dark modes with an adaptive design.
 
-## 📲 Installation
+## Installation
 
 ### AltStore / SideStore
 You can add Shirox to AltStore or SideStore by using the following source URL:
@@ -20,7 +20,7 @@ You can add Shirox to AltStore or SideStore by using the following source URL:
 ### Manual IPA
 Download the latest IPA from the [Releases](https://github.com/xibrox/Shirox/releases) page and sideload it using your preferred method (AltStore, Sideloadly, etc.).
 
-## 🛠 Development
+## Development
 
 ### Prerequisites
 -   macOS with Xcode 15+
@@ -40,7 +40,7 @@ Download the latest IPA from the [Releases](https://github.com/xibrox/Shirox/rel
 3. Open `Shirox.xcworkspace` in Xcode.
 4. Select the `Shirox_iOS` scheme and run.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Whether it's fixing bugs, adding new features, or improving documentation, feel free to open a Pull Request.
 
