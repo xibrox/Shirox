@@ -68,18 +68,16 @@ struct HomeView: View {
 
 private struct FeaturedCarousel: View {
     let items: [AniListMedia]
-    // Use a high range to avoid jump flickering
     @State private var selectedTab = 1000
     @State private var overscrollY: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var realItems: [AniListMedia] { items.prefix(8).map { $0 } }
     private var displayCount: Int { realItems.count }
-    
+
     private var currentIndex: Int {
-        let count = displayCount
-        guard count > 0 else { return 0 }
-        return selectedTab % count
+        guard displayCount > 0 else { return 0 }
+        return selectedTab % displayCount
     }
 
     var body: some View {
@@ -88,7 +86,7 @@ private struct FeaturedCarousel: View {
         let imageHeight: CGFloat = isIPad
             ? UIScreen.main.bounds.width * (9.0 / 16.0)
             : UIScreen.main.bounds.height - 140
-        
+
         let displayItems = realItems
         let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]
 
@@ -124,6 +122,17 @@ private struct FeaturedCarousel: View {
                 if !realItems.isEmpty {
                     TVDBPosterImage(media: realItems[currentIndex], type: .fanart)
                         .ignoresSafeArea()
+                }
+                // Hidden preloader — triggers image fetch for all items into NSCache
+                ForEach(realItems.indices, id: \.self) { i in
+                    TVDBPosterImage(media: realItems[i], type: .fanart)
+                        .frame(width: 1, height: 1)
+                        .opacity(0)
+                        .allowsHitTesting(false)
+                    TVDBPosterImage(media: realItems[i], type: .poster)
+                        .frame(width: 1, height: 1)
+                        .opacity(0)
+                        .allowsHitTesting(false)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -196,11 +205,9 @@ private struct FeaturedCarousel: View {
         }
         .onAppear {
             if displayCount > 0 {
-                // Initialize to a middle point for safety
                 selectedTab = (1000 / displayCount) * displayCount
             }
         }
-
         #else
         let displayItems = realItems
         ZStack(alignment: .bottom) {
