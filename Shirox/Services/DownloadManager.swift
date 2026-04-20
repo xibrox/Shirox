@@ -111,11 +111,11 @@ final class DownloadManager: NSObject, ObservableObject {
             // Local HLS manifest MUST be served through proxy to work in AVPlayer
             HLSProxyServer.shared.start(headers: ["User-Agent": URLSession.randomUserAgent])
             playURL = HLSProxyServer.shared.proxyURL(for: fileURL) ?? fileURL
-            print("[Downloads] Routing Local HLS through proxy: \(playURL)")
+            Logger.shared.log("[Downloads] Routing Local HLS through proxy: \(playURL)", type: "Download")
         } else {
             // Standard MP4 is direct
             playURL = fileURL
-            print("[Downloads] Playing direct MP4: \(playURL)")
+            Logger.shared.log("[Downloads] Playing direct MP4: \(playURL)", type: "Download")
         }
         
         return StreamResult(

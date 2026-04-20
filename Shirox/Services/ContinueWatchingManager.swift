@@ -175,7 +175,7 @@ import Foundation
             persist()
             
         } catch {
-            print("[CW] Sync failed: \(error.localizedDescription)")
+            Logger.shared.log("[CW] Sync failed: \(error.localizedDescription)", type: "Error")
         }
     }
 
@@ -375,7 +375,7 @@ import Foundation
         // This makes the CW card disappear when the user is caught up on an ongoing show.
         let cap = srcAvailable ?? srcTotalEps
         if let cap, cap > 0, episodeNumber > cap {
-            print("[CW] Caught up (ep \(episodeNumber) > available \(cap)), no placeholder created.")
+            Logger.shared.log("[CW] Caught up (ep \(episodeNumber) > available \(cap)), no placeholder created.", type: "General")
             return nil
         }
 
@@ -462,7 +462,7 @@ import Foundation
         guard nextEp <= availableEpisodes else { return }  // still caught up
 
         // New episode is available beyond what the user has watched — recreate "Up Next" card
-        print("[CW] New episode available: Up Next ep \(nextEp) (available: \(availableEpisodes))")
+        Logger.shared.log("[CW] New episode available: Up Next ep \(nextEp) (available: \(availableEpisodes))", type: "General")
         if let placeholder = makePlaceholder(
             episodeNumber: nextEp, from: nil,
             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle,

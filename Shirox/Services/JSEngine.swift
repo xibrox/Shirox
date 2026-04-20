@@ -47,7 +47,7 @@ final class JSEngine: ObservableObject {
         setupContext()
         context.evaluateScript(script)
         if let exception = context.exception {
-            print("[JSEngine] Script load error: \(exception)")
+            Logger.shared.log("[JSEngine] Script load error: \(exception)", type: "Error")
         }
     }
 
@@ -64,7 +64,7 @@ final class JSEngine: ObservableObject {
         context.setupNetworkFetchSimple()
 
         context.exceptionHandler = { _, exception in
-            print("[JS Exception] \(exception?.toString() ?? "unknown")")
+            Logger.shared.log("[JS Exception] \(exception?.toString() ?? "unknown")", type: "Error")
         }
     }
 
@@ -72,13 +72,13 @@ final class JSEngine: ObservableObject {
 
     private func setupConsoleLogging() {
         let consoleLog: @convention(block) (JSValue) -> Void = { value in
-            print("[JS] \(value.toString() ?? "undefined")")
+            Logger.shared.log("[JS] \(value.toString() ?? "undefined")", type: "Debug")
         }
         let consoleError: @convention(block) (JSValue) -> Void = { value in
-            print("[JS Error] \(value.toString() ?? "undefined")")
+            Logger.shared.log("[JS Error] \(value.toString() ?? "undefined")", type: "Error")
         }
         let consoleWarn: @convention(block) (JSValue) -> Void = { value in
-            print("[JS Warn] \(value.toString() ?? "undefined")")
+            Logger.shared.log("[JS Warn] \(value.toString() ?? "undefined")", type: "General")
         }
         let consoleObj = JSValue(newObjectIn: context)!
         consoleObj.setObject(consoleLog, forKeyedSubscript: "log" as NSString)

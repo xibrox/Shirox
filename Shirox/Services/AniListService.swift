@@ -283,17 +283,13 @@ final class AniListService {
         let bodyDict: [String: Any] = ["query": query, "variables": variables]
         request.httpBody = try JSONSerialization.data(withJSONObject: bodyDict, options: [])
 
-        #if DEBUG
-        print("AniList Request: \(bodyDict)")
-        #endif
+        Logger.shared.log("AniList Request: \(bodyDict)", type: "Debug")
 
         let (data, response) = try await session.data(for: request)
 
-        #if DEBUG
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            print("AniList Response:", json)
+            Logger.shared.log("AniList Response: \(json)", type: "Debug")
         }
-        #endif
 
         if let http = response as? HTTPURLResponse {
             switch http.statusCode {
@@ -474,8 +470,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
                 cache[aniListId] = CachedData(tid: -1, season: nil)
                 saveCache()
             }
+        } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
+            // task cancelled — ignore
         } catch {
-            print("Failed to fetch TVDB mapping: \(error)")
+            Logger.shared.log("Failed to fetch TVDB mapping: \(error)", type: "Error")
         }
         
         return nil
@@ -584,7 +582,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             saveCache()
             return (formatURL(poster), formatURL(fanart))
         } catch {
-            print("TVDB API Error: \(error)")
+            Logger.shared.log("TVDB API Error: \(error)", type: "Error")
             return ("https://artworks.thetvdb.com/banners/posters/\(tid)-1.jpg", nil)
         }
     }
@@ -602,8 +600,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             guard let url = URL(string: urlString) else { throw URLError(.badURL) }
             let (data, _) = try await URLSession.shared.data(for: URLRequest(url: url))
             aniMapResults = try JSONDecoder().decode([AniMapEpisode].self, from: data)
+        } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
+            return []
         } catch {
-            print("AniMap Media EP Error: \(error)")
+            Logger.shared.log("AniMap Media EP Error: \(error)", type: "Error")
         }
 
         if !aniMapResults.isEmpty {
@@ -649,8 +649,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             let results = try JSONDecoder().decode([AniMapEpisode].self, from: data)
             episodeCache[aniListId] = results
             return results
+        } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
+            return []
         } catch {
-            print("AniMap Mapping EP Error: \(error)")
+            Logger.shared.log("AniMap Mapping EP Error: \(error)", type: "Error")
         }
         
         return []
@@ -687,8 +689,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
                 .filter { $0.seasonNumber == season }
                 .map { TVDBRawEpisode(number: $0.number, seasonNumber: $0.seasonNumber,
                                      image: $0.image, name: $0.name, overview: $0.overview) }
+        } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
+            return []
         } catch {
-            print("TVDB EP fetch error: \(error)")
+            Logger.shared.log("TVDB EP fetch error: \(error)", type: "Error")
             return []
         }
     }

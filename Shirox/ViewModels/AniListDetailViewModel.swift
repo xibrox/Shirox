@@ -124,7 +124,7 @@ final class AniListDetailViewModel: ObservableObject {
         // Build next-episode loader using ModuleJSRunner (same path as ModuleStreamPickerView)
         let onWatchNext: WatchNextLoader? = {
             guard let module = ModuleManager.shared.activeModule, let resultHref = searchResultHref else {
-                print("[AniListDetailVM] No module or working href available")
+                Logger.shared.log("[AniListDetailVM] No module or working href available", type: "Error")
                 return nil
             }
             let total = availEps ?? 0
@@ -134,7 +134,7 @@ final class AniListDetailViewModel: ObservableObject {
             }
 
             return { currentEpNum in
-                print("[AniListDetailVM] onWatchNext called for episode \(currentEpNum) using stored href: \(resultHref)")
+                Logger.shared.log("[AniListDetailVM] onWatchNext called for episode \(currentEpNum) using stored href: \(resultHref)", type: "Debug")
                 let nextEpNum = currentEpNum + 1
                 if total > 0, nextEpNum > total { return nil }
 
@@ -144,21 +144,21 @@ final class AniListDetailViewModel: ObservableObject {
 
                     // Use the stored working href - this is the search result that was proven to work
                     let episodes = try await runner.fetchEpisodes(url: resultHref)
-                    print("[AniListDetailVM] Got \(episodes.count) episodes from stored href")
+                    Logger.shared.log("[AniListDetailVM] Got \(episodes.count) episodes from stored href", type: "Debug")
 
                     guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else {
-                        print("[AniListDetailVM] Episode \(nextEpNum) not found")
+                        Logger.shared.log("[AniListDetailVM] Episode \(nextEpNum) not found", type: "Error")
                         return nil
                     }
 
                     let streams = try await runner.fetchStreams(episodeUrl: ep.href)
                         .sorted { $0.title < $1.title }
-                    print("[AniListDetailVM] Got \(streams.count) streams for episode \(nextEpNum)")
+                    Logger.shared.log("[AniListDetailVM] Got \(streams.count) streams for episode \(nextEpNum)", type: "Debug")
 
                     guard !streams.isEmpty else { return nil }
                     return (streams: streams, episodeNumber: nextEpNum)
                 } catch {
-                    print("[AniListDetailVM] Error loading next episode: \(error)")
+                    Logger.shared.log("[AniListDetailVM] Error loading next episode: \(error)", type: "Error")
                     return nil
                 }
             }

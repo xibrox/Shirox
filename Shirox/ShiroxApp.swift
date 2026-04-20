@@ -52,7 +52,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try audioSession.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Failed to configure audio session: \(error)")
+            Logger.shared.log("Failed to configure audio session: \(error)", type: "Error")
         }
     }
 

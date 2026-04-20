@@ -43,7 +43,7 @@ final class ModuleJSRunner {
         setupContext(ctx)
         ctx.evaluateScript(script)
         if let exception = ctx.exception {
-            print("[ModuleJSRunner] Script load error: \(exception)")
+            Logger.shared.log("[ModuleJSRunner] Script load error: \(exception)", type: "Error")
         }
         self.context = ctx
     }
@@ -176,14 +176,20 @@ final class ModuleJSRunner {
         ctx.setupNetworkFetchSimple()
 
         ctx.exceptionHandler = { _, exception in
-            print("[ModuleJSRunner JS] \(exception?.toString() ?? "unknown")")
+            Logger.shared.log("[ModuleJSRunner JS] \(exception?.toString() ?? "unknown")", type: "Error")
         }
     }
 
     private func setupConsole(_ ctx: JSContext) {
-        let log: @convention(block) (JSValue) -> Void = { print("[JS] \($0.toString() ?? "")") }
-        let err: @convention(block) (JSValue) -> Void = { print("[JS Error] \($0.toString() ?? "")") }
-        let warn: @convention(block) (JSValue) -> Void = { print("[JS Warn] \($0.toString() ?? "")") }
+        let log: @convention(block) (JSValue) -> Void = {
+            Logger.shared.log("[JS] \($0.toString() ?? "")", type: "Debug")
+        }
+        let err: @convention(block) (JSValue) -> Void = {
+            Logger.shared.log("[JS Error] \($0.toString() ?? "")", type: "Error")
+        }
+        let warn: @convention(block) (JSValue) -> Void = {
+            Logger.shared.log("[JS Warn] \($0.toString() ?? "")", type: "General")
+        }
         let console = JSValue(newObjectIn: ctx)!
         console.setObject(log, forKeyedSubscript: "log" as NSString)
         console.setObject(err, forKeyedSubscript: "error" as NSString)

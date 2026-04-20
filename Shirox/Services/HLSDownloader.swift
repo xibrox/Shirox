@@ -30,7 +30,7 @@ actor HLSDownloader {
         downloadDir: URL,
         onProgress: @escaping (Double) -> Void
     ) async throws -> String {
-        print("[HLS] Downloading manifest: \(url)")
+        Logger.shared.log("[HLS] Downloading manifest: \(url)", type: "Download")
         
         // 1. Resolve Master Playlist
         var manifest = try await fetchManifest(url: url, headers: headers)
@@ -49,7 +49,7 @@ actor HLSDownloader {
         try FileManager.default.createDirectory(at: episodeFolder, withIntermediateDirectories: true)
         
         // 4. Concurrent Download
-        print("[HLS] Downloading \(segments.count) segments to \(episodeFolder.lastPathComponent)...")
+        Logger.shared.log("[HLS] Downloading \(segments.count) segments to \(episodeFolder.lastPathComponent)...", type: "Download")
         try await withThrowingTaskGroup(of: Int.self) { group in
             for (index, segment) in segments.enumerated() {
                 group.addTask {

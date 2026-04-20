@@ -42,12 +42,12 @@ final class HLSProxyServer {
                 switch state {
                 case .ready:
                     self.isRunning = true
-                    print("[Proxy] Ready on 127.0.0.1:\(self.port.rawValue)")
+                    Logger.shared.log("[Proxy] Ready on 127.0.0.1:\(self.port.rawValue)", type: "Stream")
                     let waiting = self.readyContinuations
                     self.readyContinuations.removeAll()
                     waiting.forEach { $0.resume() }
                 case .failed(let error):
-                    print("[Proxy] Listener failed: \(error)")
+                    Logger.shared.log("[Proxy] Listener failed: \(error)", type: "Error")
                     self.isRunning = false
                     self.listener = nil
                     let waiting = self.readyContinuations
@@ -65,7 +65,8 @@ final class HLSProxyServer {
             l.start(queue: listenerQueue)
             self.listener = l
         } catch {
-            print("[Proxy] Start failed: \(error)")
+            let msg = "[Proxy] Start failed: \(error)"
+            Logger.shared.log(msg, type: "Error")
             let waiting = readyContinuations
             readyContinuations.removeAll()
             waiting.forEach { $0.resume() }
@@ -73,7 +74,7 @@ final class HLSProxyServer {
     }
 
     func stop() {
-        print("[Proxy] Stopping server")
+        Logger.shared.log("[Proxy] Stopping server", type: "Stream")
         listener?.cancel()
         listener = nil
         isRunning = false

@@ -66,7 +66,7 @@ final class ModuleManager: ObservableObject {
             do {
                 try await JSEngine.shared.loadModule(module)
             } catch {
-                print("[ModuleManager] Failed to load JS for module \(module.sourceName): \(error.localizedDescription)")
+                Logger.shared.log("[ModuleManager] Failed to load JS for module \(module.sourceName): \(error.localizedDescription)", type: "Error")
             }
         }
     }

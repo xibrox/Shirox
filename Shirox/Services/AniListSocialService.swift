@@ -45,11 +45,9 @@ final class AniListSocialService {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, _) = try await session.data(for: request)
         
-        #if DEBUG
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            print("--- GraphQL Response ---\n\(json)")
+            Logger.shared.log("--- GraphQL Response ---\n\(json)", type: "Debug")
         }
-        #endif
         
         return try JSONDecoder().decode(T.self, from: data)
     }

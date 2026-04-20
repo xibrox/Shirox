@@ -53,12 +53,12 @@ final class CastProxyServer {
                 switch state {
                 case .ready:
                     self.isRunning = true
-                    print("[CastProxy] Ready on \(self.localIP()):\(self.port.rawValue)")
+                    Logger.shared.log("[CastProxy] Ready on \(self.localIP()):\(self.port.rawValue)", type: "Stream")
                     let waiting = self.readyContinuations
                     self.readyContinuations.removeAll()
                     waiting.forEach { $0.resume() }
                 case .failed(let error):
-                    print("[CastProxy] Listener failed: \(error)")
+                    Logger.shared.log("[CastProxy] Listener failed: \(error)", type: "Error")
                     self.isRunning = false
                     self.listener = nil
                     self.endBackgroundTask()
@@ -75,7 +75,7 @@ final class CastProxyServer {
             l.start(queue: listenerQueue)
             listener = l
         } catch {
-            print("[CastProxy] Start failed: \(error)")
+            Logger.shared.log("[CastProxy] Start failed: \(error)", type: "Error")
             endBackgroundTask()
             let waiting = readyContinuations
             readyContinuations.removeAll()
@@ -88,7 +88,7 @@ final class CastProxyServer {
         listener = nil
         isRunning = false
         endBackgroundTask()
-        print("[CastProxy] Stopped")
+        Logger.shared.log("[CastProxy] Stopped", type: "Stream")
     }
 
     // MARK: - Background task

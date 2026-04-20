@@ -378,7 +378,7 @@ final class CastManager: NSObject, ObservableObject {
 
         let isHLS = url.pathExtension.lowercased() == "m3u8"
             || url.absoluteString.contains(".m3u8")
-        print("[Cast] URL: \(url.absoluteString), isHLS: \(isHLS)")
+        Logger.shared.log("[Cast] URL: \(url.absoluteString), isHLS: \(isHLS)", type: "Stream")
         let mediaInfoBuilder = GCKMediaInformationBuilder(contentURL: url)
         mediaInfoBuilder.streamType = isHLS ? .unknown : .buffered
         mediaInfoBuilder.contentType = isHLS ? "application/x-mpegURL" : "video/mp4"
@@ -439,7 +439,7 @@ extension CastManager: GCKRemoteMediaClientListener {
 @MainActor
 extension CastManager: GCKRequestDelegate {
     func request(_ request: GCKRequest, didFailWithError error: GCKError) {
-        print("[Cast] Request failed: \(error.localizedDescription)")
+        Logger.shared.log("[Cast] Request failed: \(error.localizedDescription)", type: "Error")
     }
 }
 #endif

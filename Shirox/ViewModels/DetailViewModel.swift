@@ -107,7 +107,7 @@ final class DetailViewModel: ObservableObject {
                 fetchAniListMetadata(id: match.id)
             }
         } catch {
-            print("[DetailVM] Auto-match failed: \(error)")
+            Logger.shared.log("[DetailVM] Auto-match failed: \(error)", type: "Error")
         }
         isMatchingAniList = false
     }
