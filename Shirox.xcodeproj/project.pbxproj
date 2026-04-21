@@ -175,12 +175,16 @@
 		CFD5A40FA6E74CB3ADB60000 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */; };
 		D0E5AFA00D4E6868A52A1123 /* JSEngine+Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51053A55A3C1D2682EB7719D /* JSEngine+Streams.swift */; };
 		D16E18BD46A2A5ABA035EFF3 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB2ACC14C82E1EC1E47DC2E /* HomeViewModel.swift */; };
+		DD000001000000000000AA01 /* ThumbnailEpisodeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */; };
+		DD000001000000000000AA02 /* ThumbnailEpisodeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */; };
 		E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */; };
 		E2A6544D9407734FABCFD57D /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEA5105668982AD0021041F /* SearchView.swift */; };
 		E2DCF99DA506F27794A1B6CD /* Pods_Shirox_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F51FC1BEA042BB8C4C9820F9 /* Pods_Shirox_iOS.framework */; };
 		EA5B1C17081C02D59196F61C /* ModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 330313A7F7AB1EF362097130 /* ModuleListView.swift */; };
 		EADD7BDDF8A641980A2CFE35 /* WatchHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDFD568A3E8F21EA674244C /* WatchHistoryService.swift */; };
 		EB389DABE1A542FCA214B6D7 /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71374A74E55E4B9BB0555C59 /* BrowseView.swift */; };
+		EE000001000000000000AA01 /* EpisodeSortManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000001000000000000BB01 /* EpisodeSortManager.swift */; };
+		EE000001000000000000AA02 /* EpisodeSortManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000001000000000000BB01 /* EpisodeSortManager.swift */; };
 		F971C44DD8C1F3918A3CE985 /* StreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520D2B9F954BF05330758E81 /* StreamPickerView.swift */; };
 		F9E24C2C4FF74E1EAC5BFD9B /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E45F91C732C2601421713C8 /* NetworkFetch.swift */; };
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
@@ -277,11 +281,13 @@
 		DB3FBB9F1A9B237743F4808C /* AniListService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListService.swift; sourceTree = "<group>"; };
 		DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
 		DCADDEA3748C5AE8D3C1A3CD /* JSEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSEngine.swift; sourceTree = "<group>"; };
+		DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailEpisodeRow.swift; sourceTree = "<group>"; };
 		E06843969693AE9C1AEB7FAD /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailViewModel.swift; sourceTree = "<group>"; };
 		E8D91E43B99205901655CDF0 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA29B2619FC97EF54B854F95 /* ModuleDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDefinition.swift; sourceTree = "<group>"; };
 		ECEA5105668982AD0021041F /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
+		EE000001000000000000BB01 /* EpisodeSortManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeSortManager.swift; sourceTree = "<group>"; };
 		F17247C5B93534109904F77D /* Pods-Shirox_iOS.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Shirox_iOS.debug.xcconfig"; path = "Target Support Files/Pods-Shirox_iOS/Pods-Shirox_iOS.debug.xcconfig"; sourceTree = "<group>"; };
 		F51FC1BEA042BB8C4C9820F9 /* Pods_Shirox_iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Shirox_iOS.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6221F81B7112850281B7187 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -382,6 +388,7 @@
 				FA54E15EA936A28D42B73886 /* ModuleManager.swift */,
 				B6B720E10D4EE0F2136F17C5 /* ModuleSearchAliasManager.swift */,
 				B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */,
+				EE000001000000000000BB01 /* EpisodeSortManager.swift */,
 				5E45F91C732C2601421713C8 /* NetworkFetch.swift */,
 				AA000001000000000000BB01 /* SubtitleSettingsManager.swift */,
 				AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */,
@@ -446,6 +453,7 @@
 			isa = PBXGroup;
 			children = (
 				DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */,
+				DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -689,6 +697,7 @@
 				72D5458BF7DD94A53658F64C /* ModuleManager.swift in Sources */,
 				B6B720E10D4EE0F2136F17C4 /* ModuleSearchAliasManager.swift in Sources */,
 				B6B720E10D4EE0F2136F17C8 /* CacheManager.swift in Sources */,
+				EE000001000000000000AA02 /* EpisodeSortManager.swift in Sources */,
 				AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */,
 				142A89C32F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
 				B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */,
@@ -731,6 +740,7 @@
 				AA000001000000000000AA81 /* DownloadItem.swift in Sources */,
 				7A2F29854EAC49CBBA429793 /* ContinueWatchingCard.swift in Sources */,
 				748517C4AE504A939CC1610F /* CachedAsyncImage.swift in Sources */,
+				DD000001000000000000AA01 /* ThumbnailEpisodeRow.swift in Sources */,
 				AA000001000000000000AC02 /* AniListUser.swift in Sources */,
 				AA000001000000000000AC04 /* AniListActivity.swift in Sources */,
 				AA000001000000000000AC06 /* AniListNotification.swift in Sources */,
@@ -777,6 +787,7 @@
 				959D35AAA4791E5B4B9DB7D3 /* ModuleManager.swift in Sources */,
 				B6B720E10D4EE0F2136F17C6 /* ModuleSearchAliasManager.swift in Sources */,
 				B6B720E10D4EE0F2136F17C9 /* CacheManager.swift in Sources */,
+				EE000001000000000000AA01 /* EpisodeSortManager.swift in Sources */,
 				AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */,
 				142A89C22F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
 				F9E24C2C4FF74E1EAC5BFD9B /* NetworkFetch.swift in Sources */,
@@ -827,6 +838,7 @@
 				AA000002000000000000AA89 /* BatchDownloadStreamPickerView.swift in Sources */,
 				C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */,
 				70F287DD43E84880B274852E /* CachedAsyncImage.swift in Sources */,
+				DD000001000000000000AA02 /* ThumbnailEpisodeRow.swift in Sources */,
 				AA000001000000000000AC01 /* AniListUser.swift in Sources */,
 				AA000001000000000000AC03 /* AniListActivity.swift in Sources */,
 				AA000001000000000000AC05 /* AniListNotification.swift in Sources */,
@@ -923,13 +935,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 49;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.51;
+				MARKETING_VERSION = 0.0.52;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -946,14 +958,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 49;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.51;
+				MARKETING_VERSION = 0.0.52;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -971,13 +983,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 49;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.51;
+				MARKETING_VERSION = 0.0.52;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1055,14 +1067,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 48;
+				CURRENT_PROJECT_VERSION = 49;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.51;
+				MARKETING_VERSION = 0.0.52;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

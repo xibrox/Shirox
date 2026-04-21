@@ -80,7 +80,12 @@ private struct DownloadModuleRow: View {
         self.animeTitle = animeTitle
         self.episodeNumber = episodeNumber
         self.onStreamsLoaded = onStreamsLoaded
-        _rowVm = StateObject(wrappedValue: DownloadModuleRowViewModel(module: module, mediaId: mediaId, animeTitle: animeTitle))
+        _rowVm = StateObject(wrappedValue: DownloadModuleRowViewModel(
+            module: module,
+            mediaId: mediaId,
+            animeTitle: animeTitle,
+            targetEpisodeNumber: episodeNumber
+        ))
     }
 
     var body: some View {
@@ -89,6 +94,9 @@ private struct DownloadModuleRow: View {
             stateContent
         }
         .padding(.vertical, 6)
+        .onAppear {
+            rowVm.startFind()
+        }
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
             onStreamsLoaded(streams, rowVm.selectedEpisodeHref)
@@ -238,15 +246,17 @@ private final class DownloadModuleRowViewModel: ObservableObject {
     let module: ModuleDefinition
     let mediaId: Int?
     let originalAnimeTitle: String
+    let targetEpisodeNumber: Int
 
     private var runner: ModuleJSRunner?
     private var currentTask: Task<Void, Never>?
     private var currentSearchResultHref: String?
 
-    init(module: ModuleDefinition, mediaId: Int?, animeTitle: String) {
+    init(module: ModuleDefinition, mediaId: Int?, animeTitle: String, targetEpisodeNumber: Int) {
         self.module = module
         self.mediaId = mediaId
         self.originalAnimeTitle = animeTitle
+        self.targetEpisodeNumber = targetEpisodeNumber
         self.searchTitle = ModuleSearchAliasManager.shared.getAlias(mediaId: mediaId, animeTitle: animeTitle, moduleId: module.id) ?? animeTitle
     }
 
@@ -273,7 +283,12 @@ private final class DownloadModuleRowViewModel: ObservableObject {
         do {
             try await r.load(module: module)
             let results = try await r.search(keyword: keyword)
-            state = results.isEmpty ? .notFound : .searchResults(results)
+            
+            if results.isEmpty {
+                state = .notFound
+            } else {
+                state = .searchResults(results)
+            }
         } catch {
             if (error as? CancellationError) != nil { return }
             state = .error(error.localizedDescription)

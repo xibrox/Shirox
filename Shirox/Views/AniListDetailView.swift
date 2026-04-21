@@ -65,6 +65,10 @@ struct AniListDetailView: View {
         }
         .onAppear {
             PlayerPresenter.shared.resetToAppOrientation()
+            isReversed = EpisodeSortManager.shared.isReversed(for: "anilist_\(mediaId)")
+        }
+        .onChange(of: isReversed) { _, newValue in
+            EpisodeSortManager.shared.setReversed(newValue, for: "anilist_\(mediaId)")
         }
         .frame(maxWidth: .infinity)
         .tint(.primary)
@@ -277,7 +281,30 @@ struct AniListDetailView: View {
                 #if os(iOS)
                 HStack(spacing: 10) {
                     watchButton(media: media)
-                    
+
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedTab = selectedTab == 0 ? 1 : 0
+                        }
+                    } label: {
+                        Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                selectedTab == 1
+                                    ? Color.primary
+                                    : Color.clear,
+                                in: Circle()
+                            )
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+
                     if (media.episodes ?? 0) > 0 || media.status == "RELEASING" {
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -308,9 +335,11 @@ struct AniListDetailView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 8)
                 #endif
-                
+
+                #if !os(iOS)
                 tabSelector
                     .padding(.top, 8)
+                #endif
                 
                 if selectedTab == 0 {
                     episodesSection(media: media)
@@ -608,9 +637,7 @@ struct AniListDetailView: View {
                 
                 // Sort Toggle
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isReversed.toggle()
-                    }
+                    isReversed.toggle()
                 } label: {
                     Image(systemName: isReversed ? "arrow.down" : "arrow.up")
                         .font(.system(size: 14, weight: .bold))
@@ -969,7 +996,7 @@ private struct AniListEpisodeRowContainer: View {
     }
 
     var body: some View {
-        AniListEpisodeRow(
+        ThumbnailEpisodeRow(
             number: ep,
             thumbnail: aniMapEpisode?.thumbnail ?? fallbackThumbnail,
             title: aniMapEpisode?.title,
@@ -1025,177 +1052,6 @@ private struct AniListEpisodeRowContainer: View {
     }
 }
 
-// MARK: - Episode Row
-private struct AniListEpisodeRow: View {
-    let number: Int
-    var thumbnail: String? = nil
-    var title: String? = nil
-    var progress: Double? = nil
-    let onTap: () -> Void
-    var onMarkWatched: (() -> Void)? = nil
-    var onMarkUnwatched: (() -> Void)? = nil
-    var onResetProgress: (() -> Void)? = nil
-    var allPreviousWatched: Bool = false
-    var onTogglePreviousWatched: (() -> Void)? = nil
-    var onDownload: (() -> Void)? = nil
-    var isSelectionMode: Bool = false
-    var isSelected: Bool = false
-
-    private var isComplete: Bool { (progress ?? 0) >= 0.9 }
-
-    private var adaptiveBackground: Color {
-        #if os(iOS)
-        Color(uiColor: .systemBackground)
-        #else
-        Color(nsColor: .windowBackgroundColor)
-        #endif
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                if isSelectionMode {
-                    ZStack {
-                        Circle()
-                            .strokeBorder(isSelected ? Color.primary : Color.secondary.opacity(0.35), lineWidth: 2)
-                            .frame(width: 40, height: 40)
-                        if isSelected {
-                            Circle()
-                                .fill(Color.primary)
-                                .frame(width: 40, height: 40)
-                            Image(systemName: "checkmark")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(adaptiveBackground)
-                        }
-                    }
-                } else {
-                    if let thumb = thumbnail {
-                        CachedAsyncImage(urlString: thumb)
-                            .aspectRatio(16/9, contentMode: .fill)
-                            .frame(width: 100, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(
-                                ZStack {
-                                    if isComplete {
-                                        Color.black.opacity(0.3)
-                                        Image(systemName: "checkmark")
-                                            .font(.caption.weight(.bold))
-                                            .foregroundStyle(.white)
-                                    }
-                                }
-                            )
-                    } else {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.secondary.opacity(0.07))
-                                .frame(width: 100, height: 56)
-                            
-                            Circle()
-                                .fill(isComplete ? Color.green : Color.primary)
-                                .frame(width: 40, height: 40)
-                            
-                            if isComplete {
-                                Image(systemName: "checkmark")
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(.white)
-                            } else {
-                                Text("\(number)")
-                                    .font(.footnote.weight(.bold))
-                                    .foregroundStyle(adaptiveBackground)
-                            }
-                        }
-                        .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
-                                radius: 4, y: 2)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Episode \(number)")
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    
-                    if let t = title, !t.isEmpty {
-                        Text(t)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer()
-
-                if !isSelectionMode {
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .padding(8)
-                        .background(Color.primary.opacity(0.1), in: Circle())
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, (progress ?? 0) > 0 && !isComplete && !isSelectionMode ? 6 : 12)
-
-            if let p = progress, p > 0, !isComplete, !isSelectionMode {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.secondary.opacity(0.15))
-                        Capsule()
-                            .fill(Color.primary)
-                            .frame(width: geo.size.width * p)
-                    }
-                    .frame(height: 3)
-                }
-                .frame(height: 3)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 8)
-            }
-        }
-        .background(
-            isSelectionMode && isSelected
-                ? Color.primary.opacity(0.08)
-                : Color.secondary.opacity(0.07),
-            in: RoundedRectangle(cornerRadius: 14)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 14))
-        .onTapGesture { onTap() }
-        .contextMenu {
-            if !isSelectionMode {
-                if isComplete {
-                    Button { onMarkUnwatched?() } label: {
-                        Label("Mark as Unwatched", systemImage: "xmark.circle")
-                    }
-                } else {
-                    Button { onMarkWatched?() } label: {
-                        Label("Mark as Watched", systemImage: "checkmark.circle")
-                    }
-                }
-                if let onTogglePreviousWatched {
-                    Divider()
-                    Button { onTogglePreviousWatched() } label: {
-                        Label(
-                            allPreviousWatched ? "Mark previous episodes as Unwatched" : "Mark previous episodes as Watched",
-                            systemImage: allPreviousWatched ? "xmark.circle.fill" : "checkmark.circle.fill"
-                        )
-                    }
-                }
-                if let onResetProgress, progress != nil {
-                    Divider()
-                    Button(role: .destructive) { onResetProgress() } label: {
-                        Label("Reset Progress", systemImage: "arrow.counterclockwise")
-                    }
-                }
-                if let onDownload {
-                    Divider()
-                    Button { onDownload() } label: {
-                        Label("Download Episode", systemImage: "arrow.down.circle")
-                    }
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Final Stream Result Modal
 
 struct AniListStreamResultSheet: View {
@@ -1218,9 +1074,24 @@ struct AniListStreamResultSheet: View {
                         Button {
                             onSelect(stream, nil)
                         } label: {
-                            Label(stream.title, systemImage: "play.fill")
-                                .foregroundStyle(.primary)
+                            HStack(spacing: 12) {
+                                Image(systemName: "play.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.primary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(stream.title)
+                                        .font(.subheadline).fontWeight(.semibold)
+                                        .foregroundStyle(.primary)
+                                    Text(stream.subtitle != nil ? "Soft subtitles available" : "No soft subtitles")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                            .padding(.vertical, 6)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -1231,6 +1102,7 @@ struct AniListStreamResultSheet: View {
                     Button("Cancel") { onDismiss() }
                 }
             }
+            .tint(.primary)
         }
     }
 }

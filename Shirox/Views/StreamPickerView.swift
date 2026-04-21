@@ -29,7 +29,7 @@ struct StreamPickerView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "play.circle.fill")
                                     .font(.system(size: 32))
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(.primary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(stream.title)
                                         .font(.subheadline).fontWeight(.semibold)
@@ -38,7 +38,9 @@ struct StreamPickerView: View {
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
+                                Spacer()
                             }
+                            .contentShape(Rectangle())
                             .padding(.vertical, 6)
                         }
                         .buttonStyle(.plain)
@@ -53,6 +55,7 @@ struct StreamPickerView: View {
                     Button("Cancel") { vm.cancelStreamLoading() }
                 }
             }
+            .tint(.primary)
         }
         .presentationDetents([.medium, .large])
     }

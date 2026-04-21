@@ -87,6 +87,8 @@ struct SettingsView: View {
                     }
                     Toggle("Auto Next Episode", isOn: $autoNextEpisode)
                         .tint(.secondary)
+                    Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
+                        .tint(.secondary)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Show Button At")

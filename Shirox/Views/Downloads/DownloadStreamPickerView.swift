@@ -24,6 +24,7 @@ struct DownloadStreamPickerView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .tint(.primary)
         }
         .presentationDetents([.medium, .large])
     }
@@ -40,7 +41,7 @@ private struct DownloadStreamRow: View {
             HStack(spacing: 12) {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(.primary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(stream.title)
@@ -55,7 +56,9 @@ private struct DownloadStreamRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                Spacer()
             }
+            .contentShape(Rectangle())
             .padding(.vertical, 6)
         }
         .buttonStyle(.plain)

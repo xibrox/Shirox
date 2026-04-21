@@ -35,6 +35,7 @@ struct ModuleStreamPickerView: View {
                     Button("Cancel") { onDismiss() }
                 }
             }
+            .tint(.primary)
         }
         .presentationDetents([.medium, .large])
     }
@@ -64,15 +65,17 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     let module: ModuleDefinition
     let mediaId: Int?
     let originalAnimeTitle: String
+    let targetEpisodeNumber: Int
 
     private var runner: ModuleJSRunner?
     private var currentTask: Task<Void, Never>?
     private var currentSearchResultHref: String?  // Track active search result for manual episode selection
 
-    init(module: ModuleDefinition, mediaId: Int?, animeTitle: String) {
+    init(module: ModuleDefinition, mediaId: Int?, animeTitle: String, targetEpisodeNumber: Int) {
         self.module = module
         self.mediaId = mediaId
         self.originalAnimeTitle = animeTitle
+        self.targetEpisodeNumber = targetEpisodeNumber
         
         // Load custom alias if available, otherwise fallback to original title
         if let alias = ModuleSearchAliasManager.shared.getAlias(mediaId: mediaId, animeTitle: animeTitle, moduleId: module.id) {
@@ -221,7 +224,12 @@ private struct ModuleStreamRow: View {
         self.animeTitle = animeTitle
         self.episodeNumber = episodeNumber
         self.onStreamsLoaded = onStreamsLoaded
-        _rowVm = StateObject(wrappedValue: ModuleStreamRowViewModel(module: module, mediaId: mediaId, animeTitle: animeTitle))
+        _rowVm = StateObject(wrappedValue: ModuleStreamRowViewModel(
+            module: module,
+            mediaId: mediaId,
+            animeTitle: animeTitle,
+            targetEpisodeNumber: episodeNumber
+        ))
     }
 
     var body: some View {
@@ -230,6 +238,9 @@ private struct ModuleStreamRow: View {
             stateContent
         }
         .padding(.vertical, 6)
+        .onAppear {
+            rowVm.startFind()
+        }
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
             showStreamPicker = true
@@ -297,7 +308,7 @@ private struct ModuleStreamRow: View {
             Button("Find") { rowVm.startFind() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(.primary)
 
         case .loading, .loadingEpisodes, .loadingStreams:
             Button { rowVm.cancel() } label: {
@@ -309,7 +320,7 @@ private struct ModuleStreamRow: View {
             Button("Retry") { rowVm.reset(); rowVm.startFind() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(.primary)
         }
     }
 
@@ -378,7 +389,7 @@ private struct ModuleStreamRow: View {
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.mini)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(.primary)
                         }
                     }
                 }
@@ -530,7 +541,7 @@ private struct ModuleStreamSelectionView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "play.circle.fill")
                                     .font(.system(size: 32))
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(.primary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(stream.title)
                                         .font(.subheadline).fontWeight(.semibold)
@@ -539,7 +550,9 @@ private struct ModuleStreamSelectionView: View {
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
+                                Spacer()
                             }
+                            .contentShape(Rectangle())
                             .padding(.vertical, 6)
                         }
                         .buttonStyle(.plain)

@@ -53,7 +53,30 @@ struct DetailView: View {
                             
                             HStack(spacing: 12) {
                                 watchButton(detail: detail)
-                                
+
+                                Button {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        selectedTab = selectedTab == 0 ? 1 : 0
+                                    }
+                                } label: {
+                                    Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
+                                        .frame(width: 46, height: 46)
+                                        .background(
+                                            selectedTab == 1
+                                                ? Color.primary
+                                                : Color.clear,
+                                            in: Circle()
+                                        )
+                                        .background(.ultraThinMaterial, in: Circle())
+                                        .overlay(
+                                            Circle()
+                                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+
                                 Button {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                         isSelectionMode.toggle()
@@ -85,8 +108,10 @@ struct DetailView: View {
                         }
                         #endif
                         
+                        #if !os(iOS)
                         tabSelector
                             .padding(.top, 8)
+                        #endif
                         
                         if selectedTab == 0 {
                             episodesSection(detail: detail)
@@ -178,11 +203,16 @@ struct DetailView: View {
                 selectedRangeIndex = (resumeNum - 1) / 100
             } else {
                 let currentEp = continueWatching.items.first(where: { CW in
-                    (aniListID != nil && CW.aniListID == aniListID) || 
-                    (CW.mediaTitle == item.title && CW.moduleId == moduleId)
+                    let aid = vm.aniListID ?? aniListID
+                    return (aid != nil && CW.aniListID == aid) || 
+                           (CW.mediaTitle == item.title && CW.moduleId == moduleId)
                 })?.episodeNumber ?? 1
                 selectedRangeIndex = (currentEp - 1) / 100
             }
+            isReversed = EpisodeSortManager.shared.isReversed(for: "\(moduleId ?? "unknown")_\(item.id)")
+        }
+        .onChange(of: isReversed) { _, newValue in
+            EpisodeSortManager.shared.setReversed(newValue, for: "\(moduleId ?? "unknown")_\(item.id)")
         }
         .onChange(of: vm.detail?.episodes) {
             guard !autoPlayOnLoad else { return }
@@ -190,7 +220,7 @@ struct DetailView: View {
             if let detail = vm.detail, !detail.episodes.isEmpty {
                 let moduleId = ModuleManager.shared.activeModule?.id
                 ContinueWatchingManager.shared.notifyNewEpisodesAvailable(
-                    aniListID: aniListID,
+                    aniListID: vm.aniListID ?? aniListID,
                     moduleId: moduleId,
                     mediaTitle: detail.title,
                     availableEpisodes: detail.episodes.count,
@@ -206,6 +236,7 @@ struct DetailView: View {
             autoPlayOnLoad = true
             vm.loadStreams(for: episode)
         }
+        .tint(.primary)
         .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
             if let stream = vm.pendingStream {
                 vm.pendingStream = nil
@@ -692,9 +723,7 @@ struct DetailView: View {
                 
                 // Sort Toggle
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isReversed.toggle()
-                    }
+                    isReversed.toggle()
                 } label: {
                     Image(systemName: isReversed ? "arrow.down" : "arrow.up")
                         .font(.system(size: 14, weight: .bold))
@@ -708,7 +737,7 @@ struct DetailView: View {
 
                 #if os(iOS)
                 if !isSelectionMode {
-                    if continueWatching.hasProgress(aniListID: aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
+                    if continueWatching.hasProgress(aniListID: vm.aniListID ?? aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
                         Button {
                             showResetConfirmation = true
                         } label: {
@@ -723,7 +752,7 @@ struct DetailView: View {
                     }
                 }
                 #else
-                if continueWatching.hasProgress(aniListID: aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
+                if continueWatching.hasProgress(aniListID: vm.aniListID ?? aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
                     Button {
                         showResetConfirmation = true
                     } label: {
@@ -900,7 +929,7 @@ struct DetailView: View {
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
-                            aniListID: aniListID,
+                            aniListID: vm.aniListID ?? aniListID,
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
                             onTap: sel ? {
@@ -923,7 +952,7 @@ struct DetailView: View {
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
-                            aniListID: aniListID,
+                            aniListID: vm.aniListID ?? aniListID,
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
                             onTap: { vm.loadStreams(for: episode) }
@@ -963,6 +992,9 @@ private struct ModuleEpisodeRowContainer: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    
+    @State private var aniMapEpisode: AniMapEpisode?
+    @State private var fallbackThumbnail: String?
 
     private var moduleId: String? { ModuleManager.shared.activeModule?.id }
     private var epNum: Int { Int(episode.number) }
@@ -1001,43 +1033,103 @@ private struct ModuleEpisodeRowContainer: View {
     }
 
     var body: some View {
-        EpisodeRowView(
-            episode: episode,
-            progress: progress,
-            onTap: onTap,
-            onMarkWatched: {
-                ContinueWatchingManager.shared.markWatched(
-                    aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
-                    imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
-            },
-            onMarkUnwatched: {
-                ContinueWatchingManager.shared.markUnwatched(
-                    aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
-                    imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
-            },
-            onResetProgress: {
-                ContinueWatchingManager.shared.resetEpisodeProgress(
-                    aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
-            },
-            allPreviousWatched: allPreviousWatched,
-            onTogglePreviousWatched: epNum > 1 ? {
-                let mid = ModuleManager.shared.activeModule?.id
-                let fresh = (1..<epNum).allSatisfy {
-                    ContinueWatchingManager.shared.isWatched(
-                        aniListID: nil, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
+        Group {
+            if aniListID != nil {
+                ThumbnailEpisodeRow(
+                    number: epNum,
+                    thumbnail: aniMapEpisode?.thumbnail ?? fallbackThumbnail,
+                    title: aniMapEpisode?.title,
+                    progress: progress,
+                    onTap: onTap,
+                    onMarkWatched: {
+                        ContinueWatchingManager.shared.markWatched(
+                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                    },
+                    onMarkUnwatched: {
+                        ContinueWatchingManager.shared.markUnwatched(
+                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                    },
+                    onResetProgress: {
+                        ContinueWatchingManager.shared.resetEpisodeProgress(
+                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
+                    },
+                    allPreviousWatched: allPreviousWatched,
+                    onTogglePreviousWatched: epNum > 1 ? {
+                        let mid = ModuleManager.shared.activeModule?.id
+                        let fresh = (1..<epNum).allSatisfy {
+                            ContinueWatchingManager.shared.isWatched(
+                                aniListID: nil, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
+                        }
+                        if fresh {
+                            ContinueWatchingManager.shared.markUnwatched(
+                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle)
+                        } else {
+                            ContinueWatchingManager.shared.markWatched(
+                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle,
+                                imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                        }
+                    } : nil,
+                    onDownload: onDownload,
+                    isSelectionMode: isSelectionMode,
+                    isSelected: isSelected
+                )
+            } else {
+                EpisodeRowView(
+                    episode: episode,
+                    progress: progress,
+                    onTap: onTap,
+                    onMarkWatched: {
+                        ContinueWatchingManager.shared.markWatched(
+                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                    },
+                    onMarkUnwatched: {
+                        ContinueWatchingManager.shared.markUnwatched(
+                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                    },
+                    onResetProgress: {
+                        ContinueWatchingManager.shared.resetEpisodeProgress(
+                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
+                    },
+                    allPreviousWatched: allPreviousWatched,
+                    onTogglePreviousWatched: epNum > 1 ? {
+                        let mid = ModuleManager.shared.activeModule?.id
+                        let fresh = (1..<epNum).allSatisfy {
+                            ContinueWatchingManager.shared.isWatched(
+                                aniListID: nil, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
+                        }
+                        if fresh {
+                            ContinueWatchingManager.shared.markUnwatched(
+                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle)
+                        } else {
+                            ContinueWatchingManager.shared.markWatched(
+                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle,
+                                imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                        }
+                    } : nil,
+                    onDownload: onDownload,
+                    isSelectionMode: isSelectionMode,
+                    isSelected: isSelected
+                )
+            }
+        }
+        .task {
+            guard let aid = aniListID else { return }
+            if aniMapEpisode == nil {
+                aniMapEpisode = TVDBMappingService.shared.getCachedEpisode(for: aid, episodeNumber: epNum)
+                if aniMapEpisode == nil {
+                    let eps = await TVDBMappingService.shared.getEpisodes(for: aid)
+                    aniMapEpisode = eps.first(where: { $0.episode == epNum })
                 }
-                if fresh {
-                    ContinueWatchingManager.shared.markUnwatched(
-                        upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle)
-                } else {
-                    ContinueWatchingManager.shared.markWatched(
-                        upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle,
-                        imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
-                }
-            } : nil,
-            onDownload: onDownload,
-            isSelectionMode: isSelectionMode,
-            isSelected: isSelected
-        )
+            }
+            // If episode was found but has no thumbnail, fall back to series fanart
+            if aniMapEpisode?.thumbnail == nil {
+                let artwork = await TVDBMappingService.shared.getArtwork(for: aid)
+                fallbackThumbnail = artwork.fanart ?? artwork.poster
+            }
+        }
     }
 }
