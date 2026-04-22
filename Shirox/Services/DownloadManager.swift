@@ -32,8 +32,11 @@ final class DownloadManager: NSObject, ObservableObject {
     private let hlsDownloader = HLSDownloader()
     private var hlsTasks: [UUID: Task<Void, Never>] = [:]
     
+    private var backgroundCompletionHandler: (() -> Void)?
+
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.background(withIdentifier: "com.shirox.downloads.v2")
+        config.sessionSendsLaunchEvents = true
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
     
@@ -42,6 +45,7 @@ final class DownloadManager: NSObject, ObservableObject {
         // Ensure download directory exists so it shows up in Files app
         _ = downloadDir
         load()
+        reconnectBackgroundTasks()
     }
     
     // MARK: - Public API
@@ -89,9 +93,9 @@ final class DownloadManager: NSObject, ObservableObject {
         if let fileName = item.fileName {
             // Delete the file or the folder (for Local HLS)
             let path = downloadDir.appendingPathComponent(fileName)
-            let folder = path.deletingLastPathComponent()
             
             if item.isHLS {
+                let folder = path.deletingLastPathComponent()
                 try? FileManager.default.removeItem(at: folder)
             } else {
                 try? FileManager.default.removeItem(at: path)
@@ -134,8 +138,10 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     func reconnectPendingTasks() {
+        // This is called on app launch. MP4 tasks are handled by reconnectBackgroundTasks.
+        // HLS tasks cannot be resumed automatically if the app was killed.
         for (idx, item) in items.enumerated() where item.state == .downloading {
-            if item.isHLS || item.fileName == nil {
+            if item.isHLS {
                 items[idx].state = .failed
                 items[idx].error = "Interrupted"
             }
@@ -143,8 +149,30 @@ final class DownloadManager: NSObject, ObservableObject {
         persist()
     }
 
+    private func reconnectBackgroundTasks() {
+        urlSession.getAllTasks { tasks in
+            Task { @MainActor in
+                for task in tasks {
+                    if let downloadTask = task as? URLSessionDownloadTask,
+                       let idx = self.items.firstIndex(where: { 
+                           $0.state == .downloading && 
+                           ($0.taskIdentifier == downloadTask.taskIdentifier || $0.taskIdentifier == nil)
+                       }) {
+                        self.items[idx].taskIdentifier = downloadTask.taskIdentifier
+                        self.items[idx].state = .downloading
+                    }
+                }
+                self.persist()
+            }
+        }
+    }
+
     func handleBackgroundEvents(identifier: String, completionHandler: @escaping () -> Void) {
-        completionHandler()
+        if identifier == "com.shirox.downloads.v2" {
+            self.backgroundCompletionHandler = completionHandler
+        } else {
+            completionHandler()
+        }
     }
     
     // MARK: - Private
@@ -178,6 +206,7 @@ final class DownloadManager: NSObject, ObservableObject {
         stream.headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
         
         let task = urlSession.downloadTask(with: req)
+        task.taskDescription = item.id.uuidString
         if let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx].taskIdentifier = task.taskIdentifier
             items[idx].state = .downloading
@@ -236,33 +265,70 @@ extension DownloadManager: URLSessionDownloadDelegate {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         Task { @MainActor in
             if let idx = items.firstIndex(where: { $0.taskIdentifier == downloadTask.taskIdentifier }) {
-                let p = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-                items[idx].progress = p
-                objectWillChange.send()
+                if totalBytesExpectedToWrite > 0 {
+                    let p = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+                    items[idx].progress = p
+                    objectWillChange.send()
+                }
             }
         }
     }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        Task { @MainActor in
-            guard let idx = items.firstIndex(where: { $0.taskIdentifier == downloadTask.taskIdentifier }) else { return }
-            let id = items[idx].id
-            let finalName = "\(id.uuidString).mp4"
-            let destination = downloadDir.appendingPathComponent(finalName)
-            
-            try? FileManager.default.removeItem(at: destination)
-            try? FileManager.default.moveItem(at: location, to: destination)
-            
-            updateCompletion(id, fileName: finalName)
+        // We MUST move the file synchronously here because the temp file at 'location' 
+        // will be deleted as soon as this delegate method returns.
+        
+        guard let uuidString = downloadTask.taskDescription,
+              let id = UUID(uuidString: uuidString) else {
+            // Fallback: try to find by task identifier if description is missing
+            let taskIdentifier = downloadTask.taskIdentifier
+            Task { @MainActor in
+                if let idx = self.items.firstIndex(where: { $0.taskIdentifier == taskIdentifier }) {
+                    self.updateError(self.items[idx].id, "Internal error: Download task lost context")
+                }
+            }
+            return
+        }
+        
+        let finalName = "\(id.uuidString).mp4"
+        let destination = downloadDir.appendingPathComponent(finalName)
+        
+        do {
+            try FileManager.default.removeItem(at: destination)
+        } catch {
+            // Ignore if file doesn't exist
+        }
+        
+        do {
+            try FileManager.default.moveItem(at: location, to: destination)
+            Task { @MainActor in
+                self.updateCompletion(id, fileName: finalName)
+            }
+        } catch {
+            Task { @MainActor in
+                self.updateError(id, "Failed to save file: \(error.localizedDescription)")
+            }
         }
     }
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let taskIdentifier = task.taskIdentifier
         Task { @MainActor in
             if let error = error,
-               let idx = items.firstIndex(where: { $0.taskIdentifier == task.taskIdentifier }) {
-                updateError(items[idx].id, error.localizedDescription)
+               let idx = items.firstIndex(where: { $0.taskIdentifier == taskIdentifier }) {
+                let nsError = error as NSError
+                // Don't mark as error if it was manually cancelled
+                if nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled {
+                    updateError(items[idx].id, error.localizedDescription)
+                }
             }
+        }
+    }
+
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.async {
+            self.backgroundCompletionHandler?()
+            self.backgroundCompletionHandler = nil
         }
     }
 }
