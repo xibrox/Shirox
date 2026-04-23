@@ -22,11 +22,13 @@ final class PlayerPresenter: ObservableObject {
     @Published var orientationLock = UIInterfaceOrientationMask.portrait
     #endif
 
+    #if os(iOS)
     private weak var playerVC: UIViewController?
     private var sourceView: UIView?
     /// Last interface orientation observed during a player session via device-orientation notifications.
     private var trackedPlayerOrientation: UIInterfaceOrientation = .portrait
     private var orientationObserver: NSObjectProtocol?
+    #endif
 
     private init() {}
 

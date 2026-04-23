@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 
 @MainActor
 final class DetailViewModel: ObservableObject {
@@ -198,7 +197,7 @@ final class DetailViewModel: ObservableObject {
         pendingEpisodeTitle = nil
     }
 
-    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil) {
+    func selectStream(_ stream: StreamResult) {
         selectedStream = stream
 
         // For module shows, availableEpisodes == totalEpisodes (the fetched episode list).
@@ -245,6 +244,8 @@ final class DetailViewModel: ObservableObject {
             }
         }()
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, from: sourceView)
+        #if os(iOS)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader)
+        #endif
     }
 }

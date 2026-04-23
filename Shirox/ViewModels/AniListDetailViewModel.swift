@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 
 @MainActor
 final class AniListDetailViewModel: ObservableObject {
@@ -89,7 +88,7 @@ final class AniListDetailViewModel: ObservableObject {
         showStreamPicker = false
     }
 
-    func selectStream(_ stream: StreamResult, from sourceView: UIView? = nil, searchResultHref: String? = nil, availableEpisodes: Int? = nil) {
+    func selectStream(_ stream: StreamResult, searchResultHref: String? = nil, availableEpisodes: Int? = nil) {
         selectedStream = stream
         guard let media else { return }
         let currentEpNum = selectedEpisodeNumber ?? 1
@@ -164,7 +163,9 @@ final class AniListDetailViewModel: ObservableObject {
             }
         }()
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext, from: sourceView)
+        #if os(iOS)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext)
+        #endif
         selectedEpisodeNumber = nil
     }
 

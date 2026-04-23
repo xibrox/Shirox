@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+#if os(iOS)
 import UIKit
 
 struct ViewTracker: UIViewRepresentable {
@@ -30,6 +31,7 @@ extension View {
         self.background(ViewTracker(onView: onView))
     }
 }
+#endif
 
 // MARK: - Shared Modal Button Styles
 
