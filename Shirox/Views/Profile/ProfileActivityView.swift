@@ -71,7 +71,11 @@ struct ProfileActivityView: View {
                 Button { showCompose = true } label: {
                     Image(systemName: "square.and.pencil")
                         .font(.title3.weight(.semibold))
+                        #if os(iOS)
                         .foregroundStyle(Color(UIColor.systemBackground))
+                        #else
+                        .foregroundStyle(Color(NSColor.windowBackgroundColor))
+                        #endif
                         .frame(width: 52, height: 52)
                         .background(Circle().fill(Color.primary))
                         .shadow(color: .black.opacity(0.25), radius: 8, y: 3)

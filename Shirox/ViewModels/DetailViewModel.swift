@@ -174,6 +174,7 @@ final class DetailViewModel: ObservableObject {
     }
 
     func downloadWithSelectedStream(_ stream: StreamResult) {
+        #if os(iOS)
         guard let episode = pendingEpisode, let detail = detail else { return }
 
         let ctx = DownloadContext(
@@ -195,6 +196,7 @@ final class DetailViewModel: ObservableObject {
         pendingStreams = []
         pendingEpisode = nil
         pendingEpisodeTitle = nil
+        #endif
     }
 
     func selectStream(_ stream: StreamResult) {

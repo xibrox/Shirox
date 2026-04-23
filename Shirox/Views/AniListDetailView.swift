@@ -64,7 +64,9 @@ struct AniListDetailView: View {
             }
         }
         .onAppear {
+            #if os(iOS)
             PlayerPresenter.shared.resetToAppOrientation()
+            #endif
             isReversed = EpisodeSortManager.shared.isReversed(for: "anilist_\(mediaId)")
         }
         .onChange(of: isReversed) { _, newValue in
@@ -110,8 +112,11 @@ struct AniListDetailView: View {
             if let resumeNum = resumeEpisodeNumber {
                 selectedRangeIndex = (resumeNum - 1) / 100
             } else if let media = vm.media {
+                let searchTitle = media.title.searchTitle
+                let displayTitle = media.title.displayTitle
+                let mediaId = media.id
                 let currentEp = continueWatching.items.first(where: { CW in
-                    CW.aniListID == media.id || CW.mediaTitle == media.title.searchTitle || CW.mediaTitle == media.title.displayTitle
+                    CW.aniListID == mediaId || CW.mediaTitle == searchTitle || CW.mediaTitle == displayTitle
                 })?.episodeNumber ?? 1
                 selectedRangeIndex = (currentEp - 1) / 100
             }
@@ -185,7 +190,7 @@ struct AniListDetailView: View {
                 episodeNumber: vm.selectedEpisodeNumber ?? 0,
                 streams: vm.pendingStreams,
                 onDismiss: { vm.showFinalStreamPicker = false },
-                onSelect: { stream, _ in
+                onSelect: { stream in
                     vm.pendingFinalStream = stream
                     vm.showFinalStreamPicker = false
                 }
@@ -229,38 +234,40 @@ struct AniListDetailView: View {
         .sheet(isPresented: $showLibraryEdit) {
             if let media = vm.media {
                 LibraryEntryEditSheet(entry: existingEntry, media: media) { status, progress, score in
-                    if var updated = existingEntry {
-                        updated.status = status
-                        updated.progress = progress
-                        updated.score = score
-                        existingEntry = updated
-                    }
-
-                    if status == .completed {
-                        ContinueWatchingManager.shared.resetProgress(
-                            aniListID: media.id, moduleId: nil, mediaTitle: media.title.searchTitle
-                        )
-                    } else if progress > 0 {
-                        ContinueWatchingManager.shared.markWatched(
-                            upThrough: progress,
-                            aniListID: media.id,
-                            moduleId: nil,
-                            mediaTitle: media.title.displayTitle,
-                            imageUrl: media.coverImage.best,
-                            totalEpisodes: media.episodes,
-                            availableEpisodes: nil,
-                            detailHref: nil
-                        )
-                    }
-
-                    Task {
-                        try? await AniListLibraryService.shared.updateEntry(
-                            mediaId: media.id, status: status, progress: progress, score: score
-                        )
-                    }
+                    handleLibraryEdit(media: media, status: status, progress: progress, score: score)
                 }
                 .presentationDetents([.medium, .large])
             }
+        }
+    }
+
+    private func handleLibraryEdit(media: AniListMedia, status: MediaListStatus, progress: Int, score: Double) {
+        if var updated = existingEntry {
+            updated.status = status
+            updated.progress = progress
+            updated.score = score
+            existingEntry = updated
+        }
+        if status == .completed {
+            ContinueWatchingManager.shared.resetProgress(
+                aniListID: media.id, moduleId: nil, mediaTitle: media.title.searchTitle
+            )
+        } else if progress > 0 {
+            ContinueWatchingManager.shared.markWatched(
+                upThrough: progress,
+                aniListID: media.id,
+                moduleId: nil,
+                mediaTitle: media.title.displayTitle,
+                imageUrl: media.coverImage.best,
+                totalEpisodes: media.episodes,
+                availableEpisodes: nil,
+                detailHref: nil
+            )
+        }
+        Task {
+            try? await AniListLibraryService.shared.updateEntry(
+                mediaId: media.id, status: status, progress: progress, score: score
+            )
         }
     }
 
@@ -833,6 +840,8 @@ struct AniListDetailView: View {
                                 mediaTitle: media.title.searchTitle,
                                 coverImage: media.coverImage.best,
                                 totalEpisodes: totalEpisodes,
+                                aniListProgress: existingEntry?.progress,
+                                aniListStatus: existingEntry?.status,
                                 onTap: { vm.watchEpisode(ep) }
                             )
                             #endif
@@ -1058,7 +1067,7 @@ struct AniListStreamResultSheet: View {
     let episodeNumber: Int
     let streams: [StreamResult]
     let onDismiss: () -> Void
-    let onSelect: (StreamResult, UIView?) -> Void
+    let onSelect: (StreamResult) -> Void
 
     var body: some View {
         NavigationStack {
@@ -1072,7 +1081,7 @@ struct AniListStreamResultSheet: View {
                 } else {
                     List(streams) { stream in
                         Button {
-                            onSelect(stream, nil)
+                            onSelect(stream)
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "play.circle.fill")
@@ -1096,7 +1105,9 @@ struct AniListStreamResultSheet: View {
                 }
             }
             .navigationTitle("Episode \(episodeNumber)")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { onDismiss() }

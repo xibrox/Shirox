@@ -129,7 +129,9 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                #if os(iOS)
                 .environment(\.editMode, .constant(.active))
+                #endif
 
                 #if os(iOS)
                 Section("Storage & Cache") {
@@ -225,7 +227,9 @@ struct SettingsView: View {
             .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
                 Button("Reset", role: .destructive) {
                     CacheManager.shared.clearContinueWatching()
+                    #if os(iOS)
                     updateCacheSizes()
+                    #endif
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -234,15 +238,17 @@ struct SettingsView: View {
             .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
                 Button("Reset", role: .destructive) {
                     CacheManager.shared.clearWatchHistory()
+                    #if os(iOS)
                     updateCacheSizes()
+                    #endif
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will clear all 'Watched' checkmarks from episode lists.")
             }
             .onAppear {
-                PlayerPresenter.shared.resetToAppOrientation()
                 #if os(iOS)
+                PlayerPresenter.shared.resetToAppOrientation()
                 updateCacheSizes()
                 #endif
             }
@@ -375,7 +381,7 @@ struct SettingsViewLogger: View {
         #endif
         .onAppear { loadEntries() }
         .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .automatic) {
                 Menu {
                     Button {
                         let text = entries.map { "[\($0.type)] \($0.message)" }.joined(separator: "\n")

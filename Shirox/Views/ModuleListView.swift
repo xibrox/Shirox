@@ -65,13 +65,23 @@ struct ModuleListView: View {
                         .textCase(.uppercase)
                 }
             }
+            #if os(iOS)
             .listStyle(.insetGrouped)
+            #else
+            .listStyle(.inset)
+            #endif
             .scrollContentBackground(.hidden)
+            #if os(iOS)
             .background(Color(.systemBackground))
+            #else
+            .background(Color(NSColor.windowBackgroundColor))
+            #endif
             .navigationTitle("Modules")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button {
                         Task {
                             isRefreshing = true
@@ -88,12 +98,18 @@ struct ModuleListView: View {
                     }
                     .disabled(moduleManager.modules.isEmpty || isRefreshing)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                #if os(iOS)
+                ToolbarItem(placement: .automatic) {
                     EditButton()
                 }
+                #endif
             }
         }
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #else
+        .background(Color(.windowBackgroundColor))
+        #endif
         .onTapGesture {
             isTextFieldFocused = false
         }
@@ -120,8 +136,10 @@ struct ModuleListView: View {
                 TextField("Module JSON URL", text: $moduleURL)
                     .textContentType(.URL)
                     .autocorrectionDisabled()
+                    #if os(iOS)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
+                    #endif
                     .focused($isTextFieldFocused)
                     .disabled(isAddingModule)
                     .onSubmit {
@@ -164,7 +182,11 @@ struct ModuleListView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        #if os(iOS)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        #else
+        .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        #endif
         .padding(.horizontal, 16)
         .padding(.vertical, 4)
     }

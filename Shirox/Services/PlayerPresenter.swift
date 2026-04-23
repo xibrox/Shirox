@@ -273,6 +273,7 @@ final class CastManager: NSObject, ObservableObject {
     }
 
     private func startVolumeObservation() {
+        #if os(iOS)
         guard volumeObserver == nil else { return }
         let audioSession = AVAudioSession.sharedInstance()
         volumeObserver = audioSession.observe(\.outputVolume, options: [.new]) { [weak self] session, _ in
@@ -283,6 +284,7 @@ final class CastManager: NSObject, ObservableObject {
                 #endif
             }
         }
+        #endif
     }
 
     private func stopVolumeObservation() {

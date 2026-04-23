@@ -40,9 +40,11 @@ struct ProfileView: View {
                     }
                 }
             }
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     if userId == AniListAuthManager.shared.userId {
                         Button(role: .destructive) { showLogoutConfirm = true } label: {
                             Image(systemName: "rectangle.portrait.and.arrow.right")
@@ -50,7 +52,7 @@ struct ProfileView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -79,19 +81,25 @@ struct ProfileView: View {
                 if let banner = vm.user?.bannerImage {
                     CachedAsyncImage(urlString: banner)
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: UIScreen.main.bounds.width, height: 140)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 140)
                         .clipped()
                 } else {
                     Color.accentColor.opacity(0.1)
-                        .frame(width: UIScreen.main.bounds.width, height: 120)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 120)
                 }
-                
+
                 // Avatar
                 if let url = vm.user?.avatar?.large ?? avatarURL {
                     CachedAsyncImage(urlString: url)
                         .frame(width: 80, height: 80)
                         .clipShape(Circle())
+                        #if os(iOS)
                         .overlay(Circle().strokeBorder(Color(UIColor.systemBackground), lineWidth: 3))
+                        #else
+                        .overlay(Circle().strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: 3))
+                        #endif
                         .shadow(radius: 2)
                         .offset(x: 20, y: 30)
                 }
@@ -131,7 +139,7 @@ struct ProfileView: View {
                 }
             }
             .padding(.top, 4)
-            .frame(width: UIScreen.main.bounds.width)
+            .frame(maxWidth: .infinity)
         }
     }
 

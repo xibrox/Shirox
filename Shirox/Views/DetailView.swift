@@ -248,11 +248,13 @@ struct DetailView: View {
         }) {
             StreamPickerView(vm: vm)
         }
+        #if os(iOS)
         .sheet(isPresented: $vm.showDownloadStreamPicker) {
             DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
                 vm.downloadWithSelectedStream(stream)
             }
         }
+        #endif
         .sheet(isPresented: $showLibraryEdit) {
             if let aid = vm.aniListID, let detail = vm.detail {
                 let tempMedia = AniListMedia(

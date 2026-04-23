@@ -20,7 +20,9 @@ struct ComposeStatusView: View {
                 Spacer()
             }
             .navigationTitle("New Status")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

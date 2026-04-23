@@ -56,7 +56,9 @@ struct LibraryEntryEditSheet: View {
                 }
             }
             .navigationTitle(entry == nil ? "Add to Library" : "Edit Entry")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

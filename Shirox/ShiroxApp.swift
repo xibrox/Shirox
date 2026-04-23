@@ -98,7 +98,7 @@ struct ShiroxApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if #available(iOS 18, *) {
+            if #available(iOS 18, macOS 15, *) {
                 TabView {
                     Tab("Home", systemImage: "house.fill") {
                         HomeView()

@@ -366,16 +366,26 @@ struct ContinueWatchingCardDisplay: View {
 /// per URL, not re-firing on every SwiftUI update cycle.
 private struct CardThumbnail: View {
     let urlString: String
-    @State private var uiImage: UIImage?
-
+    #if os(iOS)
+    @State private var platformImage: UIImage?
     private static let cache = NSCache<NSString, UIImage>()
+    #else
+    @State private var platformImage: NSImage?
+    private static let cache = NSCache<NSString, NSImage>()
+    #endif
 
     var body: some View {
         Group {
-            if let uiImage {
-                Image(uiImage: uiImage)
+            if let platformImage {
+                #if os(iOS)
+                Image(uiImage: platformImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                #else
+                Image(nsImage: platformImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                #endif
             } else {
                 Color.gray.opacity(0.3)
             }
@@ -383,13 +393,17 @@ private struct CardThumbnail: View {
         .task(id: urlString) {
             guard !urlString.isEmpty, let url = URL(string: urlString) else { return }
             if let cached = Self.cache.object(forKey: urlString as NSString) {
-                uiImage = cached
+                platformImage = cached
                 return
             }
-            guard let (data, _) = try? await URLSession.shared.data(from: url),
-                  let loaded = UIImage(data: data) else { return }
+            guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
+            #if os(iOS)
+            guard let loaded = UIImage(data: data) else { return }
+            #else
+            guard let loaded = NSImage(data: data) else { return }
+            #endif
             Self.cache.setObject(loaded, forKey: urlString as NSString)
-            uiImage = loaded
+            platformImage = loaded
         }
     }
 }

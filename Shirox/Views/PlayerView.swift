@@ -95,10 +95,10 @@ struct PlayerView: View {
         #endif
     }
 
+    @State private var isSpeedBoosted = false
     // PiP (iOS only)
     #if os(iOS)
     @State private var pipTrigger = 0
-    @State private var isSpeedBoosted = false
     #endif
 
     init(stream: StreamResult, streams: [StreamResult] = [], customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil) {
@@ -667,7 +667,9 @@ struct PlayerView: View {
     private func exitCastMode() {
         let resumeAt = castManager.currentPosition
         castManager.disconnect()
+        #if os(iOS)
         CastProxyServer.shared.stop()
+        #endif
         guard let player else { return }
         player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600))
         player.rate = Float(playbackSpeed)
@@ -819,7 +821,9 @@ struct PlayerView: View {
         let p = AVPlayer(playerItem: item)
         p.automaticallyWaitsToMinimizeStalling = true
         p.volume = volume
+        #if os(iOS)
         p.usesExternalPlaybackWhileExternalScreenIsActive = true
+        #endif
         p.rate = Float(playbackSpeed)
         p.play() // Ensure player starts
         isPlaying = true

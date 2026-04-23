@@ -333,15 +333,15 @@ struct LibraryView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .automatic) {
                 sortMenu
             }
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Button { showSettings = true } label: {
                     Image(systemName: "slider.horizontal.3")
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 if auth.isLoggedIn {
                     HStack(spacing: 4) {
                         Button {
@@ -375,7 +375,7 @@ struct LibraryView: View {
             if loggedIn { Task { await vm.load() } }
         }
         .navigationTitle("Library")
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search library")
+        .searchable(text: $searchText, prompt: "Search library")
         .sheet(item: $selectedEntry) { entry in
             LibraryEntryEditSheet(entry: entry, media: entry.media) { status, progress, score in
                 if status == .completed {
@@ -544,13 +544,17 @@ private struct LibrarySettingsView: View {
                 }
             }
             .navigationTitle("Library Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
+            #if os(iOS)
             .environment(\.editMode, .constant(.active))
+            #endif
         }
     }
 

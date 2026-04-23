@@ -28,13 +28,12 @@ struct SearchView: View {
             mainContent
                 .navigationTitle("Search")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         moduleButton
                     }
                 }
                 .searchable(
                     text: $vm.query,
-                    placement: .navigationBarDrawer(displayMode: .always),
                     prompt: "Search anime…"
                 )
                 .onSubmit(of: .search) {
@@ -53,7 +52,9 @@ struct SearchView: View {
                     vm.search(usingModule: usingModule)
                 }
         }
+        #if os(iOS)
         .toolbarRole(.navigationStack)
+        #endif
         .sheet(isPresented: $showModuleList) {
             ModuleListView()
                 .environmentObject(moduleManager)
@@ -67,7 +68,9 @@ struct SearchView: View {
             }
         )
         .onAppear {
+            #if os(iOS)
             PlayerPresenter.shared.resetToAppOrientation()
+            #endif
         }
     }
 
@@ -175,7 +178,11 @@ struct SearchView: View {
                 }
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.inset)
+        #endif
     }
 
     // MARK: - Empty State

@@ -77,9 +77,11 @@ struct ActivityDetailView: View {
                 .padding(.bottom, 12)
         }
         .navigationTitle("Activity")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }
             }
         }
@@ -208,7 +210,11 @@ struct ActivityDetailView: View {
                     CachedAsyncImage(urlString: user.avatar?.large ?? "")
                         .frame(width: 24, height: 24)
                         .clipShape(Circle())
+                        #if os(iOS)
                         .overlay(Circle().stroke(Color(UIColor.systemBackground), lineWidth: 1.5))
+                        #else
+                        .overlay(Circle().stroke(Color(NSColor.windowBackgroundColor), lineWidth: 1.5))
+                        #endif
                 }
                 
                 if likeCount > 5 {

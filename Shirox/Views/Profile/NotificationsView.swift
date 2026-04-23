@@ -23,7 +23,9 @@ private struct ActivityFetchView: View {
             }
         }
         .navigationTitle("Activity")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task { await load() }
     }
 
@@ -54,9 +56,11 @@ struct NotificationsView: View {
                 content
             }
             .navigationTitle("Notifications")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }

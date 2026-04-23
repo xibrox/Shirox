@@ -170,6 +170,7 @@ final class AniListDetailViewModel: ObservableObject {
     }
 
     func downloadWithSelectedStream(_ stream: StreamResult) {
+        #if os(iOS)
         guard let (episodeLink, epNum) = pendingDownloadEpisode,
               let module = pendingDownloadModule,
               let media = pendingDownloadMedia else { return }
@@ -194,5 +195,6 @@ final class AniListDetailViewModel: ObservableObject {
         pendingDownloadEpisode = nil
         pendingDownloadModule = nil
         pendingDownloadMedia = nil
+        #endif
     }
 }

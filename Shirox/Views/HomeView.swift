@@ -59,7 +59,9 @@ struct HomeView: View {
         }
         .task { await vm.load() }
         .onAppear {
+            #if os(iOS)
             PlayerPresenter.shared.resetToAppOrientation()
+            #endif
         }
     }
 }
@@ -108,7 +110,9 @@ private struct FeaturedCarousel: View {
                         }
                     }
                 }
+                #if os(iOS)
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                #endif
                 .frame(maxWidth: .infinity)
                 .frame(height: tabHeight)
                 .offset(y: tabOffset)
@@ -231,7 +235,9 @@ private struct FeaturedCarousel: View {
                         }
                     }
                 }
+                #if os(iOS)
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                #endif
                 .frame(width: availableWidth, height: cardHeight)
                 .position(x: availableWidth / 2, y: cardHeight / 2)
             }
