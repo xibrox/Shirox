@@ -173,14 +173,17 @@ final class PlayerPresenter: ObservableObject {
     }
 
     func resetToAppOrientation(shouldRotate: Bool = false) {
+        #if !targetEnvironment(macCatalyst)
         updateOrientationLock(.portrait, shouldRotate: shouldRotate)
+        #endif
     }
 
     func updateOrientationLock(_ orientation: UIInterfaceOrientationMask, shouldRotate: Bool = false) {
+        #if !targetEnvironment(macCatalyst)
         guard UIDevice.current.userInterfaceIdiom == .phone else { return }
-        
+
         self.orientationLock = orientation
-        
+
         if shouldRotate {
             let preferredRotation: UIInterfaceOrientationMask
             if orientation == .landscape {
@@ -192,13 +195,16 @@ final class PlayerPresenter: ObservableObject {
             }
             requestRotation(to: preferredRotation)
         }
-        
+
         refreshSupportedOrientations()
+        #endif
     }
 
     func requestRotation(to orientation: UIInterfaceOrientationMask) {
+        #if !targetEnvironment(macCatalyst)
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation)) { _ in }
+        #endif
     }
 
     func refreshSupportedOrientations() {

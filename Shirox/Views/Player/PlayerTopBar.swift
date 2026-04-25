@@ -73,8 +73,10 @@ struct PlayerTopBar: View {
         let frameSize: CGFloat = isPad ? 44 : 32
         
         #if os(iOS)
+        #if !targetEnvironment(macCatalyst)
         CastButton()
             .frame(width: frameSize, height: frameSize)
+        #endif
         AirPlayButton()
             .frame(width: frameSize, height: frameSize)
         if onPiP != nil {

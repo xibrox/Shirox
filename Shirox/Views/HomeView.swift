@@ -72,6 +72,7 @@ private struct FeaturedCarousel: View {
     let items: [AniListMedia]
     @State private var selectedTab = 1000
     @State private var overscrollY: CGFloat = 0
+    @State private var containerWidth: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var realItems: [AniListMedia] { items.prefix(8).map { $0 } }
@@ -85,8 +86,9 @@ private struct FeaturedCarousel: View {
     var body: some View {
         #if os(iOS)
         let isIPad = sizeClass == .regular
+        let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
         let imageHeight: CGFloat = isIPad
-            ? UIScreen.main.bounds.width * (9.0 / 16.0)
+            ? effectiveWidth * (9.0 / 16.0)
             : UIScreen.main.bounds.height - 140
 
         let displayItems = realItems
@@ -119,6 +121,13 @@ private struct FeaturedCarousel: View {
                 .background(Color.clear.preference(key: CarouselOverscrollKey.self, value: scrollY))
             }
             .frame(maxWidth: .infinity)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { containerWidth = geo.size.width }
+                        .onChange(of: geo.size.width) { _, w in containerWidth = w }
+                }
+            )
             .frame(height: imageHeight + overscrollY)
             .onPreferenceChange(CarouselOverscrollKey.self) { y in overscrollY = max(0, y) }
             .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
@@ -298,7 +307,7 @@ private struct FeaturedCard: View {
                         ZStack {
                             GeometryReader { geo in
                                 let minX = geo.frame(in: .global).minX
-                                let screenW = UIScreen.main.bounds.width
+                                let screenW = geo.size.width > 0 ? geo.size.width : 1
                                 let extra: CGFloat = 80
                                 let px = -(extra / 2) - minX * (extra / (2 * screenW))
 

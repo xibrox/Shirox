@@ -17,7 +17,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        #if canImport(GoogleCast)
+        #if !targetEnvironment(macCatalyst) && canImport(GoogleCast)
         let bgTask = application.beginBackgroundTask { }
         Task { @MainActor in
             CastManager.shared.stopCasting()
@@ -35,7 +35,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        #if os(iOS)
+        #if targetEnvironment(macCatalyst)
+        return .all
+        #elseif os(iOS)
         if UIDevice.current.userInterfaceIdiom == .pad {
             return .all
         }
@@ -85,19 +87,44 @@ struct ShiroxApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
     @StateObject private var moduleManager = ModuleManager.shared
-    
+
     init() {
         URLCache.shared = URLCache(
             memoryCapacity: 20 * 1024 * 1024,
             diskCapacity: 150 * 1024 * 1024,
             diskPath: nil
         )
-        // Initialize Chromecast
+        #if !targetEnvironment(macCatalyst)
         _ = CastManager.shared
+        #endif
     }
-    
+
     var body: some Scene {
         WindowGroup {
+            RootTabView()
+                .environmentObject(moduleManager)
+        }
+        #if targetEnvironment(macCatalyst)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings") {
+                    NotificationCenter.default.post(name: .openSettingsTab, object: nil)
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
+        #endif
+    }
+}
+
+// MARK: - Root Tab View
+
+private struct RootTabView: View {
+    @EnvironmentObject private var moduleManager: ModuleManager
+    @State private var selectedTab = 0
+
+    var body: some View {
+        Group {
             if #available(iOS 18, macOS 15, *) {
                 TabView {
                     Tab("Home", systemImage: "house.fill") {
@@ -118,46 +145,53 @@ struct ShiroxApp: App {
                         SearchView()
                     }
                 }
+                .tabViewStyle(.sidebarAdaptable)
                 .tint(.primary)
-                .environmentObject(moduleManager)
-                .onOpenURL { url in
-                    guard url.scheme == "shirox" else { return }
-                    AniListAuthManager.shared.handleCallback(url: url)
-                }
-                .task {
-                    await moduleManager.restoreActiveModule()
-                    await moduleManager.checkForUpdates()
-                    await AniListAuthManager.shared.fetchViewer()
-                    await ContinueWatchingManager.shared.syncWithAniList()
-                }
             } else {
-                TabView {
+                TabView(selection: $selectedTab) {
                     HomeView()
                         .tabItem { Label("Home", systemImage: "house.fill") }
+                        .tag(0)
                     LibraryView()
                         .tabItem { Label("Library", systemImage: "books.vertical.fill") }
+                        .tag(1)
                     #if os(iOS)
                     DownloadsView()
                         .tabItem { Label("Downloads", systemImage: "arrow.down.circle.fill") }
+                        .tag(2)
                     #endif
                     SettingsView()
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                        .tag(3)
                     SearchView()
                         .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                        .tag(4)
                 }
                 .tint(.primary)
-                .environmentObject(moduleManager)
-                .onOpenURL { url in
-                    guard url.scheme == "shirox" else { return }
-                    AniListAuthManager.shared.handleCallback(url: url)
-                }
-                .task {
-                    await moduleManager.restoreActiveModule()
-                    await moduleManager.checkForUpdates()
-                    await AniListAuthManager.shared.fetchViewer()
-                    await ContinueWatchingManager.shared.syncWithAniList()
-                }
             }
         }
+        .onOpenURL { url in
+            guard url.scheme == "shirox" else { return }
+            AniListAuthManager.shared.handleCallback(url: url)
+        }
+        .task {
+            await moduleManager.restoreActiveModule()
+            await moduleManager.checkForUpdates()
+            await AniListAuthManager.shared.fetchViewer()
+            await ContinueWatchingManager.shared.syncWithAniList()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettingsTab)) { _ in
+            selectedTab = 3
+        }
+        #if targetEnvironment(macCatalyst)
+        .onAppear {
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+            scene.sizeRestrictions?.minimumSize = CGSize(width: 1024, height: 700)
+        }
+        #endif
     }
+}
+
+extension Notification.Name {
+    static let openSettingsTab = Notification.Name("OpenSettingsTab")
 }
