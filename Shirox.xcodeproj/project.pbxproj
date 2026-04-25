@@ -700,6 +700,7 @@
 				EE000001000000000000AA02 /* EpisodeSortManager.swift in Sources */,
 				AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */,
 				142A89C32F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
+				AA000001000000000000AA71 /* LibraryView.swift in Sources */,
 				B99023D82F7EC2073FD1C7F7 /* NetworkFetch.swift in Sources */,
 				960B593459A5612AC1C6F74F /* PlayerView.swift in Sources */,
 				7E512B73EA8CD52B6DFA09E5 /* SearchItem.swift in Sources */,
@@ -790,6 +791,7 @@
 				EE000001000000000000AA01 /* EpisodeSortManager.swift in Sources */,
 				AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */,
 				142A89C22F58E5FF008652D9 /* PlayerPresenter.swift in Sources */,
+				AA000001000000000000AA70 /* LibraryView.swift in Sources */,
 				F9E24C2C4FF74E1EAC5BFD9B /* NetworkFetch.swift in Sources */,
 				3FC9AA112431E36A46BF336D /* PlayerView.swift in Sources */,
 				CC14EF9C84C3E8BE5456C77D /* SearchItem.swift in Sources */,
@@ -935,20 +937,22 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 51;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.53;
+				MARKETING_VERSION = 0.0.54;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				s = s;
 			};
 			name = Debug;
 		};
@@ -958,14 +962,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 51;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.53;
+				MARKETING_VERSION = 0.0.54;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -983,20 +987,22 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 51;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.53;
+				MARKETING_VERSION = 0.0.54;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				s = s;
 			};
 			name = Release;
 		};
@@ -1067,14 +1073,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 50;
+				CURRENT_PROJECT_VERSION = 51;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.53;
+				MARKETING_VERSION = 0.0.54;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

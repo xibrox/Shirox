@@ -26,6 +26,7 @@ struct SearchView: View {
     var body: some View {
         NavigationStack {
             mainContent
+                .background(SearchActivationObserver { vm.clearResults() })
                 .navigationTitle("Search")
                 .toolbar {
                     ToolbarItem(placement: .automatic) {
@@ -43,8 +44,8 @@ struct SearchView: View {
                 .onChange(of: vm.query) { _, new in
                     if new.isEmpty {
                         vm.clearResults()
-                    } else {
-                        vm.hasSearched = false
+                    } else if vm.hasResults || vm.hasSearched {
+                        vm.clearResults()
                     }
                 }
                 .onChange(of: moduleManager.activeModule?.id) { _, _ in
@@ -60,6 +61,7 @@ struct SearchView: View {
                 .environmentObject(moduleManager)
                 .tint(.primary)
         }
+        #if os(iOS)
         .background(
             GeometryReader { geo in
                 Color.clear
@@ -67,6 +69,7 @@ struct SearchView: View {
                     .onChange(of: geo.size) { _, size in isLandscape = size.width > size.height }
             }
         )
+        #endif
         .onAppear {
             #if os(iOS)
             PlayerPresenter.shared.resetToAppOrientation()
@@ -214,37 +217,13 @@ struct SearchView: View {
                 // Icon container (rounded)
                 Group {
                     if usingModule {
-                        // Active module icon (or fallback puzzle)
-                        if let iconUrlString = moduleManager.activeModule?.iconUrl,
-                           !iconUrlString.isEmpty,
-                           let url = URL(string: iconUrlString) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                default:
-                                    fallbackIcon
-                                }
-                            }
+                        if let iconUrlString = moduleManager.activeModule?.iconUrl, !iconUrlString.isEmpty {
+                            CachedAsyncImage(urlString: iconUrlString)
                         } else {
                             fallbackIcon
                         }
                     } else {
-                        // AniList icon (built‑in)
-                        AsyncImage(url: URL(string: "https://anilist.co/img/icons/apple-touch-icon.png")) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            default:
-                                Image(systemName: "antenna.radiowaves.left.and.right")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(.primary)
-                            }
-                        }
+                        CachedAsyncImage(urlString: "https://anilist.co/img/icons/apple-touch-icon.png")
                     }
                 }
                 .frame(width: 20, height: 20)
@@ -297,6 +276,20 @@ private final class SearchHistoryManager: ObservableObject {
     func clear() {
         queries = []
         UserDefaults.standard.removeObject(forKey: key)
+    }
+}
+
+// MARK: - Search Activation Observer
+private struct SearchActivationObserver: View {
+    @Environment(\.isSearching) private var isSearching
+    let onActivate: () -> Void
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: isSearching) { _, active in
+                if active { onActivate() }
+            }
     }
 }
 

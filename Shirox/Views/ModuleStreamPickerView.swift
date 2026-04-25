@@ -43,7 +43,14 @@ struct ModuleStreamPickerView: View {
             }
             .tint(.primary)
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 }
 
@@ -521,7 +528,14 @@ private struct SearchResultsPickerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 }
 
@@ -582,6 +596,13 @@ private struct ModuleStreamSelectionView: View {
                 }
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 }

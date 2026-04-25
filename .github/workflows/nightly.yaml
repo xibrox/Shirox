@@ -80,3 +80,31 @@ jobs:
        run: |
          gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
          gh release upload beta build/Shirox.dmg --clobber
+
+ build-catalyst:
+   name: Build Mac Catalyst DMG
+   runs-on: macos-26
+   permissions:
+     contents: write
+   steps:
+     - name: Checkout repository
+       uses: actions/checkout@v6
+
+     - name: Make build script executable
+       run: chmod +x ./buildcatalyst.sh
+
+     - name: Build Mac Catalyst DMG
+       run: ./buildcatalyst.sh
+
+     - name: Upload Catalyst DMG
+       uses: actions/upload-artifact@v7
+       with:
+         name: Shirox-Nightly-Catalyst-DMG
+         path: build/Shirox-Catalyst.dmg
+
+     - name: Upload Catalyst DMG to beta release
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
+         gh release upload beta build/Shirox-Catalyst.dmg --clobber

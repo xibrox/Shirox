@@ -133,7 +133,7 @@ struct PlayerView: View {
                     .ignoresSafeArea()
                     .overlay { videoLoadingOverlay }
                 #else
-                VideoPlayer(player: player).ignoresSafeArea()
+                MacVideoPlayerView(player: player).ignoresSafeArea()
                 #endif
             } else {
                 loadingViewPlaceholder
@@ -253,17 +253,23 @@ struct PlayerView: View {
                 get: { Float(playbackSpeed) },
                 set: { playbackSpeed = Double($0) }
             ))
+            #if os(iOS)
             .presentationDetents([.height(320)])
+            #endif
         }
         .sheet(isPresented: $showSubtitleSettings) {
             PlayerSubtitleSettingsView(settings: subtitleSettings)
+                #if os(iOS)
                 .presentationDetents([.medium, .large])
+                #endif
         }
         .sheet(isPresented: $showAudioPicker) {
             let optionCount = audioGroup?.options.count ?? 0
             let sheetHeight = CGFloat(60 + 56 * max(1, optionCount))
             audioPickerSheet
+                #if os(iOS)
                 .presentationDetents([.height(sheetHeight)])
+                #endif
         }
         .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
             nextEpisodeStreams = []
@@ -272,13 +278,47 @@ struct PlayerView: View {
             PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
                 swapStream(selected, episodeNumber: nextEpisodeNumber)
             }
+            #if os(iOS)
             .presentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
+            #endif
         }
         .sheet(isPresented: $showInPlayerStreamPicker) {
             PlayerNextEpisodePicker(streams: availableStreams, title: "Choose Quality") { selected in
                 switchQuality(selected)
             }
+            #if os(iOS)
             .presentationDetents([.height(CGFloat(60 + 56 * max(1, availableStreams.count)))])
+            #endif
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.space) {
+            togglePlayPause()
+            return .handled
+        }
+        .onKeyPress(KeyEquivalent("k")) {
+            togglePlayPause()
+            return .handled
+        }
+        .onKeyPress(.leftArrow) {
+            skip(by: -Double(skipShort))
+            scheduleHide()
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            skip(by: Double(skipShort))
+            scheduleHide()
+            return .handled
+        }
+        .onKeyPress(KeyEquivalent("j")) {
+            skip(by: -Double(skipLong))
+            scheduleHide()
+            return .handled
+        }
+        .onKeyPress(KeyEquivalent("l")) {
+            skip(by: Double(skipLong))
+            scheduleHide()
+            return .handled
         }
     }
 
@@ -1227,6 +1267,68 @@ struct PlayerView: View {
         #endif
     }
 }
+
+// MARK: - Video Layer (macOS)
+
+#if os(macOS)
+import AppKit
+import AVKit
+
+struct MacVideoPlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.player = player
+        view.controlsStyle = .none
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        nsView.player = player
+    }
+}
+
+// MARK: - macOS Player Window Manager
+
+@MainActor
+final class MacPlayerWindowManager {
+    static let shared = MacPlayerWindowManager()
+    private var playerWindow: NSWindow?
+
+    private init() {}
+
+    func open(stream: StreamResult, streams: [StreamResult], context: PlayerContext, onWatchNext: WatchNextLoader?) {
+        playerWindow?.close()
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 960, height: 540),
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.backgroundColor = .black
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.fullScreenPrimary]
+        window.minSize = NSSize(width: 640, height: 360)
+
+        let playerView = PlayerView(
+            stream: stream,
+            streams: streams,
+            customDismiss: { [weak window] in window?.close() },
+            context: context,
+            onWatchNext: onWatchNext
+        )
+
+        window.contentView = NSHostingView(rootView: playerView)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        playerWindow = window
+    }
+}
+#endif
 
 // MARK: - Video Layer (iOS)
 

@@ -72,6 +72,10 @@
         <string>_CC1AD845._googlecast._tcp</string>
     </array>
 
+    <!-- Mac Catalyst minimum macOS version -->
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+
     <!-- Support for Files App -->
     <key>UIFileSharingEnabled</key>
     <true/>

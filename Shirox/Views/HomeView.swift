@@ -84,7 +84,7 @@ private struct FeaturedCarousel: View {
     }
 
     var body: some View {
-        #if os(iOS)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         let isIPad = sizeClass == .regular
         let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
         let imageHeight: CGFloat = isIPad
@@ -222,48 +222,139 @@ private struct FeaturedCarousel: View {
             }
         }
         #else
-        let displayItems = realItems
-        ZStack(alignment: .bottom) {
-            GeometryReader { geometry in
-                let availableWidth = geometry.size.width
-                let cardWidth = max(0, availableWidth - 32)
-                let cardHeight = cardWidth * (9.0 / 16.0)
-
-                TabView(selection: $selectedTab) {
-                    ForEach(0..<2000, id: \.self) { index in
-                        if !displayItems.isEmpty {
-                            let media = displayItems[index % displayItems.count]
-                            NavigationLink {
-                                AniListDetailView(mediaId: media.id, preloadedMedia: media)
-                            } label: {
-                                FeaturedCard(media: media)
-                                    .padding(.horizontal, 16)
-                            }
-                            .buttonStyle(.plain)
-                            .tag(index)
-                        }
-                    }
-                }
-                #if os(iOS)
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                #endif
-                .frame(width: availableWidth, height: cardHeight)
-                .position(x: availableWidth / 2, y: cardHeight / 2)
-            }
-            .frame(height: (NSScreen.main?.frame.width ?? 800) * (9.0 / 16.0))
-
-            PageIndicator(numberOfPages: displayCount, currentPage: currentIndex)
-                .padding(.bottom, 20)
-        }
-        .frame(maxWidth: .infinity)
-        .onAppear {
-            if displayCount > 0 {
-                selectedTab = (1000 / displayCount) * displayCount
-            }
-        }
+        MacFeaturedCarousel(items: realItems)
         #endif
     }
 }
+
+// MARK: - macOS Featured Carousel (lightweight, no TabView with 2000 items)
+
+#if os(macOS) || targetEnvironment(macCatalyst)
+private struct MacFeaturedCarousel: View {
+    let items: [AniListMedia]
+    @State private var currentIndex = 0
+    @State private var timer: Timer?
+
+    private var displayItems: [AniListMedia] { Array(items.prefix(8)) }
+
+    var body: some View {
+        GeometryReader { geo in
+            let cardHeight = geo.size.width * (9.0 / 16.0)
+            ZStack(alignment: .bottom) {
+                if !displayItems.isEmpty {
+                    let media = displayItems[currentIndex]
+                    ZStack(alignment: .bottomLeading) {
+                        // Banner background
+                        Group {
+                            if let bannerUrl = media.bannerImage {
+                                CachedAsyncImage(urlString: bannerUrl)
+                            } else {
+                                LinearGradient(
+                                    colors: [Color.gray.opacity(0.6), Color.gray.opacity(0.3)],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            }
+                        }
+                        .frame(width: geo.size.width, height: cardHeight)
+                        .clipped()
+
+                        // Gradient overlay
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.6), .black.opacity(0.95)],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                        .frame(width: geo.size.width, height: cardHeight)
+
+                        // Cover + text + watch button
+                        HStack(alignment: .bottom, spacing: 12) {
+                            CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                                .frame(width: 80, height: 120)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .shadow(radius: 4)
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(media.title.displayTitle)
+                                    .font(.title2).fontWeight(.bold)
+                                    .foregroundStyle(.white)
+                                    .lineLimit(2)
+
+                                if let desc = media.plainDescription, !desc.isEmpty {
+                                    Text(desc)
+                                        .font(.caption)
+                                        .foregroundStyle(.white.opacity(0.8))
+                                        .lineLimit(2)
+                                }
+
+                                HStack(spacing: 8) {
+                                    if let score = media.averageScore {
+                                        Label("\(score)%", systemImage: "star.fill")
+                                            .font(.caption).fontWeight(.semibold)
+                                            .foregroundStyle(.yellow)
+                                    }
+                                    if let genres = media.genres, !genres.isEmpty {
+                                        ForEach(genres.prefix(2), id: \.self) { genre in
+                                            Text(genre)
+                                                .font(.caption2.weight(.medium))
+                                                .foregroundStyle(.white)
+                                                .padding(.horizontal, 7)
+                                                .padding(.vertical, 3)
+                                                .background(Color.white.opacity(0.15), in: Capsule())
+                                        }
+                                    }
+                                }
+
+                                NavigationLink {
+                                    AniListDetailView(mediaId: media.id, preloadedMedia: media)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "play.fill").font(.footnote.weight(.semibold))
+                                        Text("Watch").fontWeight(.semibold)
+                                    }
+                                    .foregroundStyle(Color(UIColor.systemBackground))
+                                    .frame(width: 110, height: 36)
+                                    .background(Color.primary, in: RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.leading, 16)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 14)
+                    }
+                    .frame(width: geo.size.width, height: cardHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .transition(.opacity)
+                    .id(currentIndex)
+                }
+
+                PageIndicator(numberOfPages: displayItems.count, currentPage: currentIndex)
+                    .padding(.bottom, 6)
+            }
+            .frame(width: geo.size.width, height: cardHeight)
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(16/9, contentMode: .fit)
+        .onAppear { startTimer() }
+        .onDisappear { stopTimer() }
+    }
+
+    private func startTimer() {
+        guard displayItems.count > 1 else { return }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.4)) {
+                currentIndex = (currentIndex + 1) % displayItems.count
+            }
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+#endif
 
 // MARK: - Page Indicator (animated pill style)
 
@@ -290,7 +381,7 @@ private struct FeaturedCard: View {
     var isWide: Bool = false
 
     private var aspectRatio: CGFloat {
-        #if os(iOS)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         return 2.0 / 3.0
         #else
         return 16.0 / 9.0
@@ -299,7 +390,7 @@ private struct FeaturedCard: View {
 
     var body: some View {
         Group {
-            #if os(iOS)
+            #if os(iOS) && !targetEnvironment(macCatalyst)
             if isWide {
                 // iPad: banner background (poster fallback) + poster card + text
                 Color.clear

@@ -236,7 +236,14 @@ struct AniListDetailView: View {
                 LibraryEntryEditSheet(entry: existingEntry, media: media) { status, progress, score in
                     handleLibraryEdit(media: media, status: status, progress: progress, score: score)
                 }
+                #if os(iOS)
                 .presentationDetents([.medium, .large])
+
+                #else
+
+                .frame(minWidth: 480, minHeight: 360)
+
+                #endif
             }
         }
     }
@@ -1307,7 +1314,14 @@ struct AniListMatchingSearchView: View {
                 Button("Cancel") { dismiss() }
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
         #endif
         .onAppear {
             searchText = initialTitle

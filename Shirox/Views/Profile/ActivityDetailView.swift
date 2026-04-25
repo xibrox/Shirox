@@ -95,7 +95,14 @@ struct ActivityDetailView: View {
         .sheet(item: $targetMediaId) { mid in
             AniListDetailView(mediaId: mid)
         }
+        #if os(iOS)
         .presentationDetents([.large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
         .alert("Delete Activity?", isPresented: $confirmDeleteActivity) {
             Button("Delete", role: .destructive) {
                 Task { await performDeleteActivity() }
@@ -119,11 +126,25 @@ struct ActivityDetailView: View {
         }
         .sheet(isPresented: $showActivityLikes) {
             LikesSheetView(id: activity.id, type: .activity)
+                #if os(iOS)
                 .presentationDetents([.medium, .large])
+
+                #else
+
+                .frame(minWidth: 480, minHeight: 360)
+
+                #endif
         }
         .sheet(item: $showLikesForReply) { target in
             LikesSheetView(id: target.id, type: .activityReply)
+                #if os(iOS)
                 .presentationDetents([.medium, .large])
+
+                #else
+
+                .frame(minWidth: 480, minHeight: 360)
+
+                #endif
         }
     }
 

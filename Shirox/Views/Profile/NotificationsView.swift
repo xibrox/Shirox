@@ -72,7 +72,14 @@ struct NotificationsView: View {
             }
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 
     // MARK: - Filter bar

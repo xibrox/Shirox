@@ -396,7 +396,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
 
 @MainActor final class TVDBMappingService: ObservableObject {
     static let shared = TVDBMappingService()
-    private let mappingEndpoint = "https://animap.s0n1c.ca/mappings/"
+    private let mappingEndpoint = "https://api.anira.dev/mappings/"
     private let tvdbEndpoint = "https://api4.thetvdb.com/v4"
     private let apiKey = "4cd66d53-3c21-45a7-9dd2-e4a9c2ed20a8"
     private let cacheKey = "tvdb_mappings_cache_v3"
@@ -414,8 +414,14 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private var cache: [Int: CachedData] = [:]
     private var episodeCache: [Int: [AniMapEpisode]] = [:]
 
-    private init() {
+    private static let session: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 10
+        cfg.timeoutIntervalForResource = 20
+        return URLSession(configuration: cfg)
+    }()
 
+    private init() {
         if let data = UserDefaults.standard.data(forKey: cacheKey),
            let decoded = try? JSONDecoder().decode([Int: CachedData].self, from: data) {
             self.cache = decoded
@@ -437,7 +443,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["apikey": apiKey])
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await Self.session.data(for: request)
         let res = try JSONDecoder().decode(LoginResponse.self, from: data)
         self.token = res.data.token
         self.tokenExpiry = Date().addingTimeInterval(3600 * 24 * 25) // Token usually lasts 1 month
@@ -453,7 +459,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             let urlString = "\(mappingEndpoint)\(aniListId)?mapping_key=anilist"
             guard let url = URL(string: urlString) else { return nil }
             
-            let (data, _) = try await URLSession.shared.data(for: URLRequest(url: url))
+            let (data, _) = try await Self.session.data(for: URLRequest(url: url))
             
             struct Mapping: Decodable {
                 let tvdb_id: Int?
@@ -531,7 +537,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
                 let url = URL(string: "\(tvdbEndpoint)/series/\(tid)/extended")!
                 var req = URLRequest(url: url)
                 req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                guard let (data, _) = try? await URLSession.shared.data(for: req),
+                guard let (data, _) = try? await Self.session.data(for: req),
                       let res = try? JSONDecoder().decode(SeriesExtended.self, from: data) else { return nil }
                 return res.data
             }
@@ -540,7 +546,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
                 let url = URL(string: "\(tvdbEndpoint)/seasons/\(seasonId)/extended")!
                 var req = URLRequest(url: url)
                 req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                guard let (data, _) = try? await URLSession.shared.data(for: req),
+                guard let (data, _) = try? await Self.session.data(for: req),
                       let res = try? JSONDecoder().decode(SeasonExtended.self, from: data) else { return [] }
                 return res.data.artwork ?? []
             }
@@ -596,9 +602,9 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         // 1. Try the AniMap media episodes endpoint first (highly detailed)
         var aniMapResults: [AniMapEpisode] = []
         do {
-            let urlString = "https://animap.s0n1c.ca/media/\(aniListId)/episodes?mapping_key=anilist"
+            let urlString = "https://api.anira.dev/media/\(aniListId)/episodes?mapping_key=anilist"
             guard let url = URL(string: urlString) else { throw URLError(.badURL) }
-            let (data, _) = try await URLSession.shared.data(for: URLRequest(url: url))
+            let (data, _) = try await Self.session.data(for: URLRequest(url: url))
             aniMapResults = try JSONDecoder().decode([AniMapEpisode].self, from: data)
         } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
             return []
@@ -645,7 +651,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         do {
             let urlString = "\(mappingEndpoint)\(aniListId)/episodes?mapping_key=anilist"
             guard let url = URL(string: urlString) else { return [] }
-            let (data, _) = try await URLSession.shared.data(for: URLRequest(url: url))
+            let (data, _) = try await Self.session.data(for: URLRequest(url: url))
             let results = try JSONDecoder().decode([AniMapEpisode].self, from: data)
             episodeCache[aniListId] = results
             return results
@@ -683,7 +689,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             let url = URL(string: "\(tvdbEndpoint)/series/\(tid)/extended")!
             var req = URLRequest(url: url)
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let (data, _) = try await Self.session.data(for: req)
             let res = try JSONDecoder().decode(TVDBExtendedResponse.self, from: data)
             return (res.data.episodes ?? [])
                 .filter { $0.seasonNumber == season }
@@ -710,8 +716,11 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     }
 
     private func saveCache() {
-        if let encoded = try? JSONEncoder().encode(cache) {
-            UserDefaults.standard.set(encoded, forKey: cacheKey)
+        let snapshot = cache
+        let key = cacheKey
+        Task.detached(priority: .background) {
+            guard let encoded = try? JSONEncoder().encode(snapshot) else { return }
+            UserDefaults.standard.set(encoded, forKey: key)
         }
     }
     }

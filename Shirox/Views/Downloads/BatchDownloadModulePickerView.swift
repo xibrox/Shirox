@@ -94,7 +94,14 @@ struct BatchDownloadModulePickerView: View {
                 }
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 }
 
@@ -426,7 +433,14 @@ private struct BatchSearchResultsPickerSheet: View {
             .navigationTitle(module.sourceName)
             .navigationBarTitleDisplayMode(.inline)
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 }
 #endif

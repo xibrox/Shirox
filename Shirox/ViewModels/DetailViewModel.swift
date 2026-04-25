@@ -248,6 +248,8 @@ final class DetailViewModel: ObservableObject {
 
         #if os(iOS)
         PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader)
+        #elseif os(macOS)
+        MacPlayerWindowManager.shared.open(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader)
         #endif
     }
 }

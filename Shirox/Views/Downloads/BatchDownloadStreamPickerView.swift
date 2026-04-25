@@ -67,7 +67,14 @@ struct BatchDownloadStreamPickerView: View {
             }
             .tint(.primary)
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
         .task { await loadStreams() }
     }
 

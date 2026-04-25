@@ -47,8 +47,11 @@ final class SearchViewModel: ObservableObject {
     }
 
     func clearResults() {
+        searchTask?.cancel()
+        searchTask = nil
         moduleResults = []
         aniListResults = []
+        isLoading = false
         errorMessage = nil
         hasSearched = false
     }

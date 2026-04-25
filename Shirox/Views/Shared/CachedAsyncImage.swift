@@ -72,9 +72,8 @@ struct CachedAsyncImage: View {
             platformImage = nil
         }
         .task(id: urlString + (base64String ?? "")) {
-            platformImage = nil
             loadFailed = false
-            
+
             // Check Base64 first
             if let base64 = base64String, !base64.isEmpty,
                let data = Data(base64Encoded: base64),
@@ -84,11 +83,16 @@ struct CachedAsyncImage: View {
             }
 
             guard !urlString.isEmpty, let url = URL(string: urlString) else { return }
-            
-            if Self.cache.object(forKey: urlString as NSString) != nil {
+
+            // Use cached image immediately — avoids clearing platformImage to nil first,
+            // which prevents 25 simultaneous blank-state mutations on macOS full screen.
+            if let cached = Self.cache.object(forKey: urlString as NSString) {
+                platformImage = cached
                 return
             }
-            
+
+            platformImage = nil
+
             guard let (data, _) = try? await Self.session.data(from: url),
                   let loaded = PlatformImage(data: data) else {
                 loadFailed = true
@@ -128,14 +132,16 @@ struct TVDBPosterImage: View {
     }
 
     var body: some View {
-        // Show finalURL (TVDB) when available; show placeholder while resolving;
-        // fall back to AniList only after TVDB returns nothing
+        #if os(macOS)
+        CachedAsyncImage(urlString: anilistFallback)
+        #else
         CachedAsyncImage(urlString: finalURL ?? "")
             .task(id: media.id) {
-                guard finalURL == nil else { return } // already resolved from cache
+                guard finalURL == nil else { return }
                 let artwork = await TVDBMappingService.shared.getArtwork(for: media.id)
                 let tvdbURL = (type == .poster) ? artwork.poster : artwork.fanart
                 finalURL = tvdbURL ?? anilistFallback
             }
+        #endif
     }
 }

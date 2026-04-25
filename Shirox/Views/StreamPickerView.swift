@@ -63,7 +63,11 @@ struct StreamPickerView: View {
             }
             .tint(.primary)
         }
+        #if os(macOS)
+        .frame(minWidth: 480, minHeight: 320)
+        #else
         .presentationDetents([.medium, .large])
+        #endif
     }
 
     private var episodeTitle: String {

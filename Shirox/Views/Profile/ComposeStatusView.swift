@@ -38,6 +38,13 @@ struct ComposeStatusView: View {
                 }
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 }

@@ -26,7 +26,14 @@ struct DownloadStreamPickerView: View {
             }
             .tint(.primary)
         }
+        #if os(iOS)
         .presentationDetents([.medium, .large])
+
+        #else
+
+        .frame(minWidth: 480, minHeight: 360)
+
+        #endif
     }
 }
 

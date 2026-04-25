@@ -300,7 +300,14 @@ struct DetailView: View {
                         existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
                     }
                 }
+                #if os(iOS)
                 .presentationDetents([.medium, .large])
+
+                #else
+
+                .frame(minWidth: 480, minHeight: 360)
+
+                #endif
             }
         }
         #if os(iOS)
