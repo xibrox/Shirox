@@ -17,24 +17,41 @@ if [ ! -d "build" ]; then
     mkdir build
 fi
 
-# CocoaPods injects -framework GoogleCast into OTHER_LDFLAGS for all platforms,
-# but GoogleCast has no Catalyst slice. Strip it from the xcconfig before linking
-# and restore it afterward so iOS builds are unaffected.
+# CocoaPods injects -framework GoogleCast and its resources into the build phases,
+# but GoogleCast has no Catalyst slice. Strip them from the Pods files before 
+# building and restore them afterward so iOS builds are unaffected.
 XCCONFIG_DIR="$WORKING_LOCATION/Pods/Target Support Files/Pods-Shirox_iOS"
-XCCONFIG_RELEASE="$XCCONFIG_DIR/Pods-Shirox_iOS.release.xcconfig"
-XCCONFIG_BAK="${XCCONFIG_RELEASE}.catalyst_bak"
+FILES_TO_PATCH=(
+    "Pods-Shirox_iOS.release.xcconfig"
+    "Pods-Shirox_iOS.debug.xcconfig"
+    "Pods-Shirox_iOS-resources.sh"
+    "Pods-Shirox_iOS-resources-Release-input-files.xcfilelist"
+    "Pods-Shirox_iOS-resources-Release-output-files.xcfilelist"
+    "Pods-Shirox_iOS-resources-Debug-input-files.xcfilelist"
+    "Pods-Shirox_iOS-resources-Debug-output-files.xcfilelist"
+)
 
-if [ -f "$XCCONFIG_RELEASE" ]; then
-    cp "$XCCONFIG_RELEASE" "$XCCONFIG_BAK"
-    sed -i '' 's/ -framework "GoogleCast"//g; s/ -framework GoogleCast//g' "$XCCONFIG_RELEASE"
-fi
-
-restore_xcconfig() {
-    if [ -f "$XCCONFIG_BAK" ]; then
-        mv "$XCCONFIG_BAK" "$XCCONFIG_RELEASE"
+for file in "${FILES_TO_PATCH[@]}"; do
+    FILE_PATH="$XCCONFIG_DIR/$file"
+    if [ -f "$FILE_PATH" ]; then
+        cp "$FILE_PATH" "${FILE_PATH}.catalyst_bak"
+        if [[ $file == *.xcconfig ]]; then
+            sed -i '' 's/ -framework "GoogleCast"//g; s/ -framework GoogleCast//g' "$FILE_PATH"
+        else
+            sed -i '' '/GoogleCast/d; /google-cast-sdk/d' "$FILE_PATH"
+        fi
     fi
+done
+
+restore_pod_files() {
+    for file in "${FILES_TO_PATCH[@]}"; do
+        FILE_PATH="$XCCONFIG_DIR/$file"
+        if [ -f "${FILE_PATH}.catalyst_bak" ]; then
+            mv "${FILE_PATH}.catalyst_bak" "$FILE_PATH"
+        fi
+    done
 }
-trap restore_xcconfig EXIT
+trap restore_pod_files EXIT
 
 echo "--- Building $APPLICATION_NAME for Mac Catalyst ---"
 
