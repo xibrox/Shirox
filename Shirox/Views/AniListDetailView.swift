@@ -142,7 +142,7 @@ struct AniListDetailView: View {
                 }
             }
         }
-        .onChange(of: vm.media?.id) { _ in
+        .onChange(of: vm.media?.id) { _, _ in
             guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber else { return }
             guard vm.media?.episodes != nil else { return }
             autoPlayOnLoad = true
@@ -459,7 +459,7 @@ struct AniListDetailView: View {
             moduleId: item.moduleId,
             totalEpisodes: vm.media?.episodes ?? item.totalEpisodes,
             availableEpisodes: availableEpisodes ?? item.availableEpisodes,
-            isAiring: (vm.media?.status == "RELEASING") ?? item.isAiring,
+            isAiring: vm.media.map { $0.status == "RELEASING" } ?? item.isAiring,
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
             streamTitle: item.streamTitle,
@@ -898,27 +898,23 @@ struct AniListDetailView: View {
     @ViewBuilder
     private func relationsSection(relations: [AniListRelationEdge]) -> some View {
         let animeRelations = relations.filter { $0.node.type != "MANGA" }
-        guard !animeRelations.isEmpty else {
-            return AnyView(
-                VStack(spacing: 20) {
-                    Image(systemName: "film")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary.opacity(0.5))
-                    Text("No anime relations")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 60)
-            )
-        }
-        
-        let columns = [
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible(), spacing: 16)
-        ]
-        
-        return AnyView(
+        if animeRelations.isEmpty {
+            VStack(spacing: 20) {
+                Image(systemName: "film")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                Text("No anime relations")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 60)
+        } else {
+            let columns = [
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ]
+            
             VStack(alignment: .leading, spacing: 16) {
                 LazyVGrid(columns: columns, spacing: 20) {
                     ForEach(animeRelations) { edge in
@@ -934,7 +930,7 @@ struct AniListDetailView: View {
             }
             .padding(.bottom, 24)
             .padding(.top, 8)
-        )
+        }
     }
 }
 

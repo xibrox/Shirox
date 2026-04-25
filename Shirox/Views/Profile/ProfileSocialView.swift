@@ -17,7 +17,7 @@ struct ProfileSocialView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
             .padding(.vertical, 10)
-            .onChange(of: selectedSocial) { newValue in
+            .onChange(of: selectedSocial) { _, newValue in
                 Task { await vm.loadSocial(userId: userId, type: newValue) }
             }
 

@@ -371,8 +371,8 @@ struct LibraryView: View {
             }
         }
         .task { await vm.load() }
-        .onChange(of: auth.isLoggedIn) { loggedIn in
-            if loggedIn { Task { await vm.load() } }
+        .onChange(of: auth.isLoggedIn) { _, newValue in
+            if newValue { Task { await vm.load() } }
         }
         .navigationTitle("Library")
         .searchable(text: $searchText, prompt: "Search library")

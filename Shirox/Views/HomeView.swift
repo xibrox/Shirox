@@ -4,6 +4,14 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
+    private var platformBackground: Color {
+        #if os(iOS)
+        Color(UIColor.systemBackground)
+        #else
+        Color(NSColor.windowBackgroundColor)
+        #endif
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -83,6 +91,14 @@ private struct FeaturedCarousel: View {
         return selectedTab % displayCount
     }
 
+    private var platformBackground: Color {
+        #if os(iOS)
+        Color(UIColor.systemBackground)
+        #else
+        Color(NSColor.windowBackgroundColor)
+        #endif
+    }
+
     var body: some View {
         #if os(iOS) && !targetEnvironment(macCatalyst)
         let isIPad = sizeClass == .regular
@@ -153,9 +169,9 @@ private struct FeaturedCarousel: View {
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: 0),
-                            .init(color: Color(UIColor.systemBackground).opacity(0.5), location: 0.38),
-                            .init(color: Color(UIColor.systemBackground).opacity(0.88), location: 0.68),
-                            .init(color: Color(UIColor.systemBackground), location: 1.0)
+                            .init(color: platformBackground.opacity(0.5), location: 0.38),
+                            .init(color: platformBackground.opacity(0.88), location: 0.68),
+                            .init(color: platformBackground, location: 1.0)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -200,7 +216,7 @@ private struct FeaturedCarousel: View {
                                 Image(systemName: "play.fill").font(.footnote.weight(.semibold))
                                 Text("Watch").fontWeight(.semibold)
                             }
-                            .foregroundStyle(Color(UIColor.systemBackground))
+                            .foregroundStyle(platformBackground)
                             .frame(width: 130, height: 42)
                             .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
                         }
@@ -236,6 +252,14 @@ private struct MacFeaturedCarousel: View {
     @State private var timer: Timer?
 
     private var displayItems: [AniListMedia] { Array(items.prefix(8)) }
+
+    private var platformBackground: Color {
+        #if os(iOS)
+        Color(UIColor.systemBackground)
+        #else
+        Color(NSColor.windowBackgroundColor)
+        #endif
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -310,7 +334,7 @@ private struct MacFeaturedCarousel: View {
                                         Image(systemName: "play.fill").font(.footnote.weight(.semibold))
                                         Text("Watch").fontWeight(.semibold)
                                     }
-                                    .foregroundStyle(Color(UIColor.systemBackground))
+                                    .foregroundStyle(platformBackground)
                                     .frame(width: 110, height: 36)
                                     .background(Color.primary, in: RoundedRectangle(cornerRadius: 10))
                                 }
