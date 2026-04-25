@@ -37,6 +37,9 @@ for file in "${FILES_TO_PATCH[@]}"; do
         cp "$FILE_PATH" "${FILE_PATH}.catalyst_bak"
         if [[ $file == *.xcconfig ]]; then
             sed -i '' 's/ -framework "GoogleCast"//g; s/ -framework GoogleCast//g' "$FILE_PATH"
+        elif [[ $file == *.sh ]]; then
+            # Replace install_resource calls with : (null command) to avoid empty if blocks
+            sed -i '' 's/install_resource.*GoogleCast.*/:/g; s/install_resource.*google-cast-sdk.*/:/g' "$FILE_PATH"
         else
             sed -i '' '/GoogleCast/d; /google-cast-sdk/d' "$FILE_PATH"
         fi
