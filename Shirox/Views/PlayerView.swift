@@ -96,6 +96,10 @@ struct PlayerView: View {
     }
 
     @State private var isSpeedBoosted = false
+    // Now Playing artwork cache (iOS only)
+    #if os(iOS)
+    @State private var artworkCache: [String: MPMediaItemArtwork] = [:]
+    #endif
     // PiP (iOS only)
     #if os(iOS)
     @State private var pipTrigger = 0
@@ -1013,15 +1017,40 @@ struct PlayerView: View {
     }
 
     private func updateNowPlaying(player p: AVPlayer) {
+        let epNumber = currentContext?.episodeNumber
+        let mediaTitle = currentContext?.mediaTitle ?? currentStream.title
+        let titleString: String
+        if let n = epNumber {
+            titleString = "Ep\(n) - \(mediaTitle)"
+        } else {
+            titleString = mediaTitle
+        }
+
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: currentStream.title,
+            MPMediaItemPropertyTitle: titleString,
             MPNowPlayingInfoPropertyIsLiveStream: false,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: p.currentTime().seconds,
             MPNowPlayingInfoPropertyPlaybackRate: Double(p.rate)
         ]
         if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
-        if let mediaTitle = currentContext?.mediaTitle { info[MPMediaItemPropertyAlbumTitle] = mediaTitle }
+        info[MPMediaItemPropertyAlbumTitle] = mediaTitle
+
+        let artworkUrl = currentContext?.thumbnailUrl ?? currentContext?.imageUrl
+        if let key = artworkUrl, let cached = artworkCache[key] {
+            info[MPMediaItemPropertyArtwork] = cached
+        }
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+
+        if let urlStr = artworkUrl, artworkCache[urlStr] == nil, let url = URL(string: urlStr) {
+            Task { @MainActor in
+                guard let (data, _) = try? await URLSession.shared.data(from: url),
+                      let uiImage = UIImage(data: data) else { return }
+                let artwork = MPMediaItemArtwork(boundsSize: uiImage.size) { _ in uiImage }
+                artworkCache[urlStr] = artwork
+                if let p = player { updateNowPlaying(player: p) }
+            }
+        }
     }
 
     private func tearDownNowPlaying() {
