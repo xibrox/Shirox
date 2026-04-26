@@ -1,7 +1,7 @@
 import SwiftUI
 import AVKit
-#if os(iOS)
 import MediaPlayer
+#if os(iOS)
 import AVFoundation
 #endif
 #if canImport(GoogleCast)
@@ -96,10 +96,7 @@ struct PlayerView: View {
     }
 
     @State private var isSpeedBoosted = false
-    // Now Playing artwork cache (iOS only)
-    #if os(iOS)
     @State private var artworkCache: [String: MPMediaItemArtwork] = [:]
-    #endif
     // PiP (iOS only)
     #if os(iOS)
     @State private var pipTrigger = 0
@@ -204,9 +201,7 @@ struct PlayerView: View {
             rateObserver?.invalidate()
             player?.pause()
             saveProgress()
-            #if os(iOS)
             tearDownNowPlaying()
-            #endif
             castManager.disconnect()
         }
         .onChange(of: volume) { _, newVolume in
@@ -942,9 +937,7 @@ struct PlayerView: View {
                     DispatchQueue.main.async { videoReady = true }
                 }
             }
-            #if os(iOS)
             if let p { updateNowPlaying(player: p) }
-            #endif
         }
 
         setupPlaybackEndObserver(for: item)
@@ -1015,6 +1008,7 @@ struct PlayerView: View {
             return .success
         }
     }
+    #endif
 
     private func updateNowPlaying(player p: AVPlayer) {
         let epNumber = currentContext?.episodeNumber
@@ -1044,9 +1038,13 @@ struct PlayerView: View {
 
         if let urlStr = artworkUrl, artworkCache[urlStr] == nil, let url = URL(string: urlStr) {
             Task { @MainActor in
-                guard let (data, _) = try? await URLSession.shared.data(from: url),
-                      let uiImage = UIImage(data: data) else { return }
-                let artwork = MPMediaItemArtwork(boundsSize: uiImage.size) { _ in uiImage }
+                guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
+                #if os(iOS)
+                guard let image = UIImage(data: data) else { return }
+                #else
+                guard let image = NSImage(data: data) else { return }
+                #endif
+                let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                 artworkCache[urlStr] = artwork
                 if let p = player { updateNowPlaying(player: p) }
             }
@@ -1063,7 +1061,6 @@ struct PlayerView: View {
         center.skipForwardCommand.removeTarget(nil)
         center.skipBackwardCommand.removeTarget(nil)
     }
-    #endif
 
     private func setupPlaybackEndObserver(for item: AVPlayerItem) {
         NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { _ in
@@ -1209,9 +1206,7 @@ struct PlayerView: View {
             }
         }
         showInPlayerStreamPicker = false
-        #if os(iOS)
         if let p = player { updateNowPlaying(player: p) }
-        #endif
         scheduleHide()
     }
 
@@ -1257,9 +1252,7 @@ struct PlayerView: View {
         }
         tvdbEpisodeTitle = nil
         loadTVDBTitle()
-        #if os(iOS)
         if let p = player { updateNowPlaying(player: p) }
-        #endif
         scheduleHide()
     }
 
