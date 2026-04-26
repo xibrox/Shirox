@@ -44,7 +44,7 @@ struct SearchView: View {
                 .onChange(of: vm.query) { _, new in
                     if new.isEmpty {
                         vm.clearResults()
-                    } else if vm.hasResults || vm.hasSearched {
+                    } else if (vm.hasResults || vm.hasSearched) && !vm.isLoading {
                         vm.clearResults()
                     }
                 }

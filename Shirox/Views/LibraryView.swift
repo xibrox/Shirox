@@ -144,7 +144,7 @@ struct LibraryView: View {
             } label: {
                 Text("Sign in with AniList")
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(.systemBackground))
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(Color.primary, in: Capsule())

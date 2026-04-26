@@ -103,6 +103,7 @@ struct ShiroxApp: App {
         WindowGroup {
             RootTabView()
                 .environmentObject(moduleManager)
+                .tint(.primary)
         }
         #if targetEnvironment(macCatalyst)
         .commands {
@@ -162,8 +163,9 @@ private struct MacSidebarRow: View {
             .foregroundStyle(isSelected ? .white : .secondary)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color.accentColor : Color.clear)
+                    .fill(isSelected ? Color.primary : Color.clear)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

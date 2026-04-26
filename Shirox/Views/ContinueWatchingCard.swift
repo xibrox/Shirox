@@ -18,7 +18,7 @@ struct ContinueWatchingSection: View {
                         .font(.title2.weight(.heavy))
                         .tracking(0.3)
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accentColor.opacity(0.9))
+                        .fill(Color.primary)
                         .frame(width: 36, height: 3)
                 }
                 Spacer()
@@ -321,9 +321,9 @@ struct ContinueWatchingCardDisplay: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Color.white.opacity(0.2)
-                                Color.accentColor
+                                Color.primary
                                     .frame(width: geo.size.width * progress)
-                                    .shadow(color: Color.accentColor.opacity(0.5), radius: 3, x: 0, y: 0)
+                                    .shadow(color: Color.primary.opacity(0.5), radius: 3, x: 0, y: 0)
                             }
                         }
                         .frame(height: 3)

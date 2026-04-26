@@ -1029,7 +1029,10 @@ struct PlayerView: View {
             MPNowPlayingInfoPropertyPlaybackRate: Double(p.rate)
         ]
         if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
-        if !subtitleString.isEmpty { info[MPMediaItemPropertyAlbumTitle] = subtitleString }
+        if !subtitleString.isEmpty {
+            info[MPMediaItemPropertyAlbumTitle] = subtitleString
+            info[MPMediaItemPropertyArtist] = subtitleString
+        }
 
         let artworkUrl = currentContext?.thumbnailUrl ?? currentContext?.imageUrl
         if let key = artworkUrl, let cached = artworkCache[key] {

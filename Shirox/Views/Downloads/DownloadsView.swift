@@ -188,30 +188,35 @@ private struct DownloadEpisodeRow: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.episodeTitle ?? "Episode \(item.episodeNumber)")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    HStack(spacing: 5) {
-                        if let streamTitle = item.streamTitle {
-                            badge(streamTitle, color: .accentColor)
-                        }
-                        badge(item.isHLS ? "HLS" : "MP4", color: .secondary)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.episodeTitle ?? "Episode \(item.episodeNumber)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    if let streamTitle = item.streamTitle {
+                        badge(streamTitle, color: .accentColor)
                     }
+                    badge(item.isHLS ? "HLS" : "MP4", color: .secondary)
                 }
-                Spacer()
-                Image(systemName: "play.fill")
-                    .font(.system(size: 11))
-                    .padding(8)
-                    .background(Color.accentColor, in: Circle())
-                    .foregroundStyle(.white)
             }
-            .padding(.vertical, 2)
+            Spacer()
+            Button(action: onTap) {
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: "play.fill")
+                            .foregroundStyle(Color(.systemBackground))
+                            .font(.system(size: 11))
+                    }
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
     }
 
     private func badge(_ text: String, color: Color) -> some View {

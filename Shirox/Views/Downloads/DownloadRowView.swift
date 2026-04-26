@@ -68,10 +68,10 @@ struct DownloadRowView: View {
             ProgressView().controlSize(.small)
         case .completed:
             Image(systemName: "play.fill")
+                .foregroundStyle(.white)
                 .font(.system(size: 12))
                 .padding(8)
                 .background(Color.red, in: Circle())
-                .foregroundStyle(.white)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
         }
