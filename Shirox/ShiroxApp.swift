@@ -199,10 +199,26 @@ private struct MacSidebarView: View {
 private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @State private var selectedTab = 0
+    #if targetEnvironment(macCatalyst)
+    @State private var sidebarTab: SidebarTab = .home
+    #endif
 
     var body: some View {
         Group {
             if #available(iOS 18, macOS 15, *) {
+                #if targetEnvironment(macCatalyst)
+                NavigationSplitView {
+                    MacSidebarView(selection: $sidebarTab)
+                } detail: {
+                    switch sidebarTab {
+                    case .home:      HomeView()
+                    case .library:   LibraryView()
+                    case .downloads: DownloadsView()
+                    case .settings:  SettingsView()
+                    case .search:    SearchView()
+                    }
+                }
+                #else
                 TabView {
                     Tab("Home", systemImage: "house.fill") {
                         HomeView()
@@ -224,6 +240,7 @@ private struct RootTabView: View {
                 }
                 .tabViewStyle(.sidebarAdaptable)
                 .tint(.primary)
+                #endif
             } else {
                 TabView(selection: $selectedTab) {
                     HomeView()
@@ -258,7 +275,11 @@ private struct RootTabView: View {
             await ContinueWatchingManager.shared.syncWithAniList()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsTab)) { _ in
+            #if targetEnvironment(macCatalyst)
+            sidebarTab = .settings
+            #else
             selectedTab = 3
+            #endif
         }
         #if targetEnvironment(macCatalyst)
         .onAppear {
