@@ -96,7 +96,10 @@ struct PlayerView: View {
     }
 
     @State private var isSpeedBoosted = false
+    // Now Playing artwork cache (iOS only)
+    #if os(iOS)
     @State private var artworkCache: [String: MPMediaItemArtwork] = [:]
+    #endif
     // PiP (iOS only)
     #if os(iOS)
     @State private var pipTrigger = 0
@@ -1011,6 +1014,7 @@ struct PlayerView: View {
     #endif
 
     private func updateNowPlaying(player p: AVPlayer) {
+<<<<<<< HEAD
         let mediaTitle = currentContext?.mediaTitle ?? currentStream.title
         let epNumber = currentContext?.episodeNumber
         let epTitle = tvdbEpisodeTitle ?? currentContext?.episodeTitle
@@ -1024,12 +1028,29 @@ struct PlayerView: View {
 
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: mediaTitle,
+=======
+        let epNumber = currentContext?.episodeNumber
+        let mediaTitle = currentContext?.mediaTitle ?? currentStream.title
+        let titleString: String
+        if let n = epNumber {
+            titleString = "Ep\(n) - \(mediaTitle)"
+        } else {
+            titleString = mediaTitle
+        }
+
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: titleString,
+>>>>>>> f2df789 (feat: show episode title and TVDB thumbnail in Now Playing / AirPlay controls)
             MPNowPlayingInfoPropertyIsLiveStream: false,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: p.currentTime().seconds,
             MPNowPlayingInfoPropertyPlaybackRate: Double(p.rate)
         ]
         if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
+<<<<<<< HEAD
         if !subtitleString.isEmpty { info[MPMediaItemPropertyAlbumTitle] = subtitleString }
+=======
+        info[MPMediaItemPropertyAlbumTitle] = mediaTitle
+>>>>>>> f2df789 (feat: show episode title and TVDB thumbnail in Now Playing / AirPlay controls)
 
         let artworkUrl = currentContext?.thumbnailUrl ?? currentContext?.imageUrl
         if let key = artworkUrl, let cached = artworkCache[key] {
@@ -1040,6 +1061,7 @@ struct PlayerView: View {
 
         if let urlStr = artworkUrl, artworkCache[urlStr] == nil, let url = URL(string: urlStr) {
             Task { @MainActor in
+<<<<<<< HEAD
                 guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
                 #if os(iOS)
                 guard let image = UIImage(data: data) else { return }
@@ -1047,6 +1069,11 @@ struct PlayerView: View {
                 guard let image = NSImage(data: data) else { return }
                 #endif
                 let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+=======
+                guard let (data, _) = try? await URLSession.shared.data(from: url),
+                      let uiImage = UIImage(data: data) else { return }
+                let artwork = MPMediaItemArtwork(boundsSize: uiImage.size) { _ in uiImage }
+>>>>>>> f2df789 (feat: show episode title and TVDB thumbnail in Now Playing / AirPlay controls)
                 artworkCache[urlStr] = artwork
                 if let p = player { updateNowPlaying(player: p) }
             }
