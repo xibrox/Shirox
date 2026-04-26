@@ -1011,7 +1011,6 @@ struct PlayerView: View {
     #endif
 
     private func updateNowPlaying(player p: AVPlayer) {
-<<<<<<< HEAD
         let mediaTitle = currentContext?.mediaTitle ?? currentStream.title
         let epNumber = currentContext?.episodeNumber
         let epTitle = tvdbEpisodeTitle ?? currentContext?.episodeTitle
@@ -1025,29 +1024,12 @@ struct PlayerView: View {
 
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: mediaTitle,
-=======
-        let epNumber = currentContext?.episodeNumber
-        let mediaTitle = currentContext?.mediaTitle ?? currentStream.title
-        let titleString: String
-        if let n = epNumber {
-            titleString = "Ep\(n) - \(mediaTitle)"
-        } else {
-            titleString = mediaTitle
-        }
-
-        var info: [String: Any] = [
-            MPMediaItemPropertyTitle: titleString,
->>>>>>> f2df789 (feat: show episode title and TVDB thumbnail in Now Playing / AirPlay controls)
             MPNowPlayingInfoPropertyIsLiveStream: false,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: p.currentTime().seconds,
             MPNowPlayingInfoPropertyPlaybackRate: Double(p.rate)
         ]
         if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
-<<<<<<< HEAD
         if !subtitleString.isEmpty { info[MPMediaItemPropertyAlbumTitle] = subtitleString }
-=======
-        info[MPMediaItemPropertyAlbumTitle] = mediaTitle
->>>>>>> f2df789 (feat: show episode title and TVDB thumbnail in Now Playing / AirPlay controls)
 
         let artworkUrl = currentContext?.thumbnailUrl ?? currentContext?.imageUrl
         if let key = artworkUrl, let cached = artworkCache[key] {
