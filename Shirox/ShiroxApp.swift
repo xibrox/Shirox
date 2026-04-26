@@ -117,6 +117,32 @@ struct ShiroxApp: App {
     }
 }
 
+#if targetEnvironment(macCatalyst)
+enum SidebarTab: CaseIterable {
+    case home, library, downloads, settings, search
+
+    var label: String {
+        switch self {
+        case .home:      return "Home"
+        case .library:   return "Library"
+        case .downloads: return "Downloads"
+        case .settings:  return "Settings"
+        case .search:    return "Search"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .home:      return "house.fill"
+        case .library:   return "books.vertical.fill"
+        case .downloads: return "arrow.down.circle.fill"
+        case .settings:  return "gearshape.fill"
+        case .search:    return "magnifyingglass"
+        }
+    }
+}
+#endif
+
 // MARK: - Root Tab View
 
 private struct RootTabView: View {
