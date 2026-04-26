@@ -1,6 +1,6 @@
 import Foundation
 
-struct ModuleDefinition: Codable, Identifiable {
+struct ModuleDefinition: Codable, Identifiable, Equatable {
     var id: String { scriptUrl }
     let sourceName: String
     let iconUrl: String?
@@ -20,7 +20,7 @@ struct ModuleDefinition: Codable, Identifiable {
     var iconData: String?      // cached icon data (Base64)
 }
 
-struct ModuleAuthor: Codable {
+struct ModuleAuthor: Codable, Equatable {
     let name: String
     let icon: String?
 }

@@ -111,6 +111,14 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section("Library") {
+                    NavigationLink {
+                        LibrarySettingsView()
+                    } label: {
+                        Label("List Order & Custom Lists", systemImage: "list.bullet.indent")
+                    }
+                }
+
                 Section("Matching") {
                     ForEach(orderedLanguages, id: \.self) { lang in
                         HStack {
@@ -272,6 +280,67 @@ struct SettingsView: View {
             return String(format: "%.1f MB", Double(bytes) / 1_000_000)
         } else {
             return String(format: "%.0f KB", Double(bytes) / 1_000)
+        }
+    }
+}
+
+// MARK: - Library Settings
+
+struct LibrarySettingsView: View {
+    @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
+
+    private var statuses: [MediaListStatus] {
+        let saved = statusOrderRaw.components(separatedBy: ",").compactMap(MediaListStatus.init(rawValue:))
+        let missing = MediaListStatus.allCases.filter { !saved.contains($0) }
+        return saved + missing
+    }
+
+    private var customListNames: [String] {
+        UserDefaults.standard.stringArray(forKey: "libraryCustomListNames") ?? []
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(statuses) { status in
+                    Label(status.displayName, systemImage: icon(for: status))
+                }
+                .onMove { from, to in
+                    var list = statuses
+                    list.move(fromOffsets: from, toOffset: to)
+                    statusOrderRaw = list.map(\.rawValue).joined(separator: ",")
+                }
+            } header: {
+                Text("Drag to reorder status tabs")
+            }
+
+            if !customListNames.isEmpty {
+                Section {
+                    ForEach(customListNames, id: \.self) { name in
+                        Label(name, systemImage: "list.star")
+                    }
+                } header: {
+                    Text("Custom Lists")
+                } footer: {
+                    Text("Custom lists are managed on AniList.")
+                }
+            }
+        }
+        .navigationTitle("Library")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .environment(\.editMode, .constant(.active))
+        #endif
+    }
+
+    private func icon(for status: MediaListStatus) -> String {
+        switch status {
+        case .current:   return "play.circle"
+        case .planning:  return "bookmark"
+        case .completed: return "checkmark.circle"
+        case .dropped:   return "xmark.circle"
+        case .paused:    return "pause.circle"
+        case .repeating: return "arrow.counterclockwise.circle"
         }
     }
 }

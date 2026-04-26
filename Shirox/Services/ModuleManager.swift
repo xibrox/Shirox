@@ -6,6 +6,7 @@ final class ModuleManager: ObservableObject {
 
     @Published var modules: [ModuleDefinition] = []
     @Published var activeModule: ModuleDefinition?
+    @Published var moduleReadyId: String? = nil
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -65,6 +66,7 @@ final class ModuleManager: ObservableObject {
         Task {
             do {
                 try await JSEngine.shared.loadModule(module)
+                moduleReadyId = module.id
             } catch {
                 Logger.shared.log("[ModuleManager] Failed to load JS for module \(module.sourceName): \(error.localizedDescription)", type: "Error")
             }

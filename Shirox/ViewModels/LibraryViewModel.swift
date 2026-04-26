@@ -92,6 +92,7 @@ final class LibraryViewModel: ObservableObject {
             // Collect sorted custom list names
             var seen = Set<String>()
             customListNames = result.compactMap { $0.customListName }.filter { seen.insert($0).inserted }.sorted()
+            UserDefaults.standard.set(customListNames, forKey: "libraryCustomListNames")
             applyFilter()
         } catch {
             self.error = error.localizedDescription

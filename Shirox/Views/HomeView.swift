@@ -79,8 +79,8 @@ struct HomeView: View {
 private struct FeaturedCarousel: View {
     let items: [AniListMedia]
     @State private var selectedTab = 1000
-    @State private var overscrollY: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
+    @State private var stretchAmount: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var realItems: [AniListMedia] { items.prefix(8).map { $0 } }
@@ -111,32 +111,44 @@ private struct FeaturedCarousel: View {
         let currentMedia = displayItems.isEmpty ? items[0] : displayItems[currentIndex]
 
         VStack(spacing: 0) {
-            GeometryReader { proxy in
-                let scrollY = proxy.frame(in: .named("homeScroll")).minY
-                let parallaxFactor: CGFloat = 0.5
-                let parallaxBuffer: CGFloat = 60
-                let stretch = max(0, scrollY)
-                let tabHeight = imageHeight + stretch + parallaxBuffer
-                let tabOffset = scrollY >= 0 ? -stretch - parallaxBuffer : -parallaxBuffer - scrollY * (1 - parallaxFactor)
+            ZStack {
+                // Pull-down sensor: sibling of TabView so re-evaluation never cascades into
+                // TabView layout. Preference fires max(0,scrollY); stretchAmount only changes
+                // when the user is pulling down — stable (= 0) during normal scroll and swipes.
+                GeometryReader { proxy in
+                    Color.clear.preference(key: CarouselStretchKey.self,
+                                           value: max(0, proxy.frame(in: .named("homeScroll")).minY))
+                }
 
+                // iPad fanart background behind the cards
+                if isIPad, !displayItems.isEmpty {
+                    TVDBPosterImage(media: displayItems[currentIndex], type: .fanart)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+
+                // TabView: completely stable — fixed height, zero scroll dependency.
+                // Images live inside FeaturedCard so they move naturally with swipe gestures.
                 TabView(selection: $selectedTab) {
                     ForEach(0..<2000, id: \.self) { index in
                         if !displayItems.isEmpty {
-                            FeaturedCard(media: displayItems[index % displayItems.count], isWide: isIPad)
+                            FeaturedCard(media: displayItems[index % displayCount], isWide: isIPad)
                                 .allowsHitTesting(false)
                                 .tag(index)
                         }
                     }
                 }
-                #if os(iOS)
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                #endif
                 .frame(maxWidth: .infinity)
-                .frame(height: tabHeight)
-                .offset(y: tabOffset)
-                .background(Color.clear.preference(key: CarouselOverscrollKey.self, value: scrollY))
+                .frame(height: imageHeight)
             }
-            .frame(maxWidth: .infinity)
+            .frame(height: imageHeight)
+            // Elastic stretch: render-only transforms — layout size never changes so
+            // UIScrollView's bounce is never disrupted.
+            // scaleEffect grows the image from the top anchor.
+            // offset cancels the bounce displacement so the top edge stays pinned at screen y=0.
+            .scaleEffect(1 + stretchAmount / imageHeight, anchor: .top)
+            .offset(y: -stretchAmount)
+            .onPreferenceChange(CarouselStretchKey.self) { y in stretchAmount = y }
             .background(
                 GeometryReader { geo in
                     Color.clear
@@ -144,21 +156,15 @@ private struct FeaturedCarousel: View {
                         .onChange(of: geo.size.width) { _, w in containerWidth = w }
                 }
             )
-            .frame(height: imageHeight + overscrollY)
-            .onPreferenceChange(CarouselOverscrollKey.self) { y in overscrollY = max(0, y) }
             .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
             .background {
-                if !realItems.isEmpty {
-                    TVDBPosterImage(media: realItems[currentIndex], type: .fanart)
-                        .ignoresSafeArea()
-                }
                 // Hidden preloader — triggers image fetch for all items into NSCache
-                ForEach(realItems.indices, id: \.self) { i in
-                    TVDBPosterImage(media: realItems[i], type: .fanart)
+                ForEach(displayItems.indices, id: \.self) { i in
+                    TVDBPosterImage(media: displayItems[i], type: .fanart)
                         .frame(width: 1, height: 1)
                         .opacity(0)
                         .allowsHitTesting(false)
-                    TVDBPosterImage(media: realItems[i], type: .poster)
+                    TVDBPosterImage(media: displayItems[i], type: .poster)
                         .frame(width: 1, height: 1)
                         .opacity(0)
                         .allowsHitTesting(false)
@@ -416,7 +422,7 @@ private struct FeaturedCard: View {
         Group {
             #if os(iOS) && !targetEnvironment(macCatalyst)
             if isWide {
-                // iPad: banner background (poster fallback) + poster card + text
+                // iPad: fanart with horizontal parallax
                 Color.clear
                     .overlay(
                         ZStack {
@@ -425,28 +431,25 @@ private struct FeaturedCard: View {
                                 let screenW = geo.size.width > 0 ? geo.size.width : 1
                                 let extra: CGFloat = 80
                                 let px = -(extra / 2) - minX * (extra / (2 * screenW))
-
                                 TVDBPosterImage(media: media, type: .fanart)
                                     .frame(width: geo.size.width + extra, height: geo.size.height)
                                     .offset(x: px)
                                     .clipped()
                             }
-
                             LinearGradient(
                                 stops: [
                                     .init(color: .clear, location: 0),
                                     .init(color: .black.opacity(0.4), location: 0.5),
                                     .init(color: .black.opacity(0.92), location: 1)
                                 ],
-                                startPoint: .top,
-                                endPoint: .bottom
+                                startPoint: .top, endPoint: .bottom
                             )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // iPhone: portrait cover image with horizontal parallax.
+                // iPhone: portrait with horizontal parallax
                 GeometryReader { geo in
                     let pageOffset = geo.frame(in: .global).minX
                     let buffer: CGFloat = 100
@@ -456,7 +459,6 @@ private struct FeaturedCard: View {
                 }
                 .clipped()
             }
-
             #else
             // macOS: banner background + poster overlay
             Color.clear
@@ -624,9 +626,9 @@ private struct AnimeSection: View {
     }
 }
 
-// MARK: - Carousel Overscroll Preference
+// MARK: - Carousel Stretch Preference
 
-private struct CarouselOverscrollKey: PreferenceKey {
+private struct CarouselStretchKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }

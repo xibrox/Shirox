@@ -12,7 +12,6 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 struct LibraryView: View {
     @StateObject private var vm = LibraryViewModel()
     @ObservedObject private var auth = AniListAuthManager.shared
-    @State private var showSettings = false
     @State private var showProfile = false
     @State private var showNotifications = false
     @StateObject private var profileVM = ProfileViewModel()
@@ -30,6 +29,11 @@ struct LibraryView: View {
 
     // Comma-separated raw values, e.g. "CURRENT,PLANNING,COMPLETED,DROPPED,PAUSED,REPEATING"
     @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
+
+    private var displayUsername: String {
+        let name = auth.username ?? "Profile"
+        return name.count > 15 ? String(name.prefix(15)) + "…" : name
+    }
 
     private var orderedStatuses: [MediaListStatus] {
         let saved = statusOrderRaw.components(separatedBy: ",").compactMap(MediaListStatus.init(rawValue:))
@@ -112,9 +116,14 @@ struct LibraryView: View {
                 }
             }
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 15, weight: .medium))
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.subheadline)
+                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
+                    .font(.caption)
+            }
         }
+        .menuOrder(.fixed)
     }
 
     // MARK: - Login prompt
@@ -162,7 +171,7 @@ struct LibraryView: View {
         VStack(spacing: 0) {
             // Combined row: Status on left, Genres on right
             HStack {
-                // Status & Custom List Menu (left)
+                // Status & Custom List Menu
                 Menu {
                     Section("Lists") {
                         ForEach(orderedStatuses) { status in
@@ -222,13 +231,13 @@ struct LibraryView: View {
                 // Genre Filter Menu (right)
                 if !availableGenres.isEmpty {
                     Menu {
+                        Section("Genres") {
                         if !selectedGenres.isEmpty {
                             Button(role: .destructive) {
                                 selectedGenres.removeAll()
                             } label: {
                                 Label("Clear All Filters", systemImage: "xmark.circle")
                             }
-                            Divider()
                         }
                         ForEach(availableGenres, id: \.self) { genre in
                             Button {
@@ -245,6 +254,7 @@ struct LibraryView: View {
                                     }
                                 }
                             }
+                        }
                         }
                     } label: {
                         HStack(spacing: 6) {
@@ -333,23 +343,20 @@ struct LibraryView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .automatic) {
+            ToolbarItem(placement: .topBarLeading) {
                 sortMenu
             }
-            ToolbarItem(placement: .automatic) {
-                Button { showSettings = true } label: {
-                    Image(systemName: "slider.horizontal.3")
-                }
-            }
-            ToolbarItem(placement: .automatic) {
+            ToolbarItem(placement: .topBarTrailing) {
                 if auth.isLoggedIn {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 10) {
                         Button {
                             showNotifications = true
                         } label: {
                             Image(systemName: "bell")
                                 .font(.system(size: 17, weight: .medium))
                         }
+
+                        Divider().frame(height: 16)
 
                         Button {
                             showProfile = true
@@ -360,13 +367,14 @@ struct LibraryView: View {
                                         .frame(width: 28, height: 28)
                                         .clipShape(Circle())
                                 }
-                                Text(auth.username ?? "Profile")
+                                Text(displayUsername)
                                     .font(.subheadline.weight(.medium))
+                                    .layoutPriority(1)
                             }
-                            .padding(.trailing, 8)
                         }
                         .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 8)
                 }
             }
         }
@@ -388,9 +396,6 @@ struct LibraryView: View {
                     await vm.update(entry: entry, status: status, progress: progress, score: score)
                 }
             }
-        }
-        .sheet(isPresented: $showSettings) {
-            LibrarySettingsView(statusOrderRaw: $statusOrderRaw)
         }
         .sheet(isPresented: $showProfile) {
             if let uid = auth.userId, let username = auth.username {
@@ -515,57 +520,3 @@ private struct LibraryRowView: View {
     }
 }
 
-// MARK: - Library Settings
-
-private struct LibrarySettingsView: View {
-    @Binding var statusOrderRaw: String
-    @Environment(\.dismiss) private var dismiss
-
-    private var statuses: [MediaListStatus] {
-        let saved = statusOrderRaw.components(separatedBy: ",").compactMap(MediaListStatus.init(rawValue:))
-        let missing = MediaListStatus.allCases.filter { !saved.contains($0) }
-        return saved + missing
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(statuses) { status in
-                        Label(status.displayName, systemImage: icon(for: status))
-                    }
-                    .onMove { from, to in
-                        var list = statuses
-                        list.move(fromOffsets: from, toOffset: to)
-                        statusOrderRaw = list.map(\.rawValue).joined(separator: ",")
-                    }
-                } header: {
-                    Text("Drag to reorder list tabs")
-                }
-            }
-            .navigationTitle("Library Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            #if os(iOS)
-            .environment(\.editMode, .constant(.active))
-            #endif
-        }
-    }
-
-    private func icon(for status: MediaListStatus) -> String {
-        switch status {
-        case .current:   return "play.circle"
-        case .planning:  return "bookmark"
-        case .completed: return "checkmark.circle"
-        case .dropped:   return "xmark.circle"
-        case .paused:    return "pause.circle"
-        case .repeating: return "arrow.counterclockwise.circle"
-        }
-    }
-}

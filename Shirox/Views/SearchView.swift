@@ -48,9 +48,13 @@ struct SearchView: View {
                         vm.clearResults()
                     }
                 }
-                .onChange(of: moduleManager.activeModule?.id) { _, _ in
-                    guard !vm.query.isEmpty else { return }
-                    vm.search(usingModule: usingModule)
+                .onChange(of: moduleManager.moduleReadyId) { _, newId in
+                    guard !vm.query.isEmpty, newId != nil else { return }
+                    vm.search(usingModule: true)
+                }
+                .onChange(of: moduleManager.activeModule) { _, newModule in
+                    guard !vm.query.isEmpty, newModule == nil else { return }
+                    vm.search(usingModule: false)
                 }
         }
         #if os(iOS)
