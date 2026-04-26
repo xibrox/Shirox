@@ -509,6 +509,29 @@ struct DetailView: View {
                         .font(.title3.weight(.bold))
                         .lineLimit(3)
 
+                    // Module chip
+                    let activeModule = ModuleManager.shared.activeModule
+                    HStack(spacing: 5) {
+                        if let module = activeModule {
+                            CachedAsyncImage(urlString: module.iconUrl ?? "", base64String: module.iconData)
+                                .frame(width: 14, height: 14)
+                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                            Text(module.sourceName)
+                                .font(.caption2).fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+                        } else {
+                            CachedAsyncImage(urlString: "https://anilist.co/img/icons/apple-touch-icon.png", base64String: nil)
+                                .frame(width: 14, height: 14)
+                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                            Text("AniList")
+                                .font(.caption2).fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(Color.primary.opacity(0.1), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+
                     // Only airdate badge
                     if let detail = vm.detail, detail.airdate != "N/A" {
                         HStack(spacing: 8) {
