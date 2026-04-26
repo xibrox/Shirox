@@ -141,6 +141,57 @@ enum SidebarTab: CaseIterable {
         }
     }
 }
+
+private struct MacSidebarRow: View {
+    let tab: SidebarTab
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 20))
+                    .frame(width: 24)
+                Text(tab.label)
+                    .font(.body.weight(.medium))
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .foregroundStyle(isSelected ? .white : .secondary)
+            .background(
+                Capsule()
+                    .fill(isSelected ? Color.accentColor : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MacSidebarView: View {
+    @Binding var selection: SidebarTab
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Shirox")
+                .font(.title2.bold())
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                .padding(.bottom, 12)
+
+            ForEach(SidebarTab.allCases, id: \.self) { tab in
+                MacSidebarRow(tab: tab, isSelected: selection == tab) {
+                    selection = tab
+                }
+                .padding(.horizontal, 8)
+            }
+
+            Spacer()
+        }
+        .navigationSplitViewColumnWidth(220)
+    }
+}
 #endif
 
 // MARK: - Root Tab View
