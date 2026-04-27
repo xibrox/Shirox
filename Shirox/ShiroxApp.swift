@@ -283,8 +283,9 @@ private struct RootTabView: View {
             selectedTab = 3
             #endif
         }
-        .overlay {
+        .overlay(alignment: .bottom) {
             ToastView()
+                .allowsHitTesting(false)
         }
         #if targetEnvironment(macCatalyst)
         .onAppear {

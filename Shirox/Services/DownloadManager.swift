@@ -3,6 +3,7 @@ import Foundation
 import Combine
 import AVFoundation
 import SwiftUI
+import UserNotifications
 
 enum ToastType {
     case info
@@ -65,39 +66,31 @@ final class ToastManager: ObservableObject {
 
 struct ToastView: View {
     @ObservedObject var manager = ToastManager.shared
-    
+
     var body: some View {
-        ZStack {
-            VStack {
-                Spacer()
-                ForEach(manager.toasts) { toast in
-                    HStack(spacing: 12) {
-                        Image(systemName: toast.type.icon)
-                            .foregroundStyle(toast.type.color)
-                        
-                        Text(toast.message)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.primary)
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.secondarySystemBackground))
-                            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-                    }
-                    .padding(.horizontal, 20)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .onTapGesture {
-                        manager.remove(toast)
-                    }
+        VStack(spacing: 8) {
+            ForEach(manager.toasts) { toast in
+                HStack(spacing: 10) {
+                    Image(systemName: toast.type.icon)
+                        .foregroundStyle(toast.type.color)
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(toast.message)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onTapGesture { manager.remove(toast) }
             }
-            .padding(.bottom, 50)
         }
-        .allowsHitTesting(!manager.toasts.isEmpty)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 88)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: manager.toasts.map(\.id))
     }
 }
 
@@ -135,7 +128,7 @@ final class DownloadManager: NSObject, ObservableObject {
     
     private let hlsDownloader = HLSDownloader()
     private var hlsTasks: [UUID: Task<Void, Never>] = [:]
-    
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var backgroundCompletionHandler: (() -> Void)?
 
     private lazy var urlSession: URLSession = {
@@ -143,21 +136,67 @@ final class DownloadManager: NSObject, ObservableObject {
         config.sessionSendsLaunchEvents = true
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
-    
+
     private override init() {
         super.init()
-        // Ensure download directory exists so it shows up in Files app
         _ = downloadDir
         load()
         reconnectBackgroundTasks()
         processQueue()
+        requestNotificationPermission()
+        observeAppLifecycle()
+    }
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    private func observeAppLifecycle() {
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.handleEnterBackground()
+        }
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.handleEnterForeground()
+        }
+    }
+
+    private func handleEnterBackground() {
+        guard !hlsTasks.isEmpty else { return }
+        // Request extra background time so in-flight HLS downloads can finish or at least
+        // make progress. iOS typically grants ~30 seconds.
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "HLSDownload") { [weak self] in
+            // Time is nearly up — pause downloads cleanly so they resume on return.
+            self?.pauseAllHLSTasks()
+            UIApplication.shared.endBackgroundTask(self?.backgroundTaskID ?? .invalid)
+            self?.backgroundTaskID = .invalid
+        }
+    }
+
+    private func handleEnterForeground() {
+        if backgroundTaskID != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
+        }
+        processQueue()
+    }
+
+    private func pauseAllHLSTasks() {
+        for (id, task) in hlsTasks {
+            task.cancel()
+            if let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx].state = .pending
+                items[idx].error = nil
+            }
+        }
+        hlsTasks.removeAll()
+        persist()
     }
     
     // MARK: - Public API
     
     func download(stream: StreamResult, episodeHref: String, context: DownloadContext) {
         // Prevent duplicates
-        if let existing = items.first(where: { $0.episodeHref == episodeHref && $0.streamTitle == context.streamTitle }) {
+        if let existing = items.first(where: { $0.episodeNumber == context.episodeNumber && $0.episodeHref == episodeHref && $0.streamTitle == context.streamTitle }) {
             let status = existing.state == .completed ? "already downloaded" : "already in queue"
             ToastManager.shared.show(message: "\(context.mediaTitle) - \(context.episodeNumber) is \(status)", type: .warning)
             return
@@ -213,7 +252,7 @@ final class DownloadManager: NSObject, ObservableObject {
                 guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { continue }
                 
                 // Check duplicate before even fetching streams to be faster
-                if items.contains(where: { $0.episodeHref == episode.href && $0.streamTitle == streamTitle }) {
+                if items.contains(where: { $0.episodeNumber == epNum && $0.episodeHref == episode.href && $0.streamTitle == streamTitle }) {
                     continue
                 }
 
@@ -251,59 +290,50 @@ final class DownloadManager: NSObject, ObservableObject {
 
     func retry(_ item: DownloadItem) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        hlsTasks[item.id]?.cancel()
+        hlsTasks.removeValue(forKey: item.id)
+        // Clean up partial HLS folder so the re-download starts fresh
+        let folder = downloadDir.appendingPathComponent(item.id.uuidString)
+        try? FileManager.default.removeItem(at: folder)
         items[idx].state = .pending
         items[idx].error = nil
-        items[idx].retryCount += 1
+        items[idx].retryCount = 0
         persist()
         processQueue()
     }
-    
+
     func remove(_ item: DownloadItem) {
         hlsTasks[item.id]?.cancel()
         hlsTasks.removeValue(forKey: item.id)
-        
         if let taskID = item.taskIdentifier {
-            urlSession.getAllTasks { tasks in
-                tasks.first { $0.taskIdentifier == taskID }?.cancel()
-            }
+            urlSession.getAllTasks { tasks in tasks.first { $0.taskIdentifier == taskID }?.cancel() }
         }
-        
         if let fileName = item.fileName {
-            // Delete the file or the folder (for Local HLS)
             let path = downloadDir.appendingPathComponent(fileName)
-            
             if item.isHLS {
-                let folder = path.deletingLastPathComponent()
-                try? FileManager.default.removeItem(at: folder)
+                try? FileManager.default.removeItem(at: path.deletingLastPathComponent())
             } else {
                 try? FileManager.default.removeItem(at: path)
             }
         }
-        
         items.removeAll { $0.id == item.id }
         persist()
-        
         ToastManager.shared.show(message: "Download removed: \(item.mediaTitle) - \(item.episodeNumber)", type: .info)
-        
         processQueue()
     }
-    
+
     func getStream(for item: DownloadItem) async -> StreamResult? {
         guard item.state == .completed, let fileName = item.fileName else { return nil }
         let fileURL = downloadDir.appendingPathComponent(fileName)
-
         let playURL: URL
         if item.isHLS {
-            // Local HLS manifest MUST be served through proxy to work in AVPlayer
             HLSProxyServer.shared.start(headers: ["User-Agent": URLSession.randomUserAgent])
             playURL = HLSProxyServer.shared.proxyURL(for: fileURL) ?? fileURL
-            Logger.shared.log("[Downloads] Routing Local HLS through proxy: \(playURL)", type: "Download")
+            Logger.shared.log("[Downloads] Routing HLS through proxy: \(playURL)", type: "Download")
         } else {
-            // Standard MP4 is direct
             playURL = fileURL
             Logger.shared.log("[Downloads] Playing direct MP4: \(playURL)", type: "Download")
         }
-        
         return StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: playURL,
@@ -320,13 +350,9 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     func reconnectPendingTasks() {
-        // This is called on app launch. MP4 tasks are handled by reconnectBackgroundTasks.
-        // HLS tasks cannot be resumed automatically if the app was killed.
-        for (idx, item) in items.enumerated() where item.state == .downloading {
-            if item.isHLS {
-                items[idx].state = .failed
-                items[idx].error = "Interrupted"
-            }
+        // HLS Swift Tasks don't survive app kill — reset them to pending so they restart.
+        for (idx, item) in items.enumerated() where item.state == .downloading && item.isHLS {
+            items[idx].state = .pending
         }
         persist()
         processQueue()
@@ -337,8 +363,8 @@ final class DownloadManager: NSObject, ObservableObject {
             Task { @MainActor in
                 for task in tasks {
                     if let downloadTask = task as? URLSessionDownloadTask,
-                       let idx = self.items.firstIndex(where: { 
-                           $0.state == .downloading && 
+                       let idx = self.items.firstIndex(where: {
+                           $0.state == .downloading &&
                            ($0.taskIdentifier == downloadTask.taskIdentifier || $0.taskIdentifier == nil)
                        }) {
                         self.items[idx].taskIdentifier = downloadTask.taskIdentifier
@@ -386,7 +412,6 @@ final class DownloadManager: NSObject, ObservableObject {
     private func startHLS(_ item: DownloadItem) {
         let id = item.id
         updateState(id, .downloading)
-        
         let task = Task {
             do {
                 let manifestPath = try await hlsDownloader.download(
@@ -443,10 +468,24 @@ final class DownloadManager: NSObject, ObservableObject {
             items[idx].fileName = fileName
             items[idx].completedAt = Date()
             persist()
-            
-            ToastManager.shared.show(message: "Download finished: \(item.mediaTitle) - \(item.episodeNumber)", type: .success)
+
+            let appState = UIApplication.shared.applicationState
+            if appState == .background || appState == .inactive {
+                sendCompletionNotification(item: item)
+            } else {
+                ToastManager.shared.show(message: "Download finished: \(item.mediaTitle) - Ep \(item.episodeNumber)", type: .success)
+            }
             processQueue()
         }
+    }
+
+    private func sendCompletionNotification(item: DownloadItem) {
+        let content = UNMutableNotificationContent()
+        content.title = item.mediaTitle
+        content.body = "Episode \(item.episodeNumber) finished downloading"
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: item.id.uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
     }
     
     private func updateError(_ id: UUID, _ error: Error) {
@@ -514,52 +553,35 @@ extension DownloadManager: URLSessionDownloadDelegate {
     }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        // We MUST move the file synchronously here because the temp file at 'location' 
-        // will be deleted as soon as this delegate method returns.
-        
         guard let uuidString = downloadTask.taskDescription,
               let id = UUID(uuidString: uuidString) else {
-            // Fallback: try to find by task identifier if description is missing
             let taskIdentifier = downloadTask.taskIdentifier
             Task { @MainActor in
                 if let idx = self.items.firstIndex(where: { $0.taskIdentifier == taskIdentifier }) {
-                    self.updateError(self.items[idx].id, NSError(domain: "DownloadManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Internal error: Download task lost context"]))
+                    self.updateError(self.items[idx].id, NSError(domain: "DownloadManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Download task lost context"]))
                 }
             }
             return
         }
-        
         let finalName = "\(id.uuidString).mp4"
         let destination = downloadDir.appendingPathComponent(finalName)
-        
-        do {
-            try FileManager.default.removeItem(at: destination)
-        } catch {
-            // Ignore if file doesn't exist
-        }
-        
+        try? FileManager.default.removeItem(at: destination)
         do {
             try FileManager.default.moveItem(at: location, to: destination)
-            Task { @MainActor in
-                self.updateCompletion(id, fileName: finalName)
-            }
+            Task { @MainActor in self.updateCompletion(id, fileName: finalName) }
         } catch {
-            Task { @MainActor in
-                self.updateError(id, error)
-            }
+            Task { @MainActor in self.updateError(id, error) }
         }
     }
-    
+
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        let taskIdentifier = task.taskIdentifier
+        guard let error else { return }
+        let nsError = error as NSError
+        guard nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled else { return }
+        let taskID = task.taskIdentifier
         Task { @MainActor in
-            if let error = error,
-               let idx = items.firstIndex(where: { $0.taskIdentifier == taskIdentifier }) {
-                let nsError = error as NSError
-                // Don't mark as error if it was manually cancelled
-                if nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled {
-                    updateError(items[idx].id, error)
-                }
+            if let idx = self.items.firstIndex(where: { $0.taskIdentifier == taskID }) {
+                self.updateError(self.items[idx].id, error)
             }
         }
     }
