@@ -325,9 +325,20 @@ final class DownloadManager: NSObject, ObservableObject {
     func getStream(for item: DownloadItem) async -> StreamResult? {
         guard item.state == .completed, let fileName = item.fileName else { return nil }
         let fileURL = downloadDir.appendingPathComponent(fileName)
+        let checkPath = item.isHLS ? fileURL.deletingLastPathComponent().path : fileURL.path
+        guard FileManager.default.fileExists(atPath: checkPath) else {
+            if let idx = items.firstIndex(where: { $0.id == item.id }) {
+                items[idx].state = .pending
+                items[idx].fileName = nil
+                items[idx].progress = 0
+                persist()
+                processQueue()
+            }
+            return nil
+        }
         let playURL: URL
         if item.isHLS {
-            HLSProxyServer.shared.start(headers: ["User-Agent": URLSession.randomUserAgent])
+            await HLSProxyServer.shared.startAndWait(headers: ["User-Agent": URLSession.randomUserAgent])
             playURL = HLSProxyServer.shared.proxyURL(for: fileURL) ?? fileURL
             Logger.shared.log("[Downloads] Routing HLS through proxy: \(playURL)", type: "Download")
         } else {
@@ -534,7 +545,21 @@ final class DownloadManager: NSObject, ObservableObject {
     private func load() {
         if let data = UserDefaults.standard.data(forKey: "shirox_downloads_v3"),
            let decoded = try? JSONDecoder().decode([DownloadItem].self, from: data) {
-            items = decoded
+            items = decoded.map { item in
+                guard item.state == .completed, let fileName = item.fileName else { return item }
+                let fileURL = downloadDir.appendingPathComponent(fileName)
+                let checkPath = (fileName.hasSuffix(".m3u8"))
+                    ? fileURL.deletingLastPathComponent().path
+                    : fileURL.path
+                guard FileManager.default.fileExists(atPath: checkPath) else {
+                    var reset = item
+                    reset.state = .pending
+                    reset.fileName = nil
+                    reset.progress = 0
+                    return reset
+                }
+                return item
+            }
         }
     }
 }

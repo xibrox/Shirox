@@ -598,25 +598,33 @@ struct DownloadedMediaDetailView: View {
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(sortedItems) { item in
-                        DownloadedEpisodeRowContainer(
-                            item: item,
-                            aniListID: aniListID,
-                            moduleId: moduleId,
-                            mediaTitle: mediaTitle,
-                            aniListProgress: existingEntry?.progress,
-                            aniListStatus: existingEntry?.status,
-                            onTap: { play(item) }
-                        )
+                        ZStack(alignment: .trailing) {
+                            DownloadedEpisodeRowContainer(
+                                item: item,
+                                aniListID: aniListID,
+                                moduleId: moduleId,
+                                mediaTitle: mediaTitle,
+                                aniListProgress: existingEntry?.progress,
+                                aniListStatus: existingEntry?.status,
+                                onTap: { play(item) }
+                            )
+                            Button {
+                                dm.remove(item)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 32, height: 32)
+                                    .background(.ultraThinMaterial, in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.trailing, 14)
+                        }
                         .contextMenu {
                             Button(role: .destructive) {
                                 dm.remove(item)
                             } label: {
                                 Label("Delete Download", systemImage: "trash")
-                            }
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { dm.remove(item) } label: {
-                                Label("Delete", systemImage: "trash")
                             }
                         }
                     }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
     @AppStorage("forceLandscape") private var forceLandscape = false
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
@@ -120,7 +121,7 @@ struct SettingsView: View {
                 }
 
                 Section("Downloads") {
-                    Picker("Concurrent Downloads", selection: DownloadManager.shared.$maxConcurrentDownloads) {
+                    Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
                         ForEach(1...5, id: \.self) { count in
                             Text("\(count)").tag(count)
                         }
