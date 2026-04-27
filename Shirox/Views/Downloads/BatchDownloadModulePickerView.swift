@@ -49,42 +49,36 @@ struct BatchDownloadModulePickerView: View {
                 guard let streamTitle = chosenStreamTitle, let pickerItem = chosenPickerItem else { return }
                 chosenStreamTitle = nil
                 chosenPickerItem = nil
-                // startDownloadAll is triggered via the row's own VM — signal via a stored reference
-                // Instead, we call back into the row via the module manager approach:
-                // Actually we need to trigger downloadAll on the right row's VM.
-                // The cleanest approach: pass episodeNumbers/imageUrl/mediaId into a shared download call.
+                
                 let mod = pickerItem.module
                 let item = pickerItem.searchItem
                 let epNums = episodeNumbers
                 let imgUrl = imageUrl
                 let mId = mediaId
                 let mTitle = animeTitle
+                
+                // Fetch episodes once to get the EpisodeLink objects
                 Task {
                     let r = ModuleJSRunner()
                     do {
                         try await r.load(module: mod)
                         let allEpisodes = try await r.fetchEpisodes(url: item.href)
-                        for epNum in epNums {
-                            guard let matched = allEpisodes.first(where: { $0.number == Double(epNum) }) else { continue }
-                            let streams = (try? await r.fetchStreams(episodeUrl: matched.href)) ?? []
-                            guard !streams.isEmpty else { continue }
-                            let stream = streams.first(where: { $0.title == streamTitle }) ?? streams[0]
-                            let ctx = DownloadContext(
-                                mediaTitle: mTitle,
-                                episodeNumber: epNum,
-                                episodeTitle: nil,
-                                imageUrl: imgUrl,
-                                aniListID: mId,
-                                moduleId: mod.id,
-                                detailHref: item.href,
-                                episodeHref: matched.href,
-                                streamTitle: stream.title,
-                                totalEpisodes: nil
-                            )
-                            DownloadManager.shared.download(stream: stream, episodeHref: matched.href, context: ctx)
-                        }
-                    } catch {}
+                        
+                        DownloadManager.shared.batchDownload(
+                            mediaTitle: mTitle,
+                            imageUrl: imgUrl,
+                            aniListID: mId,
+                            moduleId: mod.id,
+                            detailHref: item.href,
+                            episodes: allEpisodes,
+                            episodeNumbers: epNums,
+                            streamTitle: streamTitle
+                        )
+                    } catch {
+                        ToastManager.shared.show(message: "Failed to load episodes: \(error.localizedDescription)", type: .error)
+                    }
                 }
+                
                 onDismiss()
             }) { pickerItem in
                 DownloadStreamPickerView(streams: pickerItem.streams) { stream in
@@ -238,13 +232,16 @@ private struct BatchDownloadModuleRow: View {
             stateContent
         }
         .padding(.vertical, 6)
+        .onAppear {
+            rowVm.startFind()
+        }
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams, let item = rowVm.readySearchItem else { return }
             onStreamsForPicker(streams, item)
         }
         .sheet(isPresented: $showAllResults) {
             if case .searchResults(let items) = rowVm.state {
-                BatchSearchResultsPickerSheet(items: items, module: module) { item in
+                BatchSearchResultsPickerSheet(items: items, module: module, episodeCount: episodeNumbers.count) { item in
                     showAllResults = false
                     rowVm.startFetchStreamsForPicker(from: item)
                 }
@@ -281,7 +278,7 @@ private struct BatchDownloadModuleRow: View {
         switch rowVm.state {
         case .idle, .notFound, .error:
             Button("Find") { rowVm.startFind() }
-                .buttonStyle(.borderedProminent).controlSize(.small)
+                .buttonStyle(.bordered).controlSize(.small)
         case .loading, .downloading:
             Button { rowVm.cancel() } label: {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -381,8 +378,10 @@ private struct BatchSearchResultCard: View {
                                 Text("\(episodeCount) ep\(episodeCount == 1 ? "" : "s")")
                                     .font(.system(size: 8, weight: .bold))
                                     .padding(.horizontal, 4).padding(.vertical, 2)
-                                    .background(Color.accentColor, in: Capsule())
-                                    .foregroundStyle(.white).padding(4)
+                                    .foregroundStyle(Color.primary)
+                                    .colorInvert()
+                                    .background(Color.primary, in: Capsule())
+                                    .padding(4)
                             }
                         }
                     }
@@ -401,6 +400,7 @@ private struct BatchSearchResultCard: View {
 private struct BatchSearchResultsPickerSheet: View {
     let items: [SearchItem]
     let module: ModuleDefinition
+    let episodeCount: Int
     let onSelect: (SearchItem) -> Void
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
@@ -421,6 +421,15 @@ private struct BatchSearchResultsPickerSheet: View {
                                 .overlay(alignment: .bottomLeading) {
                                     Text(item.title).font(.caption2.weight(.semibold)).foregroundStyle(.white)
                                         .lineLimit(2).padding(.horizontal, 8).padding(.bottom, 8)
+                                }
+                                .overlay(alignment: .topTrailing) {
+                                    Text("\(episodeCount) ep\(episodeCount == 1 ? "" : "s")")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .padding(.horizontal, 6).padding(.vertical, 3)
+                                        .foregroundStyle(Color.primary)
+                                        .colorInvert()
+                                        .background(Color.primary, in: Capsule())
+                                        .padding(6)
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .shadow(color: .black.opacity(0.3), radius: 5, y: 3)

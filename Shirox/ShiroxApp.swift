@@ -283,6 +283,9 @@ private struct RootTabView: View {
             selectedTab = 3
             #endif
         }
+        .overlay {
+            ToastView()
+        }
         #if targetEnvironment(macCatalyst)
         .onAppear {
             guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }

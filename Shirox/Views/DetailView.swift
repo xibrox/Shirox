@@ -899,12 +899,22 @@ struct DetailView: View {
                         return Array(visibleEpisodes[startIndex..<endIndex])
                     }()
                     
-                    let allSelected = !currentRangeEpisodes.isEmpty && currentRangeEpisodes.allSatisfy { selectedEpisodeNumbers.contains(Int($0.number)) }
+                    let selectableEpisodes = currentRangeEpisodes.filter { ep in
+                        let epNum = Int(ep.number)
+                        let state = DownloadManager.shared.items.first { 
+                            $0.episodeHref == ep.href || 
+                            ($0.mediaTitle == detail.title && $0.episodeNumber == epNum && $0.moduleId == ModuleManager.shared.activeModule?.id)
+                        }?.state
+                        return state != .completed && state != .downloading && state != .pending
+                    }
+                    
+                    let allSelected = !selectableEpisodes.isEmpty && selectableEpisodes.allSatisfy { selectedEpisodeNumbers.contains(Int($0.number)) }
+                    
                     Button(allSelected ? "Deselect All" : "Select All") {
                         if allSelected {
-                            currentRangeEpisodes.forEach { selectedEpisodeNumbers.remove(Int($0.number)) }
+                            selectableEpisodes.forEach { selectedEpisodeNumbers.remove(Int($0.number)) }
                         } else {
-                            currentRangeEpisodes.forEach { selectedEpisodeNumbers.insert(Int($0.number)) }
+                            selectableEpisodes.forEach { selectedEpisodeNumbers.insert(Int($0.number)) }
                         }
                     }
                     .font(.subheadline.weight(.bold))
@@ -965,6 +975,16 @@ struct DetailView: View {
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
                             onTap: sel ? {
+                                // Prevent selecting if already downloaded or in progress
+                                let state = DownloadManager.shared.items.first { 
+                                    $0.episodeHref == episode.href || 
+                                    ($0.mediaTitle == detail.title && $0.episodeNumber == epNum && $0.moduleId == ModuleManager.shared.activeModule?.id)
+                                }?.state
+                                
+                                if state == .completed || state == .downloading || state == .pending {
+                                    return 
+                                }
+
                                 if selectedEpisodeNumbers.contains(epNum) {
                                     selectedEpisodeNumbers.remove(epNum)
                                 } else {
@@ -1024,12 +1044,20 @@ private struct ModuleEpisodeRowContainer: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    @ObservedObject private var downloadManager = DownloadManager.shared
     
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
 
     private var moduleId: String? { ModuleManager.shared.activeModule?.id }
     private var epNum: Int { Int(episode.number) }
+
+    private var downloadState: DownloadState? {
+        downloadManager.items.first { 
+            $0.episodeHref == episode.href || 
+            ($0.mediaTitle == mediaTitle && $0.episodeNumber == epNum && $0.moduleId == moduleId)
+        }?.state
+    }
 
     private var progress: Double? {
         if continueWatching.isWatched(aniListID: aniListID, moduleId: moduleId,
@@ -1105,7 +1133,8 @@ private struct ModuleEpisodeRowContainer: View {
                     } : nil,
                     onDownload: onDownload,
                     isSelectionMode: isSelectionMode,
-                    isSelected: isSelected
+                    isSelected: isSelected,
+                    downloadState: downloadState
                 )
             } else {
                 EpisodeRowView(
@@ -1144,7 +1173,8 @@ private struct ModuleEpisodeRowContainer: View {
                     } : nil,
                     onDownload: onDownload,
                     isSelectionMode: isSelectionMode,
-                    isSelected: isSelected
+                    isSelected: isSelected,
+                    downloadState: downloadState
                 )
             }
         }

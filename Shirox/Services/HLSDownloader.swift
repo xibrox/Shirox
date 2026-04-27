@@ -48,22 +48,42 @@ actor HLSDownloader {
         let episodeFolder = downloadDir.appendingPathComponent(id.uuidString)
         try FileManager.default.createDirectory(at: episodeFolder, withIntermediateDirectories: true)
         
-        // 4. Concurrent Download
+        // 4. Concurrent Download with limited concurrency
         Logger.shared.log("[HLS] Downloading \(segments.count) segments to \(episodeFolder.lastPathComponent)...", type: "Download")
+        
+        let maxConcurrentSegments = 10
         try await withThrowingTaskGroup(of: Int.self) { group in
-            for (index, segment) in segments.enumerated() {
+            var index = 0
+            
+            // Initial fill
+            while index < min(segments.count, maxConcurrentSegments) {
+                let currentIdx = index
+                let segment = segments[currentIdx]
                 group.addTask {
-                    let segmentName = "seg_\(index).ts"
+                    let segmentName = "seg_\(currentIdx).ts"
                     let path = episodeFolder.appendingPathComponent(segmentName)
                     try await self.downloadFile(segment.url, to: path, headers: headers)
-                    return index
+                    return currentIdx
                 }
+                index += 1
             }
             
             var completed = 0
             for try await _ in group {
                 completed += 1
                 onProgress(Double(completed) / Double(segments.count))
+                
+                if index < segments.count {
+                    let currentIdx = index
+                    let segment = segments[currentIdx]
+                    group.addTask {
+                        let segmentName = "seg_\(currentIdx).ts"
+                        let path = episodeFolder.appendingPathComponent(segmentName)
+                        try await self.downloadFile(segment.url, to: path, headers: headers)
+                        return currentIdx
+                    }
+                    index += 1
+                }
             }
         }
         

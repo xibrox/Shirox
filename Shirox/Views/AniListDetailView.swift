@@ -757,13 +757,20 @@ struct AniListDetailView: View {
                     
                     if currentRangeStart <= currentRangeEnd {
                         let rangeEpisodes = Array(currentRangeStart...currentRangeEnd)
-                        let allInCurrentRangeSelected = !rangeEpisodes.isEmpty && rangeEpisodes.allSatisfy { selectedEpisodeNumbers.contains($0) }
+                        let selectableEpisodes = rangeEpisodes.filter { ep in
+                            let state = DownloadManager.shared.items.first { 
+                                $0.aniListID == mediaId && $0.episodeNumber == ep 
+                            }?.state
+                            return state != .completed && state != .downloading && state != .pending
+                        }
+                        
+                        let allInCurrentRangeSelected = !selectableEpisodes.isEmpty && selectableEpisodes.allSatisfy { selectedEpisodeNumbers.contains($0) }
 
                         Button(allInCurrentRangeSelected ? "Deselect Range" : "Select Range") {
                             if allInCurrentRangeSelected {
-                                rangeEpisodes.forEach { selectedEpisodeNumbers.remove($0) }
+                                selectableEpisodes.forEach { selectedEpisodeNumbers.remove($0) }
                             } else {
-                                rangeEpisodes.forEach { selectedEpisodeNumbers.insert($0) }
+                                selectableEpisodes.forEach { selectedEpisodeNumbers.insert($0) }
                             }
                         }
                         .font(.subheadline.weight(.medium))
@@ -828,6 +835,15 @@ struct AniListDetailView: View {
                                 aniListProgress: existingEntry?.progress,
                                 aniListStatus: existingEntry?.status,
                                 onTap: sel ? {
+                                    // Prevent selecting if already downloaded or in progress
+                                    let state = DownloadManager.shared.items.first { 
+                                        $0.aniListID == mediaId && $0.episodeNumber == ep 
+                                    }?.state
+                                    
+                                    if state == .completed || state == .downloading || state == .pending {
+                                        return 
+                                    }
+
                                     if selectedEpisodeNumbers.contains(ep) {
                                         selectedEpisodeNumbers.remove(ep)
                                     } else {
@@ -935,7 +951,7 @@ struct AniListDetailView: View {
 }
 
 // MARK: - Synopsis
-private struct SynopsisSection: View {
+struct SynopsisSection: View {
     let text: String
     @State private var expanded = false
 
@@ -977,9 +993,16 @@ private struct AniListEpisodeRowContainer: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    @ObservedObject private var downloadManager = DownloadManager.shared
     
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
+
+    private var downloadState: DownloadState? {
+        downloadManager.items.first { 
+            $0.aniListID == mediaId && $0.episodeNumber == ep 
+        }?.state
+    }
 
     private var progress: Double? {
         if continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
@@ -1045,7 +1068,8 @@ private struct AniListEpisodeRowContainer: View {
             } : nil,
             onDownload: onDownload,
             isSelectionMode: isSelectionMode,
-            isSelected: isSelected
+            isSelected: isSelected,
+            downloadState: downloadState
         )
         .task {
             if aniMapEpisode == nil {

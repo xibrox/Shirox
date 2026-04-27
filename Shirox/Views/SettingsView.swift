@@ -119,6 +119,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Downloads") {
+                    Picker("Concurrent Downloads", selection: DownloadManager.shared.$maxConcurrentDownloads) {
+                        ForEach(1...5, id: \.self) { count in
+                            Text("\(count)").tag(count)
+                        }
+                    }
+                }
+
                 Section("Matching") {
                     ForEach(orderedLanguages, id: \.self) { lang in
                         HStack {
@@ -534,7 +542,8 @@ class LogFilterViewModel: ObservableObject {
         ("General", "General events and activities.", true),
         ("Stream", "Streaming and video playback.", true),
         ("Error", "Errors and critical issues.", true),
-        ("Debug", "Debugging and troubleshooting.", true),
+        ("Debug", "Debugging and troubleshooting.", false),
+        ("Network", "Network requests and responses.", false),
         ("Download", "HLS video downloading.", true),
         ("HTMLStrings", "Raw HTML response strings.", false)
     ]

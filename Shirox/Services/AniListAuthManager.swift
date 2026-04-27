@@ -79,7 +79,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             url: authURL,
             callbackURLScheme: "shirox"
         ) { [weak self] callbackURL, error in
-            print("[AniList] callback fired — url: \(callbackURL?.absoluteString ?? "nil"), error: \(error?.localizedDescription ?? "nil")")
+            Logger.shared.log("[AniList] callback fired — url: \(callbackURL?.absoluteString ?? "nil"), error: \(error?.localizedDescription ?? "nil")", type: "Debug")
             guard let self, let url = callbackURL, error == nil else { return }
             Task { @MainActor in self.handleCallback(url: url) }
         }
@@ -90,10 +90,10 @@ final class AniListAuthManager: NSObject, ObservableObject {
     }
 
     func handleCallback(url: URL) {
-        print("[AniList] handleCallback url: \(url.absoluteString)")
+        Logger.shared.log("[AniList] handleCallback url: \(url.absoluteString)", type: "Debug")
         // Implicit flow returns token in fragment: shirox://auth#access_token=...
         guard let fragment = url.fragment else {
-            print("[AniList] handleCallback: no fragment in URL")
+            Logger.shared.log("[AniList] handleCallback: no fragment in URL", type: "Error")
             return
         }
         var params: [String: String] = [:]
@@ -102,10 +102,10 @@ final class AniListAuthManager: NSObject, ObservableObject {
             if kv.count == 2 { params[kv[0]] = kv[1] }
         }
         guard let token = params["access_token"] else {
-            print("[AniList] handleCallback: no access_token in fragment")
+            Logger.shared.log("[AniList] handleCallback: no access_token in fragment", type: "Error")
             return
         }
-        print("[AniList] got token, fetching viewer")
+        Logger.shared.log("[AniList] got token, fetching viewer", type: "Debug")
         saveToken(token)
         isLoggedIn = true
         Task { await fetchViewer() }

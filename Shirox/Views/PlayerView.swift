@@ -734,7 +734,7 @@ struct PlayerView: View {
                 #else
                 castURL = currentStream.url
                 #endif
-                print("[Cast] proxy URL: \(castURL)")
+                Logger.shared.log("[Cast] proxy URL: \(castURL)", type: "Stream")
             } else {
                 castURL = currentStream.url
             }
@@ -833,14 +833,14 @@ struct PlayerView: View {
         // Fix: Local files and fast streams might already be ready or need a status observer
         Task { @MainActor in
             for await status in item.publisher(for: \.status).values {
-                print("[Player] Item status: \(status.rawValue)")
+                Logger.shared.log("[Player] Item status: \(status.rawValue)", type: "Debug")
                 if status == .readyToPlay {
                     if currentContext?.resumeFrom == nil {
                         videoReady = true
                     }
                     break
                 } else if status == .failed {
-                    print("[Player] Item failed: \(item.error?.localizedDescription ?? "unknown error")")
+                    Logger.shared.log("[Player] Item failed: \(item.error?.localizedDescription ?? "unknown error")", type: "Error")
                     videoReady = true // Show player so user can see error state
                     break
                 }
@@ -886,7 +886,7 @@ struct PlayerView: View {
         Task {
             try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
             if !videoReady {
-                print("[Player] Loading timeout reached, forcing ready state")
+                Logger.shared.log("[Player] Loading timeout reached, forcing ready state", type: "Debug")
                 await MainActor.run { videoReady = true }
             }
         }
@@ -931,7 +931,7 @@ struct PlayerView: View {
             }
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
-                print("[Player] Resuming from \(resumeFrom)s")
+                Logger.shared.log("[Player] Resuming from \(resumeFrom)s", type: "Debug")
                 p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { _ in
                     // Always set ready, even if seek was interrupted
                     DispatchQueue.main.async { videoReady = true }
@@ -966,7 +966,7 @@ struct PlayerView: View {
             do {
                 subtitleCues = try await VTTSubtitlesLoader.load(from: urlString)
             } catch {
-                print("[Subtitles] Failed to load: \(error)")
+                Logger.shared.log("[Subtitles] Failed to load: \(error)", type: "Error")
             }
         }
     }
@@ -1102,34 +1102,26 @@ struct PlayerView: View {
     }
 
     private func loadAndAdvance() async {
-        print("[PlayerView] loadAndAdvance() called")
-        print("[PlayerView] onWatchNext: \(onWatchNext != nil ? "set" : "nil")")
-        print("[PlayerView] currentContext: \(currentContext != nil ? "set" : "nil")")
-        print("[PlayerView] currentContext?.episodeNumber: \(currentContext?.episodeNumber ?? -1)")
-
+        Logger.shared.log("[PlayerView] loadAndAdvance() called", type: "Debug")
+        
         guard let loader = onWatchNext, let epNum = currentContext?.episodeNumber else {
-            print("[PlayerView] Guard failed: loader=\(onWatchNext != nil), epNum=\(currentContext?.episodeNumber ?? -1)")
             return
         }
 
-        print("[PlayerView] Starting next episode load for episode \(epNum)")
+        Logger.shared.log("[PlayerView] Starting next episode load for episode \(epNum)", type: "Debug")
         isLoadingNextEpisode = true
         do {
-            print("[PlayerView] Calling loader closure...")
             let result = try await loader(epNum)
-            print("[PlayerView] Loader returned: \(result != nil ? "result with \(result?.streams.count ?? 0) streams" : "nil")")
 
             guard let result = result else {
-                print("[PlayerView] Loader returned nil")
                 isLoadingNextEpisode = false
                 return
             }
 
             isLoadingNextEpisode = false
-            print("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)")
+            Logger.shared.log("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)", type: "Debug")
 
             guard !result.streams.isEmpty else {
-                print("[PlayerView] No streams available")
                 return
             }
 
@@ -1138,7 +1130,7 @@ struct PlayerView: View {
             // Prefer stream with same title as selected stream (e.g., "SUB" -> "SUB", "DUB" -> "DUB")
             let exactTitleMatch = result.streams.first { $0.title == currentContext?.streamTitle }
             if let exactMatch = exactTitleMatch {
-                print("[PlayerView] Found exact stream title match: \(exactMatch.title)")
+                Logger.shared.log("[PlayerView] Found exact stream title match: \(exactMatch.title)", type: "Debug")
                 swapStream(exactMatch, episodeNumber: result.episodeNumber)
                 return
             }
@@ -1152,24 +1144,22 @@ struct PlayerView: View {
                 ?? fallbackStreams.first
                 ?? titleMatchingStreams.first
 
-            print("[PlayerView] Stream matching: saved=\(currentContext?.streamTitle ?? "nil"), matching=\(matchingStreams.count), fallback=\(fallbackStreams.count), titleMatch=\(titleMatchingStreams.count), selected=\(match != nil ? match!.title : "picker")")
-
             if let match {
-                print("[PlayerView] Auto-selected stream: \(match.title)")
+                Logger.shared.log("[PlayerView] Auto-selected stream: \(match.title)", type: "Debug")
                 swapStream(match, episodeNumber: result.episodeNumber)
             }
             else if result.streams.count == 1 {
-                print("[PlayerView] Auto-selected single stream: \(result.streams[0].title)")
+                Logger.shared.log("[PlayerView] Auto-selected single stream: \(result.streams[0].title)", type: "Debug")
                 swapStream(result.streams[0], episodeNumber: result.episodeNumber)
             }
             else {
-                print("[PlayerView] Showing stream picker with \(result.streams.count) streams")
+                Logger.shared.log("[PlayerView] Showing stream picker with \(result.streams.count) streams", type: "Debug")
                 nextEpisodeNumber = result.episodeNumber
                 nextEpisodeStreams = result.streams
                 showNextEpisodePicker = true
             }
         } catch {
-            print("[PlayerView] Error in loadAndAdvance: \(error)")
+            Logger.shared.log("[PlayerView] Error in loadAndAdvance: \(error)", type: "Error")
             isLoadingNextEpisode = false
         }
     }
@@ -1253,7 +1243,7 @@ struct PlayerView: View {
         }
         subtitleCues = []
         if let urlString = next.subtitle, !urlString.isEmpty {
-            Task { do { subtitleCues = try await VTTSubtitlesLoader.load(from: urlString) } catch { print("[Subtitles] Failed to load: \(error)") } }
+            Task { do { subtitleCues = try await VTTSubtitlesLoader.load(from: urlString) } catch { Logger.shared.log("[Subtitles] Failed to load: \(error)", type: "Error") } }
         }
         tvdbEpisodeTitle = nil
         loadTVDBTitle()

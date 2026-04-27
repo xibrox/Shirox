@@ -22,6 +22,8 @@ struct DownloadItem: Identifiable, Codable {
     let detailHref: String?
     let episodeHref: String
     let streamTitle: String?
+    let streamURL: URL
+    let headers: [String: String]
     
     // Status
     var state: DownloadState
@@ -38,6 +40,7 @@ struct DownloadItem: Identifiable, Codable {
     
     // Task Tracking
     var taskIdentifier: Int?
+    var retryCount: Int = 0
     
     // Helper to determine if we should use HLS playback
     var isHLS: Bool {

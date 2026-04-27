@@ -283,12 +283,12 @@ final class AniListService {
         let bodyDict: [String: Any] = ["query": query, "variables": variables]
         request.httpBody = try JSONSerialization.data(withJSONObject: bodyDict, options: [])
 
-        Logger.shared.log("AniList Request: \(bodyDict)", type: "Debug")
+        Logger.shared.log("AniList Request: \(bodyDict)", type: "Network")
 
         let (data, response) = try await session.data(for: request)
 
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            Logger.shared.log("AniList Response: \(json)", type: "Debug")
+            Logger.shared.log("AniList Response: \(json)", type: "Network")
         }
 
         if let http = response as? HTTPURLResponse {

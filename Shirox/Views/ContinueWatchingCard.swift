@@ -103,11 +103,10 @@ struct ContinueWatchingSection: View {
 
         // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList)
         let onWatchNext: WatchNextLoader? = { currentEpNum in
-            print("[ContinueWatching] onWatchNext called for episode \(currentEpNum), item.moduleId=\(item.moduleId ?? "nil"), item.detailHref=\(item.detailHref ?? "nil")")
+            Logger.shared.log("[ContinueWatching] onWatchNext called for episode \(currentEpNum)", type: "Debug")
 
             // For module-sourced items
             if let moduleId = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
-                print("[ContinueWatching] Using ModuleJSRunner path")
                 do {
                     let runner = ModuleJSRunner()
                     try await runner.load(module: module)
@@ -115,78 +114,60 @@ struct ContinueWatchingSection: View {
                     // Fetch episodes via detailHref or search
                     var episodes: [EpisodeLink] = []
                     if let href = item.detailHref {
-                        print("[ContinueWatching] Fetching episodes from detailHref: \(href)")
                         episodes = try await runner.fetchEpisodes(url: href)
                     } else {
-                        print("[ContinueWatching] Searching for: \(item.mediaTitle)")
                         let results = try await runner.search(keyword: item.mediaTitle)
-                        print("[ContinueWatching] Search returned \(results.count) results")
                         if let match = results.first {
-                            print("[ContinueWatching] Fetching episodes from first search result")
                             episodes = try await runner.fetchEpisodes(url: match.href)
                         }
                     }
 
-                    print("[ContinueWatching] Got \(episodes.count) episodes")
                     guard !episodes.isEmpty else {
-                        print("[ContinueWatching] No episodes found")
                         return nil
                     }
 
                     // Find current episode
                     var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
                     if idx == nil {
-                        print("[ContinueWatching] Exact episode not found, finding closest match")
                         idx = episodes.enumerated().min(by: {
                             abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
                         })?.offset
                     }
-                    print("[ContinueWatching] Current episode index: \(idx ?? -1)")
 
                     guard let currentIdx = idx, currentIdx + 1 < episodes.count else {
-                        print("[ContinueWatching] No next episode found")
                         return nil
                     }
 
                     let nextEp = episodes[currentIdx + 1]
-                    print("[ContinueWatching] Fetching streams for next episode \(nextEp.number)")
                     let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
 
-                    print("[ContinueWatching] Got \(streams.count) streams for next episode")
                     guard !streams.isEmpty else { return nil }
                     return (streams: streams, episodeNumber: Int(nextEp.number))
                 } catch {
-                    print("[ContinueWatching] Next episode failed (module): \(error)")
+                    Logger.shared.log("[ContinueWatching] Next episode failed (module): \(error)", type: "Error")
                     return nil
                 }
             }
             // For AniList-sourced items with detailHref
             else if let href = item.detailHref {
-                print("[ContinueWatching] Using JSEngine path with detailHref")
                 do {
-                    print("[ContinueWatching] Fetching episodes from detailHref: \(href)")
                     let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-                    print("[ContinueWatching] Got \(episodes.count) episodes")
                     guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
                           idx + 1 < episodes.count else {
-                        print("[ContinueWatching] No next episode found")
                         return nil
                     }
 
                     let nextEp = episodes[idx + 1]
-                    print("[ContinueWatching] Fetching streams for next episode \(nextEp.number)")
                     let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
-                    print("[ContinueWatching] Got \(streams.count) streams")
                     guard !streams.isEmpty else { return nil }
                     return (streams: streams, episodeNumber: Int(nextEp.number))
                 } catch {
-                    print("[ContinueWatching] Next episode failed (anilist): \(error)")
+                    Logger.shared.log("[ContinueWatching] Next episode failed (anilist): \(error)", type: "Error")
                     return nil
                 }
             }
             // No way to fetch next episode
             else {
-                print("[ContinueWatching] No moduleId or detailHref available")
                 return nil
             }
         }

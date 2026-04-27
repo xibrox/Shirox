@@ -96,27 +96,16 @@ struct BatchDownloadStreamPickerView: View {
     }
 
     private func startBatchDownload(streamTitle: String) {
-        Task {
-            for epNum in episodeNumbers {
-                guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { continue }
-                guard let fetchedStreams = try? await JSEngine.shared.fetchStreams(episodeUrl: episode.href),
-                      !fetchedStreams.isEmpty else { continue }
-                let stream = fetchedStreams.first(where: { $0.title == streamTitle }) ?? fetchedStreams[0]
-                let ctx = DownloadContext(
-                    mediaTitle: mediaTitle,
-                    episodeNumber: epNum,
-                    episodeTitle: nil,
-                    imageUrl: imageUrl,
-                    aniListID: nil,
-                    moduleId: moduleId,
-                    detailHref: nil,
-                    episodeHref: episode.href,
-                    streamTitle: stream.title,
-                    totalEpisodes: episodes.count
-                )
-                DownloadManager.shared.download(stream: stream, episodeHref: episode.href, context: ctx)
-            }
-        }
+        DownloadManager.shared.batchDownload(
+            mediaTitle: mediaTitle,
+            imageUrl: imageUrl,
+            aniListID: nil,
+            moduleId: moduleId,
+            detailHref: nil,
+            episodes: episodes,
+            episodeNumbers: episodeNumbers,
+            streamTitle: streamTitle
+        )
     }
 }
 #endif

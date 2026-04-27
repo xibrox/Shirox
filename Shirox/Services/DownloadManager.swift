@@ -2,6 +2,104 @@
 import Foundation
 import Combine
 import AVFoundation
+import SwiftUI
+
+enum ToastType {
+    case info
+    case success
+    case error
+    case warning
+    
+    var color: Color {
+        switch self {
+        case .info: return .blue
+        case .success: return .green
+        case .error: return .red
+        case .warning: return .orange
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .info: return "info.circle.fill"
+        case .success: return "checkmark.circle.fill"
+        case .error: return "exclamationmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        }
+    }
+}
+
+struct Toast: Identifiable {
+    let id = UUID()
+    let message: String
+    let type: ToastType
+    var duration: Double = 3.0
+}
+
+@MainActor
+final class ToastManager: ObservableObject {
+    static let shared = ToastManager()
+    
+    @Published var toasts: [Toast] = []
+    
+    private init() {}
+    
+    func show(message: String, type: ToastType = .info, duration: Double = 3.0) {
+        let toast = Toast(message: message, type: type, duration: duration)
+        withAnimation(.spring()) {
+            toasts.append(toast)
+        }
+        
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            self.remove(toast)
+        }
+    }
+    
+    func remove(_ toast: Toast) {
+        withAnimation(.spring()) {
+            toasts.removeAll { $0.id == toast.id }
+        }
+    }
+}
+
+struct ToastView: View {
+    @ObservedObject var manager = ToastManager.shared
+    
+    var body: some View {
+        ZStack {
+            VStack {
+                Spacer()
+                ForEach(manager.toasts) { toast in
+                    HStack(spacing: 12) {
+                        Image(systemName: toast.type.icon)
+                            .foregroundStyle(toast.type.color)
+                        
+                        Text(toast.message)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.secondarySystemBackground))
+                            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                    }
+                    .padding(.horizontal, 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onTapGesture {
+                        manager.remove(toast)
+                    }
+                }
+            }
+            .padding(.bottom, 50)
+        }
+        .allowsHitTesting(!manager.toasts.isEmpty)
+    }
+}
 
 struct DownloadContext {
     let mediaTitle: String
@@ -21,6 +119,12 @@ final class DownloadManager: NSObject, ObservableObject {
     static let shared = DownloadManager()
     
     @Published private(set) var items: [DownloadItem] = []
+    
+    @AppStorage("maxConcurrentDownloads") var maxConcurrentDownloads: Int = 3 {
+        didSet {
+            processQueue()
+        }
+    }
     
     private let downloadDir: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -46,13 +150,20 @@ final class DownloadManager: NSObject, ObservableObject {
         _ = downloadDir
         load()
         reconnectBackgroundTasks()
+        processQueue()
     }
     
     // MARK: - Public API
     
     func download(stream: StreamResult, episodeHref: String, context: DownloadContext) {
+        // Prevent duplicates
+        if let existing = items.first(where: { $0.episodeHref == episodeHref && $0.streamTitle == context.streamTitle }) {
+            let status = existing.state == .completed ? "already downloaded" : "already in queue"
+            ToastManager.shared.show(message: "\(context.mediaTitle) - \(context.episodeNumber) is \(status)", type: .warning)
+            return
+        }
+        
         let id = UUID()
-        let isHLS = stream.url.absoluteString.contains(".m3u8")
         
         let item = DownloadItem(
             id: id,
@@ -65,6 +176,8 @@ final class DownloadManager: NSObject, ObservableObject {
             detailHref: context.detailHref,
             episodeHref: episodeHref,
             streamTitle: context.streamTitle,
+            streamURL: stream.url,
+            headers: stream.headers,
             state: .pending,
             progress: 0,
             createdAt: Date()
@@ -73,11 +186,76 @@ final class DownloadManager: NSObject, ObservableObject {
         items.append(item)
         persist()
         
-        if isHLS {
-            startHLS(item, stream: stream)
-        } else {
-            startMP4(item, stream: stream)
+        ToastManager.shared.show(message: "Download added: \(context.mediaTitle) - \(context.episodeNumber)", type: .info)
+        
+        processQueue()
+    }
+
+    func batchDownload(
+        mediaTitle: String,
+        imageUrl: String,
+        aniListID: Int?,
+        moduleId: String?,
+        detailHref: String?,
+        episodes: [EpisodeLink],
+        episodeNumbers: [Int],
+        streamTitle: String
+    ) {
+        ToastManager.shared.show(message: "Starting batch download for \(episodeNumbers.count) episodes...", type: .info)
+        
+        Task {
+            let runner = ModuleJSRunner()
+            if let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
+                try? await runner.load(module: module)
+            }
+            
+            for epNum in episodeNumbers {
+                guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { continue }
+                
+                // Check duplicate before even fetching streams to be faster
+                if items.contains(where: { $0.episodeHref == episode.href && $0.streamTitle == streamTitle }) {
+                    continue
+                }
+
+                do {
+                    let fetchedStreams = try await runner.fetchStreams(episodeUrl: episode.href)
+                    guard !fetchedStreams.isEmpty else {
+                        ToastManager.shared.show(message: "No streams found for Ep \(epNum)", type: .warning)
+                        continue
+                    }
+                    
+                    let stream = fetchedStreams.first(where: { $0.title == streamTitle }) ?? fetchedStreams[0]
+                    
+                    let ctx = DownloadContext(
+                        mediaTitle: mediaTitle,
+                        episodeNumber: epNum,
+                        episodeTitle: nil,
+                        imageUrl: imageUrl,
+                        aniListID: aniListID,
+                        moduleId: moduleId,
+                        detailHref: detailHref,
+                        episodeHref: episode.href,
+                        streamTitle: stream.title,
+                        totalEpisodes: episodes.count
+                    )
+                    
+                    await MainActor.run {
+                        self.download(stream: stream, episodeHref: episode.href, context: ctx)
+                    }
+                } catch {
+                    ToastManager.shared.show(message: "Failed to fetch Ep \(epNum): \(error.localizedDescription)", type: .error)
+                }
+            }
         }
+    }
+
+    func retry(_ item: DownloadItem) {
+        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        items[idx].state = .pending
+        items[idx].error = nil
+        items[idx].retryCount += 1
+        persist()
+        processQueue()
     }
     
     func remove(_ item: DownloadItem) {
@@ -104,6 +282,10 @@ final class DownloadManager: NSObject, ObservableObject {
         
         items.removeAll { $0.id == item.id }
         persist()
+        
+        ToastManager.shared.show(message: "Download removed: \(item.mediaTitle) - \(item.episodeNumber)", type: .info)
+        
+        processQueue()
     }
     
     func getStream(for item: DownloadItem) async -> StreamResult? {
@@ -147,6 +329,7 @@ final class DownloadManager: NSObject, ObservableObject {
             }
         }
         persist()
+        processQueue()
     }
 
     private func reconnectBackgroundTasks() {
@@ -163,6 +346,7 @@ final class DownloadManager: NSObject, ObservableObject {
                     }
                 }
                 self.persist()
+                self.processQueue()
             }
         }
     }
@@ -175,9 +359,31 @@ final class DownloadManager: NSObject, ObservableObject {
         }
     }
     
-    // MARK: - Private
+    // MARK: - Queue Processing
     
-    private func startHLS(_ item: DownloadItem, stream: StreamResult) {
+    private func processQueue() {
+        let activeCount = items.filter { $0.state == .downloading }.count
+        let availableSlots = maxConcurrentDownloads - activeCount
+        
+        guard availableSlots > 0 else { return }
+        
+        let pendingItems = items.filter { $0.state == .pending }
+        for i in 0..<min(pendingItems.count, availableSlots) {
+            let item = pendingItems[i]
+            startDownload(item)
+        }
+    }
+    
+    private func startDownload(_ item: DownloadItem) {
+        let isHLS = item.streamURL.absoluteString.contains(".m3u8")
+        if isHLS {
+            startHLS(item)
+        } else {
+            startMP4(item)
+        }
+    }
+    
+    private func startHLS(_ item: DownloadItem) {
         let id = item.id
         updateState(id, .downloading)
         
@@ -185,8 +391,8 @@ final class DownloadManager: NSObject, ObservableObject {
             do {
                 let manifestPath = try await hlsDownloader.download(
                     id: id,
-                    url: stream.url,
-                    headers: stream.headers,
+                    url: item.streamURL,
+                    headers: item.headers,
                     downloadDir: downloadDir,
                     onProgress: { [weak self] p in
                         Task { @MainActor in self?.updateProgress(id, p) }
@@ -194,16 +400,16 @@ final class DownloadManager: NSObject, ObservableObject {
                 )
                 updateCompletion(id, fileName: manifestPath)
             } catch {
-                updateError(id, error.localizedDescription)
+                updateError(id, error)
             }
             hlsTasks.removeValue(forKey: id)
         }
         hlsTasks[id] = task
     }
     
-    private func startMP4(_ item: DownloadItem, stream: StreamResult) {
-        var req = URLRequest(url: stream.url)
-        stream.headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+    private func startMP4(_ item: DownloadItem) {
+        var req = URLRequest(url: item.streamURL)
+        item.headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
         
         let task = urlSession.downloadTask(with: req)
         task.taskDescription = item.id.uuidString
@@ -231,20 +437,53 @@ final class DownloadManager: NSObject, ObservableObject {
     
     private func updateCompletion(_ id: UUID, fileName: String) {
         if let idx = items.firstIndex(where: { $0.id == id }) {
+            let item = items[idx]
             items[idx].state = .completed
             items[idx].progress = 1.0
             items[idx].fileName = fileName
             items[idx].completedAt = Date()
             persist()
+            
+            ToastManager.shared.show(message: "Download finished: \(item.mediaTitle) - \(item.episodeNumber)", type: .success)
+            processQueue()
         }
     }
     
-    private func updateError(_ id: UUID, _ message: String) {
+    private func updateError(_ id: UUID, _ error: Error) {
         if let idx = items.firstIndex(where: { $0.id == id }) {
-            items[idx].state = .failed
-            items[idx].error = message
-            persist()
+            let item = items[idx]
+            
+            if shouldAutoRetry(error: error, item: item) {
+                items[idx].state = .pending
+                items[idx].retryCount += 1
+                persist()
+                processQueue()
+            } else {
+                items[idx].state = .failed
+                items[idx].error = error.localizedDescription
+                persist()
+                
+                ToastManager.shared.show(message: "Download failed: \(item.mediaTitle) - \(item.episodeNumber)", type: .error)
+                processQueue()
+            }
         }
+    }
+    
+    private func shouldAutoRetry(error: Error, item: DownloadItem) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+        
+        let transientCodes: [Int] = [
+            NSURLErrorTimedOut,
+            NSURLErrorCannotConnectToHost,
+            NSURLErrorNetworkConnectionLost,
+            NSURLErrorDNSLookupFailed,
+            NSURLErrorResourceUnavailable,
+            NSURLErrorNotConnectedToInternet,
+            NSURLErrorBackgroundSessionWasDisconnected
+        ]
+        
+        return transientCodes.contains(nsError.code) && item.retryCount < 5
     }
     
     private func persist() {
@@ -284,7 +523,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
             let taskIdentifier = downloadTask.taskIdentifier
             Task { @MainActor in
                 if let idx = self.items.firstIndex(where: { $0.taskIdentifier == taskIdentifier }) {
-                    self.updateError(self.items[idx].id, "Internal error: Download task lost context")
+                    self.updateError(self.items[idx].id, NSError(domain: "DownloadManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Internal error: Download task lost context"]))
                 }
             }
             return
@@ -306,7 +545,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
             }
         } catch {
             Task { @MainActor in
-                self.updateError(id, "Failed to save file: \(error.localizedDescription)")
+                self.updateError(id, error)
             }
         }
     }
@@ -319,7 +558,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 let nsError = error as NSError
                 // Don't mark as error if it was manually cancelled
                 if nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled {
-                    updateError(items[idx].id, error.localizedDescription)
+                    updateError(items[idx].id, error)
                 }
             }
         }

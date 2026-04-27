@@ -147,7 +147,7 @@ private struct DownloadModuleRow: View {
         switch rowVm.state {
         case .idle:
             Button("Find") { rowVm.startFind() }
-                .buttonStyle(.borderedProminent).controlSize(.small)
+                .buttonStyle(.bordered).controlSize(.small)
         case .loading, .loadingEpisodes, .loadingStreams:
             Button { rowVm.cancel() } label: {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -347,6 +347,19 @@ private struct SearchResultCard: View {
                         CachedAsyncImage(urlString: item.image).frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
                         LinearGradient(stops: [.init(color: .clear, location: 0.5), .init(color: .black.opacity(0.8), location: 1)],
                                        startPoint: .top, endPoint: .bottom)
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                Text("1 ep")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .padding(.horizontal, 4).padding(.vertical, 2)
+                                    .foregroundStyle(Color.primary)
+                                    .colorInvert()
+                                    .background(Color.primary, in: Capsule())
+                                    .padding(4)
+                            }
+                        }
                     }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -383,6 +396,15 @@ private struct SearchResultsPickerSheet: View {
                                 .overlay(alignment: .bottomLeading) {
                                     Text(item.title).font(.caption2.weight(.semibold)).foregroundStyle(.white)
                                         .lineLimit(2).padding(.horizontal, 8).padding(.bottom, 8)
+                                }
+                                .overlay(alignment: .topTrailing) {
+                                    Text("1 ep")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .padding(.horizontal, 6).padding(.vertical, 3)
+                                        .foregroundStyle(Color.primary)
+                                        .colorInvert()
+                                        .background(Color.primary, in: Capsule())
+                                        .padding(6)
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
