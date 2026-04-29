@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 
 struct ProfileStatsView: View {
-    let stats: AniListAnimeStats?
+    let stats: ProfileAnimeStats?
     
     var body: some View {
         if let stats = stats {
@@ -72,7 +72,7 @@ struct ProfileStatsView: View {
     }
     
     @ViewBuilder
-    private func statusChart(_ data: [StatusStatistic]?) -> some View {
+    private func statusChart(_ data: [ProfileStatusStat]?) -> some View {
         if let data = data?.filter({ $0.count > 0 }) {
             Chart(data, id: \.status) { item in
                 BarMark(
@@ -98,7 +98,7 @@ struct ProfileStatsView: View {
     }
     
     @ViewBuilder
-    private func genreChart(_ data: [GenreStatistic]?) -> some View {
+    private func genreChart(_ data: [ProfileGenreStat]?) -> some View {
         if let data = data?.sorted(by: { $0.count > $1.count }).prefix(10) {
             Chart(data, id: \.genre) { item in
                 BarMark(
@@ -118,7 +118,7 @@ struct ProfileStatsView: View {
     }
     
     @ViewBuilder
-    private func scoreChart(_ data: [ScoreStatistic]?) -> some View {
+    private func scoreChart(_ data: [ProfileScoreStat]?) -> some View {
         if let data = data?.sorted(by: { $0.score < $1.score }) {
             Chart(data, id: \.score) { item in
                 AreaMark(

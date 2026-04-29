@@ -97,6 +97,7 @@ struct ShiroxApp: App {
         #if !targetEnvironment(macCatalyst)
         _ = CastManager.shared
         #endif
+        ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
     }
 
     var body: some Scene {

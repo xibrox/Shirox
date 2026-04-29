@@ -138,11 +138,14 @@ struct NotificationsView: View {
 
     // MARK: - Row
 
-    private func notificationRow(_ notif: AniListNotification) -> some View {
+    private func notificationRow(_ notif: ProviderNotification) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            iconBadge(for: notif)
-
-            thumb(for: notif)
+            let (symbol, color) = iconFor(notif)
+            Image(systemName: symbol)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(color))
 
             VStack(alignment: .leading, spacing: 3) {
                 bodyText(for: notif)
@@ -156,7 +159,6 @@ struct NotificationsView: View {
 
             Spacer(minLength: 0)
 
-            // Chevron only for tappable notifications
             if isTappable(notif) {
                 Image(systemName: "chevron.right")
                     .font(.caption2).foregroundStyle(.tertiary)
@@ -168,112 +170,51 @@ struct NotificationsView: View {
     }
 
     @ViewBuilder
-    private func iconBadge(for notif: AniListNotification) -> some View {
-        let (symbol, color) = iconFor(notif)
-        Image(systemName: symbol)
-            .font(.caption.weight(.bold))
-            .foregroundStyle(.white)
-            .frame(width: 26, height: 26)
-            .background(Circle().fill(color))
-    }
-
-    @ViewBuilder
-    private func thumb(for notif: AniListNotification) -> some View {
-        switch notif {
-        case .airing(let n):
-            if let img = n.media?.coverImage?.large {
-                CachedAsyncImage(urlString: img).frame(width: 40, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-        case .mediaAddition(let n), .mediaDataChange(let n), .mediaMerge(let n):
-            if let img = n.media?.coverImage?.large {
-                CachedAsyncImage(urlString: img).frame(width: 40, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-        case .following(let n):
-            if let url = n.user?.avatar?.large {
-                CachedAsyncImage(urlString: url).frame(width: 40, height: 40).clipShape(Circle())
-            }
-        case .activityMessage(let n), .activityReply(let n), .activityReplySubscribed(let n),
-             .activityMention(let n), .activityLike(let n), .activityReplyLike(let n):
-            if let url = n.user?.avatar?.large {
-                CachedAsyncImage(urlString: url).frame(width: 40, height: 40).clipShape(Circle())
-            }
-        case .threadCommentMention(let n), .threadCommentReply(let n),
-             .threadCommentSubscribed(let n), .threadCommentLike(let n), .threadLike(let n):
-            if let url = n.user?.avatar?.large {
-                CachedAsyncImage(urlString: url).frame(width: 40, height: 40).clipShape(Circle())
-            }
-        case .mediaDeletion, .unknown:
-            EmptyView()
+    private func bodyText(for notif: ProviderNotification) -> some View {
+        switch notif.kind {
+        case .airing(let episode, let mediaTitle, _):
+            Text("\(mediaTitle ?? "Anime") ").bold() + Text("episode \(episode) aired")
+        case .following(_, let userName):
+            Text(userName ?? "Someone").bold() + Text(" followed you")
+        case .activityMessage(_, let context), .activityReply(_, let context),
+             .activityMention(_, let context), .activityLike(_, let context):
+            Text("Activity ") + Text(context ?? "")
+        case .mediaChange(let context):
+            Text(context ?? "A title was updated")
+        case .unknown(let context):
+            Text(context ?? "Notification").foregroundStyle(.secondary)
         }
     }
 
-    @ViewBuilder
-    private func bodyText(for notif: AniListNotification) -> some View {
-        switch notif {
-        case .airing(let n):
-            Text("\(n.media?.displayTitle ?? "") ").bold() + Text("episode \(n.episode) aired")
-        case .following(let n):
-            Text(n.user?.name ?? "Someone").bold() + Text(" \(n.context ?? "followed you")")
-        case .activityMessage(let n), .activityReply(let n), .activityReplySubscribed(let n),
-             .activityMention(let n), .activityLike(let n), .activityReplyLike(let n):
-            Text(n.user?.name ?? "Someone").bold() + Text(" \(n.context ?? "")")
-        case .threadCommentMention(let n), .threadCommentReply(let n),
-             .threadCommentSubscribed(let n), .threadCommentLike(let n), .threadLike(let n):
-            Text(n.user?.name ?? "Someone").bold() + Text(" \(n.context ?? "")")
-        case .mediaAddition(let n):
-            Text(n.media?.displayTitle ?? "").bold() + Text(" \(n.context ?? "was added")")
-        case .mediaDataChange(let n), .mediaMerge(let n):
-            Text(n.media?.displayTitle ?? "").bold() + Text(" \(n.context ?? "")")
-        case .mediaDeletion(let n):
-            Text(n.deletedMediaTitle ?? "A title").bold() + Text(" \(n.context ?? "was deleted")")
-        case .unknown:
-            Text("Notification").foregroundStyle(.secondary)
-        }
-    }
-
-    // MARK: - Tap handling
-
-    private func isTappable(_ notif: AniListNotification) -> Bool {
-        switch notif {
-        case .airing, .mediaAddition, .mediaDataChange, .mediaMerge,
-             .activityMessage, .activityReply, .activityReplySubscribed,
-             .activityMention, .activityLike, .activityReplyLike:
+    private func isTappable(_ notif: ProviderNotification) -> Bool {
+        switch notif.kind {
+        case .airing, .activityMessage, .activityReply, .activityMention, .activityLike, .mediaChange:
             return true
         default:
             return false
         }
     }
 
-    private func handleTap(_ notif: AniListNotification) {
-        switch notif {
-        case .airing(let n):
-            if let id = n.media?.id { navMedia = MediaNavItem(id: id) }
-        case .mediaAddition(let n), .mediaDataChange(let n), .mediaMerge(let n):
-            if let id = n.media?.id { navMedia = MediaNavItem(id: id) }
-        case .activityMessage(let n), .activityReply(let n), .activityReplySubscribed(let n),
-             .activityMention(let n), .activityLike(let n), .activityReplyLike(let n):
-            if let id = n.activityId { navActivity = ActivityNavItem(id: id) }
+    private func handleTap(_ notif: ProviderNotification) {
+        switch notif.kind {
+        case .airing(_, _, let mediaId):
+            navMedia = MediaNavItem(id: mediaId)
+        case .activityMessage(let activityId, _), .activityReply(let activityId, _),
+             .activityMention(let activityId, _), .activityLike(let activityId, _):
+            if let id = activityId { navActivity = ActivityNavItem(id: id) }
         default:
             break
         }
     }
 
-    private func iconFor(_ notif: AniListNotification) -> (String, Color) {
-        switch notif {
+    private func iconFor(_ notif: ProviderNotification) -> (String, Color) {
+        switch notif.kind {
         case .airing: return ("tv", .blue)
         case .following: return ("person.badge.plus", .green)
         case .activityMessage: return ("envelope", .purple)
-        case .activityReply, .activityReplySubscribed, .activityMention:
-            return ("bubble.left", .orange)
-        case .activityLike, .activityReplyLike: return ("heart.fill", .pink)
-        case .threadCommentMention, .threadCommentReply, .threadCommentSubscribed:
-            return ("text.bubble", .indigo)
-        case .threadCommentLike, .threadLike: return ("heart.fill", .pink)
-        case .mediaAddition: return ("sparkles", .teal)
-        case .mediaDataChange, .mediaMerge: return ("arrow.triangle.2.circlepath", .gray)
-        case .mediaDeletion: return ("trash", .red)
+        case .activityReply, .activityMention: return ("bubble.left", .orange)
+        case .activityLike: return ("heart.fill", .pink)
+        case .mediaChange: return ("arrow.triangle.2.circlepath", .gray)
         case .unknown: return ("bell", .gray)
         }
     }

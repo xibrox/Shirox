@@ -2,10 +2,10 @@ import Foundation
 
 @MainActor
 final class HomeViewModel: ObservableObject {
-    @Published var trending: [AniListMedia] = []
-    @Published var seasonal: [AniListMedia] = []
-    @Published var popular: [AniListMedia] = []
-    @Published var topRated: [AniListMedia] = []
+    @Published var trending: [Media] = []
+    @Published var seasonal: [Media] = []
+    @Published var popular: [Media] = []
+    @Published var topRated: [Media] = []
     @Published var isLoading = false
     @Published var error: String?
 
@@ -17,10 +17,10 @@ final class HomeViewModel: ObservableObject {
         error = nil
 
         do {
-            async let t = AniListService.shared.trending()
-            async let s = AniListService.shared.seasonal()
-            async let p = AniListService.shared.popular()
-            async let r = AniListService.shared.topRated()
+            async let t = ProviderManager.shared.call { try await $0.trending() }
+            async let s = ProviderManager.shared.call { try await $0.seasonal() }
+            async let p = ProviderManager.shared.call { try await $0.popular() }
+            async let r = ProviderManager.shared.call { try await $0.topRated() }
 
             let (tResult, sResult, pResult, rResult) = try await (t, s, p, r)
             trending = tResult

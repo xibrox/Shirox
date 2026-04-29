@@ -108,7 +108,7 @@ struct CachedAsyncImage: View {
 // MARK: - TVDB Poster Image Wrapper
 
 struct TVDBPosterImage: View {
-    let media: AniListMedia
+    let media: Media
     var type: TVDBArtworkType = .poster
     @State private var finalURL: String?
     
@@ -122,7 +122,7 @@ struct TVDBPosterImage: View {
             : (media.coverImage.extraLarge ?? media.coverImage.large ?? "")
     }
 
-    init(media: AniListMedia, type: TVDBArtworkType = .poster) {
+    init(media: Media, type: TVDBArtworkType = .poster) {
         self.media = media
         self.type = type
         // If TVDB artwork is already cached, use it immediately (no flicker)

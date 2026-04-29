@@ -98,7 +98,7 @@ struct ProfileView: View {
                 }
 
                 // Avatar
-                if let url = vm.user?.avatar?.large ?? avatarURL {
+                if let url = vm.user?.avatarURL ?? avatarURL {
                     CachedAsyncImage(urlString: url)
                         .frame(width: 80, height: 80)
                         .clipShape(Circle())

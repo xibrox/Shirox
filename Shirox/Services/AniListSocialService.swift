@@ -1,29 +1,5 @@
 import Foundation
 
-enum LikeableType: String {
-    case activity = "ACTIVITY"
-    case activityReply = "ACTIVITY_REPLY"
-}
-
-enum ActivityFeed: String, CaseIterable, Identifiable {
-    case mine, following, global
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .mine: return "My Feed"
-        case .following: return "Following"
-        case .global: return "Global"
-        }
-    }
-    var icon: String {
-        switch self {
-        case .mine: return "person.circle"
-        case .following: return "person.2.circle"
-        case .global: return "globe"
-        }
-    }
-}
-
 @MainActor
 final class AniListSocialService {
     static let shared = AniListSocialService()

@@ -77,13 +77,13 @@ struct HomeView: View {
 // MARK: - Featured Carousel (full width, indicator below)
 
 private struct FeaturedCarousel: View {
-    let items: [AniListMedia]
+    let items: [Media]
     @State private var selectedTab = 1000
     @State private var containerWidth: CGFloat = 0
     @State private var stretchAmount: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var realItems: [AniListMedia] { items.prefix(8).map { $0 } }
+    private var realItems: [Media] { items.prefix(8).map { $0 } }
     private var displayCount: Int { realItems.count }
 
     private var currentIndex: Int {
@@ -253,11 +253,11 @@ private struct FeaturedCarousel: View {
 
 #if os(macOS) || targetEnvironment(macCatalyst)
 private struct MacFeaturedCarousel: View {
-    let items: [AniListMedia]
+    let items: [Media]
     @State private var currentIndex = 0
     @State private var timer: Timer?
 
-    private var displayItems: [AniListMedia] { Array(items.prefix(8)) }
+    private var displayItems: [Media] { Array(items.prefix(8)) }
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -407,7 +407,7 @@ private struct PageIndicator: View {
 // MARK: - Featured Card (platform‑specific layout)
 
 private struct FeaturedCard: View {
-    let media: AniListMedia
+    let media: Media
     var isWide: Bool = false
 
     private var aspectRatio: CGFloat {
@@ -562,7 +562,7 @@ private struct FeaturedCard: View {
 
 private struct AnimeSection: View {
     let title: String
-    let items: [AniListMedia]
+    let items: [Media]
     let category: BrowseCategory
     @Environment(\.horizontalSizeClass) private var sizeClass
 

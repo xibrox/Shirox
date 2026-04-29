@@ -18,7 +18,7 @@ final class WatchHistoryService: ObservableObject {
 
     private init() { loadFromStorage() }
 
-    func record(media: AniListMedia, episode: Int) {
+    func record(media: Media, episode: Int) {
         history.removeAll { $0.mediaId == media.id }
         history.insert(WatchProgress(
             mediaId: media.id,

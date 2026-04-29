@@ -23,8 +23,8 @@ enum MediaListStatus: String, Codable, CaseIterable, Identifiable {
 }
 
 struct LibraryEntry: Identifiable, Codable {
-    let id: Int           // mediaListEntry id (not media id)
-    let media: AniListMedia
+    let id: Int           // provider's list entry id
+    let media: Media      // provider-agnostic media
     var status: MediaListStatus
     var progress: Int     // episodes watched
     var score: Double     // 0–10

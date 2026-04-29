@@ -15,13 +15,7 @@ final class LibraryViewModel: ObservableObject {
     private var cacheValid = false
 
     func load() async {
-        guard let userId = AniListAuthManager.shared.userId else {
-            await AniListAuthManager.shared.fetchViewer()
-            guard let uid = AniListAuthManager.shared.userId else { return }
-            await fetch(userId: uid)
-            return
-        }
-        await fetch(userId: userId)
+        await fetch()
     }
 
     func selectStatus(_ status: MediaListStatus) {
@@ -41,31 +35,20 @@ final class LibraryViewModel: ObservableObject {
     }
 
     func update(entry: LibraryEntry, status: MediaListStatus, progress: Int, score: Double) async {
-        // 1. Optimistic update: apply changes immediately to local state
-        if let index = allEntries.firstIndex(where: { $0.media.id == entry.media.id }) {
+        if let index = allEntries.firstIndex(where: { $0.media.uniqueId == entry.media.uniqueId }) {
             allEntries[index].status = status
             allEntries[index].progress = progress
             allEntries[index].score = score
             applyFilter()
         }
-
         do {
-            try await AniListLibraryService.shared.updateEntry(
-                mediaId: entry.media.id,
-                status: status,
-                progress: progress,
-                score: score
-            )
-            
-            // Mark cache as invalid so next manual refresh or navigation gets fresh data,
-            // but don't immediately call load() to avoid stale data flicker from AniList lag.
+            try await ProviderManager.shared.call {
+                try await $0.updateEntry(mediaId: entry.media.id, status: status,
+                                         progress: progress, score: score)
+            }
             cacheValid = false
-            
-            // Optional: Background refresh after a short delay to get final server state (ids, timestamps)
-            // For now, we trust our local state until the next manual refresh or view appearance.
         } catch {
             self.error = error.localizedDescription
-            // On error, we should probably revert the optimistic update or force a reload
             cacheValid = false
             await load()
         }
@@ -73,23 +56,14 @@ final class LibraryViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private func fetch(userId: Int) async {
-        if cacheValid {
-            applyFilter()
-            return
-        }
-        
-        // Only show full-screen loader if we have no entries at all
-        if allEntries.isEmpty {
-            isLoading = true
-        }
-        
+    private func fetch() async {
+        if cacheValid { applyFilter(); return }
+        if allEntries.isEmpty { isLoading = true }
         error = nil
         do {
-            let result = try await AniListLibraryService.shared.fetchAllLists(userId: userId)
+            let result = try await ProviderManager.shared.call { try await $0.fetchLibrary() }
             allEntries = result
             cacheValid = true
-            // Collect sorted custom list names
             var seen = Set<String>()
             customListNames = result.compactMap { $0.customListName }.filter { seen.insert($0).inserted }.sorted()
             UserDefaults.standard.set(customListNames, forKey: "libraryCustomListNames")

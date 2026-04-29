@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class SearchViewModel: ObservableObject {
     @Published var moduleResults: [SearchItem] = []
-    @Published var aniListResults: [AniListMedia] = []
+    @Published var aniListResults: [Media] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var query = ""
@@ -31,7 +31,7 @@ final class SearchViewModel: ObservableObject {
                         aniListResults = []
                     }
                 } else {
-                    let res = try await AniListService.shared.search(keyword: q)
+                    let res = try await ProviderManager.shared.call { try await $0.search(q) }
                     if !Task.isCancelled {
                         aniListResults = res
                         moduleResults = []

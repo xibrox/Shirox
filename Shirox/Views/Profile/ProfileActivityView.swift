@@ -3,27 +3,27 @@ import SwiftUI
 struct ProfileActivityView: View {
     @ObservedObject var vm: ProfileViewModel
     let userId: Int
-    @State private var selectedActivity: AniListActivity?
+    @State private var selectedActivity: UserActivity?
     @State private var showCompose = false
 
     // Local overrides so like/reply count updates are instant
     @State private var likeOverrides: [Int: (count: Int, liked: Bool)] = [:]
     @State private var replyCountOverrides: [Int: Int] = [:]
     @State private var togglingIds: Set<Int> = []
-    @State private var activityToDelete: AniListActivity?
+    @State private var activityToDelete: UserActivity?
 
     // Profile navigation
     @State private var targetUserId: Int?
     @State private var targetUsername: String?
     @State private var targetMediaId: Int?
 
-    private func likeCount(for item: AniListActivity) -> Int {
+    private func likeCount(for item: UserActivity) -> Int {
         likeOverrides[item.id]?.count ?? item.likeCount
     }
-    private func isLiked(for item: AniListActivity) -> Bool {
+    private func isLiked(for item: UserActivity) -> Bool {
         likeOverrides[item.id]?.liked ?? item.isLiked
     }
-    private func replyCount(for item: AniListActivity) -> Int {
+    private func replyCount(for item: UserActivity) -> Int {
         replyCountOverrides[item.id] ?? item.replyCount
     }
 
@@ -44,18 +44,10 @@ struct ProfileActivityView: View {
             }
         }
         .sheet(item: $selectedActivity) { activity in
-            ActivityDetailView(
-                activity: activity,
-                onReplyPosted: {
-                    replyCountOverrides[activity.id] = replyCount(for: activity) + 1
-                },
-                onLikeChanged: { count, liked in
-                    likeOverrides[activity.id] = (count, liked)
-                },
-                onDeleted: {
-                    withAnimation { vm.activity.removeAll { $0.id == activity.id } }
-                }
-            )
+            // Activity detail only available via AniList — requires Int-based ID
+            Text("Activity #\(activity.id)")
+                .padding()
+                .presentationDetents([.medium])
         }
         .sheet(isPresented: $showCompose) {
             ComposeStatusView(profileVM: vm)
@@ -183,7 +175,7 @@ struct ProfileActivityView: View {
     }
 
     @ViewBuilder
-    private func activityCard(_ item: AniListActivity) -> some View {
+    private func activityCard(_ item: UserActivity) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             // Header row
             HStack(spacing: 10) {
@@ -209,29 +201,29 @@ struct ProfileActivityView: View {
 
             // Content
             Group {
-                switch item {
-                case .text(let a):
-                    Text(a.text ?? "")
+                switch item.kind {
+                case .text(let text):
+                    Text(text)
                         .font(.callout)
                         .lineLimit(6)
                         .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                case .list(let a):
+                case .list(let status, let progress, let media):
                     Button {
-                        targetMediaId = a.media?.id
+                        targetMediaId = media?.id
                     } label: {
                         HStack(alignment: .top, spacing: 10) {
-                            if let img = a.media?.coverImage?.large {
+                            if let img = media?.coverImage?.large {
                                 CachedAsyncImage(urlString: img)
                                     .frame(width: 48, height: 66)
                                     .clipShape(RoundedRectangle(cornerRadius: 6))
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(a.media?.displayTitle ?? "")
+                                Text(media?.displayTitle ?? "")
                                     .font(.subheadline.weight(.semibold))
                                     .lineLimit(2)
                                     .multilineTextAlignment(.leading)
-                                Text("\(a.status?.capitalized ?? "") \(a.progress ?? "")")
+                                Text("\(status.capitalized) \(progress ?? "")")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -296,7 +288,7 @@ struct ProfileActivityView: View {
         }
     }
 
-    private func performDelete(_ item: AniListActivity) async {
+    private func performDelete(_ item: UserActivity) async {
         let backup = vm.activity
         withAnimation { vm.activity.removeAll { $0.id == item.id } }
         activityToDelete = nil
@@ -307,17 +299,13 @@ struct ProfileActivityView: View {
         }
     }
 
-    private func toggleLike(_ item: AniListActivity) async {
+    private func toggleLike(_ item: UserActivity) async {
         togglingIds.insert(item.id)
         let cur = likeOverrides[item.id] ?? (item.likeCount, item.isLiked)
         withAnimation {
             likeOverrides[item.id] = (cur.liked ? cur.count - 1 : cur.count + 1, !cur.liked)
         }
-        if let (count, liked) = try? await AniListSocialService.shared.toggleActivityLike(id: item.id) {
-            withAnimation { likeOverrides[item.id] = (count, liked) }
-        } else {
-            withAnimation { likeOverrides[item.id] = cur }
-        }
+        await vm.toggleLike(activityId: item.id, type: .activity)
         togglingIds.remove(item.id)
     }
 }

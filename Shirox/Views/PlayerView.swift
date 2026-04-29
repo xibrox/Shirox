@@ -644,23 +644,20 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - AniList Tracking
+    // MARK: - Tracking
 
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
 
     private func trackAniListProgress() {
-        guard aniListAuth.isLoggedIn,
-              aniListTrackingEnabled,
+        guard aniListTrackingEnabled,
               let aniListID = currentContext?.aniListID,
               let episodeNumber = currentContext?.episodeNumber else { return }
         Task {
             let isCompleted = currentContext?.totalEpisodes != nil && currentContext?.totalEpisodes == Int(episodeNumber)
             let status: MediaListStatus = isCompleted ? .completed : .current
-            try? await AniListLibraryService.shared.updateEntry(
-                mediaId: aniListID,
-                status: status,
-                progress: episodeNumber
-            )
+            try? await ProviderManager.shared.call {
+                try await $0.updateEntry(mediaId: aniListID, status: status, progress: episodeNumber, score: 0)
+            }
         }
     }
 

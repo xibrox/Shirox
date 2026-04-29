@@ -1,5 +1,16 @@
 import Foundation
 
+// Raw library entry using AniListMedia — mapped to LibraryEntry (with Media) by AniListProvider.
+struct AniListRawEntry {
+    let id: Int
+    let media: AniListMedia
+    let status: MediaListStatus
+    let progress: Int
+    let score: Double
+    let updatedAt: Int?
+    let customListName: String?
+}
+
 final class AniListLibraryService {
     static let shared = AniListLibraryService()
     private let endpoint = URL(string: "https://graphql.anilist.co")!
@@ -7,7 +18,7 @@ final class AniListLibraryService {
 
     // MARK: - Fetch all lists (status + custom)
 
-    func fetchAllLists(userId: Int) async throws -> [LibraryEntry] {
+    func fetchAllLists(userId: Int) async throws -> [AniListRawEntry] {
         let query = """
         query ($userId: Int) {
           MediaListCollection(userId: $userId, type: ANIME) {
@@ -68,11 +79,11 @@ final class AniListLibraryService {
         let response = try JSONDecoder().decode(Response.self, from: data)
         guard let lists = response.data?.MediaListCollection.lists else { return [] }
 
-        var result: [LibraryEntry] = []
+        var result: [AniListRawEntry] = []
         for list in lists {
             let customName: String? = list.isCustomList ? list.name : nil
             for raw in list.entries {
-                result.append(LibraryEntry(
+                result.append(AniListRawEntry(
                     id: raw.id,
                     media: raw.media,
                     status: raw.status,
@@ -88,7 +99,7 @@ final class AniListLibraryService {
 
     // MARK: - Fetch single entry for a media id
 
-    func fetchEntry(mediaId: Int) async throws -> LibraryEntry? {
+    func fetchEntry(mediaId: Int) async throws -> AniListRawEntry? {
         guard let userId = await AniListAuthManager.shared.userId else { return nil }
         let query = """
         query ($userId: Int, $mediaId: Int) {
@@ -133,12 +144,12 @@ final class AniListLibraryService {
         }
 
         guard let raw = try JSONDecoder().decode(Response.self, from: data).data?.MediaList else { return nil }
-        return LibraryEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil)
+        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil)
     }
 
     // MARK: - Fetch list (by status, kept for compatibility)
 
-    func fetchList(status: MediaListStatus, userId: Int) async throws -> [LibraryEntry] {
+    func fetchList(status: MediaListStatus, userId: Int) async throws -> [AniListRawEntry] {
         let all = try await fetchAllLists(userId: userId)
         return all.filter { $0.status == status && $0.customListName == nil }
     }

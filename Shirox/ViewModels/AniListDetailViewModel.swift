@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 final class AniListDetailViewModel: ObservableObject {
-    @Published var media: AniListMedia?
+    @Published var media: Media?
     @Published var isLoading = true
     @Published var error: String?
 
@@ -20,7 +20,7 @@ final class AniListDetailViewModel: ObservableObject {
     @Published var pendingDownloadStreams: [StreamResult] = []
     @Published var pendingDownloadEpisode: (EpisodeLink, Int)?
     @Published var pendingDownloadModule: ModuleDefinition?
-    @Published var pendingDownloadMedia: AniListMedia?
+    @Published var pendingDownloadMedia: Media?
     @Published var showDownloadStreamPicker = false
 
     /// Deferred streams waiting to be presented after a sheet fully dismisses.
@@ -34,15 +34,13 @@ final class AniListDetailViewModel: ObservableObject {
     /// Resume position if navigated from Continue Watching
     var resumeWatchedSeconds: Double?
 
-    func load(id: Int, preloaded: AniListMedia? = nil) async {
+    func load(id: Int, preloaded: Media? = nil) async {
         guard media == nil else { return }
-        if let preloaded {
-            media = preloaded
-        }
+        if let preloaded { media = preloaded }
         isLoading = true
         error = nil
         do {
-            media = try await AniListService.shared.detail(id: id)
+            media = try await ProviderManager.shared.call { try await $0.detail(id: id) }
         } catch {
             self.error = error.localizedDescription
         }

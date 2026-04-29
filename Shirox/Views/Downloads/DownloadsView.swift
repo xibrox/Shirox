@@ -269,7 +269,7 @@ struct DownloadedMediaDetailView: View {
     @ObservedObject private var auth = AniListAuthManager.shared
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
-    @State private var aniListMedia: AniListMedia? = nil
+    @State private var aniListMedia: Media? = nil
     @State private var existingEntry: LibraryEntry? = nil
     @State private var isLoadingEntry = false
     @State private var showLibraryEdit = false
@@ -293,11 +293,12 @@ struct DownloadedMediaDetailView: View {
     }
 
     // Minimal stub so the edit sheet always renders even when offline
-    private var mediaForSheet: AniListMedia {
-        aniListMedia ?? AniListMedia(
+    private var mediaForSheet: Media {
+        aniListMedia ?? Media(
             id: aniListID ?? 0,
-            title: AniListTitle(romaji: mediaTitle, english: mediaTitle, native: nil),
-            coverImage: AniListCoverImage(large: imageUrl, extraLarge: imageUrl),
+            provider: .anilist,
+            title: MediaTitle(romaji: mediaTitle, english: mediaTitle, native: nil),
+            coverImage: MediaCoverImage(large: imageUrl, extraLarge: imageUrl),
             bannerImage: nil,
             description: nil,
             episodes: downloadedItems.map(\.episodeNumber).max(),
@@ -366,9 +367,13 @@ struct DownloadedMediaDetailView: View {
         }
         .task {
             if let aid = aniListID {
-                aniListMedia = try? await AniListService.shared.detail(id: aid)
+                if let raw = try? await AniListService.shared.detail(id: aid) {
+                    aniListMedia = AniListProvider.shared.mapMedia(raw)
+                }
                 if auth.isLoggedIn {
-                    existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
+                    if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                        existingEntry = AniListProvider.shared.mapEntry(raw)
+                    }
                 }
             }
         }
@@ -492,7 +497,7 @@ struct DownloadedMediaDetailView: View {
     // MARK: - Metadata
 
     @ViewBuilder
-    private func metadataSection(media: AniListMedia) -> some View {
+    private func metadataSection(media: Media) -> some View {
         if let genres = media.genres, !genres.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -636,7 +641,7 @@ struct DownloadedMediaDetailView: View {
 
     // MARK: - Helpers
 
-    private func handleLibraryEdit(media: AniListMedia, status: MediaListStatus, progress: Int, score: Double) {
+    private func handleLibraryEdit(media: Media, status: MediaListStatus, progress: Int, score: Double) {
         if var updated = existingEntry {
             updated.status = status
             updated.progress = progress
@@ -659,8 +664,9 @@ struct DownloadedMediaDetailView: View {
             )
         }
         Task {
-            try? await AniListLibraryService.shared.updateEntry(
-                mediaId: media.id, status: status, progress: progress, score: score)
+            try? await ProviderManager.shared.call {
+                try await $0.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
+            }
         }
     }
 

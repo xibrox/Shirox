@@ -2,7 +2,7 @@ import SwiftUI
 
 struct LibraryEntryEditSheet: View {
     let entry: LibraryEntry?         // nil = adding new (not in library yet)
-    let media: AniListMedia
+    let media: Media
     let onSave: (MediaListStatus, Int, Double) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -10,7 +10,7 @@ struct LibraryEntryEditSheet: View {
     @State private var progress: Int
     @State private var score: Double
 
-    init(entry: LibraryEntry?, media: AniListMedia, onSave: @escaping (MediaListStatus, Int, Double) -> Void) {
+    init(entry: LibraryEntry?, media: Media, onSave: @escaping (MediaListStatus, Int, Double) -> Void) {
         self.entry = entry
         self.media = media
         self.onSave = onSave

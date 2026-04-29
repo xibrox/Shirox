@@ -4,7 +4,7 @@ import Foundation
 final class BrowseViewModel: ObservableObject {
     let category: BrowseCategory
 
-    @Published var items: [AniListMedia] = []
+    @Published var items: [Media] = []
     @Published var isLoading = false
     @Published var error: String?
     @Published var hasMore = true
@@ -21,7 +21,8 @@ final class BrowseViewModel: ObservableObject {
         error = nil
         let nextPage = currentPage + 1
         do {
-            let newItems = try await AniListService.shared.browse(category: category, page: nextPage)
+            let aniListItems = try await AniListService.shared.browse(category: category, page: nextPage)
+            let newItems = aniListItems.map { AniListProvider.shared.mapMedia($0) }
             items.append(contentsOf: newItems)
             currentPage = nextPage
             if newItems.count < 20 { hasMore = false }

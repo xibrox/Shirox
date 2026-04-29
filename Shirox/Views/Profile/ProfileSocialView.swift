@@ -50,7 +50,7 @@ struct ProfileSocialView: View {
                         targetUserId = user.id
                     } label: {
                         HStack(spacing: 12) {
-                            CachedAsyncImage(urlString: user.avatar?.large ?? "")
+                            CachedAsyncImage(urlString: user.avatarURL ?? "")
                                 .frame(width: 44, height: 44)
                                 .clipShape(Circle())
                             

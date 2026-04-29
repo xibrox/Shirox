@@ -308,7 +308,7 @@ private struct CardPressStyle: ButtonStyle {
 
 // MARK: - AniList Card
 struct AniListCardView: View {
-    let media: AniListMedia
+    let media: Media
 
     var body: some View {
         Color.clear

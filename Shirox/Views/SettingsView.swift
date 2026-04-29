@@ -68,6 +68,8 @@ struct SettingsView: View {
                     }
                 }
 
+                ProvidersSettingsSection()
+
                 Section("Player") {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
                         .tint(.secondary)
@@ -738,5 +740,72 @@ class Logger {
         let formattedMessage = "[\(dateFormatter.string(from: entry.timestamp))] [\(entry.type)] \(entry.message)"
         print(formattedMessage)
 #endif
+    }
+}
+
+// MARK: - Providers Settings Section
+
+private struct ProvidersSettingsSection: View {
+    @ObservedObject private var manager = ProviderManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+
+    var body: some View {
+        Section {
+            ForEach(manager.orderedProviders, id: \.providerType) { provider in
+                HStack(spacing: 12) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(provider.providerType.displayName)
+                            .font(.headline)
+                        Text(providerStatus(provider))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if manager.orderedProviders.first?.providerType == provider.providerType {
+                        Text("Primary")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.accentColor, in: Capsule())
+                    }
+                }
+            }
+            .onMove { from, to in
+                manager.moveProvider(from: from, to: to)
+            }
+            Text("Drag to reorder. The first provider is primary; the second is used as fallback.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if !malAuth.isLoggedIn {
+                #if os(iOS)
+                Button("Sign in with MyAnimeList") {
+                    if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let window = scene.windows.first {
+                        malAuth.login(presentationAnchor: window)
+                    }
+                }
+                #endif
+            } else {
+                Button("Sign out of MyAnimeList", role: .destructive) {
+                    malAuth.logout()
+                }
+            }
+        } header: {
+            Text("Providers")
+        }
+        #if os(iOS)
+        .environment(\.editMode, .constant(.active))
+        #endif
+    }
+
+    private func providerStatus(_ provider: any MediaProvider) -> String {
+        switch provider.providerType {
+        case .anilist: return AniListAuthManager.shared.isLoggedIn ? "Signed in" : "Not signed in"
+        case .mal: return malAuth.isLoggedIn ? "Signed in" : "Not signed in"
+        }
     }
 }

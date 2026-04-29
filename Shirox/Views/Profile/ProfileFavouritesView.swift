@@ -1,19 +1,19 @@
 import SwiftUI
 
 struct ProfileFavouritesView: View {
-    let favourites: AniListFavourites?
-    
+    let favourites: [Media]?
+
     @State private var targetMediaId: Int?
-    
+
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
-    
+
     var body: some View {
         Group {
-            if let anime = favourites?.anime?.nodes, !anime.isEmpty {
+            if let anime = favourites, !anime.isEmpty {
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(anime) { media in
                         Button {

@@ -10,7 +10,7 @@ private struct DownloadEpisodeItem: Identifiable {
 
 struct AniListDetailView: View {
     let mediaId: Int
-    let preloadedMedia: AniListMedia?
+    let preloadedMedia: Media?
     var resumeEpisodeNumber: Int?
     var resumeWatchedSeconds: Double?
 
@@ -41,7 +41,7 @@ struct AniListDetailView: View {
         #endif
     }
 
-    init(mediaId: Int, preloadedMedia: AniListMedia? = nil, resumeEpisodeNumber: Int? = nil, resumeWatchedSeconds: Double? = nil) {
+    init(mediaId: Int, preloadedMedia: Media? = nil, resumeEpisodeNumber: Int? = nil, resumeWatchedSeconds: Double? = nil) {
         self.mediaId = mediaId
         self.preloadedMedia = preloadedMedia
         self.resumeEpisodeNumber = resumeEpisodeNumber
@@ -87,7 +87,7 @@ struct AniListDetailView: View {
                     Button {
                         Task {
                             isLoadingEntry = true
-                            existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId)
+                            existingEntry = try? await ProviderManager.shared.call { try await $0.fetchEntry(mediaId: mediaId) }
                             isLoadingEntry = false
                             showLibraryEdit = true
                         }
@@ -121,7 +121,7 @@ struct AniListDetailView: View {
                 selectedRangeIndex = (currentEp - 1) / 100
             }
             if auth.isLoggedIn {
-                existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: mediaId)
+                existingEntry = try? await ProviderManager.shared.call { try await $0.fetchEntry(mediaId: mediaId) }
             }
 
             if let media = vm.media {
@@ -248,7 +248,7 @@ struct AniListDetailView: View {
         }
     }
 
-    private func handleLibraryEdit(media: AniListMedia, status: MediaListStatus, progress: Int, score: Double) {
+    private func handleLibraryEdit(media: Media, status: MediaListStatus, progress: Int, score: Double) {
         if var updated = existingEntry {
             updated.status = status
             updated.progress = progress
@@ -272,15 +272,15 @@ struct AniListDetailView: View {
             )
         }
         Task {
-            try? await AniListLibraryService.shared.updateEntry(
-                mediaId: media.id, status: status, progress: progress, score: score
-            )
+            try? await ProviderManager.shared.call {
+                try await $0.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
+            }
         }
     }
 
     // MARK: - Content
     @ViewBuilder
-    private func content(media: AniListMedia) -> some View {
+    private func content(media: Media) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 heroSection(media: media)
@@ -382,7 +382,7 @@ struct AniListDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func continueWatchingItem(for media: AniListMedia) -> ContinueWatchingItem? {
+    private func continueWatchingItem(for media: Media) -> ContinueWatchingItem? {
         continueWatching.items
             .filter { $0.aniListID == media.id }
             .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
@@ -391,7 +391,7 @@ struct AniListDetailView: View {
 
     #if os(iOS)
     @ViewBuilder
-    private func watchButton(media: AniListMedia) -> some View {
+    private func watchButton(media: Media) -> some View {
         let item = continueWatchingItem(for: media)
         let total = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
         let rawNext = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
@@ -507,7 +507,7 @@ struct AniListDetailView: View {
 
     // MARK: - Hero
     @ViewBuilder
-    private func heroSection(media: AniListMedia) -> some View {
+    private func heroSection(media: Media) -> some View {
         ZStack(alignment: .bottom) {
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("heroScroll")).minY
@@ -590,7 +590,7 @@ struct AniListDetailView: View {
 
     // MARK: - Metadata
     @ViewBuilder
-    private func metadataSection(media: AniListMedia) -> some View {
+    private func metadataSection(media: Media) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let genres = media.genres, !genres.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -615,7 +615,7 @@ struct AniListDetailView: View {
 
     // MARK: - Episodes
     @ViewBuilder
-    private func episodesSection(media: AniListMedia) -> some View {
+    private func episodesSection(media: Media) -> some View {
         let metadataTotal = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
         let historyEp = continueWatching.items.first(where: { CW in
             CW.aniListID == media.id || CW.mediaTitle == media.title.searchTitle || CW.mediaTitle == media.title.displayTitle
@@ -1202,11 +1202,11 @@ struct RelationCard: View {
 struct AniListMatchingSearchView: View {
     let initialTitle: String
     var isLinked: Bool = false
-    let onSelect: (AniListMedia?) -> Void
+    let onSelect: (Media?) -> Void
     
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
-    @State private var results: [AniListMedia] = []
+    @State private var results: [Media] = []
     @State private var isLoading = false
     @State private var searchTask: Task<Void, Never>?
     
@@ -1362,7 +1362,7 @@ struct AniListMatchingSearchView: View {
             
             isLoading = true
             do {
-                results = try await AniListService.shared.search(keyword: searchText)
+                results = try await ProviderManager.shared.call { try await $0.search(searchText) }
             } catch {
                 print("[MappingSearch] Search failed: \(error)")
             }
