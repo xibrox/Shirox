@@ -298,6 +298,7 @@ struct DownloadedMediaDetailView: View {
     private var mediaForSheet: Media {
         aniListMedia ?? Media(
             id: aniListID ?? 0,
+            idMal: nil,
             provider: .anilist,
             title: MediaTitle(romaji: mediaTitle, english: mediaTitle, native: nil),
             coverImage: MediaCoverImage(large: imageUrl, extraLarge: imageUrl),
@@ -681,6 +682,7 @@ struct DownloadedMediaDetailView: View {
                 episodeTitle: item.episodeTitle,
                 imageUrl: item.imageUrl,
                 aniListID: item.aniListID,
+                malID: item.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
                 moduleId: item.moduleId,
                 totalEpisodes: nil,
                 availableEpisodes: nil,

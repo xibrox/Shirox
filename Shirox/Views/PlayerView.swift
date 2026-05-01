@@ -647,16 +647,53 @@ struct PlayerView: View {
     // MARK: - Tracking
 
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
+    @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
 
     private func trackAniListProgress() {
-        guard aniListTrackingEnabled,
-              let aniListID = currentContext?.aniListID,
-              let episodeNumber = currentContext?.episodeNumber else { return }
+        guard let episodeNumber = currentContext?.episodeNumber else { return }
+        let aniListID = currentContext?.aniListID
+        let malID = currentContext?.malID
+        let isCompleted = currentContext?.totalEpisodes != nil && currentContext?.totalEpisodes == Int(episodeNumber)
+        let status: MediaListStatus = isCompleted ? .completed : .current
         Task {
-            let isCompleted = currentContext?.totalEpisodes != nil && currentContext?.totalEpisodes == Int(episodeNumber)
-            let status: MediaListStatus = isCompleted ? .completed : .current
-            try? await ProviderManager.shared.call {
-                try await $0.updateEntry(mediaId: aniListID, status: status, progress: episodeNumber, score: 0)
+            for provider in ProviderManager.shared.orderedProviders {
+                switch provider.providerType {
+                case .anilist:
+                    guard aniListTrackingEnabled else { continue }
+                    let resolvedAniListID: Int?
+                    if let aniListID {
+                        resolvedAniListID = aniListID
+                    } else if let malID {
+                        resolvedAniListID = await IDMappingService.shared.anilistId(forMALId: malID)
+                    } else {
+                        resolvedAniListID = nil
+                    }
+                    if let resolvedAniListID {
+                        try? await provider.updateEntry(mediaId: resolvedAniListID, status: status, progress: episodeNumber, score: 0)
+                    } else {
+                        Logger.shared.log("[Tracking] AniList tracking skipped: no AniList ID available", type: "Warning")
+                    }
+                case .mal:
+                    guard malTrackingEnabled else { continue }
+                    let resolvedMALID: Int?
+                    if let malID {
+                        resolvedMALID = malID
+                    } else if let aniListID {
+                        resolvedMALID = await IDMappingService.shared.malId(forAnilistId: aniListID)
+                    } else {
+                        resolvedMALID = nil
+                    }
+                    if let resolvedMALID {
+                        do {
+                            try await provider.updateEntry(mediaId: resolvedMALID, status: status, progress: episodeNumber, score: 0)
+                            Logger.shared.log("[Tracking] MAL progress updated: ep \(episodeNumber), malId \(resolvedMALID)", type: "Info")
+                        } catch {
+                            Logger.shared.log("[Tracking] MAL update failed: \(error)", type: "Error")
+                        }
+                    } else {
+                        Logger.shared.log("[Tracking] MAL tracking skipped: no MAL ID available", type: "Warning")
+                    }
+                }
             }
         }
     }
@@ -1175,7 +1212,7 @@ struct PlayerView: View {
         player?.replaceCurrentItem(with: newItem)
         currentStream = next
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
         }
         subtitleCues = []
         if let urlString = next.subtitle, !urlString.isEmpty {
@@ -1227,7 +1264,7 @@ struct PlayerView: View {
         didSeekToResume = true
         currentStream = next
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
         }
         audioGroup = nil
         Task {

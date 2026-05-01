@@ -10,6 +10,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         configureAudioSession()
         configureURLSession()
+        IDMappingService.shared.prefetchAllMappingsIfNeeded()
         #if os(iOS)
         DownloadManager.shared.reconnectPendingTasks()
         #endif

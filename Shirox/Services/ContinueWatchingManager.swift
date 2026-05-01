@@ -148,11 +148,34 @@ import Foundation
                 // Don't create a placeholder if the user is already caught up on all aired episodes
                 if let avail = availableEpisodes, nextEp > avail { continue }
 
-                // Only add if we don't already have progress for this show
                 let existing = newItems.first { matchesShow($0, aniListID: media.id, moduleId: nil, mediaTitle: "") }
 
-                if existing == nil {
-                    // Create a placeholder pointing to the next episode based on AniList progress
+                // Update existing entry if AniList shows the user has watched further (e.g. on another device)
+                if let existing, existing.streamUrl.isEmpty, nextEp > existing.episodeNumber {
+                    newItems.removeAll { matchesShow($0, aniListID: media.id, moduleId: nil, mediaTitle: "") }
+                    if let placeholder = makePlaceholder(
+                        episodeNumber: nextEp,
+                        from: existing,
+                        aniListID: media.id,
+                        moduleId: existing.moduleId,
+                        mediaTitle: media.title.displayTitle,
+                        imageUrl: media.coverImage.best ?? existing.imageUrl,
+                        totalEpisodes: media.episodes ?? existing.totalEpisodes,
+                        availableEpisodes: availableEpisodes,
+                        isAiring: isAiring,
+                        detailHref: existing.detailHref
+                    ) {
+                        newItems.insert(placeholder, at: 0)
+                    }
+                    // Also mark all episodes up to entry.progress as watched
+                    for ep in 1...entry.progress {
+                        if let key = Self.watchedKey(aniListID: media.id, moduleId: existing.moduleId,
+                                                     mediaTitle: media.title.displayTitle, episodeNumber: ep) {
+                            watchedKeys.insert(key)
+                        }
+                    }
+                } else if existing == nil {
+                    // No local entry — create a placeholder from AniList progress
                     if let placeholder = makePlaceholder(
                         episodeNumber: nextEp,
                         from: nil,
@@ -526,6 +549,7 @@ import Foundation
     // MARK: - Persistence
 
     private func persist() {
+        items = items.sorted { $0.lastWatchedAt > $1.lastWatchedAt }
         do {
             let data = try JSONEncoder().encode(items)
             UserDefaults.standard.set(data, forKey: Keys.storage)

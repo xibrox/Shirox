@@ -9,7 +9,9 @@ struct SettingsView: View {
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
+    @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
     @State private var showResetCWConfirmation = false
     @State private var showResetHistoryConfirmation = false
@@ -104,11 +106,17 @@ struct SettingsView: View {
                     }
                 }
 
-                if aniListAuth.isLoggedIn {
-                    Section("AniList") {
-                        Toggle("Track Watching Progress", isOn: $aniListTrackingEnabled)
-                            .tint(.secondary)
-                        Text("Automatically update your AniList progress as you watch.")
+                if aniListAuth.isLoggedIn || malAuth.isLoggedIn {
+                    Section("Tracking") {
+                        if aniListAuth.isLoggedIn {
+                            Toggle("Track on AniList", isOn: $aniListTrackingEnabled)
+                                .tint(.secondary)
+                        }
+                        if malAuth.isLoggedIn {
+                            Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
+                                .tint(.secondary)
+                        }
+                        Text("Automatically update your watch progress as you watch.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

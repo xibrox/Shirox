@@ -158,6 +158,7 @@ final class MALDiscoveryService {
     func mapToMedia(_ a: JikanAnime) -> Media {
         Media(
             id: a.mal_id,
+            idMal: a.mal_id,
             provider: .mal,
             title: MediaTitle(romaji: a.title, english: a.title_english, native: a.title_japanese),
             coverImage: MediaCoverImage(

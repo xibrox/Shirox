@@ -3,6 +3,7 @@ import SwiftUI
 struct ProfileActivityView: View {
     @ObservedObject var vm: ProfileViewModel
     let userId: Int
+    var topContent: AnyView? = nil
     @State private var selectedActivity: UserActivity?
     @State private var showCompose = false
 
@@ -143,6 +144,12 @@ struct ProfileActivityView: View {
             }
         } else {
             List {
+                if let topContent {
+                    topContent
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
                 ForEach(vm.activity) { item in
                     activityCard(item)
                         .listRowSeparator(.hidden)

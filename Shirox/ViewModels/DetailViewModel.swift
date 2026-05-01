@@ -211,7 +211,8 @@ final class DetailViewModel: ObservableObject {
             episodeNumber: Int(selectedEpisode?.number ?? 1),
             episodeTitle: nil,
             imageUrl: detail?.image ?? "",
-            aniListID: aniListID, // Added this
+            aniListID: aniListID,
+            malID: aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
             moduleId: ModuleManager.shared.activeModule?.id,
             totalEpisodes: episodeCount,
             availableEpisodes: episodeCount,

@@ -38,11 +38,20 @@ if [ ! -d "$DD_APP_PATH" ]; then
 fi
 
 echo "--- Packaging DMG ---"
+
+DMG_STAGING="$WORKING_LOCATION/build/dmg-staging"
+rm -rf "$DMG_STAGING"
+mkdir -p "$DMG_STAGING"
+cp -R "$DD_APP_PATH" "$DMG_STAGING/"
+ln -s /Applications "$DMG_STAGING/Applications"
+
 hdiutil create \
     -volname "$APPLICATION_NAME" \
-    -srcfolder "$DD_APP_PATH" \
+    -srcfolder "$DMG_STAGING" \
     -ov \
     -format UDZO \
     "$APPLICATION_NAME.dmg"
+
+rm -rf "$DMG_STAGING"
 
 echo "--- Success: build/$APPLICATION_NAME.dmg created ---"

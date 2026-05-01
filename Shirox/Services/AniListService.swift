@@ -224,6 +224,7 @@ final class AniListService {
         query ($id: Int) {
           Media(id: $id, type: ANIME, isAdult: false) {
             id
+            idMal
             title { romaji english native }
             coverImage { large extraLarge }
             bannerImage

@@ -139,6 +139,7 @@ final class AniListProvider: MediaProvider {
     func mapMedia(_ m: AniListMedia) -> Media {
         Media(
             id: m.id,
+            idMal: m.idMal,
             provider: .anilist,
             title: MediaTitle(romaji: m.title.romaji, english: m.title.english, native: m.title.native),
             coverImage: MediaCoverImage(large: m.coverImage.large, extraLarge: m.coverImage.extraLarge),

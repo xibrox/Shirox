@@ -456,6 +456,7 @@ struct AniListDetailView: View {
             episodeTitle: item.episodeTitle,
             imageUrl: item.imageUrl,
             aniListID: item.aniListID,
+            malID: vm.media?.idMal,
             moduleId: item.moduleId,
             totalEpisodes: vm.media?.episodes ?? item.totalEpisodes,
             availableEpisodes: availableEpisodes ?? item.availableEpisodes,

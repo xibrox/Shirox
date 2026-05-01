@@ -2,6 +2,7 @@ import Foundation
 
 struct AniListMedia: Identifiable, Codable {
     let id: Int
+    let idMal: Int?
     let title: AniListTitle
     let coverImage: AniListCoverImage
     let bannerImage: String?

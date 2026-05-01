@@ -15,6 +15,7 @@ struct LibraryView: View {
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showProfile = false
+    @State private var showMALLogoutConfirm = false
     @State private var showNotifications = false
     @StateObject private var profileVM = ProfileViewModel()
     @State private var searchText = ""
@@ -393,7 +394,11 @@ struct LibraryView: View {
                         }
 
                         Button {
-                            showProfile = true
+                            if activeProviderType == .mal {
+                                showMALLogoutConfirm = true
+                            } else {
+                                showProfile = true
+                            }
                         } label: {
                             HStack(spacing: 6) {
                                 if let url = activeAvatarURL {
@@ -446,11 +451,13 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: $showProfile) {
-            let uid = activeProviderType == .mal ? malAuth.userId : anilistAuth.userId
-            let username = activeProviderType == .mal ? malAuth.username : anilistAuth.username
-            if let uid, let username {
-                ProfileView(userId: uid, username: username, avatarURL: activeAvatarURL)
+            if let uid = anilistAuth.userId, let username = anilistAuth.username {
+                ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL)
             }
+        }
+        .confirmationDialog("Log out of MyAnimeList?", isPresented: $showMALLogoutConfirm, titleVisibility: .visible) {
+            Button("Log Out", role: .destructive) { malAuth.logout() }
+            Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $showNotifications) {
             NotificationsView(vm: profileVM)

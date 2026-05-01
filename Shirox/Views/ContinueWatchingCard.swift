@@ -90,6 +90,7 @@ struct ContinueWatchingSection: View {
             episodeTitle: item.episodeTitle,
             imageUrl: item.imageUrl,
             aniListID: item.aniListID,
+            malID: item.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
             moduleId: item.moduleId,
             totalEpisodes: item.totalEpisodes,
             availableEpisodes: item.availableEpisodes,

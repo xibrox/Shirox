@@ -26,32 +26,36 @@ struct ProfileView: View {
             : userId == anilistAuth.userId
     }
 
-    var body: some View {
-        NavigationStack {
+    private var scrollableHeader: AnyView {
+        AnyView(
             VStack(spacing: 0) {
                 profileHeader
                     .padding(.bottom, 16)
-
                 tabBar
                     .padding(.horizontal)
                     .padding(.bottom, 6)
-
                 Divider().opacity(0.4)
+            }
+        )
+    }
 
-                ZStack {
-                    if selectedTab == 0 {
-                        ProfileActivityView(vm: vm, userId: userId)
-                    } else if selectedTab == 1 {
-                        ScrollView {
-                            ProfileFavouritesView(favourites: vm.user?.favourites)
-                        }
-                    } else if selectedTab == 2 {
-                        ScrollView {
-                            ProfileStatsView(stats: vm.user?.statistics?.anime)
-                        }
-                    } else if selectedTab == 3 {
-                        ProfileSocialView(vm: vm, userId: userId)
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                if selectedTab == 0 {
+                    ProfileActivityView(vm: vm, userId: userId, topContent: scrollableHeader)
+                } else if selectedTab == 1 {
+                    ScrollView {
+                        scrollableHeader
+                        ProfileFavouritesView(favourites: vm.user?.favourites)
                     }
+                } else if selectedTab == 2 {
+                    ScrollView {
+                        scrollableHeader
+                        ProfileStatsView(stats: vm.user?.statistics?.anime)
+                    }
+                } else if selectedTab == 3 {
+                    ProfileSocialView(vm: vm, userId: userId, topContent: scrollableHeader)
                 }
             }
             #if os(iOS)

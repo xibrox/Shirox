@@ -110,6 +110,7 @@ final class MALProvider: MediaProvider {
         let status = MALLibraryService.shared.mapStatusFromMAL(e.list_status.status)
         let media = Media(
             id: node.id,
+            idMal: node.id,
             provider: .mal,
             title: MediaTitle(romaji: node.title, english: nil, native: nil),
             coverImage: MediaCoverImage(large: node.main_picture?.medium, extraLarge: node.main_picture?.large),

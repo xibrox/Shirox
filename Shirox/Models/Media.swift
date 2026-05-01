@@ -21,6 +21,7 @@ enum ProviderType: String, Codable, CaseIterable, Hashable {
 
 struct Media: Identifiable, Codable, Equatable, Hashable {
     let id: Int
+    let idMal: Int?
     let provider: ProviderType
     let title: MediaTitle
     let coverImage: MediaCoverImage

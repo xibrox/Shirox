@@ -6,6 +6,7 @@ struct PlayerContext {
     let episodeTitle: String?
     let imageUrl: String
     let aniListID: Int?
+    let malID: Int?
     let moduleId: String?
     let totalEpisodes: Int?
     /// Number of episodes currently aired/available (may be less than totalEpisodes for ongoing shows).

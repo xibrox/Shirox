@@ -248,42 +248,6 @@ struct DetailView: View {
     }
 
     @ViewBuilder
-    private func libraryEditSheet() -> some View {
-        if let aid = vm.aniListID, let detail = vm.detail {
-            let tempMedia = makeLibraryMedia(aid: aid, detail: detail)
-            LibraryEntryEditSheet(entry: existingEntry, media: tempMedia) { status, progress, score in
-                if status == .completed {
-                    ContinueWatchingManager.shared.resetProgress(
-                        aniListID: aid, moduleId: nil, mediaTitle: detail.title
-                    )
-                } else if progress > 0 {
-                    ContinueWatchingManager.shared.markWatched(
-                        upThrough: progress,
-                        aniListID: aid,
-                        moduleId: ModuleManager.shared.activeModule?.id,
-                        mediaTitle: detail.title,
-                        imageUrl: detail.image,
-                        totalEpisodes: detail.episodes.count,
-                        availableEpisodes: detail.episodes.count,
-                        detailHref: vm.detailHref
-                    )
-                }
-                Task {
-                    try? await AniListLibraryService.shared.updateEntry(
-                        mediaId: aid, status: status, progress: progress, score: score
-                    )
-                    existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)).flatMap { AniListProvider.shared.mapEntry($0) }
-                }
-            }
-            #if os(iOS)
-            .presentationDetents([.medium, .large])
-            #else
-            .frame(minWidth: 480, minHeight: 360)
-            #endif
-        }
-    }
-
-    @ViewBuilder
     private func tabContent(detail: MediaDetail) -> some View {
         if selectedTab == 0 {
             episodesSection(detail: detail)
@@ -295,6 +259,7 @@ struct DetailView: View {
     private func makeLibraryMedia(aid: Int, detail: MediaDetail) -> Media {
         Media(
             id: aid,
+            idMal: nil,
             provider: .anilist,
             title: MediaTitle(romaji: detail.title, english: detail.title, native: detail.title),
             coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
@@ -456,6 +421,7 @@ struct DetailView: View {
             episodeTitle: item.episodeTitle,
             imageUrl: item.imageUrl,
             aniListID: item.aniListID,
+            malID: item.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
             moduleId: item.moduleId,
             totalEpisodes: currentEpCount ?? item.totalEpisodes,
             availableEpisodes: currentEpCount ?? item.availableEpisodes,
@@ -527,7 +493,7 @@ struct DetailView: View {
     private var libraryEditSheet: some View {
         if let aid = vm.aniListID, let detail = vm.detail {
             let tempMedia = Media(
-                id: aid, provider: .anilist,
+                id: aid, idMal: nil, provider: .anilist,
                 title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
                 coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
                 bannerImage: nil, description: detail.description,
@@ -703,7 +669,7 @@ struct DetailView: View {
     @ViewBuilder
     private var relationsSection: some View {
         let mappedRelations: [MediaRelationEdge]? = vm.aniListMedia?.relations?.edges.filter({ $0.node.type != "MANGA" }).map { edge in
-            MediaRelationEdge(relationType: edge.relationType, node: AniListProvider.shared.mapMedia(edge.node))
+            MediaRelationEdge(relationType: edge.relationType, node: edge.node)
         }
         if let relations = mappedRelations, !relations.isEmpty {
             let columns = [

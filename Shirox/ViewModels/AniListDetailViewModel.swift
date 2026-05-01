@@ -107,6 +107,7 @@ final class AniListDetailViewModel: ObservableObject {
             episodeTitle: nil,
             imageUrl: media.coverImage.extraLarge ?? media.coverImage.large ?? "",
             aniListID: media.id,
+            malID: media.idMal,
             moduleId: ModuleManager.shared.activeModule?.id,
             totalEpisodes: totalEpisodes,
             availableEpisodes: availEps,

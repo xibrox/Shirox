@@ -45,7 +45,10 @@ final class LibraryViewModel: ObservableObject {
 
     func refresh() async {
         cacheValid = false
-        await load()
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.load() }
+            group.addTask { await ContinueWatchingManager.shared.syncWithAniList() }
+        }
     }
 
     func update(entry: LibraryEntry, status: MediaListStatus, progress: Int, score: Double) async {
