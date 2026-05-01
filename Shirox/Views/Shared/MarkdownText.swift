@@ -7,7 +7,7 @@ struct MarkdownText: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 blockView(block)
             }
@@ -134,7 +134,16 @@ struct MarkdownText: View {
                 Spacer()
             }
         case .media(let type, let source):
-            Text("\(type.capitalized) embed: \(source)").foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Image(systemName: type == "youtube" ? "play.rectangle.fill" : "video.fill")
+                    .foregroundStyle(type == "youtube" ? .red : .accentColor)
+                Text("\(type.capitalized) embed: \(source)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(8)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
 
         case .spacer:
             Color.clear.frame(height: 2)
@@ -286,6 +295,21 @@ struct MarkdownText: View {
                 result.append(.image(url: url, width: nil))
                 continue
             }
+
+            // Media embeds: youtube(id), webm(url), mp4(url)
+            let mediaTypes = ["youtube", "webm", "mp4"]
+            var mediaFound = false
+            for type in mediaTypes {
+                if let match = trimmed.range(of: #"^\#(type)\((.*?)\)$"#, options: .regularExpression) {
+                    flushParagraph()
+                    let matchStr = String(trimmed[match])
+                    let source = matchStr.components(separatedBy: "(").last?.trimmingCharacters(in: CharacterSet(charactersIn: ")")) ?? ""
+                    result.append(.media(type: type, source: source))
+                    mediaFound = true
+                    break
+                }
+            }
+            if mediaFound { continue }
 
             // Table detection
             let isTableLine = trimmed.contains("|")
