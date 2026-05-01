@@ -405,8 +405,11 @@ struct MarkdownText: View {
     private func inlineMarkdown(_ raw: String) -> AttributedString {
         var s = raw
         // AniList-specific
-        s = s.replacingOccurrences(of: #"~!.*?!~"#, with: "⬛ spoiler", options: .regularExpression)
+        // Spoilers: ~!content!~ -> [Spoiler](spoiler://content)
+        s = s.replacingOccurrences(of: #"~!([\s\S]*?)!~"#, with: "[$1](spoiler://$1)", options: .regularExpression)
         s = s.replacingOccurrences(of: #"img\([^)]*\)"#, with: "", options: .regularExpression)
+        // Mentions: @user -> [@user](user://user)
+        s = s.replacingOccurrences(of: #"(?<!\w)@(\w+)"#, with: "[$0](user://$1)", options: .regularExpression)
         // HTML line breaks
         s = s.replacingOccurrences(of: "<br>", with: "\n")
         s = s.replacingOccurrences(of: "<br/>", with: "\n")
