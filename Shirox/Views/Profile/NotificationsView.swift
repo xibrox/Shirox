@@ -7,7 +7,7 @@ private struct MediaNavItem: Identifiable, Hashable { let id: Int }
 
 // MARK: - Loader that fetches an activity by ID then shows ActivityDetailView
 
-private struct ActivityFetchView: View {
+struct ActivityFetchView: View {
     let activityId: Int
     @State private var activity: AniListActivity?
     @State private var isLoading = true

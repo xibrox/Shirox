@@ -177,7 +177,7 @@ struct ActivityDetailView: View {
 
             switch activity {
             case .text(let a):
-                MarkdownText(text: a.text ?? "")
+                MarkdownText(text: a.text ?? "", font: .body)
             case .list(let a):
                 Button {
                     targetMediaId = a.media?.id

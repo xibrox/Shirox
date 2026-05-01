@@ -38,6 +38,13 @@ final class ProviderManager: ObservableObject {
         saveOrder()
     }
 
+    func selectProvider(_ type: ProviderType) {
+        guard let idx = orderedProviders.firstIndex(where: { $0.providerType == type }), idx != 0 else { return }
+        orderedProviders.move(fromOffsets: IndexSet(integer: idx), toOffset: 0)
+        fallbackActive = false
+        saveOrder()
+    }
+
     var primary: (any MediaProvider)? { orderedProviders.first }
     var fallback: (any MediaProvider)? { orderedProviders.count > 1 ? orderedProviders[1] : nil }
 
@@ -50,13 +57,20 @@ final class ProviderManager: ObservableObject {
         } catch {
             guard isFallbackEligible(error), let fallback else { throw error }
             fallbackActive = true
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(30))
+                self?.fallbackActive = false
+            }
             return try await operation(fallback)
         }
     }
 
     private func isFallbackEligible(_ error: Error) -> Bool {
+        if error is CancellationError { return false }
         if let pe = error as? ProviderError { return pe.isFallbackEligible }
-        if error is URLError { return true }
+        if let urlError = error as? URLError {
+            return urlError.code != .cancelled
+        }
         return false
     }
 }

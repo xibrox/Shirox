@@ -3,6 +3,7 @@ import Foundation
 struct AniListUser: Identifiable, Codable {
     let id: Int
     let name: String
+    let about: String?
     let avatar: AniListUserAvatar?
     let bannerImage: String?
     var isFollowing: Bool?

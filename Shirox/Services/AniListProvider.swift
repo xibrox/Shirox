@@ -48,6 +48,10 @@ final class AniListProvider: MediaProvider {
         mapMedia(try await AniListService.shared.detail(id: id))
     }
 
+    func browse(category: BrowseCategory, page: Int) async throws -> [Media] {
+        try await AniListService.shared.browse(category: category, page: page).map { mapMedia($0) }
+    }
+
     // MARK: - Library
 
     func fetchLibrary() async throws -> [LibraryEntry] {
@@ -171,6 +175,7 @@ final class AniListProvider: MediaProvider {
             id: u.id,
             provider: .anilist,
             name: u.name,
+            about: u.about,
             avatarURL: u.avatar?.large,
             bannerImage: u.bannerImage,
             isFollowing: u.isFollowing,

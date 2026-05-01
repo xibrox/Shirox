@@ -6,6 +6,15 @@ struct ProfileActivityView: View {
     @State private var selectedActivity: UserActivity?
     @State private var showCompose = false
 
+    @ObservedObject private var providerManager = ProviderManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
+
+    private var isMAL: Bool { providerManager.primary?.providerType == .mal }
+    private var isOwnProfile: Bool {
+        isMAL ? userId == malAuth.userId : userId == anilistAuth.userId
+    }
+
     // Local overrides so like/reply count updates are instant
     @State private var likeOverrides: [Int: (count: Int, liked: Bool)] = [:]
     @State private var replyCountOverrides: [Int: Int] = [:]
@@ -37,20 +46,17 @@ struct ProfileActivityView: View {
 
             content
         }
-        .task { 
+        .task {
             if vm.activity.isEmpty {
-                let initialFeed: ActivityFeed = (userId == AniListAuthManager.shared.userId) ? .following : .mine
+                let initialFeed: ActivityFeed = (!isMAL && isOwnProfile) ? .following : .mine
                 await vm.loadActivity(userId: userId, feed: initialFeed)
             }
         }
         .sheet(item: $selectedActivity) { activity in
             NavigationStack {
-                ActivityDetailView(
-                    activity: activity.asAniListActivity,
-                    onReplyPosted: { replyCountOverrides[activity.id] = replyCount(for: activity) + 1 },
-                    onLikeChanged: { count, liked in likeOverrides[activity.id] = (count, liked) }
-                )
+                ActivityFetchView(activityId: activity.id)
             }
+            .presentationDetents([.large])
         }
         .sheet(isPresented: $showCompose) {
             ComposeStatusView(profileVM: vm)
@@ -62,7 +68,7 @@ struct ProfileActivityView: View {
             AniListDetailView(mediaId: mid)
         }
         .overlay(alignment: .bottomTrailing) {
-            if userId == AniListAuthManager.shared.userId {
+            if !isMAL && isOwnProfile {
                 Button { showCompose = true } label: {
                     Image(systemName: "square.and.pencil")
                         .font(.title3.weight(.semibold))
@@ -96,9 +102,8 @@ struct ProfileActivityView: View {
     private var feedPicker: some View {
         HStack(spacing: 6) {
             let feeds = ActivityFeed.allCases.filter { feed in
-                if userId != AniListAuthManager.shared.userId {
-                    return feed != .following
-                }
+                if isMAL { return feed == .mine }
+                if !isOwnProfile { return feed != .following }
                 return true
             }
             
@@ -207,6 +212,9 @@ struct ProfileActivityView: View {
                 switch item.kind {
                 case .text(let text):
                     MarkdownText(text: text, font: .callout)
+                        .lineLimit(6)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
                 case .list(let status, let progress, let media):
                     Button {
                         targetMediaId = media?.id
@@ -271,7 +279,7 @@ struct ProfileActivityView: View {
                 .fill(Color.secondary.opacity(0.08))
         )
         .contextMenu {
-            if item.user?.id == AniListAuthManager.shared.userId {
+            if !isMAL && item.user?.id == anilistAuth.userId {
                 Button(role: .destructive) {
                     activityToDelete = item
                 } label: {

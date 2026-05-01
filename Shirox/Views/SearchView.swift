@@ -4,6 +4,7 @@ struct SearchView: View {
     @StateObject private var vm = SearchViewModel()
     @StateObject private var history = SearchHistoryManager()
     @EnvironmentObject private var moduleManager: ModuleManager
+    @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showModuleList = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var isLandscape = false
@@ -22,6 +23,7 @@ struct SearchView: View {
     }
 
     private var usingModule: Bool { moduleManager.activeModule != nil }
+    private var primaryProvider: ProviderType { providerManager.orderedProviders.first?.providerType ?? .anilist }
 
     var body: some View {
         NavigationStack {
@@ -54,6 +56,10 @@ struct SearchView: View {
                 }
                 .onChange(of: moduleManager.activeModule) { _, newModule in
                     guard !vm.query.isEmpty, newModule == nil else { return }
+                    vm.search(usingModule: false)
+                }
+                .onChange(of: providerManager.orderedProviders.first?.providerType) { _, _ in
+                    guard !vm.query.isEmpty, !usingModule else { return }
                     vm.search(usingModule: false)
                 }
         }
@@ -93,7 +99,7 @@ struct SearchView: View {
                     title: usingModule ? "Search via Module" : "Search Anime",
                     subtitle: usingModule
                         ? "Searching \(moduleManager.activeModule?.sourceName ?? "")…"
-                        : "Find any anime via AniList"
+                        : "Find any anime via \(primaryProvider.displayName)"
                 )
             }
         } else if vm.isLoading {
@@ -227,7 +233,7 @@ struct SearchView: View {
                             fallbackIcon
                         }
                     } else {
-                        CachedAsyncImage(urlString: "https://anilist.co/img/icons/apple-touch-icon.png")
+                        CachedAsyncImage(urlString: primaryProvider.iconURL)
                     }
                 }
                 .frame(width: 20, height: 20)
@@ -238,7 +244,7 @@ struct SearchView: View {
                 )
 
                 // Text label
-                Text(usingModule ? (moduleManager.activeModule?.sourceName ?? "Module") : "AniList")
+                Text(usingModule ? (moduleManager.activeModule?.sourceName ?? "Module") : primaryProvider.displayName)
                     .font(.callout)
                     .fontWeight(.medium)
             }
@@ -354,5 +360,6 @@ struct AniListCardView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
+            .contentShape(Rectangle())
     }
 }

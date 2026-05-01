@@ -41,12 +41,13 @@ struct BrowseView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(vm.items) { media in
+                        ForEach(vm.items, id: \.uniqueId) { media in
                             NavigationLink {
                                 AniListDetailView(mediaId: media.id, preloadedMedia: media)
                             } label: {
                                 AniListCardView(media: media)
                             }
+                            .contentShape(Rectangle())
                             .buttonStyle(BrowseCardPressStyle())
                         }
 

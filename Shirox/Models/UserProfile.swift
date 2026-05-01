@@ -4,18 +4,20 @@ struct UserProfile: Identifiable, Codable {
     let id: Int
     let provider: ProviderType
     let name: String
+    let about: String?
     let avatarURL: String?
     let bannerImage: String?
     var isFollowing: Bool?
     let statistics: ProfileStatistics?
     let favourites: [Media]?
 
-    init(id: Int, provider: ProviderType, name: String, avatarURL: String?,
+    init(id: Int, provider: ProviderType, name: String, about: String? = nil, avatarURL: String?,
          bannerImage: String?, isFollowing: Bool?, statistics: ProfileStatistics?,
          favourites: [Media]? = nil) {
         self.id = id
         self.provider = provider
         self.name = name
+        self.about = about
         self.avatarURL = avatarURL
         self.bannerImage = bannerImage
         self.isFollowing = isFollowing

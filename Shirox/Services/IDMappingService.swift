@@ -14,6 +14,10 @@ final class IDMappingService {
         let malId: Int?
     }
 
+    func cachedAnilistId(forMALId malId: Int) -> Int? {
+        cache["mal-\(malId)"]
+    }
+
     func anilistId(forMALId malId: Int) async -> Int? {
         let key = "mal-\(malId)"
         if let cached = cache[key] { return cached }

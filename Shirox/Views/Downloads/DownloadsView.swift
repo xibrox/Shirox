@@ -82,6 +82,7 @@ struct DownloadsView: View {
                                             Button(role: .destructive) { dm.remove(item) } label: {
                                                 Label("Cancel", systemImage: "xmark")
                                             }
+                                            .tint(.red)
                                         }
                                 }
                             }
@@ -124,6 +125,7 @@ struct DownloadsView: View {
                                             Button(role: .destructive) { dm.remove(item) } label: {
                                                 Label("Delete", systemImage: "trash")
                                             }
+                                            .tint(.red)
                                         }
                                 }
                             }
@@ -555,9 +557,9 @@ struct DownloadedMediaDetailView: View {
                         .font(.title3.weight(.bold))
                     Text("\(downloadedItems.count)")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(platformBackground)
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.primary, in: Capsule())
+                        .background(.primary.opacity(0.1), in: Capsule())
                 }
                 Spacer()
 

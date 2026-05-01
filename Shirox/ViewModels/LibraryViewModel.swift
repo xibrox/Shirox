@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor
 final class LibraryViewModel: ObservableObject {
@@ -13,6 +14,19 @@ final class LibraryViewModel: ObservableObject {
 
     private var allEntries: [LibraryEntry] = []
     private var cacheValid = false
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        ProviderManager.shared.$orderedProviders
+            .map { $0.first?.providerType }
+            .removeDuplicates { $0 == $1 }
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.refresh() }
+            }
+            .store(in: &cancellables)
+    }
 
     func load() async {
         await fetch()

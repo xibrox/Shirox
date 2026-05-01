@@ -46,6 +46,10 @@ final class MALProvider: MediaProvider {
         MALDiscoveryService.shared.mapToMedia(try await MALDiscoveryService.shared.detail(malId: id))
     }
 
+    func browse(category: BrowseCategory, page: Int) async throws -> [Media] {
+        try await MALDiscoveryService.shared.browse(category: category, page: page).map { MALDiscoveryService.shared.mapToMedia($0) }
+    }
+
     // MARK: - Library
 
     func fetchLibrary() async throws -> [LibraryEntry] {

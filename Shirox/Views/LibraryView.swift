@@ -11,7 +11,9 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 
 struct LibraryView: View {
     @StateObject private var vm = LibraryViewModel()
-    @ObservedObject private var auth = AniListAuthManager.shared
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showProfile = false
     @State private var showNotifications = false
     @StateObject private var profileVM = ProfileViewModel()
@@ -23,16 +25,36 @@ struct LibraryView: View {
         LibrarySortOrder(rawValue: sortOrderRaw) ?? .score
     }
     @State private var selectedGenres: Set<String> = []
-    
-    // Selection state for editing
     @State private var selectedEntry: LibraryEntry? = nil
+    #if os(iOS)
+    @State private var presentationWindow: UIWindow?
+    #endif
 
-    // Comma-separated raw values, e.g. "CURRENT,PLANNING,COMPLETED,DROPPED,PAUSED,REPEATING"
     @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
 
+    /// The provider type that should drive the library UI right now.
+    /// Normally the primary provider; falls back to secondary when primary is down.
+    private var activeProviderType: ProviderType {
+        let primary = providerManager.primary?.providerType ?? .anilist
+        if providerManager.fallbackActive, let fallback = providerManager.fallback {
+            return fallback.providerType
+        }
+        return primary
+    }
+
+    private var isActiveProviderAuthenticated: Bool {
+        activeProviderType == .mal ? malAuth.isLoggedIn : anilistAuth.isLoggedIn
+    }
+
     private var displayUsername: String {
-        let name = auth.username ?? "Profile"
+        let name = activeProviderType == .mal
+            ? (malAuth.username ?? "Profile")
+            : (anilistAuth.username ?? "Profile")
         return name.count > 15 ? String(name.prefix(15)) + "…" : name
+    }
+
+    private var activeAvatarURL: String? {
+        activeProviderType == .mal ? malAuth.avatarURL : anilistAuth.avatarURL
     }
 
     private var orderedStatuses: [MediaListStatus] {
@@ -88,7 +110,7 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            if !auth.isLoggedIn {
+            if !isActiveProviderAuthenticated {
                 loginPrompt
             } else {
                 libraryContent
@@ -134,7 +156,9 @@ struct LibraryView: View {
             Image(systemName: "books.vertical.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.primary)
-            Text("Track your anime with AniList")
+            Text(activeProviderType == .mal
+                 ? "Track your anime with MyAnimeList"
+                 : "Track your anime with AniList")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
             Text("Sign in to view and manage your anime library.")
@@ -144,14 +168,15 @@ struct LibraryView: View {
                 .padding(.horizontal, 32)
             Button {
                 #if os(iOS)
-                let anchor = UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .flatMap { $0.windows }
-                    .first { $0.isKeyWindow } ?? UIWindow()
-                auth.login(presentationAnchor: anchor)
+                guard let window = presentationWindow else { return }
+                if activeProviderType == .mal {
+                    MALAuthManager.shared.login(presentationAnchor: window)
+                } else {
+                    AniListAuthManager.shared.login(presentationAnchor: window)
+                }
                 #endif
             } label: {
-                Text("Sign in with AniList")
+                Text(activeProviderType == .mal ? "Sign in with MyAnimeList" : "Sign in with AniList")
                     .font(.headline)
                     .foregroundStyle(Color(.systemBackground))
                     .frame(maxWidth: .infinity)
@@ -163,6 +188,14 @@ struct LibraryView: View {
             Spacer()
         }
         .navigationTitle("Library")
+        #if os(iOS)
+        .onAppear {
+            presentationWindow = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+        }
+        #endif
     }
 
     // MARK: - Library content
@@ -300,7 +333,7 @@ struct LibraryView: View {
                     searchText.isEmpty ? "Nothing here yet" : "No Results",
                     systemImage: searchText.isEmpty ? "tray" : "magnifyingglass",
                     description: Text(searchText.isEmpty
-                        ? "Add anime to \(vm.selectedCustomList ?? vm.selectedStatus.displayName) on AniList."
+                        ? "Add anime to \(vm.selectedCustomList ?? vm.selectedStatus.displayName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList")."
                         : "No anime matching \"\(searchText)\".")
                 )
             } else {
@@ -347,22 +380,23 @@ struct LibraryView: View {
                 sortMenu
             }
             ToolbarItem(placement: .topBarTrailing) {
-                if auth.isLoggedIn {
+                if isActiveProviderAuthenticated {
                     HStack(spacing: 10) {
-                        Button {
-                            showNotifications = true
-                        } label: {
-                            Image(systemName: "bell")
-                                .font(.system(size: 17, weight: .medium))
+                        if activeProviderType == .anilist {
+                            Button {
+                                showNotifications = true
+                            } label: {
+                                Image(systemName: "bell")
+                                    .font(.system(size: 17, weight: .medium))
+                            }
+                            Divider().frame(height: 16)
                         }
-
-                        Divider().frame(height: 16)
 
                         Button {
                             showProfile = true
                         } label: {
                             HStack(spacing: 6) {
-                                if let url = auth.avatarURL {
+                                if let url = activeAvatarURL {
                                     CachedAsyncImage(urlString: url)
                                         .frame(width: 28, height: 28)
                                         .clipShape(Circle())
@@ -379,8 +413,22 @@ struct LibraryView: View {
             }
         }
         .task { await vm.load() }
-        .onChange(of: auth.isLoggedIn) { _, newValue in
+        #if os(iOS)
+        .onAppear {
+            presentationWindow = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+        }
+        #endif
+        .onChange(of: anilistAuth.isLoggedIn) { _, newValue in
             if newValue { Task { await vm.load() } }
+        }
+        .onChange(of: malAuth.isLoggedIn) { _, newValue in
+            if newValue { Task { await vm.load() } }
+        }
+        .onChange(of: providerManager.fallbackActive) { _, _ in
+            Task { await vm.refresh() }
         }
         .navigationTitle("Library")
         .searchable(text: $searchText, prompt: "Search library")
@@ -398,8 +446,10 @@ struct LibraryView: View {
             }
         }
         .sheet(isPresented: $showProfile) {
-            if let uid = auth.userId, let username = auth.username {
-                ProfileView(userId: uid, username: username, avatarURL: auth.avatarURL)
+            let uid = activeProviderType == .mal ? malAuth.userId : anilistAuth.userId
+            let username = activeProviderType == .mal ? malAuth.username : anilistAuth.username
+            if let uid, let username {
+                ProfileView(userId: uid, username: username, avatarURL: activeAvatarURL)
             }
         }
         .sheet(isPresented: $showNotifications) {

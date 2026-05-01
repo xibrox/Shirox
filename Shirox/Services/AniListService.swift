@@ -400,19 +400,22 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private let tvdbEndpoint = "https://api4.thetvdb.com/v4"
     private let apiKey = "4cd66d53-3c21-45a7-9dd2-e4a9c2ed20a8"
     private let cacheKey = "tvdb_mappings_cache_v3"
+    private let malCacheKey = "tvdb_mal_mappings_cache_v1"
 
     @Published private var token: String?
     private var tokenExpiry: Date?
 
-    // Cache: AniListID -> (TVDB_ID, SeasonNumber, PosterPath?, FanartPath?)
+    // Cache: AniListID or MALID -> (TVDB_ID, SeasonNumber, PosterPath?, FanartPath?)
     struct CachedData: Codable {
         let tid: Int
         var season: Int?
         var posterPath: String?
         var fanartPath: String?
     }
-    private var cache: [Int: CachedData] = [:]
+    private var cache: [Int: CachedData] = [:]       // keyed by AniList ID
+    private var malCache: [Int: CachedData] = [:]     // keyed by MAL ID
     private var episodeCache: [Int: [AniMapEpisode]] = [:]
+    private var malEpisodeCache: [Int: [AniMapEpisode]] = [:]
 
     private static let session: URLSession = {
         let cfg = URLSessionConfiguration.default
@@ -425,6 +428,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         if let data = UserDefaults.standard.data(forKey: cacheKey),
            let decoded = try? JSONDecoder().decode([Int: CachedData].self, from: data) {
             self.cache = decoded
+        }
+        if let data = UserDefaults.standard.data(forKey: malCacheKey),
+           let decoded = try? JSONDecoder().decode([Int: CachedData].self, from: data) {
+            self.malCache = decoded
         }
     }
 
@@ -450,151 +457,76 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         return res.data.token
     }
 
-    func getTVDBId(for aniListId: Int) async -> (id: Int, season: Int?)? {
-        if let cached = cache[aniListId] {
-            return cached.tid > 0 ? (cached.tid, cached.season) : nil
-        }
-        
+    private func mappingKey(for provider: ProviderType) -> String {
+        provider == .mal ? "myanimelist" : "anilist"
+    }
+
+    private func tvdbCache(for provider: ProviderType) -> [Int: CachedData] {
+        provider == .mal ? malCache : cache
+    }
+
+    private func setTVDBCache(_ data: CachedData, id: Int, provider: ProviderType) {
+        if provider == .mal { malCache[id] = data } else { cache[id] = data }
+    }
+
+    func getTVDBId(for id: Int, provider: ProviderType = .anilist) async -> (id: Int, season: Int?)? {
+        let cached = tvdbCache(for: provider)[id]
+        if let cached { return cached.tid > 0 ? (cached.tid, cached.season) : nil }
         do {
-            let urlString = "\(mappingEndpoint)\(aniListId)?mapping_key=anilist"
-            guard let url = URL(string: urlString) else { return nil }
-            
+            let key = mappingKey(for: provider)
+            guard let url = URL(string: "\(mappingEndpoint)\(id)?mapping_key=\(key)") else { return nil }
             let (data, _) = try await Self.session.data(for: URLRequest(url: url))
-            
-            struct Mapping: Decodable {
-                let tvdb_id: Int?
-                let tvdb_season: Int?
-            }
-            
+            struct Mapping: Decodable { let tvdb_id: Int?; let tvdb_season: Int? }
             let results = try JSONDecoder().decode([Mapping].self, from: data)
             if let first = results.first, let tid = first.tvdb_id {
-                let season = first.tvdb_season
-                cache[aniListId] = CachedData(tid: tid, season: season)
-                saveCache()
-                return (tid, season)
+                setTVDBCache(CachedData(tid: tid, season: first.tvdb_season), id: id, provider: provider)
+                provider == .mal ? saveMALCache() : saveCache()
+                return (tid, first.tvdb_season)
             } else {
-                cache[aniListId] = CachedData(tid: -1, season: nil)
-                saveCache()
+                setTVDBCache(CachedData(tid: -1, season: nil), id: id, provider: provider)
+                provider == .mal ? saveMALCache() : saveCache()
             }
         } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
-            // task cancelled — ignore
         } catch {
-            Logger.shared.log("Failed to fetch TVDB mapping: \(error)", type: "Error")
+            Logger.shared.log("TVDB mapping error (\(provider.rawValue)): \(error)", type: "Error")
         }
-        
         return nil
     }
-    
-    func getCachedArtwork(for aniListId: Int) -> (poster: String?, fanart: String?) {
-        if let c = cache[aniListId] {
+
+    /// Returns true if we've already checked TVDB for this ID (result may be positive or negative).
+    func hasMappingResolved(for id: Int, provider: ProviderType = .anilist) -> Bool {
+        tvdbCache(for: provider)[id] != nil
+    }
+
+    func getCachedArtwork(for id: Int, provider: ProviderType = .anilist) -> (poster: String?, fanart: String?) {
+        if let c = tvdbCache(for: provider)[id] {
             return (formatURL(c.posterPath), formatURL(c.fanartPath))
         }
         return (nil, nil)
     }
-    
-    func getArtwork(for aniListId: Int) async -> (poster: String?, fanart: String?) {
-        guard let mapping = await getTVDBId(for: aniListId), mapping.id > 0 else { return (nil, nil) }
-        let tid = mapping.id
-        let targetSeason = mapping.season
-        
-        if let cached = cache[aniListId], cached.posterPath != nil || cached.fanartPath != nil {
-            return (formatURL(cached.posterPath), formatURL(cached.fanartPath))
+
+    func getArtwork(for id: Int, provider: ProviderType = .anilist) async -> (poster: String?, fanart: String?) {
+        if let c = tvdbCache(for: provider)[id], c.posterPath != nil || c.fanartPath != nil {
+            return (formatURL(c.posterPath), formatURL(c.fanartPath))
         }
-        
-        do {
-            let token = try await authenticate()
-
-            struct Artwork: Decodable {
-                let image: String
-                let type: Int
-                let width: Int?
-                let height: Int?
-            }
-            struct SeasonType: Decodable {
-                let id: Int
-                let type: String?
-            }
-            struct Season: Decodable {
-                let id: Int
-                let number: Int
-                let type: SeasonType?
-            }
-            struct SeriesExtended: Decodable {
-                struct Data: Decodable {
-                    let artworks: [Artwork]?
-                    let seasons: [Season]?
-                }
-                let data: Data
-            }
-            struct SeasonExtended: Decodable {
-                struct Data: Decodable {
-                    let artwork: [Artwork]?
-                }
-                let data: Data
-            }
-
-            func fetchSeriesExtended() async -> SeriesExtended.Data? {
-                let url = URL(string: "\(tvdbEndpoint)/series/\(tid)/extended")!
-                var req = URLRequest(url: url)
-                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                guard let (data, _) = try? await Self.session.data(for: req),
-                      let res = try? JSONDecoder().decode(SeriesExtended.self, from: data) else { return nil }
-                return res.data
-            }
-
-            func fetchSeasonArtwork(seasonId: Int) async -> [Artwork] {
-                let url = URL(string: "\(tvdbEndpoint)/seasons/\(seasonId)/extended")!
-                var req = URLRequest(url: url)
-                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                guard let (data, _) = try? await Self.session.data(for: req),
-                      let res = try? JSONDecoder().decode(SeasonExtended.self, from: data) else { return [] }
-                return res.data.artwork ?? []
-            }
-
-            guard let seriesData = await fetchSeriesExtended() else {
-                return ("https://artworks.thetvdb.com/banners/posters/\(tid)-1.jpg", nil)
-            }
-
-            let artworks = seriesData.artworks ?? []
-
-            // Fanart is series-wide (type 3), pick largest
-            let fanart = artworks.filter { $0.type == 3 }
-                .sorted { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
-                .first?.image
-
-            // For poster: fetch season-specific artwork using official aired-order season
-            var poster: String?
-            if let targetSeason {
-                // Filter to official aired-order seasons only (type "official" or id 1)
-                let officialSeasons = seriesData.seasons?.filter {
-                    $0.type?.type == "official" || $0.type?.id == 1
-                }
-                if let seasonId = officialSeasons?.first(where: { $0.number == targetSeason })?.id {
-                    let seasonArtworks = await fetchSeasonArtwork(seasonId: seasonId)
-                    let bySize: (Artwork, Artwork) -> Bool = { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
-                    let seasonPosters = seasonArtworks.filter { $0.type == 7 }.sorted(by: bySize)
-                    poster = seasonPosters.first?.image ?? seasonArtworks.sorted(by: bySize).first?.image
-                }
-            }
-
-            // Fallback to series-level poster (type 2)
-            if poster == nil {
-                let bySize: (Artwork, Artwork) -> Bool = { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
-                poster = artworks.filter { $0.type == 2 }.sorted(by: bySize).first?.image
-            }
-
-            cache[aniListId]?.posterPath = poster
-            cache[aniListId]?.fanartPath = fanart
+        guard let mapping = await getTVDBId(for: id, provider: provider), mapping.id > 0 else {
+            return (nil, nil)
+        }
+        let artwork = await fetchTVDBIdArtwork(tid: mapping.id, targetSeason: mapping.season)
+        if provider == .mal {
+            malCache[id]?.posterPath = artwork.poster
+            malCache[id]?.fanartPath = artwork.fanart
+            saveMALCache()
+        } else {
+            cache[id]?.posterPath = artwork.poster
+            cache[id]?.fanartPath = artwork.fanart
             saveCache()
-            return (formatURL(poster), formatURL(fanart))
-        } catch {
-            Logger.shared.log("TVDB API Error: \(error)", type: "Error")
-            return ("https://artworks.thetvdb.com/banners/posters/\(tid)-1.jpg", nil)
         }
+        return (formatURL(artwork.poster), formatURL(artwork.fanart))
     }
 
 
-    func getEpisodes(for aniListId: Int) async -> [AniMapEpisode] {
+    private func getEpisodesAniList(_ aniListId: Int) async -> [AniMapEpisode] {
         if let cached = episodeCache[aniListId] {
             return cached
         }
@@ -703,10 +635,65 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         }
     }
 
-    func getCachedEpisode(for aniListId: Int, episodeNumber: Int) -> AniMapEpisode? {
-        let eps = episodeCache[aniListId]
+    func getCachedEpisode(for id: Int, provider: ProviderType = .anilist, episodeNumber: Int) -> AniMapEpisode? {
+        let eps = provider == .mal ? malEpisodeCache[id] : episodeCache[id]
         return eps?.first(where: { $0.episode == episodeNumber })
             ?? eps?.first(where: { $0.absolute == episodeNumber })
+    }
+
+    func getEpisodes(for id: Int, provider: ProviderType = .anilist) async -> [AniMapEpisode] {
+        if provider != .mal { return await getEpisodesAniList(id) }
+        if let cached = malEpisodeCache[id] { return cached }
+
+        // 1. Try TVDB first using the MAL ID mapping
+        if let mapping = await getTVDBId(for: id, provider: ProviderType.mal), mapping.id > 0 {
+            let tvdbEps = await fetchTVDBEpisodes(tid: mapping.id, season: mapping.season ?? 1)
+            if !tvdbEps.isEmpty {
+                let mapped = tvdbEps.map { te in
+                    AniMapEpisode(absolute: te.number, airdate: nil, description: te.overview,
+                                  episode: te.number, filler_type: nil, mal_id: nil,
+                                  season: te.seasonNumber, thumbnail: formatURL(te.image), title: te.name)
+                }
+                malEpisodeCache[id] = mapped
+                return mapped
+            }
+        }
+
+        // 2. Fall back to anira MAL episodes endpoint
+        do {
+            guard let url = URL(string: "https://api.anira.dev/media/\(id)/episodes?mapping_key=myanimelist") else { return [] }
+            let (data, _) = try await Self.session.data(for: URLRequest(url: url))
+            var results = try JSONDecoder().decode([AniMapEpisode].self, from: data)
+            results = results.map { ep in
+                guard let thumb = ep.thumbnail, !thumb.contains("mapping_key") else { return ep }
+                return AniMapEpisode(absolute: ep.absolute, airdate: ep.airdate, description: ep.description,
+                                    episode: ep.episode, filler_type: ep.filler_type, mal_id: ep.mal_id,
+                                    season: ep.season, thumbnail: thumb + "?mapping_key=myanimelist", title: ep.title)
+            }
+            // If all titles are generic ("Episode N" or nil), fetch real titles from Jikan
+            let allGeneric = results.allSatisfy { ep in
+                guard let t = ep.title else { return true }
+                return t.range(of: #"^Episode \d+$"#, options: .regularExpression) != nil
+            }
+            if allGeneric && !results.isEmpty {
+                let jikanEps = (try? await MALDiscoveryService.shared.episodes(malId: id)) ?? []
+                let titleByNumber = Dictionary(jikanEps.map { ($0.mal_id, $0.title) }, uniquingKeysWith: { $1 })
+                results = results.map { ep in
+                    let title = titleByNumber[ep.episode] ?? ep.title
+                    guard title != ep.title else { return ep }
+                    return AniMapEpisode(absolute: ep.absolute, airdate: ep.airdate, description: ep.description,
+                                        episode: ep.episode, filler_type: ep.filler_type, mal_id: ep.mal_id,
+                                        season: ep.season, thumbnail: ep.thumbnail, title: title)
+                }
+            }
+            malEpisodeCache[id] = results
+            return results
+        } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
+            return []
+        } catch {
+            Logger.shared.log("Anira MAL episodes error: \(error)", type: "Error")
+            return []
+        }
     }
 
     private func formatURL(_ path: String?) -> String? {
@@ -721,6 +708,77 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         Task.detached(priority: .background) {
             guard let encoded = try? JSONEncoder().encode(snapshot) else { return }
             UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
+    private func saveMALCache() {
+        let snapshot = malCache
+        let key = malCacheKey
+        Task.detached(priority: .background) {
+            guard let encoded = try? JSONEncoder().encode(snapshot) else { return }
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
+    /// Shared TVDB artwork fetch used by both AniList and MAL paths.
+    private func fetchTVDBIdArtwork(tid: Int, targetSeason: Int?) async -> (poster: String?, fanart: String?) {
+        struct Artwork: Decodable {
+            let image: String
+            let type: Int
+            let width: Int?
+            let height: Int?
+        }
+        struct SeasonType: Decodable { let id: Int; let type: String? }
+        struct Season: Decodable { let id: Int; let number: Int; let type: SeasonType? }
+        struct SeriesExtended: Decodable {
+            struct Data: Decodable { let artworks: [Artwork]?; let seasons: [Season]? }
+            let data: Data
+        }
+        struct SeasonExtended: Decodable {
+            struct Data: Decodable { let artwork: [Artwork]? }
+            let data: Data
+        }
+        do {
+            let token = try await authenticate()
+
+            func fetchSeriesExtended() async -> SeriesExtended.Data? {
+                let url = URL(string: "\(tvdbEndpoint)/series/\(tid)/extended")!
+                var req = URLRequest(url: url)
+                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                guard let (data, _) = try? await Self.session.data(for: req),
+                      let res = try? JSONDecoder().decode(SeriesExtended.self, from: data) else { return nil }
+                return res.data
+            }
+            func fetchSeasonArtwork(seasonId: Int) async -> [Artwork] {
+                let url = URL(string: "\(tvdbEndpoint)/seasons/\(seasonId)/extended")!
+                var req = URLRequest(url: url)
+                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                guard let (data, _) = try? await Self.session.data(for: req),
+                      let res = try? JSONDecoder().decode(SeasonExtended.self, from: data) else { return [] }
+                return res.data.artwork ?? []
+            }
+
+            guard let seriesData = await fetchSeriesExtended() else { return (nil, nil) }
+            let artworks = seriesData.artworks ?? []
+            let bySize: (Artwork, Artwork) -> Bool = { ($0.width ?? 0) * ($0.height ?? 0) > ($1.width ?? 0) * ($1.height ?? 0) }
+            let fanart = artworks.filter { $0.type == 3 }.sorted(by: bySize).first?.image
+
+            var poster: String?
+            if let targetSeason {
+                let officialSeasons = seriesData.seasons?.filter { $0.type?.type == "official" || $0.type?.id == 1 }
+                if let seasonId = officialSeasons?.first(where: { $0.number == targetSeason })?.id {
+                    let seasonArtworks = await fetchSeasonArtwork(seasonId: seasonId)
+                    poster = seasonArtworks.filter { $0.type == 7 }.sorted(by: bySize).first?.image
+                        ?? seasonArtworks.sorted(by: bySize).first?.image
+                }
+            }
+            if poster == nil {
+                poster = artworks.filter { $0.type == 2 }.sorted(by: bySize).first?.image
+            }
+            return (poster, fanart)
+        } catch {
+            Logger.shared.log("TVDB artwork fetch error: \(error)", type: "Error")
+            return (nil, nil)
         }
     }
     }

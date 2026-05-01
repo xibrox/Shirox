@@ -124,7 +124,8 @@ final class ProfileViewModel: ObservableObject {
     func postStatus(text: String) async {
         do {
             try await ProviderManager.shared.call { try await $0.postStatus(text) }
-            if let uid = AniListAuthManager.shared.userId {
+            let uid = AniListAuthManager.shared.userId ?? MALAuthManager.shared.userId
+            if let uid {
                 await loadActivity(userId: uid)
             }
         } catch ProviderError.unsupported {

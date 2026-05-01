@@ -33,60 +33,53 @@ struct DetailView: View {
         #endif
     }
 
-    var body: some View {
+    @ViewBuilder
+    private var mainContent: some View {
         ZStack {
             platformBackground.ignoresSafeArea()
-            
             if vm.isLoadingDetail && vm.detail == nil {
                 loadingView
             } else if let detail = vm.detail {
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        heroSection
-                        metadataSection(detail: detail)
-                            .padding(.top, 12)
-                        
-                        #if os(iOS)
-                        VStack(alignment: .leading, spacing: 16) {
-                            synopsisSection(detail: detail)
-                                .padding(.top, 16)
-                            
-                            HStack(spacing: 12) {
-                                watchButton(detail: detail)
-                                tabToggleButton()
-                                selectionModeButton()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                        }
-                        #endif
-                        
-                        #if !os(iOS)
-                        tabSelector
-                            .padding(.top, 8)
-                        #endif
-                        
-                        tabContent(detail: detail)
-                    }
-                    .padding(.bottom, 30)
-                }
-                .coordinateSpace(name: "detailScroll")
-                .ignoresSafeArea(edges: .top)
+                detailScrollView(detail: detail)
             } else if let error = vm.errorMessage {
                 errorView(error)
             }
         }
+    }
+
+    private func detailScrollView(detail: MediaDetail) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                heroSection
+                metadataSection(detail: detail).padding(.top, 12)
+                #if os(iOS)
+                VStack(alignment: .leading, spacing: 16) {
+                    synopsisSection(detail: detail).padding(.top, 16)
+                    actionBar(detail: detail).padding(.horizontal, 16).padding(.bottom, 8)
+                }
+                #endif
+                #if !os(iOS)
+                tabSelector.padding(.top, 8)
+                #endif
+                if selectedTab == 0 {
+                    episodesSection(detail: detail)
+                } else {
+                    relationsSection
+                }
+            }
+            .padding(.bottom, 30)
+        }
+        .coordinateSpace(name: "detailScroll")
+        .ignoresSafeArea(edges: .top)
+    }
+
+    var body: some View {
+        mainContent
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .tint(.primary)
-        .toolbar {
-            if AniListAuthManager.shared.isLoggedIn {
-                ToolbarItem(placement: .topBarTrailing) {
-                    aniListToolbarButton()
-                }
-            }
-        }
+        .toolbar { detailToolbar }
         #endif
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
@@ -98,7 +91,9 @@ struct DetailView: View {
             
             if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
                 Task {
-                    existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)).flatMap { AniListProvider.shared.mapEntry($0) }
+                    if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                        existingEntry = AniListProvider.shared.mapEntry(raw)
+                    }
                 }
             }
 
@@ -170,7 +165,7 @@ struct DetailView: View {
         }
         #endif
         .sheet(isPresented: $showLibraryEdit) {
-            libraryEditSheet()
+            libraryEditSheet
         }
         #if os(iOS)
         .sheet(isPresented: $showBatchDownloadPicker) {
@@ -319,6 +314,41 @@ struct DetailView: View {
     }
 
     #if os(iOS)
+    private func actionBar(detail: MediaDetail) -> some View {
+        HStack(spacing: 12) {
+            watchButton(detail: detail)
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    selectedTab = selectedTab == 0 ? 1 : 0
+                }
+            } label: {
+                circleIconButton(icon: selectedTab == 0 ? "person.3.fill" : "list.bullet", isActive: selectedTab == 1, size: 16)
+            }
+            .buttonStyle(.plain)
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isSelectionMode.toggle()
+                    if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+                }
+            } label: {
+                circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+    #endif
+
+    private func circleIconButton(icon: String, isActive: Bool, size: CGFloat) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(isActive ? platformBackground : .primary)
+            .frame(width: 46, height: 46)
+            .background(isActive ? Color.primary : Color.clear, in: Circle())
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+    }
+
+    #if os(iOS)
     @ViewBuilder
     private func watchButton(detail: MediaDetail) -> some View {
         let item = continueWatchingItem(for: detail)
@@ -461,6 +491,90 @@ struct DetailView: View {
     }
     #endif
 
+    #if os(iOS)
+    @ToolbarContentBuilder
+    private var detailToolbar: some ToolbarContent {
+        if AniListAuthManager.shared.isLoggedIn {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let aid = vm.aniListID {
+                    Menu {
+                        Button {
+                            Task {
+                                isLoadingEntry = true
+                                if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                                    existingEntry = AniListProvider.shared.mapEntry(raw)
+                                }
+                                isLoadingEntry = false
+                                showLibraryEdit = true
+                            }
+                        } label: { Label("Edit Library Entry", systemImage: "pencil") }
+                        Button { showMatchingSearch = true } label: {
+                            Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    } label: { libraryEditButtonLabel }
+                    .disabled(isLoadingEntry)
+                } else {
+                    Button { showMatchingSearch = true } label: {
+                        Image(systemName: "link.badge.plus").font(.system(size: 17, weight: .medium))
+                    }
+                }
+            }
+        }
+    }
+    #endif
+
+    @ViewBuilder
+    private var libraryEditSheet: some View {
+        if let aid = vm.aniListID, let detail = vm.detail {
+            let tempMedia = Media(
+                id: aid, provider: .anilist,
+                title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
+                coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+                bannerImage: nil, description: detail.description,
+                episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+                status: "FINISHED", averageScore: nil, genres: nil,
+                season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                relations: nil, type: nil, format: nil
+            )
+            LibraryEntryEditSheet(entry: existingEntry, media: tempMedia) { status, progress, score in
+                if status == .completed {
+                    ContinueWatchingManager.shared.resetProgress(aniListID: aid, moduleId: nil, mediaTitle: detail.title)
+                } else if progress > 0 {
+                    ContinueWatchingManager.shared.markWatched(
+                        upThrough: progress, aniListID: aid,
+                        moduleId: ModuleManager.shared.activeModule?.id,
+                        mediaTitle: detail.title, imageUrl: detail.image,
+                        totalEpisodes: detail.episodes.count,
+                        availableEpisodes: detail.episodes.count,
+                        detailHref: vm.detailHref
+                    )
+                }
+                Task {
+                    try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: status, progress: progress, score: score)
+                    if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                        existingEntry = AniListProvider.shared.mapEntry(raw)
+                    }
+                }
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            #else
+            .frame(minWidth: 480, minHeight: 360)
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private var libraryEditButtonLabel: some View {
+        if isLoadingEntry {
+            ProgressView().scaleEffect(0.8)
+        } else {
+            Image(systemName: "pencil.circle")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+    }
+
     // MARK: - Hero (unchanged, but poster overlay uses neutral strokes)
     private var heroSection: some View {
         ZStack(alignment: .bottom) {
@@ -588,7 +702,10 @@ struct DetailView: View {
 
     @ViewBuilder
     private var relationsSection: some View {
-        if let relations = vm.aniListMedia?.relations?.edges.filter({ $0.node.type != "MANGA" }), !relations.isEmpty {
+        let mappedRelations: [MediaRelationEdge]? = vm.aniListMedia?.relations?.edges.filter({ $0.node.type != "MANGA" }).map { edge in
+            MediaRelationEdge(relationType: edge.relationType, node: AniListProvider.shared.mapMedia(edge.node))
+        }
+        if let relations = mappedRelations, !relations.isEmpty {
             let columns = [
                 GridItem(.flexible(), spacing: 16),
                 GridItem(.flexible(), spacing: 16)

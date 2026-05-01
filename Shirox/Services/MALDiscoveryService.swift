@@ -69,46 +69,63 @@ final class MALDiscoveryService {
         var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "sfw", value: "true")] + queryItems
         let (data, response) = try await session.data(from: components.url!)
-        if let http = response as? HTTPURLResponse, http.statusCode >= 500 {
-            throw ProviderError.serverError(http.statusCode)
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 429 { throw ProviderError.serverError(429) }
+            if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
         }
-        return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data
+        return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data.filter { $0.mal_id > 0 }
     }
 
     private func fetchSingle(_ path: String) async throws -> JikanAnime {
         let url = base.appendingPathComponent(path)
         let (data, response) = try await session.data(from: url)
-        if let http = response as? HTTPURLResponse, http.statusCode >= 500 {
-            throw ProviderError.serverError(http.statusCode)
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 429 { throw ProviderError.serverError(429) }
+            if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
         }
         return try JSONDecoder().decode(JikanSingle<JikanAnime>.self, from: data).data
     }
 
     // MARK: - Public API
 
-    func trending() async throws -> [JikanAnime] {
+    func trending(page: Int = 1) async throws -> [JikanAnime] {
         try await fetchList("top/anime", queryItems: [
             URLQueryItem(name: "filter", value: "airing"),
-            URLQueryItem(name: "limit", value: "20")
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)")
         ])
     }
 
-    func seasonal() async throws -> [JikanAnime] {
-        try await fetchList("seasons/now", queryItems: [URLQueryItem(name: "limit", value: "20")])
+    func seasonal(page: Int = 1) async throws -> [JikanAnime] {
+        try await fetchList("seasons/now", queryItems: [
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)")
+        ])
     }
 
-    func popular() async throws -> [JikanAnime] {
+    func popular(page: Int = 1) async throws -> [JikanAnime] {
         try await fetchList("top/anime", queryItems: [
             URLQueryItem(name: "filter", value: "bypopularity"),
-            URLQueryItem(name: "limit", value: "20")
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)")
         ])
     }
 
-    func topRated() async throws -> [JikanAnime] {
+    func topRated(page: Int = 1) async throws -> [JikanAnime] {
         try await fetchList("top/anime", queryItems: [
             URLQueryItem(name: "filter", value: "favorite"),
-            URLQueryItem(name: "limit", value: "20")
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "page", value: "\(page)")
         ])
+    }
+
+    func browse(category: BrowseCategory, page: Int) async throws -> [JikanAnime] {
+        switch category {
+        case .trending: return try await trending(page: page)
+        case .seasonal: return try await seasonal(page: page)
+        case .popular:  return try await popular(page: page)
+        case .topRated: return try await topRated(page: page)
+        }
     }
 
     func search(_ query: String) async throws -> [JikanAnime] {
@@ -120,6 +137,20 @@ final class MALDiscoveryService {
 
     func detail(malId: Int) async throws -> JikanAnime {
         try await fetchSingle("anime/\(malId)/full")
+    }
+
+    struct JikanEpisode: Decodable {
+        let mal_id: Int
+        let title: String?
+    }
+
+    /// Fetches episode titles from Jikan (up to 100 per page).
+    func episodes(malId: Int, page: Int = 1) async throws -> [JikanEpisode] {
+        var components = URLComponents(url: base.appendingPathComponent("anime/\(malId)/episodes"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "page", value: "\(page)")]
+        let (data, response) = try await session.data(from: components.url!)
+        if let http = response as? HTTPURLResponse, http.statusCode == 429 { throw ProviderError.serverError(429) }
+        return try JSONDecoder().decode(JikanPage<JikanEpisode>.self, from: data).data
     }
 
     // MARK: - Mapping to shared Media

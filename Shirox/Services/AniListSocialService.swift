@@ -38,7 +38,7 @@ final class AniListSocialService {
         let q = """
         query($id: Int) {
           User(id: $id) {
-            id name
+            id name about
             avatar { large }
             bannerImage
             isFollowing

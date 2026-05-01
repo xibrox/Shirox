@@ -74,6 +74,7 @@ protocol MediaProvider: AnyObject {
     func topRated() async throws -> [Media]
     func search(_ query: String) async throws -> [Media]
     func detail(id: Int) async throws -> Media
+    func browse(category: BrowseCategory, page: Int) async throws -> [Media]
 
     // Library
     func fetchLibrary() async throws -> [LibraryEntry]

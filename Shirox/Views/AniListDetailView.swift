@@ -829,6 +829,7 @@ struct AniListDetailView: View {
                             AniListEpisodeRowContainer(
                                 ep: ep,
                                 mediaId: media.id,
+                                provider: media.provider,
                                 mediaTitle: media.title.searchTitle,
                                 coverImage: media.coverImage.best,
                                 totalEpisodes: totalEpisodes,
@@ -836,12 +837,12 @@ struct AniListDetailView: View {
                                 aniListStatus: existingEntry?.status,
                                 onTap: sel ? {
                                     // Prevent selecting if already downloaded or in progress
-                                    let state = DownloadManager.shared.items.first { 
-                                        $0.aniListID == mediaId && $0.episodeNumber == ep 
+                                    let state = DownloadManager.shared.items.first {
+                                        $0.aniListID == mediaId && $0.episodeNumber == ep
                                     }?.state
-                                    
+
                                     if state == .completed || state == .downloading || state == .pending {
-                                        return 
+                                        return
                                     }
 
                                     if selectedEpisodeNumbers.contains(ep) {
@@ -860,6 +861,7 @@ struct AniListDetailView: View {
                             AniListEpisodeRowContainer(
                                 ep: ep,
                                 mediaId: media.id,
+                                provider: media.provider,
                                 mediaTitle: media.title.searchTitle,
                                 coverImage: media.coverImage.best,
                                 totalEpisodes: totalEpisodes,
@@ -983,6 +985,7 @@ struct SynopsisSection: View {
 private struct AniListEpisodeRowContainer: View {
     let ep: Int
     let mediaId: Int
+    let provider: ProviderType
     let mediaTitle: String
     let coverImage: String?
     let totalEpisodes: Int?
@@ -1073,15 +1076,14 @@ private struct AniListEpisodeRowContainer: View {
         )
         .task {
             if aniMapEpisode == nil {
-                aniMapEpisode = TVDBMappingService.shared.getCachedEpisode(for: mediaId, episodeNumber: ep)
+                aniMapEpisode = TVDBMappingService.shared.getCachedEpisode(for: mediaId, provider: provider, episodeNumber: ep)
                 if aniMapEpisode == nil {
-                    let eps = await TVDBMappingService.shared.getEpisodes(for: mediaId)
+                    let eps = await TVDBMappingService.shared.getEpisodes(for: mediaId, provider: provider)
                     aniMapEpisode = eps.first(where: { $0.episode == ep })
                 }
             }
-            // If episode was found but has no thumbnail, fall back to series fanart
             if aniMapEpisode?.thumbnail == nil {
-                let artwork = await TVDBMappingService.shared.getArtwork(for: mediaId)
+                let artwork = await TVDBMappingService.shared.getArtwork(for: mediaId, provider: provider)
                 fallbackThumbnail = artwork.fanart ?? artwork.poster
             }
         }

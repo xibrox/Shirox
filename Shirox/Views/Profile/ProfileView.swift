@@ -10,7 +10,21 @@ struct ProfileView: View {
     @State private var showLogoutConfirm = false
     @Environment(\.dismiss) private var dismiss
 
-    @ObservedObject private var auth = AniListAuthManager.shared
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @ObservedObject private var providerManager = ProviderManager.shared
+
+    private var activeProviderType: ProviderType {
+        providerManager.fallbackActive
+            ? (providerManager.fallback?.providerType ?? .anilist)
+            : (providerManager.primary?.providerType ?? .anilist)
+    }
+
+    private var isOwnProfile: Bool {
+        activeProviderType == .mal
+            ? userId == malAuth.userId
+            : userId == anilistAuth.userId
+    }
 
     var body: some View {
         NavigationStack {
@@ -45,7 +59,7 @@ struct ProfileView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    if userId == AniListAuthManager.shared.userId {
+                    if isOwnProfile {
                         Button(role: .destructive) { showLogoutConfirm = true } label: {
                             Image(systemName: "rectangle.portrait.and.arrow.right")
                                 .foregroundStyle(.red)
@@ -57,10 +71,9 @@ struct ProfileView: View {
                 }
             }
         }
-        .task { 
-            await vm.loadProfile(userId: userId) 
-            // If it's another user, default to their feed
-            if userId != auth.userId {
+        .task {
+            await vm.loadProfile(userId: userId)
+            if !isOwnProfile {
                 await vm.loadActivity(userId: userId, feed: .mine)
             }
         }
@@ -72,9 +85,13 @@ struct ProfileView: View {
         .frame(minWidth: 480, minHeight: 360)
 
         #endif
-        .confirmationDialog("Log out of AniList?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+        .confirmationDialog("Log out of \(activeProviderType == .mal ? "MyAnimeList" : "AniList")?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) {
-                AniListAuthManager.shared.logout()
+                if activeProviderType == .mal {
+                    MALAuthManager.shared.logout()
+                } else {
+                    AniListAuthManager.shared.logout()
+                }
                 dismiss()
             }
             Button("Cancel", role: .cancel) { }
@@ -127,7 +144,7 @@ struct ProfileView: View {
                 Spacer(minLength: 8)
                 
                 // Follow Button
-                if userId != auth.userId && auth.isLoggedIn {
+                if !isOwnProfile && (anilistAuth.isLoggedIn || malAuth.isLoggedIn) {
                     Button {
                         Task { await vm.toggleFollow(userId: userId) }
                     } label: {
@@ -147,6 +164,14 @@ struct ProfileView: View {
             }
             .padding(.top, 4)
             .frame(maxWidth: .infinity)
+
+            if let about = vm.user?.about, !about.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                MarkdownText(text: about, font: .footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+            }
         }
     }
 

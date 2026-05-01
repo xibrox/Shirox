@@ -9,7 +9,7 @@ final class CacheManager: ObservableObject {
     
     // MARK: - Size Calculations
     
-    var imageCacheSize: Int { URLCache.shared.currentDiskUsage }
+    var imageCacheSize: Int { URLCache.shared.currentDiskUsage + CachedAsyncImage.diskCacheBytes }
     
     var websiteDataSize: Int {
         let libraryDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
@@ -52,8 +52,7 @@ final class CacheManager: ObservableObject {
     // MARK: - Individual Reset Methods
 
     func clearImageCache() {
-        URLCache.shared.removeAllCachedResponses()
-        NotificationCenter.default.post(name: NSNotification.Name("ClearImageCache"), object: nil)
+        CachedAsyncImage.resetCache()
     }
 
     func clearWebsiteData() async {

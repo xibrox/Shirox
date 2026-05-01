@@ -13,17 +13,28 @@ final class MALAuthManager: NSObject, ObservableObject {
 
     // Register app at https://myanimelist.net/apiconfig
     // App Type: other, Redirect URI: shirox://auth-mal
-    let clientId = "YOUR_MAL_CLIENT_ID"
+    let clientId = "9e0dc49b04d7c8f95014ddcb7718fcb9"
 
     private let accessTokenKey = "mal_access_token"
     private let refreshTokenKey = "mal_refresh_token"
+    private let profileKey = "mal_user_profile"
     private var codeVerifier: String?
     private var authSession: ASWebAuthenticationSession?
     nonisolated(unsafe) var presentationAnchorWindow: ASPresentationAnchor?
 
+    private struct CachedProfile: Codable {
+        let id: Int; let name: String; let avatarURL: String?
+    }
+
     private override init() {
         super.init()
         isLoggedIn = accessToken != nil
+        if isLoggedIn, let data = UserDefaults.standard.data(forKey: profileKey),
+           let cached = try? JSONDecoder().decode(CachedProfile.self, from: data) {
+            userId = cached.id
+            username = cached.name
+            avatarURL = cached.avatarURL
+        }
     }
 
     // MARK: - Keychain
@@ -152,6 +163,10 @@ final class MALAuthManager: NSObject, ObservableObject {
             userId = profile.id
             username = profile.name
             avatarURL = profile.avatarURL
+            let cached = CachedProfile(id: profile.id, name: profile.name, avatarURL: profile.avatarURL)
+            if let data = try? JSONEncoder().encode(cached) {
+                UserDefaults.standard.set(data, forKey: profileKey)
+            }
         } catch {
             print("MAL fetchCurrentUser error: \(error)")
         }
@@ -160,6 +175,7 @@ final class MALAuthManager: NSObject, ObservableObject {
     func logout() {
         keychainDelete(key: accessTokenKey)
         keychainDelete(key: refreshTokenKey)
+        UserDefaults.standard.removeObject(forKey: profileKey)
         isLoggedIn = false
         username = nil
         avatarURL = nil

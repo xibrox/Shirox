@@ -748,6 +748,10 @@ class Logger {
 private struct ProvidersSettingsSection: View {
     @ObservedObject private var manager = ProviderManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
+    @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    #if os(iOS)
+    @State private var presentationWindow: UIWindow?
+    #endif
 
     var body: some View {
         Section {
@@ -764,12 +768,17 @@ private struct ProvidersSettingsSection: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if manager.orderedProviders.first?.providerType == provider.providerType {
-                        Text("Primary")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.accentColor, in: Capsule())
+                    HStack(spacing: 8) {
+                        if manager.orderedProviders.first?.providerType == provider.providerType {
+                            Text("Primary")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(.primary.opacity(0.1), in: Capsule())
+                        }
+                        #if os(iOS)
+                        providerAuthButton(for: provider.providerType)
+                        #endif
                     }
                 }
             }
@@ -779,28 +788,44 @@ private struct ProvidersSettingsSection: View {
             Text("Drag to reorder. The first provider is primary; the second is used as fallback.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-            if !malAuth.isLoggedIn {
-                #if os(iOS)
-                Button("Sign in with MyAnimeList") {
-                    if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                       let window = scene.windows.first {
-                        malAuth.login(presentationAnchor: window)
-                    }
-                }
-                #endif
-            } else {
-                Button("Sign out of MyAnimeList", role: .destructive) {
-                    malAuth.logout()
-                }
-            }
         } header: {
             Text("Providers")
         }
         #if os(iOS)
         .environment(\.editMode, .constant(.active))
+        .onAppear {
+            presentationWindow = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+        }
         #endif
     }
+
+    #if os(iOS)
+    @ViewBuilder
+    private func providerAuthButton(for type: ProviderType) -> some View {
+        let isLoggedIn = type == .anilist ? aniListAuth.isLoggedIn : malAuth.isLoggedIn
+        Button(isLoggedIn ? "Sign Out" : "Sign In") {
+            if isLoggedIn {
+                if type == .anilist { aniListAuth.logout() } else { malAuth.logout() }
+            } else {
+                if let window = presentationWindow {
+                    if type == .anilist {
+                        aniListAuth.login(presentationAnchor: window)
+                    } else {
+                        malAuth.login(presentationAnchor: window)
+                    }
+                }
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(isLoggedIn ? .red : Color.accentColor)
+        .padding(.horizontal, 8).padding(.vertical, 3)
+        .background((isLoggedIn ? Color.red : Color.accentColor).opacity(0.1), in: Capsule())
+        .buttonStyle(.plain)
+    }
+    #endif
 
     private func providerStatus(_ provider: any MediaProvider) -> String {
         switch provider.providerType {

@@ -10,6 +10,13 @@ enum ProviderType: String, Codable, CaseIterable, Hashable {
         case .mal: return "MyAnimeList"
         }
     }
+
+    var iconURL: String {
+        switch self {
+        case .anilist: return "https://anilist.co/img/icons/apple-touch-icon.png"
+        case .mal: return "https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png"
+        }
+    }
 }
 
 struct Media: Identifiable, Codable, Equatable, Hashable {

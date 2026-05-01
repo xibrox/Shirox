@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor
 final class SearchViewModel: ObservableObject {
@@ -11,6 +12,16 @@ final class SearchViewModel: ObservableObject {
 
     private(set) var isUsingModule = false
     private var searchTask: Task<Void, Never>?
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        ProviderManager.shared.$orderedProviders
+            .map { $0.first?.providerType }
+            .removeDuplicates { $0 == $1 }
+            .dropFirst()
+            .sink { [weak self] _ in self?.clearResults() }
+            .store(in: &cancellables)
+    }
 
     func search(usingModule: Bool) {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -27,13 +38,15 @@ final class SearchViewModel: ObservableObject {
                 if usingModule {
                     let res = try await JSEngine.shared.search(keyword: q)
                     if !Task.isCancelled {
-                        moduleResults = res
+                        var seen = Set<String>()
+                        moduleResults = res.filter { seen.insert($0.href).inserted }
                         aniListResults = []
                     }
                 } else {
                     let res = try await ProviderManager.shared.call { try await $0.search(q) }
                     if !Task.isCancelled {
-                        aniListResults = res
+                        var seen = Set<String>()
+                        aniListResults = res.filter { seen.insert($0.uniqueId).inserted }
                         moduleResults = []
                     }
                 }
@@ -42,7 +55,9 @@ final class SearchViewModel: ObservableObject {
                     errorMessage = error.localizedDescription
                 }
             }
-            isLoading = false
+            if !Task.isCancelled {
+                isLoading = false
+            }
         }
     }
 

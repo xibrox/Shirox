@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ModuleListView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
+    @ObservedObject private var providerManager = ProviderManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var moduleURL = ""
     @State private var isRefreshing = false
@@ -35,9 +36,11 @@ struct ModuleListView: View {
                 }
 
                 Section {
-                    aniListRow
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+                    ForEach(ProviderType.allCases, id: \.self) { type in
+                        builtInProviderRow(type)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
 
                     if moduleManager.modules.isEmpty {
                         emptyModulesView
@@ -191,19 +194,23 @@ struct ModuleListView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - AniList Row
-    private var aniListRow: some View {
-        let isActive = moduleManager.activeModule == nil
+    // MARK: - Built-in Provider Row
+    private func builtInProviderRow(_ type: ProviderType) -> some View {
+        let isChosen = providerManager.orderedProviders.first?.providerType == type
+        let isSelected = moduleManager.activeModule == nil
+        let isDown = isChosen && providerManager.fallbackActive
+
         return Button {
-            if !isActive {
+            if moduleManager.activeModule != nil {
                 moduleManager.deselectModule()
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
             }
+            providerManager.selectProvider(type)
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
         } label: {
             HStack(spacing: 14) {
-                AsyncImage(url: URL(string: "https://anilist.co/img/icons/apple-touch-icon.png")) { phase in
+                AsyncImage(url: URL(string: type.iconURL)) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable().aspectRatio(contentMode: .fit)
@@ -222,11 +229,22 @@ struct ModuleListView: View {
                 .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("AniList").font(.headline)
-                    Text("Built-in · anime metadata").font(.caption).foregroundStyle(.secondary)
+                    Text(type.displayName).font(.headline)
+                    HStack(spacing: 6) {
+                        Text("Built-in · anime metadata")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if isDown {
+                            Text("Unavailable")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(.red.opacity(0.12), in: Capsule())
+                        }
+                    }
                 }
                 Spacer()
-                if isActive {
+                if isSelected && isChosen && !isDown {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color.primary)
                         .font(.title3)
@@ -236,10 +254,15 @@ struct ModuleListView: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .background(isActive ? Color.primary.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
+            .background(
+                (isSelected && isChosen) ? Color.primary.opacity(0.08) : Color.black.opacity(0.001),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .opacity(isDown ? 0.45 : 1.0)
         }
         .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.2), value: isActive)
+        .animation(.easeOut(duration: 0.2), value: isSelected)
+        .animation(.easeOut(duration: 0.2), value: providerManager.fallbackActive)
     }
 
     // MARK: - Module Row
