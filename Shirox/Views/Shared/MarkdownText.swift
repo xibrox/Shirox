@@ -3,6 +3,8 @@ import SwiftUI
 struct MarkdownText: View {
     let text: String
     var font: Font = .body
+    @State private var revealedSpoilers: Set<String> = []
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -11,6 +13,23 @@ struct MarkdownText: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .environment(\.openURL, OpenURLAction { url in
+            if url.scheme == "spoiler" {
+                if let content = url.host?.removingPercentEncoding {
+                    if revealedSpoilers.contains(content) {
+                        revealedSpoilers.remove(content)
+                    } else {
+                        revealedSpoilers.insert(content)
+                    }
+                }
+                return .handled
+            } else if url.scheme == "user" {
+                // Mentions can be handled by parent or just ignored here
+                // If we had a global navigator we could use it
+                return .systemAction
+            }
+            return .systemAction
+        })
     }
 
     // MARK: - Block types
@@ -36,7 +55,7 @@ struct MarkdownText: View {
     private func blockView(_ block: MBlock) -> some View {
         switch block {
         case .heading(let level, let content):
-            Text(inlineMarkdown(content))
+            Text(inlineMarkdown(content, revealed: revealedSpoilers))
                 .font(headingFont(level))
                 .fontWeight(.bold)
                 .fixedSize(horizontal: false, vertical: true)
@@ -52,7 +71,7 @@ struct MarkdownText: View {
                 } else {
                     Text("•").font(font)
                 }
-                Text(inlineMarkdown(content))
+                Text(inlineMarkdown(content, revealed: revealedSpoilers))
                     .font(font)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -63,7 +82,7 @@ struct MarkdownText: View {
                 Text("\(n).")
                     .font(font)
                     .foregroundStyle(.secondary)
-                Text(inlineMarkdown(content))
+                Text(inlineMarkdown(content, revealed: revealedSpoilers))
                     .font(font)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -75,7 +94,7 @@ struct MarkdownText: View {
                     .fill(Color.secondary.opacity(0.4))
                     .frame(width: 3)
                     .clipShape(Capsule())
-                Text(inlineMarkdown(content))
+                Text(inlineMarkdown(content, revealed: revealedSpoilers))
                     .font(font)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -98,12 +117,16 @@ struct MarkdownText: View {
             Divider().opacity(0.5)
 
         case .paragraph(let content):
-            Text(inlineMarkdown(content))
+            Text(inlineMarkdown(content, revealed: revealedSpoilers))
                 .font(font)
                 .fixedSize(horizontal: false, vertical: true)
 
         case .image(let url, let width):
-            Text("Image: \(url)").foregroundStyle(.secondary)
+            CachedAsyncImage(urlString: url)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: width)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
         case .centered(let block):
             HStack {
                 Spacer()
@@ -127,7 +150,7 @@ struct MarkdownText: View {
                 ForEach(Array(rows.enumerated()), id: \.offset) { rowIdx, row in
                     HStack(spacing: 0) {
                         ForEach(Array(row.enumerated()), id: \.offset) { colIdx, cell in
-                            Text(inlineMarkdown(cell.trimmingCharacters(in: .whitespaces)))
+                            Text(inlineMarkdown(cell.trimmingCharacters(in: .whitespaces), revealed: revealedSpoilers))
                                 .font(rowIdx == 0 ? font.weight(.semibold) : font)
                                 .frame(maxWidth: .infinity,
                                        alignment: tableAlignment(alignments, colIdx))
@@ -402,11 +425,33 @@ struct MarkdownText: View {
 
     // MARK: - Inline markdown
 
-    private func inlineMarkdown(_ raw: String) -> AttributedString {
+    private func inlineMarkdown(_ raw: String, revealed: Set<String>) -> AttributedString {
         var s = raw
         // AniList-specific
         // Spoilers: ~!content!~ -> [Spoiler](spoiler://content)
-        s = s.replacingOccurrences(of: #"~!([\s\S]*?)!~"#, with: "[$1](spoiler://$1)", options: .regularExpression)
+        let spoilerPattern = #"~!([\s\S]*?)!~"#
+        if let regex = try? NSRegularExpression(pattern: spoilerPattern) {
+            let nsString = s as NSString
+            let matches = regex.matches(in: s, range: NSRange(location: 0, length: nsString.length))
+            
+            var offset = 0
+            for match in matches {
+                let fullRange = NSRange(location: match.range.location + offset, length: match.range.length)
+                let content = nsString.substring(with: match.range(at: 1))
+                
+                let replacement: String
+                if revealed.contains(content) {
+                    replacement = content
+                } else {
+                    let encoded = content.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? ""
+                    replacement = "[⬛ spoiler](spoiler://\(encoded))"
+                }
+                
+                s = (s as NSString).replacingCharacters(in: fullRange, with: replacement)
+                offset += (replacement.count - match.range.length)
+            }
+        }
+        
         s = s.replacingOccurrences(of: #"img\([^)]*\)"#, with: "", options: .regularExpression)
         // Mentions: @user -> [@user](user://user)
         s = s.replacingOccurrences(of: #"(?<!\w)@(\w+)"#, with: "[$0](user://$1)", options: .regularExpression)
