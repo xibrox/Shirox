@@ -243,6 +243,27 @@ struct MarkdownText: View {
 
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
+            // AniList Image: img###(url)
+            if let match = trimmed.range(of: #"^img(\d*)\((.*?)\)$"#, options: .regularExpression) {
+                flushParagraph()
+                let matchStr = String(trimmed[match])
+                let parts = matchStr.components(separatedBy: "(")
+                let widthStr = parts.first?.replacingOccurrences(of: "img", with: "") ?? ""
+                let width = CGFloat(Int(widthStr) ?? 0)
+                let url = parts.last?.trimmingCharacters(in: CharacterSet(charactersIn: ")")) ?? ""
+                result.append(.image(url: url, width: width > 0 ? width : nil))
+                continue
+            }
+
+            // Standard Image: ![alt](url)
+            if let match = trimmed.range(of: #"^!\[.*?\]\((.*?)\)$"#, options: .regularExpression) {
+                flushParagraph()
+                let matchStr = String(trimmed[match])
+                let url = matchStr.components(separatedBy: "(").last?.trimmingCharacters(in: CharacterSet(charactersIn: ")")) ?? ""
+                result.append(.image(url: url, width: nil))
+                continue
+            }
+
             // Table detection
             let isTableLine = trimmed.contains("|")
             let nextLine = i + 1 < lines.count ? lines[i + 1].trimmingCharacters(in: .whitespaces) : ""
@@ -309,6 +330,14 @@ struct MarkdownText: View {
                trimmed.filter({ !$0.isWhitespace }).allSatisfy({ $0 == first }) {
                 flushParagraph()
                 result.append(.rule)
+                continue
+            }
+
+            // Centered: ~~~content~~~
+            if trimmed.hasPrefix("~~~") && trimmed.hasSuffix("~~~") && trimmed.count > 6 {
+                flushParagraph()
+                let content = String(trimmed.dropFirst(3).dropLast(3)).trimmingCharacters(in: .whitespaces)
+                result.append(.centered(.paragraph(content)))
                 continue
             }
 
