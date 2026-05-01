@@ -53,55 +53,8 @@ struct DetailView: View {
                             
                             HStack(spacing: 12) {
                                 watchButton(detail: detail)
-
-                                Button {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                        selectedTab = selectedTab == 0 ? 1 : 0
-                                    }
-                                } label: {
-                                    Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
-                                        .frame(width: 46, height: 46)
-                                        .background(
-                                            selectedTab == 1
-                                                ? Color.primary
-                                                : Color.clear,
-                                            in: Circle()
-                                        )
-                                        .background(.ultraThinMaterial, in: Circle())
-                                        .overlay(
-                                            Circle()
-                                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-
-                                Button {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                        isSelectionMode.toggle()
-                                        if !isSelectionMode {
-                                            selectedEpisodeNumbers.removeAll()
-                                        }
-                                    }
-                                } label: {
-                                    Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundStyle(isSelectionMode ? platformBackground : .primary)
-                                        .frame(width: 46, height: 46)
-                                        .background(
-                                            isSelectionMode
-                                                ? Color.primary
-                                                : Color.clear,
-                                            in: Circle()
-                                        )
-                                        .background(.ultraThinMaterial, in: Circle())
-                                        .overlay(
-                                            Circle()
-                                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                        )
-                                }
-                                .buttonStyle(.plain)
+                                tabToggleButton()
+                                selectionModeButton()
                             }
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
@@ -113,11 +66,7 @@ struct DetailView: View {
                             .padding(.top, 8)
                         #endif
                         
-                        if selectedTab == 0 {
-                            episodesSection(detail: detail)
-                        } else {
-                            relationsSection
-                        }
+                        tabContent(detail: detail)
                     }
                     .padding(.bottom, 30)
                 }
@@ -134,42 +83,7 @@ struct DetailView: View {
         .toolbar {
             if AniListAuthManager.shared.isLoggedIn {
                 ToolbarItem(placement: .topBarTrailing) {
-                    if let aid = vm.aniListID {
-                        Menu {
-                            Button {
-                                Task {
-                                    isLoadingEntry = true
-                                    existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
-                                    isLoadingEntry = false
-                                    showLibraryEdit = true
-                                }
-                            } label: {
-                                Label("Edit Library Entry", systemImage: "pencil")
-                            }
-
-                            Button {
-                                showMatchingSearch = true
-                            } label: {
-                                Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
-                            }
-                        } label: {
-                            if isLoadingEntry {
-                                ProgressView().scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "pencil.circle")
-                                    .font(.system(size: 17, weight: .medium))
-                                    .foregroundStyle(.primary)
-                            }
-                        }
-                        .disabled(isLoadingEntry)
-                    } else {
-                        Button {
-                            showMatchingSearch = true
-                        } label: {
-                            Image(systemName: "link.badge.plus")
-                                .font(.system(size: 17, weight: .medium))
-                        }
-                    }
+                    aniListToolbarButton()
                 }
             }
         }
@@ -184,7 +98,7 @@ struct DetailView: View {
             
             if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
                 Task {
-                    existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
+                    existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)).flatMap { AniListProvider.shared.mapEntry($0) }
                 }
             }
 
@@ -256,59 +170,7 @@ struct DetailView: View {
         }
         #endif
         .sheet(isPresented: $showLibraryEdit) {
-            if let aid = vm.aniListID, let detail = vm.detail {
-                let tempMedia = AniListMedia(
-                    id: aid,
-                    title: AniListTitle(romaji: detail.title, english: detail.title, native: detail.title),
-                    coverImage: AniListCoverImage(large: detail.image, extraLarge: detail.image),
-                    bannerImage: nil,
-                    description: detail.description,
-                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
-                    status: "FINISHED",
-                    averageScore: nil,
-                    genres: nil,
-                    season: nil,
-                    seasonYear: nil,
-                    nextAiringEpisode: nil,
-                    relations: nil,
-                    type: nil,
-                    format: nil
-                )
-                
-                LibraryEntryEditSheet(entry: existingEntry, media: tempMedia) { status, progress, score in
-                    if status == .completed {
-                        ContinueWatchingManager.shared.resetProgress(
-                            aniListID: aid, moduleId: nil, mediaTitle: detail.title
-                        )
-                    } else if progress > 0 {
-                        ContinueWatchingManager.shared.markWatched(
-                            upThrough: progress,
-                            aniListID: aid,
-                            moduleId: ModuleManager.shared.activeModule?.id,
-                            mediaTitle: detail.title,
-                            imageUrl: detail.image,
-                            totalEpisodes: detail.episodes.count,
-                            availableEpisodes: detail.episodes.count,
-                            detailHref: vm.detailHref
-                        )
-                    }
-                    
-                    Task {
-                        try? await AniListLibraryService.shared.updateEntry(
-                            mediaId: aid, status: status, progress: progress, score: score
-                        )
-                        existingEntry = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)
-                    }
-                }
-                #if os(iOS)
-                .presentationDetents([.medium, .large])
-
-                #else
-
-                .frame(minWidth: 480, minHeight: 360)
-
-                #endif
-            }
+            libraryEditSheet()
         }
         #if os(iOS)
         .sheet(isPresented: $showBatchDownloadPicker) {
@@ -351,6 +213,111 @@ struct DetailView: View {
             .first
     }
 
+    @ViewBuilder
+    private func aniListToolbarButton() -> some View {
+        if let aid = vm.aniListID {
+            Menu {
+                Button {
+                    Task {
+                        isLoadingEntry = true
+                        existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)).flatMap { AniListProvider.shared.mapEntry($0) }
+                        isLoadingEntry = false
+                        showLibraryEdit = true
+                    }
+                } label: {
+                    Label("Edit Library Entry", systemImage: "pencil")
+                }
+                Button {
+                    showMatchingSearch = true
+                } label: {
+                    Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
+                }
+            } label: {
+                if isLoadingEntry {
+                    ProgressView().scaleEffect(0.8)
+                } else {
+                    Image(systemName: "pencil.circle")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .disabled(isLoadingEntry)
+        } else {
+            Button {
+                showMatchingSearch = true
+            } label: {
+                Image(systemName: "link.badge.plus")
+                    .font(.system(size: 17, weight: .medium))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func libraryEditSheet() -> some View {
+        if let aid = vm.aniListID, let detail = vm.detail {
+            let tempMedia = makeLibraryMedia(aid: aid, detail: detail)
+            LibraryEntryEditSheet(entry: existingEntry, media: tempMedia) { status, progress, score in
+                if status == .completed {
+                    ContinueWatchingManager.shared.resetProgress(
+                        aniListID: aid, moduleId: nil, mediaTitle: detail.title
+                    )
+                } else if progress > 0 {
+                    ContinueWatchingManager.shared.markWatched(
+                        upThrough: progress,
+                        aniListID: aid,
+                        moduleId: ModuleManager.shared.activeModule?.id,
+                        mediaTitle: detail.title,
+                        imageUrl: detail.image,
+                        totalEpisodes: detail.episodes.count,
+                        availableEpisodes: detail.episodes.count,
+                        detailHref: vm.detailHref
+                    )
+                }
+                Task {
+                    try? await AniListLibraryService.shared.updateEntry(
+                        mediaId: aid, status: status, progress: progress, score: score
+                    )
+                    existingEntry = (try? await AniListLibraryService.shared.fetchEntry(mediaId: aid)).flatMap { AniListProvider.shared.mapEntry($0) }
+                }
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            #else
+            .frame(minWidth: 480, minHeight: 360)
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private func tabContent(detail: MediaDetail) -> some View {
+        if selectedTab == 0 {
+            episodesSection(detail: detail)
+        } else {
+            relationsSection
+        }
+    }
+
+    private func makeLibraryMedia(aid: Int, detail: MediaDetail) -> Media {
+        Media(
+            id: aid,
+            provider: .anilist,
+            title: MediaTitle(romaji: detail.title, english: detail.title, native: detail.title),
+            coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+            bannerImage: nil,
+            description: detail.description,
+            episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+            status: "FINISHED",
+            averageScore: nil,
+            genres: nil,
+            season: nil,
+            seasonYear: nil,
+            nextAiringEpisode: nil,
+            relations: nil,
+            type: nil,
+            format: nil
+        )
+    }
+
     #if os(iOS)
     @ViewBuilder
     private func watchButton(detail: MediaDetail) -> some View {
@@ -382,6 +349,51 @@ struct DetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(detail.episodes.isEmpty && item == nil)
+    }
+
+    @ViewBuilder
+    private func tabToggleButton() -> some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedTab = (selectedTab == 0 ? 1 : 0)
+            }
+        } label: {
+            Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
+                .frame(width: 46, height: 46)
+                .background(selectedTab == 1 ? Color.primary : Color.clear, in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func selectionModeButton() -> some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                isSelectionMode.toggle()
+                if !isSelectionMode {
+                    selectedEpisodeNumbers.removeAll()
+                }
+            }
+        } label: {
+            Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
+                .frame(width: 46, height: 46)
+                .background(isSelectionMode ? Color.primary : Color.clear, in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {

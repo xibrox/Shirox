@@ -44,10 +44,13 @@ struct ProfileActivityView: View {
             }
         }
         .sheet(item: $selectedActivity) { activity in
-            // Activity detail only available via AniList — requires Int-based ID
-            Text("Activity #\(activity.id)")
-                .padding()
-                .presentationDetents([.medium])
+            NavigationStack {
+                ActivityDetailView(
+                    activity: activity.asAniListActivity,
+                    onReplyPosted: { replyCountOverrides[activity.id] = replyCount(for: activity) + 1 },
+                    onLikeChanged: { count, liked in likeOverrides[activity.id] = (count, liked) }
+                )
+            }
         }
         .sheet(isPresented: $showCompose) {
             ComposeStatusView(profileVM: vm)
@@ -203,11 +206,7 @@ struct ProfileActivityView: View {
             Group {
                 switch item.kind {
                 case .text(let text):
-                    Text(text)
-                        .font(.callout)
-                        .lineLimit(6)
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    MarkdownText(text: text, font: .callout)
                 case .list(let status, let progress, let media):
                     Button {
                         targetMediaId = media?.id

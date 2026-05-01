@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class DetailViewModel: ObservableObject {
     @Published var detail: MediaDetail?
-    @Published var aniListMedia: AniListMedia?
+    @Published var aniListMedia: Media?
     @Published var isLoadingDetail = false
     @Published var isLoadingAniListMedia = false
     @Published var isLoadingEpisodes = false
@@ -84,7 +84,9 @@ final class DetailViewModel: ObservableObject {
     private func fetchAniListMetadata(id: Int) {
         Task {
             isLoadingAniListMedia = true
-            self.aniListMedia = try? await AniListService.shared.detail(id: id)
+            if let raw = try? await AniListService.shared.detail(id: id) {
+                self.aniListMedia = AniListProvider.shared.mapMedia(raw)
+            }
             isLoadingAniListMedia = false
         }
     }

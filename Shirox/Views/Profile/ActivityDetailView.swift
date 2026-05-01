@@ -3,7 +3,7 @@ import SwiftUI
 private struct ReplyLikeTarget: Identifiable { let id: Int }
 
 struct ActivityDetailView: View {
-    let activity: AniListActivity
+    @State private var activity: AniListActivity
     /// Called when a reply is successfully posted, so parent can update its count
     var onReplyPosted: (() -> Void)?
     /// Called when like state changes, so parent can sync the card
@@ -49,7 +49,7 @@ struct ActivityDetailView: View {
          onReplyPosted: (() -> Void)? = nil,
          onLikeChanged: ((Int, Bool) -> Void)? = nil,
          onDeleted: (() -> Void)? = nil) {
-        self.activity = activity
+        _activity = State(initialValue: activity)
         self.onReplyPosted = onReplyPosted
         self.onLikeChanged = onLikeChanged
         self.onDeleted = onDeleted
@@ -85,9 +85,11 @@ struct ActivityDetailView: View {
                 Button("Done") { dismiss() }
             }
         }
-        .task { 
-            await loadReplies() 
-            await loadLikePreview()
+        .task {
+            async let replies: () = loadReplies()
+            async let likes: () = loadLikePreview()
+            async let full: () = loadFullActivity()
+            _ = await (replies, likes, full)
         }
         .sheet(item: $targetUserId) { uid in
             ProfileView(userId: uid, username: targetUsername ?? "Profile", avatarURL: nil)
@@ -175,7 +177,7 @@ struct ActivityDetailView: View {
 
             switch activity {
             case .text(let a):
-                Text(a.text ?? "").font(.body)
+                MarkdownText(text: a.text ?? "")
             case .list(let a):
                 Button {
                     targetMediaId = a.media?.id
@@ -329,7 +331,7 @@ struct ActivityDetailView: View {
                     Spacer()
                     Text(reply.createdAt.toTimeAgo()).font(.caption2).foregroundStyle(.secondary)
                 }
-                Text(reply.text ?? "").font(.callout)
+                MarkdownText(text: reply.text ?? "", font: .callout)
                 HStack(spacing: 4) {
                     Button {
                         Task { await toggleReplyLike(reply: reply) }
@@ -394,6 +396,12 @@ struct ActivityDetailView: View {
     }
 
     // MARK: - Actions
+
+    private func loadFullActivity() async {
+        if let full = try? await AniListSocialService.shared.fetchActivityById(id: activity.id) {
+            activity = full
+        }
+    }
 
     private func loadReplies() async {
         isLoadingReplies = true

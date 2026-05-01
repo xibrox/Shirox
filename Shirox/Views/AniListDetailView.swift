@@ -912,7 +912,7 @@ struct AniListDetailView: View {
 
     // MARK: - Relations
     @ViewBuilder
-    private func relationsSection(relations: [AniListRelationEdge]) -> some View {
+    private func relationsSection(relations: [MediaRelationEdge]) -> some View {
         let animeRelations = relations.filter { $0.node.type != "MANGA" }
         if animeRelations.isEmpty {
             VStack(spacing: 20) {
@@ -1148,7 +1148,7 @@ struct AniListStreamResultSheet: View {
 // MARK: - Relation Card
 
 struct RelationCard: View {
-    let edge: AniListRelationEdge
+    let edge: MediaRelationEdge
 
     var body: some View {
         Color.clear

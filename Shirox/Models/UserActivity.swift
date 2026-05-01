@@ -17,3 +17,17 @@ struct UserActivity: Identifiable {
     let replyCount: Int
     var isLiked: Bool
 }
+
+extension UserActivity {
+    var asAniListActivity: AniListActivity {
+        switch kind {
+        case .text(let t):
+            return .text(TextActivity(id: id, text: t, createdAt: createdAt,
+                user: user, likeCount: likeCount, replyCount: replyCount, isLiked: isLiked))
+        case .list(let status, let progress, let media):
+            return .list(ListActivity(id: id, status: status, progress: progress,
+                createdAt: createdAt, user: user, media: media,
+                likeCount: likeCount, replyCount: replyCount, isLiked: isLiked))
+        }
+    }
+}
