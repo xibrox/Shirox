@@ -75,11 +75,25 @@ if [ ! -d "$DD_APP_PATH" ]; then
 fi
 
 echo "--- Packaging DMG ---"
-hdiutil create \
-    -volname "$APPLICATION_NAME" \
-    -srcfolder "$DD_APP_PATH" \
-    -ov \
-    -format UDZO \
-    "build/$APPLICATION_NAME-Catalyst.dmg"
+
+DMG_FINAL="$WORKING_LOCATION/build/${APPLICATION_NAME}-Catalyst.dmg"
+
+if ! command -v create-dmg &> /dev/null; then
+    echo "--- Installing create-dmg ---"
+    brew install create-dmg
+fi
+
+rm -f "$DMG_FINAL"
+
+create-dmg \
+    --volname "$APPLICATION_NAME" \
+    --window-pos 200 120 \
+    --window-size 600 400 \
+    --icon-size 128 \
+    --icon "${APPLICATION_NAME}.app" 150 180 \
+    --hide-extension "${APPLICATION_NAME}.app" \
+    --app-drop-link 430 180 \
+    "$DMG_FINAL" \
+    "$DD_APP_PATH"
 
 echo "--- Success: build/$APPLICATION_NAME-Catalyst.dmg created ---"

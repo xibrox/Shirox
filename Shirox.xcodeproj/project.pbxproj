@@ -68,12 +68,10 @@
 		67F0294BF90E22B5A4159858 /* JSEngine+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60FE2CBD595A40B9E50E4D1 /* JSEngine+Search.swift */; };
 		6C75440BE5D5D05958C787F3 /* AnimeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */; };
 		70F287DD43E84880B274852E /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */; };
-		AA11BB22CC33DD44EE55FF61 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */; };
 		7278D6B1B1C209D5BBF96F2F /* ProviderStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BBCACB31F84DB0EEB73D491 /* ProviderStatusBanner.swift */; };
 		72D5458BF7DD94A53658F64C /* ModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA54E15EA936A28D42B73886 /* ModuleManager.swift */; };
 		73B80E5040D0A922F30FB7A3 /* AniListDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */; };
 		748517C4AE504A939CC1610F /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */; };
-		AA11BB22CC33DD44EE55FF62 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */; };
 		74CB23F311172ABF289DF6C9 /* AniListMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C20E69AFCB9F0507E969ECF /* AniListMedia.swift */; };
 		7651A14D27212D0CC696B275 /* MALAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF205A19072F2230848F6A66 /* MALAuthManager.swift */; };
 		76677AB2A47B1ECE8E1E6871 /* ProviderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A5E58144B2F9AE666FFFA1 /* ProviderManager.swift */; };
@@ -178,6 +176,8 @@
 		AA000002000000000000AA89 /* BatchDownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000BB89 /* BatchDownloadStreamPickerView.swift */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
+		AA11BB22CC33DD44EE55FF61 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */; };
+		AA11BB22CC33DD44EE55FF62 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */; };
 		AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
 		AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
 		AFD909B8E23B2E6F048F0869 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD942143248855B7D74F9E0C /* SettingsView.swift */; };
@@ -304,6 +304,7 @@
 		AA000001000000000000BC13 /* ActivityDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDetailView.swift; sourceTree = "<group>"; };
 		AA000002000000000000BB89 /* BatchDownloadStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchDownloadStreamPickerView.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
 		ADD6C63415A5CB6EC7D37707 /* MALDiscoveryService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MALDiscoveryService.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -321,7 +322,6 @@
 		DAD914ABCC5C7C316F115FB6 /* EpisodeRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeRowView.swift; sourceTree = "<group>"; };
 		DB3FBB9F1A9B237743F4808C /* AniListService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListService.swift; sourceTree = "<group>"; };
 		DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
 		DCADDEA3748C5AE8D3C1A3CD /* JSEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSEngine.swift; sourceTree = "<group>"; };
 		DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailEpisodeRow.swift; sourceTree = "<group>"; };
 		E06843969693AE9C1AEB7FAD /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
@@ -1075,13 +1075,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 58;
+				CURRENT_PROJECT_VERSION = 59;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.61;
+				MARKETING_VERSION = 0.0.62;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1100,14 +1100,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 58;
+				CURRENT_PROJECT_VERSION = 59;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.61;
+				MARKETING_VERSION = 0.0.62;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -1125,13 +1125,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 58;
+				CURRENT_PROJECT_VERSION = 59;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.61;
+				MARKETING_VERSION = 0.0.62;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1211,14 +1211,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 58;
+				CURRENT_PROJECT_VERSION = 59;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.61;
+				MARKETING_VERSION = 0.0.62;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

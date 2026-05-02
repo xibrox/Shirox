@@ -27,8 +27,8 @@
       },
       "versions": [
         {
-          "version": "0.0.61",
-          "buildVersion": "58",
+          "version": "0.0.62",
+          "buildVersion": "59",
           "date": "2026-05-01",
           "localizedDescription": "Beta release",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
