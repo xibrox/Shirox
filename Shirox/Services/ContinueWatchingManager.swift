@@ -131,7 +131,7 @@ import Foundation
         
         do {
             let library = try await AniListLibraryService.shared.fetchAllLists(userId: userId)
-            let watching = library.filter { $0.status == .current }
+            let watching = library.filter { $0.status == .current || $0.status == .repeating }
             
             var newItems = items
             
