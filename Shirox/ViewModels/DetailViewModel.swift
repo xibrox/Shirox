@@ -129,6 +129,12 @@ final class DetailViewModel: ObservableObject {
                 if sorted.count == 1 {
                     pendingStream = sorted[0]
                     showStreamPicker = false
+                } else if UserDefaults.standard.bool(forKey: "autoPickLastStream"),
+                          let moduleId = ModuleManager.shared.activeModule?.id,
+                          let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId),
+                          let match = sorted.first(where: { $0.title == savedTitle }) {
+                    pendingStream = match
+                    showStreamPicker = false
                 } else {
                     streamOptions = sorted
                 }
@@ -146,6 +152,14 @@ final class DetailViewModel: ObservableObject {
     func fetchStreams(for episode: EpisodeLink) async throws -> [StreamResult] {
         let streams = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
         return streams.sorted { $0.title < $1.title }
+    }
+
+    func pickStream(_ stream: StreamResult) {
+        if let moduleId = ModuleManager.shared.activeModule?.id {
+            ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: moduleId, title: stream.title)
+        }
+        pendingStream = stream
+        showStreamPicker = false
     }
 
     func cancelStreamLoading() {

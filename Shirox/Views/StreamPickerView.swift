@@ -23,8 +23,7 @@ struct StreamPickerView: View {
                 } else {
                     List(vm.streamOptions, id: \.url) { stream in
                         Button {
-                            vm.pendingStream = stream
-                            vm.showStreamPicker = false
+                            vm.pickStream(stream)
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "play.circle.fill")

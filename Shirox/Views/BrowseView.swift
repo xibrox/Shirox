@@ -67,6 +67,7 @@ struct BrowseView: View {
                             .padding(.bottom, 16)
                     }
                 }
+                .refreshable { await vm.retry() }
             }
         }
         .navigationTitle(category.title)
@@ -84,3 +85,4 @@ private struct BrowseCardPressStyle: ButtonStyle {
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
+

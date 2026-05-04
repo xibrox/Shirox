@@ -53,7 +53,13 @@ struct HomeView: View {
                                 AnimeSection(title: "Top Rated",        items: vm.topRated, category: .topRated)
                             }
                         }
-                        .padding(.bottom, 28)
+                        Spacer().frame(height: 28)
+                    }
+                    .refreshable {
+                        await withTaskGroup(of: Void.self) { group in
+                            group.addTask { await vm.reload() }
+                            group.addTask { await ContinueWatchingManager.shared.syncWithAniList() }
+                        }
                     }
                     .coordinateSpace(name: "homeScroll")
                     .ignoresSafeArea(edges: .top)

@@ -40,4 +40,38 @@ final class ModuleSearchAliasManager: ObservableObject {
         }
         objectWillChange.send()
     }
+
+    // MARK: - Last picked search result href
+
+    private func searchResultKey(mediaId: Int?, animeTitle: String, moduleId: String) -> String {
+        "moduleLastSearchResult_" + key(mediaId: mediaId, animeTitle: animeTitle, moduleId: moduleId)
+    }
+
+    func getLastSearchResultHref(mediaId: Int?, animeTitle: String, moduleId: String) -> String? {
+        userDefaults.string(forKey: searchResultKey(mediaId: mediaId, animeTitle: animeTitle, moduleId: moduleId))
+    }
+
+    func setLastSearchResultHref(mediaId: Int?, animeTitle: String, moduleId: String, href: String) {
+        let key = searchResultKey(mediaId: mediaId, animeTitle: animeTitle, moduleId: moduleId)
+        if href.isEmpty {
+            userDefaults.removeObject(forKey: key)
+        } else {
+            userDefaults.set(href, forKey: key)
+        }
+    }
+
+    // MARK: - Last picked stream title per module
+
+    private func streamTitleKey(moduleId: String) -> String {
+        let moduleKey = moduleId.data(using: .utf8)?.base64EncodedString() ?? moduleId
+        return "moduleLastStreamTitle_\(moduleKey)"
+    }
+
+    func getLastStreamTitle(moduleId: String) -> String? {
+        userDefaults.string(forKey: streamTitleKey(moduleId: moduleId))
+    }
+
+    func setLastStreamTitle(moduleId: String, title: String) {
+        userDefaults.set(title, forKey: streamTitleKey(moduleId: moduleId))
+    }
 }

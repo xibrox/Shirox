@@ -10,11 +10,19 @@ struct ModuleStreamPickerView: View {
     let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?) -> Void  // allStreams, selectedStream, href, availableCount
 
     @EnvironmentObject private var moduleManager: ModuleManager
+    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
+
+    private var visibleModules: [ModuleDefinition] {
+        if useDefaultExtension, let active = moduleManager.activeModule {
+            return [active]
+        }
+        return moduleManager.modules
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(moduleManager.modules) { module in
+                ForEach(visibleModules) { module in
                     ModuleStreamRow(
                         module: module,
                         mediaId: mediaId,
@@ -105,14 +113,20 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     }
 
     func startFind() {
-        // Save search title before searching so it's persisted for this module
         persistSearchTitle()
-        currentTask = Task { await find() }
+        if UserDefaults.standard.bool(forKey: "autoPickLastSearchResult"),
+           let savedHref = ModuleSearchAliasManager.shared.getLastSearchResultHref(
+               mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id) {
+            currentTask = Task { await findFast(savedHref: savedHref) }
+        } else {
+            currentTask = Task { await find() }
+        }
     }
 
     func startSelectResult(_ item: SearchItem, targetEpisodeNumber: Int) {
-        // Also save when selecting a result, in case they typed something new
         persistSearchTitle()
+        ModuleSearchAliasManager.shared.setLastSearchResultHref(
+            mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id, href: item.href)
         currentTask = Task { await selectResult(item, targetEpisodeNumber: targetEpisodeNumber) }
     }
 
@@ -127,6 +141,44 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
     func startSelectEpisode(_ episode: EpisodeLink) {
         currentTask = Task { await selectEpisode(episode) }
+    }
+
+    // Fast path: skip search entirely, go straight to episodes using the saved href.
+    // Falls back to full search if the href no longer works.
+    func findFast(savedHref: String) async {
+        state = .loading
+        readyStreams = nil
+
+        let r = ModuleJSRunner()
+        runner = r
+
+        do {
+            try await r.load(module: module)
+            let episodes = try await r.fetchEpisodes(url: savedHref)
+            availableCount = episodes.count
+            currentSearchResultHref = savedHref
+
+            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber) {
+                state = .loadingStreams
+                selectedEpisodeHref = savedHref
+                let streams = try await r.fetchStreams(episodeUrl: matched.href)
+                if streams.isEmpty {
+                    state = .error("No streams found for episode \(targetEpisodeNumber)")
+                } else {
+                    readyStreams = streams
+                }
+            } else {
+                // Saved result doesn't contain the target episode (wrong series entry or stale href).
+                // Clear the bad saved href and fall back to full search.
+                ModuleSearchAliasManager.shared.setLastSearchResultHref(
+                    mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id, href: "")
+                await find()
+            }
+        } catch {
+            if (error as? CancellationError) != nil { return }
+            // Stale href — fall back to full search
+            await find()
+        }
     }
 
     func find() async {
@@ -157,16 +209,15 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     func selectResult(_ item: SearchItem, targetEpisodeNumber: Int) async {
         guard let r = runner else { return }
         state = .loadingEpisodes(item)
-        currentSearchResultHref = item.href  // Save for manual episode selection
+        currentSearchResultHref = item.href
 
         do {
             let episodes = try await r.fetchEpisodes(url: item.href)
             availableCount = episodes.count
 
-            let targetDouble = Double(targetEpisodeNumber)
-            if let matched = episodes.first(where: { $0.number == targetDouble }) {
+            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber) {
                 state = .loadingStreams
-                selectedEpisodeHref = item.href  // Store for Next Episode
+                selectedEpisodeHref = item.href
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
                 if streams.isEmpty {
                     state = .error("No streams found for episode \(targetEpisodeNumber)")
@@ -180,6 +231,34 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             if (error as? CancellationError) != nil { return }
             state = .error(error.localizedDescription)
         }
+    }
+
+    /// Finds the episode matching `target`, handling modules that use absolute episode
+    /// numbering (e.g., Season 2 numbered as episodes 25–48 instead of 1–24).
+    private func matchEpisode(from episodes: [EpisodeLink], target: Int) -> EpisodeLink? {
+        let targetDouble = Double(target)
+
+        // 1. Exact match
+        if let exact = episodes.first(where: { $0.number == targetDouble }) {
+            return exact
+        }
+
+        // 2. Rounded match — catches modules that label ep 1 as 1.0 but ep 1.5 as a special
+        if let rounded = episodes.first(where: { round($0.number) == targetDouble }) {
+            return rounded
+        }
+
+        // 3. Offset match — module uses absolute numbering (e.g., S2 = eps 25–48).
+        //    Only apply when every episode number exceeds the target, meaning the
+        //    module doesn't start at 1 for this season.
+        if let minEp = episodes.map(\.number).min(), minEp > targetDouble {
+            let offsetTarget = minEp + targetDouble - 1
+            if let offset = episodes.first(where: { $0.number == offsetTarget }) {
+                return offset
+            }
+        }
+
+        return nil
     }
 
     func selectEpisode(_ episode: EpisodeLink) async {
@@ -224,6 +303,7 @@ private struct ModuleStreamRow: View {
     @StateObject private var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
     @State private var showStreamPicker = false
+    @AppStorage("autoPickLastStream") private var autoPickLastStream = false
 
     init(
         module: ModuleDefinition,
@@ -256,13 +336,20 @@ private struct ModuleStreamRow: View {
         }
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
-            showStreamPicker = true
+            if autoPickLastStream,
+               let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: module.id),
+               let match = streams.first(where: { $0.title == savedTitle }) {
+                onStreamsLoaded(streams, match, rowVm.selectedEpisodeHref, rowVm.availableCount)
+            } else {
+                showStreamPicker = true
+            }
         }
         .sheet(isPresented: $showStreamPicker) {
             if let streams = rowVm.readyStreams {
                 ModuleStreamSelectionView(
                     streams: streams,
                     onSelect: { stream in
+                        ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: module.id, title: stream.title)
                         showStreamPicker = false
                         let allStreams = rowVm.readyStreams ?? [stream]
                         onStreamsLoaded(allStreams, stream, rowVm.selectedEpisodeHref, rowVm.availableCount)

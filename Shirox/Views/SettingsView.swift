@@ -10,6 +10,9 @@ struct SettingsView: View {
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
     @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
+    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
+    @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
+    @AppStorage("autoPickLastStream") private var autoPickLastStream = false
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
@@ -68,6 +71,13 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    Toggle("Use Default Extension", isOn: $useDefaultExtension)
+                        .tint(.secondary)
+                        .disabled(moduleManager.activeModule == nil)
+                    Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
+                        .tint(.secondary)
+                    Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
+                        .tint(.secondary)
                 }
 
                 ProvidersSettingsSection()

@@ -85,8 +85,6 @@ final class ModuleJSRunner {
     // MARK: - Streams
 
     func fetchStreams(episodeUrl: String) async throws -> [StreamResult] {
-        await WKWebsiteDataStore.default().removeData(ofTypes: [WKWebsiteDataTypeCookies], modifiedSince: .distantPast)
-        HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
         let json = try await callAsyncJS("extractStreamUrl", args: [episodeUrl])
         let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -172,6 +170,7 @@ final class ModuleJSRunner {
         setupFetchAliases(ctx)
         setupSoraCompat(ctx)
         setupScrapingUtilities(ctx)
+        setupTimers(ctx)
         ctx.setupNetworkFetch()
         ctx.setupNetworkFetchSimple()
 
@@ -321,6 +320,52 @@ final class ModuleJSRunner {
             function sendLog(msg) { console.log('[Module] ' + msg); }
         }
         """)
+    }
+
+    private func setupTimers(_ ctx: JSContext) {
+        var timerMap: [Int: DispatchWorkItem] = [:]
+        var nextId = 1
+
+        let setTimeoutBlock: @convention(block) (JSValue, Double) -> Int = { callback, delay in
+            let id = nextId
+            nextId += 1
+            let item = DispatchWorkItem {
+                timerMap.removeValue(forKey: id)
+                callback.call(withArguments: [])
+            }
+            timerMap[id] = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(delay, 0) / 1000.0, execute: item)
+            return id
+        }
+
+        let clearTimeoutBlock: @convention(block) (Int) -> Void = { id in
+            timerMap[id]?.cancel()
+            timerMap.removeValue(forKey: id)
+        }
+
+        let setIntervalBlock: @convention(block) (JSValue, Double) -> Int = { callback, delay in
+            let id = nextId
+            nextId += 1
+            let interval = max(delay, 16) / 1000.0
+            func schedule() {
+                guard timerMap[id] != nil else { return }
+                let item = DispatchWorkItem {
+                    guard timerMap[id] != nil else { return }
+                    callback.call(withArguments: [])
+                    schedule()
+                }
+                timerMap[id] = item
+                DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: item)
+            }
+            timerMap[id] = DispatchWorkItem {}
+            schedule()
+            return id
+        }
+
+        ctx.setObject(setTimeoutBlock, forKeyedSubscript: "setTimeout" as NSString)
+        ctx.setObject(clearTimeoutBlock, forKeyedSubscript: "clearTimeout" as NSString)
+        ctx.setObject(setIntervalBlock, forKeyedSubscript: "setInterval" as NSString)
+        ctx.setObject(clearTimeoutBlock, forKeyedSubscript: "clearInterval" as NSString)
     }
 
     private func setupScrapingUtilities(_ ctx: JSContext) {
