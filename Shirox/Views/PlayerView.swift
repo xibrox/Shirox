@@ -892,7 +892,7 @@ struct PlayerView: View {
             }
         }
         let p = AVPlayer(playerItem: item)
-        p.automaticallyWaitsToMinimizeStalling = true
+        p.automaticallyWaitsToMinimizeStalling = false
         p.volume = volume
         #if os(iOS)
         p.usesExternalPlaybackWhileExternalScreenIsActive = true
