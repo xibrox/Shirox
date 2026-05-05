@@ -244,6 +244,17 @@ struct PlayerView: View {
                 player?.rate = isPlaying ? Float(playbackSpeed) : 0
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            guard let player else { return }
+            player.seek(
+                to: CMTime(seconds: currentTime, preferredTimescale: 600),
+                toleranceBefore: .zero,
+                toleranceAfter: .zero
+            )
+            if isPlaying {
+                player.rate = Float(playbackSpeed)
+            }
+        }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         #endif
