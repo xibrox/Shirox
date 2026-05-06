@@ -32,6 +32,7 @@ struct AniListDetailView: View {
     @State private var selectedRangeIndex = 0
     @State private var isReversed = false
     @State private var selectedTab = 0
+    @State private var sequelMediaId: Int? = nil
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -105,6 +106,14 @@ struct AniListDetailView: View {
             }
         }
         #endif
+        .navigationDestination(isPresented: Binding(
+            get: { sequelMediaId != nil },
+            set: { if !$0 { sequelMediaId = nil } }
+        )) {
+            if let id = sequelMediaId {
+                AniListDetailView(mediaId: id)
+            }
+        }
         .task {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             await vm.load(id: mediaId, preloaded: preloadedMedia)
@@ -156,7 +165,7 @@ struct AniListDetailView: View {
                 vm.pendingModuleStreamEpisodeHref = nil
                 let avail = vm.pendingModuleStreamAvailableCount
                 vm.pendingModuleStreamAvailableCount = nil
-                DispatchQueue.main.async { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail) }
+                DispatchQueue.main.async { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
             } else if !vm.showFinalStreamPicker {
                 vm.dismissModulePicker()
             }
@@ -181,7 +190,7 @@ struct AniListDetailView: View {
                 vm.pendingFinalStreamEpisodeHref = nil
                 let avail = vm.pendingFinalStreamAvailableCount
                 vm.pendingFinalStreamAvailableCount = nil
-                DispatchQueue.main.async { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail) }
+                DispatchQueue.main.async { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
             } else {
                 vm.dismissFinalPicker()
             }
@@ -513,7 +522,22 @@ struct AniListDetailView: View {
 
         let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired)
+        let onSequelNeeded: SequelLoader? = {
+            guard
+                let sequelNode = vm.media?.relations?.edges.first(where: { $0.relationType == "SEQUEL" && $0.node.type == "ANIME" })?.node,
+                let module = ModuleManager.shared.activeModule
+            else { return nil }
+            let sequelTitle = sequelNode.title.displayTitle
+            let sequelID = sequelNode.id
+            return {
+                let runner = ModuleJSRunner()
+                try await runner.load(module: module)
+                let items = try await SequelResolver.searchResults(title: sequelTitle, module: module, runner: runner)
+                return (items: items, mediaID: sequelID)
+            }
+        }()
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired, onSequelNeeded: onSequelNeeded, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } })
     }
     #endif
 
