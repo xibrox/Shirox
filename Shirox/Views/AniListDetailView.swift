@@ -20,6 +20,7 @@ struct AniListDetailView: View {
     @ObservedObject private var auth = AniListAuthManager.shared
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
+    @State private var resolvedAutoPlayEpisode: Int?
     @State private var showLibraryEdit = false
     @State private var existingEntry: LibraryEntry? = nil
     @State private var isLoadingEntry = false
@@ -107,6 +108,7 @@ struct AniListDetailView: View {
         #endif
         .task {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
+            vm.resumeEpisodeNumber = resumeEpisodeNumber
             await vm.load(id: mediaId, preloaded: preloadedMedia)
             
             if let resumeNum = resumeEpisodeNumber {
@@ -143,10 +145,17 @@ struct AniListDetailView: View {
             }
         }
         .onChange(of: vm.media?.id) { _, _ in
-            guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber else { return }
-            guard vm.media?.episodes != nil else { return }
+            guard !autoPlayOnLoad else { return }
+            let ep = resumeEpisodeNumber ?? resolvedAutoPlayEpisode
+            guard let ep, vm.media?.episodes != nil else { return }
             autoPlayOnLoad = true
-            vm.watchEpisode(resumeEpNum)
+            vm.watchEpisode(ep)
+        }
+        .onChange(of: resolvedAutoPlayEpisode) { _, ep in
+            // handles the race where .task sets resolvedAutoPlayEpisode after vm.media?.id already fired
+            guard !autoPlayOnLoad, let ep, vm.media?.episodes != nil else { return }
+            autoPlayOnLoad = true
+            vm.watchEpisode(ep)
         }
         .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
             if let stream = vm.pendingModuleStream {
