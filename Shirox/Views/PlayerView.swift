@@ -305,6 +305,17 @@ struct PlayerView: View {
             .presentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
             #endif
         }
+        .sheet(isPresented: $showSequelPicker, onDismiss: {
+            sequelResults = []
+            pendingSequelMediaID = nil
+        }) {
+            PlayerSequelPickerSheet(results: sequelResults) { selected in
+                advanceToSequel(selected)
+            }
+            #if os(iOS)
+            .presentationDetents([.medium])
+            #endif
+        }
         .sheet(isPresented: $showInPlayerStreamPicker) {
             PlayerNextEpisodePicker(streams: availableStreams, title: "Choose Quality") { selected in
                 switchQuality(selected)
@@ -1173,6 +1184,9 @@ struct PlayerView: View {
 
             guard let result = result else {
                 isLoadingNextEpisode = false
+                if onSequelNeeded != nil {
+                    await loadSequel()
+                }
                 return
             }
 
@@ -1219,6 +1233,49 @@ struct PlayerView: View {
         } catch {
             Logger.shared.log("[PlayerView] Error in loadAndAdvance: \(error)", type: "Error")
             isLoadingNextEpisode = false
+        }
+    }
+
+    private func loadSequel() async {
+        guard let loader = onSequelNeeded else { return }
+        isLoadingNextEpisode = true
+        do {
+            let result = try await loader()
+            isLoadingNextEpisode = false
+            pendingSequelMediaID = result.mediaID
+            sequelResults = result.items
+            showSequelPicker = true
+        } catch {
+            isLoadingNextEpisode = false
+        }
+    }
+
+    private func advanceToSequel(_ item: SearchItem) {
+        if let id = pendingSequelMediaID {
+            onSequelAdvanced?(.aniListID(id))
+        }
+        onSequelAdvanced?(.searchItem(item))
+
+        Task { @MainActor in
+            isLoadingNextEpisode = true
+            do {
+                let runner = ModuleJSRunner()
+                if let module = ModuleManager.shared.activeModule {
+                    try await runner.load(module: module)
+                }
+                let episodes = try await runner.fetchEpisodes(url: item.href)
+                guard let ep1 = episodes.first(where: { $0.number == 1 }) ?? episodes.first else {
+                    isLoadingNextEpisode = false
+                    return
+                }
+                let streams = try await runner.fetchStreams(episodeUrl: ep1.href).sorted { $0.title < $1.title }
+                isLoadingNextEpisode = false
+                guard !streams.isEmpty else { return }
+                let match = streams.first(where: { $0.title == currentContext?.streamTitle }) ?? streams[0]
+                swapStream(match, episodeNumber: Int(ep1.number ?? 1))
+            } catch {
+                isLoadingNextEpisode = false
+            }
         }
     }
 
