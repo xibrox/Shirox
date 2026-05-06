@@ -83,6 +83,7 @@ struct DetailView: View {
         #endif
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
+            vm.resumeEpisodeNumber = resumeEpisodeNumber
             vm.aniListID = aniListID
 
             if vm.aniListID == nil {
@@ -139,11 +140,17 @@ struct DetailView: View {
                 )
             }
 
-            guard let resumeEpNum = resumeEpisodeNumber else { return }
-            guard let episodes = vm.detail?.episodes else { return }
-            guard let episode = episodes.first(where: { Int($0.number) == resumeEpNum }) else { return }
-            autoPlayOnLoad = true
-            vm.loadStreams(for: episode)
+            guard let episodes = vm.detail?.episodes, !episodes.isEmpty else { return }
+
+            if let resumeEpNum = resumeEpisodeNumber {
+                guard let episode = episodes.first(where: { Int($0.number) == resumeEpNum }) else { return }
+                autoPlayOnLoad = true
+                vm.loadStreams(for: episode)
+            } else if let episode = computeAutoPlayEpisode(episodes: episodes) {
+                selectedRangeIndex = (max(0, Int(episode.number) - 1)) / 100
+                autoPlayOnLoad = true
+                vm.loadStreams(for: episode)
+            }
         }
         .tint(.primary)
         .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
@@ -200,6 +207,43 @@ struct DetailView: View {
     }
 
     // MARK: - Continue Watching Helpers
+
+    private func computeAutoPlayEpisode(episodes: [EpisodeLink]) -> EpisodeLink? {
+        guard resumeEpisodeNumber == nil else { return nil }
+
+        let cwm = ContinueWatchingManager.shared
+        let moduleId = ModuleManager.shared.activeModule?.id
+        let mediaTitle = vm.detail?.title ?? item.title
+        let aid = vm.aniListID ?? aniListID
+
+        // Step 1: in-progress item (has saved position, not yet fully watched)
+        if let inProgress = cwm.items.first(where: {
+            ($0.moduleId == moduleId || $0.aniListID == aid) &&
+            $0.watchedSeconds > 0 &&
+            !cwm.isWatched(aniListID: aid, moduleId: moduleId,
+                           mediaTitle: mediaTitle, episodeNumber: $0.episodeNumber)
+        }) {
+            vm.resumeWatchedSeconds = inProgress.watchedSeconds
+            vm.resumeEpisodeNumber = inProgress.episodeNumber
+            return episodes.first { Int($0.number) == inProgress.episodeNumber }
+        }
+
+        // Step 2: CW watched history → first episode in the list not yet watched
+        let hasAnyHistory = cwm.items.contains {
+            ($0.moduleId == moduleId || $0.aniListID == aid) &&
+            cwm.isWatched(aniListID: aid, moduleId: moduleId,
+                          mediaTitle: mediaTitle, episodeNumber: $0.episodeNumber)
+        }
+        if hasAnyHistory {
+            return episodes.first {
+                !cwm.isWatched(aniListID: aid, moduleId: moduleId,
+                               mediaTitle: mediaTitle, episodeNumber: Int($0.number))
+            }
+        }
+
+        return nil
+    }
+
     private func continueWatchingItem(for detail: MediaDetail) -> ContinueWatchingItem? {
         let moduleId = ModuleManager.shared.activeModule?.id
         return continueWatching.items
