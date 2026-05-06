@@ -216,7 +216,7 @@ final class DetailViewModel: ObservableObject {
         #endif
     }
 
-    func selectStream(_ stream: StreamResult) {
+    func selectStream(_ stream: StreamResult, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
         selectedStream = stream
 
         // For module shows, availableEpisodes == totalEpisodes (the fetched episode list).
@@ -266,10 +266,25 @@ final class DetailViewModel: ObservableObject {
             }
         }()
 
+        let onSequelNeeded: SequelLoader? = {
+            guard
+                let sequelNode = aniListMedia?.relations?.edges.first(where: { $0.relationType == "SEQUEL" })?.node,
+                let module = ModuleManager.shared.activeModule
+            else { return nil }
+            let sequelTitle = sequelNode.title.displayTitle
+            let sequelID = sequelNode.id
+            return {
+                let runner = ModuleJSRunner()
+                try await runner.load(module: module)
+                let items = try await SequelResolver.searchResults(title: sequelTitle, module: module, runner: runner)
+                return (items: items, mediaID: sequelID)
+            }
+        }()
+
         #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
         #elseif os(macOS)
-        MacPlayerWindowManager.shared.open(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader)
+        MacPlayerWindowManager.shared.open(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
         #endif
     }
 }
