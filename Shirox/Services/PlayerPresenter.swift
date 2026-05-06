@@ -54,7 +54,7 @@ final class PlayerPresenter: ObservableObject {
         return root
     }
 
-    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, from sourceView: UIView? = nil) {
+    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, from sourceView: UIView? = nil) {
         guard let topVC = Self.findTopViewController() else { return }
         self.sourceView = sourceView
 
@@ -64,7 +64,9 @@ final class PlayerPresenter: ObservableObject {
             customDismiss: { [weak self] in self?.dismissPlayer() },
             context: context,
             onWatchNext: onWatchNext,
-            onStreamExpired: onStreamExpired
+            onStreamExpired: onStreamExpired,
+            onSequelNeeded: onSequelNeeded,
+            onSequelAdvanced: onSequelAdvanced
         )
         .tint(.primary)
         .ignoresSafeArea()

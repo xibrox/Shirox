@@ -87,7 +87,7 @@ final class AniListDetailViewModel: ObservableObject {
         showStreamPicker = false
     }
 
-    func selectStream(_ stream: StreamResult, searchResultHref: String? = nil, availableEpisodes: Int? = nil) {
+    func selectStream(_ stream: StreamResult, searchResultHref: String? = nil, availableEpisodes: Int? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
         selectedStream = stream
         guard let media else { return }
         let currentEpNum = selectedEpisodeNumber ?? 1
@@ -165,10 +165,27 @@ final class AniListDetailViewModel: ObservableObject {
             }
         }()
 
+        let onSequelNeeded: SequelLoader? = {
+            guard
+                let sequelNode = media.relations?.edges.first(where: {
+                    $0.relationType == "SEQUEL" && $0.node.type == "ANIME"
+                })?.node,
+                let module = ModuleManager.shared.activeModule
+            else { return nil }
+            let sequelTitle = sequelNode.title.displayTitle
+            let sequelID = sequelNode.id
+            return {
+                let runner = ModuleJSRunner()
+                try await runner.load(module: module)
+                let items = try await SequelResolver.searchResults(title: sequelTitle, module: module, runner: runner)
+                return (items: items, mediaID: sequelID)
+            }
+        }()
+
         #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
         #elseif os(macOS)
-        MacPlayerWindowManager.shared.open(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext)
+        MacPlayerWindowManager.shared.open(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
         #endif
         selectedEpisodeNumber = nil
     }
