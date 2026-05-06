@@ -174,7 +174,38 @@ final class MALDiscoveryService {
             season: a.season?.uppercased(),
             seasonYear: a.year,
             nextAiringEpisode: nil,
-            relations: nil,
+            relations: {
+                guard let jikanRelations = a.relations else { return nil }
+                let edges: [MediaRelationEdge] = jikanRelations
+                    .filter { $0.relation == "Sequel" }
+                    .flatMap { $0.entry }
+                    .filter { $0.type == "anime" }
+                    .map { entry in
+                        MediaRelationEdge(
+                            relationType: "SEQUEL",
+                            node: Media(
+                                id: entry.mal_id,
+                                idMal: entry.mal_id,
+                                provider: .mal,
+                                title: MediaTitle(romaji: entry.name, english: nil, native: nil),
+                                coverImage: MediaCoverImage(large: nil, extraLarge: nil),
+                                bannerImage: nil,
+                                description: nil,
+                                episodes: nil,
+                                status: nil,
+                                averageScore: nil,
+                                genres: nil,
+                                season: nil,
+                                seasonYear: nil,
+                                nextAiringEpisode: nil,
+                                relations: nil,
+                                type: "TV",
+                                format: nil
+                            )
+                        )
+                    }
+                return edges.isEmpty ? nil : MediaRelations(edges: edges)
+            }(),
             type: a.type,
             format: a.source
         )
