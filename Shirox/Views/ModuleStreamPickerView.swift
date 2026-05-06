@@ -114,7 +114,10 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
     func startFind() {
         persistSearchTitle()
+        let lastUsed = UserDefaults.standard.string(forKey: "lastUsedModuleId")
+        let isPreferred = lastUsed != nil ? lastUsed == module.id : ModuleManager.shared.activeModule?.id == module.id
         if UserDefaults.standard.bool(forKey: "autoPickLastSearchResult"),
+           isPreferred,
            let savedHref = ModuleSearchAliasManager.shared.getLastSearchResultHref(
                mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id) {
             currentTask = Task { await findFast(savedHref: savedHref) }
@@ -325,6 +328,16 @@ private struct ModuleStreamRow: View {
         ))
     }
 
+    private var isPreferredModule: Bool {
+        let lastUsed = UserDefaults.standard.string(forKey: "lastUsedModuleId")
+        return lastUsed != nil ? lastUsed == module.id : ModuleManager.shared.activeModule?.id == module.id
+    }
+
+    private func fireStreamsLoaded(_ streams: [StreamResult], selected: StreamResult?, href: String?, count: Int?) {
+        UserDefaults.standard.set(module.id, forKey: "lastUsedModuleId")
+        onStreamsLoaded(streams, selected, href, count)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             headerRow
@@ -337,9 +350,10 @@ private struct ModuleStreamRow: View {
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
             if autoPickLastStream,
+               isPreferredModule,
                let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: module.id),
                let match = streams.first(where: { $0.title == savedTitle }) {
-                onStreamsLoaded(streams, match, rowVm.selectedEpisodeHref, rowVm.availableCount)
+                fireStreamsLoaded(streams, selected: match, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
             } else {
                 showStreamPicker = true
             }
@@ -352,7 +366,7 @@ private struct ModuleStreamRow: View {
                         ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: module.id, title: stream.title)
                         showStreamPicker = false
                         let allStreams = rowVm.readyStreams ?? [stream]
-                        onStreamsLoaded(allStreams, stream, rowVm.selectedEpisodeHref, rowVm.availableCount)
+                        fireStreamsLoaded(allStreams, selected: stream, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
                     },
                     onDismiss: {
                         showStreamPicker = false

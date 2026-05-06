@@ -10,6 +10,8 @@ struct PlayerProgressSlider: View {
 
     @State private var isDragging = false
     @State private var dragTime: Double = 0
+    @State private var dragStartX: CGFloat = 0
+    @State private var dragStartTime: Double = 0
 
     private var displayTime: Double {
         isDragging ? dragTime : currentTime
@@ -51,12 +53,13 @@ struct PlayerProgressSlider: View {
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
                                     if !isDragging {
-                                        dragTime = currentTime
+                                        dragStartX = value.startLocation.x
+                                        dragStartTime = currentTime
                                         isDragging = true
                                         onDragStart?()
                                     }
-                                    let rawProgress = value.location.x / geo.size.width
-                                    dragTime = min(max(rawProgress * duration, 0), duration)
+                                    let delta = (value.location.x - dragStartX) / geo.size.width * duration
+                                    dragTime = min(max(dragStartTime + delta, 0), duration)
                                 }
                                 .onEnded { _ in
                                     onSeek(dragTime)

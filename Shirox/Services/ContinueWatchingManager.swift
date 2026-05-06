@@ -163,7 +163,8 @@ import Foundation
                         totalEpisodes: media.episodes ?? existing.totalEpisodes,
                         availableEpisodes: availableEpisodes,
                         isAiring: isAiring,
-                        detailHref: existing.detailHref
+                        detailHref: existing.detailHref,
+                        aniListUpdatedAt: entry.updatedAt
                     ) {
                         newItems.insert(placeholder, at: 0)
                     }
@@ -173,6 +174,11 @@ import Foundation
                                                      mediaTitle: media.title.displayTitle, episodeNumber: ep) {
                             watchedKeys.insert(key)
                         }
+                    }
+                } else if let existing, let updatedAt = entry.updatedAt {
+                    // Refresh aniListUpdatedAt on existing items so sort order stays current
+                    if let idx = newItems.firstIndex(where: { $0.id == existing.id }) {
+                        newItems[idx].aniListUpdatedAt = updatedAt
                     }
                 } else if existing == nil {
                     // No local entry — create a placeholder from AniList progress
@@ -186,7 +192,9 @@ import Foundation
                         totalEpisodes: media.episodes,
                         availableEpisodes: availableEpisodes,
                         isAiring: isAiring,
-                        detailHref: nil
+                        detailHref: nil,
+                        lastWatchedAt: .distantPast,
+                        aniListUpdatedAt: entry.updatedAt
                     ) {
                         newItems.append(placeholder)
                     }
@@ -194,7 +202,7 @@ import Foundation
             }
             
             // Sort by date and keep unique
-            items = Array(newItems.sorted { $0.lastWatchedAt > $1.lastWatchedAt }.prefix(maxItems))
+            items = Array(newItems.sorted { cwSortOrder($0, $1) }.prefix(maxItems))
             persist()
             
         } catch {
@@ -373,7 +381,9 @@ import Foundation
                                   imageUrl: String?, totalEpisodes: Int?,
                                   availableEpisodes: Int? = nil,
                                   isAiring: Bool? = nil,
-                                  detailHref: String?) -> ContinueWatchingItem? {
+                                  detailHref: String?,
+                                  lastWatchedAt: Date = .now,
+                                  aniListUpdatedAt: Int? = nil) -> ContinueWatchingItem? {
         let srcImageUrl   = [source?.imageUrl, imageUrl].compactMap { $0 }.first(where: { !$0.isEmpty }) ?? ""
         let srcAniListID  = source?.aniListID     ?? aniListID
         let srcModuleId   = source?.moduleId      ?? moduleId
@@ -410,8 +420,9 @@ import Foundation
             watchedSeconds: 0, totalSeconds: 0, totalEpisodes: srcTotalEps,
             availableEpisodes: srcAvailable,
             isAiring: srcIsAiring,
-            lastWatchedAt: .now,
-            thumbnailUrl: nil
+            lastWatchedAt: lastWatchedAt,
+            thumbnailUrl: nil,
+            aniListUpdatedAt: aniListUpdatedAt ?? source?.aniListUpdatedAt
         )
     }
 
@@ -546,10 +557,27 @@ import Foundation
         }
     }
 
+    // MARK: - Sort
+
+    /// Sort order: (1) items with progress bar, by lastWatchedAt desc;
+    /// (2) AniList placeholders (no progress), by aniListUpdatedAt desc.
+    private func cwSortOrder(_ a: ContinueWatchingItem, _ b: ContinueWatchingItem) -> Bool {
+        let aHasProgress = a.watchedSeconds > 0
+        let bHasProgress = b.watchedSeconds > 0
+        if aHasProgress != bHasProgress { return aHasProgress }
+        if aHasProgress {
+            return a.lastWatchedAt > b.lastWatchedAt
+        }
+        // Both are AniList placeholders — sort by AniList updatedAt (unix timestamp)
+        let aUpdated = a.aniListUpdatedAt ?? 0
+        let bUpdated = b.aniListUpdatedAt ?? 0
+        return aUpdated > bUpdated
+    }
+
     // MARK: - Persistence
 
     private func persist() {
-        items = items.sorted { $0.lastWatchedAt > $1.lastWatchedAt }
+        items = items.sorted { cwSortOrder($0, $1) }
         do {
             let data = try JSONEncoder().encode(items)
             UserDefaults.standard.set(data, forKey: Keys.storage)
@@ -570,7 +598,7 @@ import Foundation
         }
         if let data = UserDefaults.standard.data(forKey: Keys.storage),
            let decoded = try? JSONDecoder().decode([ContinueWatchingItem].self, from: data) {
-            items = decoded.sorted { $0.lastWatchedAt > $1.lastWatchedAt }
+            items = decoded.sorted { cwSortOrder($0, $1) }
         }
         if let wdata = UserDefaults.standard.data(forKey: Keys.watched),
            let wdecoded = try? JSONDecoder().decode(Set<String>.self, from: wdata) {

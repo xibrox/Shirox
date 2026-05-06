@@ -31,8 +31,9 @@ final class DetailViewModel: ObservableObject {
     /// Stream selected by user in the picker — presented after the sheet fully dismisses.
     var pendingStream: StreamResult?
 
-    /// Resume position if navigated from Continue Watching
+    /// Resume position if navigated from Continue Watching (only applies to the specific episode)
     var resumeWatchedSeconds: Double?
+    var resumeEpisodeNumber: Int?
 
     private(set) var detailHref: String?
     private var streamsTask: Task<Void, Never>?
@@ -231,7 +232,9 @@ final class DetailViewModel: ObservableObject {
             totalEpisodes: episodeCount,
             availableEpisodes: episodeCount,
             isAiring: nil,
-            resumeFrom: resumeWatchedSeconds,
+            resumeFrom: resumeEpisodeNumber == Int(selectedEpisode?.number ?? 1)
+                ? resumeWatchedSeconds
+                : ContinueWatchingManager.shared.items.first(where: { $0.moduleId == ModuleManager.shared.activeModule?.id && $0.episodeNumber == Int(selectedEpisode?.number ?? 1) })?.watchedSeconds,
             detailHref: detailHref,
             streamTitle: stream.title,
             workingDetailHref: detailHref,

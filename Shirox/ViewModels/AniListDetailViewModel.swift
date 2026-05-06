@@ -31,8 +31,9 @@ final class AniListDetailViewModel: ObservableObject {
     var pendingFinalStreamEpisodeHref: String?  // episode href when selecting from final picker
     var pendingFinalStreamAvailableCount: Int?   // saved count for final picker
 
-    /// Resume position if navigated from Continue Watching
+    /// Resume position if navigated from Continue Watching (only applies to the specific episode)
     var resumeWatchedSeconds: Double?
+    var resumeEpisodeNumber: Int?
 
     func load(id: Int, preloaded: Media? = nil) async {
         guard media == nil else { return }
@@ -112,7 +113,9 @@ final class AniListDetailViewModel: ObservableObject {
             totalEpisodes: totalEpisodes,
             availableEpisodes: availEps,
             isAiring: media.status == "RELEASING",
-            resumeFrom: resumeWatchedSeconds,
+            resumeFrom: resumeEpisodeNumber == currentEpNum
+                ? resumeWatchedSeconds
+                : ContinueWatchingManager.shared.items.first(where: { $0.aniListID == media.id && $0.episodeNumber == currentEpNum })?.watchedSeconds,
             detailHref: searchResultHref,
             streamTitle: stream.title,
             workingDetailHref: searchResultHref,

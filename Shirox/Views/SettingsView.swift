@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
+    @ObservedObject private var providerManager = ProviderManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
     @State private var showResetCWConfirmation = false
     @State private var showResetHistoryConfirmation = false
@@ -47,7 +48,7 @@ struct SettingsView: View {
                                 if let active = moduleManager.activeModule {
                                     CachedAsyncImage(urlString: active.iconUrl ?? "", base64String: active.iconData)
                                 } else {
-                                    AsyncImage(url: URL(string: "https://anilist.co/img/icons/apple-touch-icon.png")) { phase in
+                                    AsyncImage(url: URL(string: providerManager.primary?.providerType.iconURL ?? "")) { phase in
                                         if case .success(let image) = phase {
                                             image.resizable().aspectRatio(contentMode: .fit)
                                         } else {
@@ -63,7 +64,7 @@ struct SettingsView: View {
                             .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(moduleManager.activeModule?.sourceName ?? "AniList")
+                                Text(moduleManager.activeModule?.sourceName ?? providerManager.primary?.providerType.displayName ?? "AniList")
                                     .font(.headline)
                                 Text("Manage your modules")
                                     .font(.subheadline)

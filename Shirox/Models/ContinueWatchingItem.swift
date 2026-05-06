@@ -34,4 +34,5 @@ struct ContinueWatchingItem: Identifiable, Codable {
     var isAiring: Bool?
     var lastWatchedAt: Date
     var thumbnailUrl: String?
+    var aniListUpdatedAt: Int?
 }
