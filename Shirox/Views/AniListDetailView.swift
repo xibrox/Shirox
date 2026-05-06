@@ -143,6 +143,16 @@ struct AniListDetailView: View {
                     )
                 }
             }
+
+            // Auto-resume: find the right episode to play if not navigated from CW card
+            if resumeEpisodeNumber == nil, let media = vm.media {
+                let mediaTitle = media.title.displayTitle
+                let totalEpisodes = media.episodes
+                if let ep = computeAutoPlayEpisode(mediaId: media.id, mediaTitle: mediaTitle, totalEpisodes: totalEpisodes) {
+                    selectedRangeIndex = (ep - 1) / 100
+                    resolvedAutoPlayEpisode = ep
+                }
+            }
         }
         .onChange(of: vm.media?.id) { _, _ in
             guard !autoPlayOnLoad else { return }
@@ -255,6 +265,50 @@ struct AniListDetailView: View {
                 #endif
             }
         }
+    }
+
+    private func computeAutoPlayEpisode(mediaId: Int, mediaTitle: String, totalEpisodes: Int?) -> Int? {
+        guard resumeEpisodeNumber == nil else { return nil }
+
+        let cwm = ContinueWatchingManager.shared
+        let cwItems = cwm.items.filter { $0.aniListID == mediaId }
+
+        // Step 1: in-progress item (has saved position, not yet fully watched)
+        if let inProgress = cwItems.first(where: {
+            $0.watchedSeconds > 0 &&
+            !cwm.isWatched(aniListID: mediaId, moduleId: nil,
+                           mediaTitle: mediaTitle, episodeNumber: $0.episodeNumber)
+        }) {
+            vm.resumeWatchedSeconds = inProgress.watchedSeconds
+            vm.resumeEpisodeNumber = inProgress.episodeNumber
+            return inProgress.episodeNumber
+        }
+
+        // Step 2: AniList library progress → next unwatched episode
+        if let progress = existingEntry?.progress, progress > 0 {
+            let nextEp = progress + 1
+            if let total = totalEpisodes {
+                if nextEp <= total { return nextEp }
+            } else {
+                return nextEp
+            }
+        }
+
+        // Step 3: CW watched history → first episode not yet watched
+        let hasAnyHistory = cwItems.contains {
+            cwm.isWatched(aniListID: mediaId, moduleId: nil,
+                          mediaTitle: mediaTitle, episodeNumber: $0.episodeNumber)
+        }
+        if hasAnyHistory, let total = totalEpisodes {
+            for ep in 1...total {
+                if !cwm.isWatched(aniListID: mediaId, moduleId: nil,
+                                  mediaTitle: mediaTitle, episodeNumber: ep) {
+                    return ep
+                }
+            }
+        }
+
+        return nil
     }
 
     private func handleLibraryEdit(media: Media, status: MediaListStatus, progress: Int, score: Double) {
