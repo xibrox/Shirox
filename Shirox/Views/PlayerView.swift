@@ -12,6 +12,12 @@ import GoogleCast
 
 typealias WatchNextLoader = (Int) async throws -> (streams: [StreamResult], episodeNumber: Int)?
 typealias StreamRefetchLoader = () async throws -> [StreamResult]
+typealias SequelLoader = () async throws -> (items: [SearchItem], mediaID: Int)
+
+enum SequelNavigation {
+    case aniListID(Int)
+    case searchItem(SearchItem)
+}
 
 // MARK: - Circular Button Style (uniform size & appearance)
 
@@ -31,6 +37,8 @@ struct PlayerView: View {
     let customDismiss: (() -> Void)?
     let onWatchNext: WatchNextLoader?
     let onStreamExpired: StreamRefetchLoader?
+    let onSequelNeeded: SequelLoader?
+    let onSequelAdvanced: ((SequelNavigation) -> Void)?
     let initialStreams: [StreamResult]
 
     @Environment(\.dismiss) private var dismiss
@@ -63,6 +71,9 @@ struct PlayerView: View {
     @State private var showInPlayerStreamPicker = false
     @State private var nextEpisodeStreams: [StreamResult] = []
     @State private var nextEpisodeNumber: Int = 0
+    @State private var showSequelPicker = false
+    @State private var sequelResults: [SearchItem] = []
+    @State private var pendingSequelMediaID: Int? = nil
 
     // Settings
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
@@ -102,7 +113,7 @@ struct PlayerView: View {
     @State private var pipTrigger = 0
     #endif
 
-    init(stream: StreamResult, streams: [StreamResult] = [], customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil) {
+    init(stream: StreamResult, streams: [StreamResult] = [], customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
         self.currentStreamInitial = stream
         self._currentStream = State(initialValue: stream)
         self._currentContext = State(initialValue: context)
@@ -111,6 +122,8 @@ struct PlayerView: View {
         self.customDismiss = customDismiss
         self.onWatchNext = onWatchNext
         self.onStreamExpired = onStreamExpired
+        self.onSequelNeeded = onSequelNeeded
+        self.onSequelAdvanced = onSequelAdvanced
     }
 
     var body: some View {
