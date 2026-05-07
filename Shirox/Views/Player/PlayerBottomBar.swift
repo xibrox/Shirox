@@ -21,7 +21,6 @@ struct PlayerBottomBar: View {
     var onStreamPickerTap: () -> Void = {}
     var bottomPadding: CGFloat = 24
     var onNextEpisodeTap: (() -> Void)? = nil
-    var showNextEpisodeButton: Bool = false
     var episodeNumber: Int? = nil
     var tvdbEpisodeTitle: String? = nil
     var mediaTitle: String? = nil
@@ -59,14 +58,6 @@ struct PlayerBottomBar: View {
 
                 Spacer()
 
-                if showNextEpisodeButton, let onNextEpisodeTap {
-                    nextEpisodeButton(action: onNextEpisodeTap)
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .trailing)),
-                            removal: .opacity
-                        ))
-                }
-
                 rightButtonGroup
             }
             .padding(.horizontal, isPad ? 30 : 20)
@@ -86,23 +77,6 @@ struct PlayerBottomBar: View {
     }
 
     // MARK: - Subviews
-
-    @ViewBuilder
-    private func nextEpisodeButton(action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: isPad ? 8 : 5) {
-                Image(systemName: "forward.end.fill")
-                    .font(.system(size: isPad ? 18 : 14, weight: .medium))
-                Text("Next")
-                    .font(isPad ? .body.weight(.semibold) : .subheadline.weight(.semibold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, isPad ? 20 : 14)
-            .frame(height: isPad ? 48 : 36)
-            .background(Color.white.opacity(0.2), in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
 
     private var skip85Button: some View {
         Button(action: onSkip85) {
@@ -147,6 +121,15 @@ struct PlayerBottomBar: View {
             if hasSubtitles {
                 Button(action: onSubtitleSettingsTap) {
                     Image(systemName: "captions.bubble.fill")
+                        .font(.system(size: iconSize, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: buttonWidth, height: height)
+                }
+                .buttonStyle(.plain)
+            }
+            if let onNextEpisodeTap {
+                Button(action: onNextEpisodeTap) {
+                    Image(systemName: "forward.end.fill")
                         .font(.system(size: iconSize, weight: .medium))
                         .foregroundStyle(.white)
                         .frame(width: buttonWidth, height: height)

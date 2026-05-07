@@ -66,7 +66,6 @@ struct PlayerView: View {
     @State private var availableStreams: [StreamResult]
     @State private var isLoadingNextEpisode = false
     @State private var isRefetchingStream = false
-    @State private var showNextEpisodeButton = false
     @State private var showNextEpisodePicker = false
     @State private var showInPlayerStreamPicker = false
     @State private var nextEpisodeStreams: [StreamResult] = []
@@ -584,8 +583,7 @@ struct PlayerView: View {
             streamCount: availableStreams.count,
             onStreamPickerTap: { showInPlayerStreamPicker = true },
             bottomPadding: bottomPad,
-            onNextEpisodeTap: onWatchNext != nil ? { Task { @MainActor in await loadAndAdvance() } } : nil,
-            showNextEpisodeButton: showNextEpisodeButton,
+            onNextEpisodeTap: (onWatchNext != nil || onSequelNeeded != nil) ? { Task { @MainActor in await loadAndAdvance() } } : nil,
             episodeNumber: currentContext?.episodeNumber,
             tvdbEpisodeTitle: tvdbEpisodeTitle,
             mediaTitle: currentContext?.mediaTitle
@@ -987,12 +985,6 @@ struct PlayerView: View {
             }
             if duration > 0 {
                 let progress = currentTime / duration
-                let shouldShow = onWatchNext != nil && progress >= watchedPercentage / 100.0
-                if shouldShow != showNextEpisodeButton {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        showNextEpisodeButton = shouldShow
-                    }
-                }
                 if progress >= watchedPercentage / 100.0 && !didTrackEpisode {
                     didTrackEpisode = true
                     trackAniListProgress()
@@ -1360,7 +1352,6 @@ struct PlayerView: View {
         bufferProgress = 0
 
 
-        showNextEpisodeButton = false
         showNextEpisodePicker = false
         nextEpisodeStreams = []
         nextEpisodeNumber = 0
