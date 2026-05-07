@@ -543,6 +543,24 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
         if request.value(forHTTPHeaderField: "Referer") == nil {
             request.setValue(randomReferers.randomElement() ?? "https://www.google.com/", forHTTPHeaderField: "Referer")
         }
+
+        // WKWebView ignores Cookie headers on URLRequest. Inject via a WKUserScript at
+        // document start so cookies are visible to the page's own JavaScript before it runs.
+        let ucc = webView.configuration.userContentController
+        ucc.removeAllUserScripts()
+        if let cookieHeader = headers["Cookie"] ?? headers["cookie"], !cookieHeader.isEmpty {
+            let cookieJS = cookieHeader
+                .components(separatedBy: ";")
+                .compactMap { pair -> String? in
+                    let kv = pair.trimmingCharacters(in: .whitespaces)
+                    guard !kv.isEmpty else { return nil }
+                    let escaped = kv.replacingOccurrences(of: "'", with: "\\'")
+                    return "document.cookie = '\(escaped); path=/; SameSite=Lax';"
+                }
+                .joined(separator: "\n")
+            let script = WKUserScript(source: cookieJS, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+            ucc.addUserScript(script)
+        }
         webView.load(request)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             self.simulateUserInteraction()

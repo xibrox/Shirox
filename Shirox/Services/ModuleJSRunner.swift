@@ -9,8 +9,11 @@ final class ModuleJSRunner {
 
     private var context: JSContext?
 
+    // Ephemeral config gives each runner its own isolated cookie store so bypass
+    // cookies from search persist through to fetchEpisodes without bleeding into
+    // other runners or being wiped by HTTPCookieStorage.shared clears.
     private let session: URLSession = {
-        let config = URLSessionConfiguration.default
+        let config = URLSessionConfiguration.ephemeral
         config.httpCookieAcceptPolicy = .always
         config.httpShouldSetCookies = true
         return URLSession(configuration: config)
@@ -21,8 +24,9 @@ final class ModuleJSRunner {
     // MARK: - Load module
 
     func load(module: ModuleDefinition) async throws {
-        // Clear cookies so previous module sessions don't bleed in
-        HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
+        // Clear WKWebView cookies (used by networkFetch/extractStreamUrl) for isolation.
+        // HTTPCookieStorage.shared is NOT cleared — the ephemeral URLSession has its own
+        // isolated store, so bypass cookies from earlier calls in this runner persist.
         NetworkFetchManager.clearCookies()
 
         let script: String

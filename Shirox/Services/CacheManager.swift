@@ -44,9 +44,26 @@ final class CacheManager: ObservableObject {
         }
         return 0
     }
-    
+
+    var searchAliasSize: Int {
+        let prefixes = ["moduleSearchAlias_", "moduleLastSearchResult_", "moduleLastStreamTitle_"]
+        return UserDefaults.standard.dictionaryRepresentation()
+            .filter { key, _ in prefixes.contains(where: { key.hasPrefix($0) }) }
+            .values.compactMap { $0 as? String }
+            .reduce(0) { $0 + $1.utf8.count }
+    }
+
+    var idMappingSize: Int {
+        (UserDefaults.standard.data(forKey: "id_mappings_cache")?.count ?? 0)
+    }
+
+    var episodeSortSize: Int {
+        guard let dict = UserDefaults.standard.dictionary(forKey: "individualSortPreferences") else { return 0 }
+        return dict.count * 16
+    }
+
     var totalDiskUsage: Int {
-        imageCacheSize + websiteDataSize + tempFilesSize + continueWatchingSize + watchHistorySize
+        imageCacheSize + websiteDataSize + tempFilesSize + continueWatchingSize + watchHistorySize + searchAliasSize + idMappingSize + episodeSortSize
     }
 
     // MARK: - Individual Reset Methods
@@ -79,12 +96,27 @@ final class CacheManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "watchHistory")
     }
 
+    func clearSearchAliases() {
+        ModuleSearchAliasManager.shared.clearAll()
+    }
+
+    func clearIDMappingCache() {
+        IDMappingService.shared.clearCache()
+    }
+
+    func clearEpisodeSortPreferences() {
+        EpisodeSortManager.shared.clearAllIndividualPreferences()
+    }
+
     func clearEverything() async {
         clearImageCache()
         await clearWebsiteData()
         clearTempFiles()
         clearContinueWatching()
         clearWatchHistory()
+        clearSearchAliases()
+        clearIDMappingCache()
+        clearEpisodeSortPreferences()
         cleanupOrphanedDownloads()
     }
     

@@ -25,7 +25,11 @@ struct SettingsView: View {
     @State private var tempFilesSize = 0
     @State private var continueWatchingSize = 0
     @State private var watchHistorySize = 0
+    @State private var searchAliasSize = 0
+    @State private var idMappingSize = 0
+    @State private var episodeSortSize = 0
     @State private var totalUsage = 0
+    @State private var isClearing = false
     #endif
 
     private let shortOptions = [5, 10, 15, 30]
@@ -174,17 +178,33 @@ struct SettingsView: View {
                 #if os(iOS)
                 Section("Storage & Cache") {
                     Button(role: .destructive) {
+                        guard !isClearing else { return }
+                        isClearing = true
                         Task {
                             await CacheManager.shared.clearEverything()
-                            updateCacheSizes()
+                            imageCacheSize = 0
+                            websiteDataSize = 0
+                            tempFilesSize = 0
+                            continueWatchingSize = 0
+                            watchHistorySize = 0
+                            searchAliasSize = 0
+                            idMappingSize = 0
+                            episodeSortSize = 0
+                            totalUsage = 0
+                            isClearing = false
                         }
                     } label: {
                         LabeledContent("Clear Everything") {
-                            Text(Self.formattedBytes(totalUsage))
-                                .foregroundStyle(.secondary)
+                            if isClearing {
+                                ProgressView().scaleEffect(0.7)
+                            } else {
+                                Text(Self.formattedBytes(totalUsage))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .foregroundStyle(.red)
+                    .disabled(isClearing)
 
                     DisclosureGroup("Individual Resets") {
                         Button {
@@ -199,9 +219,13 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
 
                         Button {
+                            guard !isClearing else { return }
+                            isClearing = true
                             Task {
                                 await CacheManager.shared.clearWebsiteData()
-                                updateCacheSizes()
+                                totalUsage -= websiteDataSize
+                                websiteDataSize = 0
+                                isClearing = false
                             }
                         } label: {
                             LabeledContent("Reset Website Data") {
@@ -217,6 +241,39 @@ struct SettingsView: View {
                         } label: {
                             LabeledContent("Clear Temporary Files") {
                                 Text(Self.formattedBytes(tempFilesSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+
+                        Button {
+                            CacheManager.shared.clearSearchAliases()
+                            updateCacheSizes()
+                        } label: {
+                            LabeledContent("Reset Search Aliases") {
+                                Text(Self.formattedBytes(searchAliasSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+
+                        Button {
+                            CacheManager.shared.clearIDMappingCache()
+                            updateCacheSizes()
+                        } label: {
+                            LabeledContent("Reset ID Mapping Cache") {
+                                Text(Self.formattedBytes(idMappingSize))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+
+                        Button {
+                            CacheManager.shared.clearEpisodeSortPreferences()
+                            updateCacheSizes()
+                        } label: {
+                            LabeledContent("Reset Episode Sort Preferences") {
+                                Text(Self.formattedBytes(episodeSortSize))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -243,8 +300,9 @@ struct SettingsView: View {
                         .foregroundStyle(.red)
                     }
                     .font(.subheadline)
+                    .disabled(isClearing)
 
-                    Text("Website Data includes cookies and local storage from module scrapers. Watch Data includes continue watching and history.")
+                    Text("Website Data includes cookies and local storage from module scrapers. Watch Data includes continue watching and history. Search Aliases store remembered search results and stream picks per module.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -300,6 +358,9 @@ struct SettingsView: View {
         tempFilesSize = CacheManager.shared.tempFilesSize
         continueWatchingSize = CacheManager.shared.continueWatchingSize
         watchHistorySize = CacheManager.shared.watchHistorySize
+        searchAliasSize = CacheManager.shared.searchAliasSize
+        idMappingSize = CacheManager.shared.idMappingSize
+        episodeSortSize = CacheManager.shared.episodeSortSize
         totalUsage = CacheManager.shared.totalDiskUsage
     }
     #endif

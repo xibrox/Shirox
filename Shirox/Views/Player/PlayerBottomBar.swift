@@ -7,6 +7,7 @@ struct PlayerBottomBar: View {
     @Binding var playbackSpeed: Float
     var onSeek: (Double) -> Void
     var onSliderDragStart: (() -> Void)? = nil
+    var onSliderDragChange: ((Double) -> Void)? = nil
     var onSliderDragEnd: (() -> Void)? = nil
     var onSpeedTap: () -> Void
     var onFillTap: () -> Void = {}
@@ -69,6 +70,7 @@ struct PlayerBottomBar: View {
                 bufferProgress: bufferProgress,
                 onSeek: onSeek,
                 onDragStart: onSliderDragStart,
+                onDragChange: onSliderDragChange,
                 onDragEnd: onSliderDragEnd
             )
             .padding(.horizontal, isPad ? 30 : 20)

@@ -402,10 +402,14 @@ struct DetailView: View {
 
     private func tapEpisode(_ episode: EpisodeLink) {
         let moduleId = ModuleManager.shared.activeModule?.id
-        let cwItem = continueWatching.items.first {
-            ($0.moduleId == moduleId || $0.aniListID == (vm.aniListID ?? aniListID)) &&
-            $0.episodeNumber == Int(episode.number) &&
-            !$0.streamUrl.isEmpty
+        let resolvedAniListID = vm.aniListID ?? aniListID
+        let currentTitle = vm.detail?.title ?? item.title
+        let epNum = Int(episode.number)
+        let cwItem = continueWatching.items.first { cw in
+            let showMatches = resolvedAniListID != nil
+                ? cw.aniListID == resolvedAniListID
+                : cw.moduleId == moduleId && cw.mediaTitle == currentTitle
+            return showMatches && cw.episodeNumber == epNum && !cw.streamUrl.isEmpty
         }
         if let item = cwItem {
             resumeWatching(item: item)

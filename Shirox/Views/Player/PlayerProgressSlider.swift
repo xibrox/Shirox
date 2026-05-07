@@ -6,6 +6,7 @@ struct PlayerProgressSlider: View {
     var bufferProgress: Double = 0
     var onSeek: (Double) -> Void
     var onDragStart: (() -> Void)? = nil
+    var onDragChange: ((Double) -> Void)? = nil
     var onDragEnd: (() -> Void)? = nil
 
     @State private var isDragging = false
@@ -60,6 +61,7 @@ struct PlayerProgressSlider: View {
                                     }
                                     let delta = (value.location.x - dragStartX) / geo.size.width * duration
                                     dragTime = min(max(dragStartTime + delta, 0), duration)
+                                    onDragChange?(dragTime)
                                 }
                                 .onEnded { _ in
                                     onSeek(dragTime)

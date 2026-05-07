@@ -106,6 +106,12 @@ struct PlayerView: View {
     }
 
     @State private var isSpeedBoosted = false
+    @State private var isVideoScrubbing = false
+    @State private var videoScrubTime: Double = 0
+    @State private var videoScrubStartTime: Double = 0
+    @State private var scrubWasPlaying = false
+    @State private var chaseTime: Double = 0
+    @State private var isChasing = false
     @State private var artworkCache: [String: MPMediaItemArtwork] = [:]
     // PiP (iOS only)
     #if os(iOS)
@@ -440,6 +446,14 @@ struct PlayerView: View {
                 speedBoostBadge
             }
 
+            if isVideoScrubbing {
+                VStack {
+                    videoScrubFeedback
+                    Spacer()
+                }
+                .padding(.top, isPad ? 110 : 90)
+            }
+
             SpeedBoostOverlay(
                 isLocked: isLocked,
                 onBegan: { if !castManager.isConnected { isSpeedBoosted = true; player.rate = 2.0 } },
@@ -448,6 +462,41 @@ struct PlayerView: View {
                         isSpeedBoosted = false
                         player.rate = isPlaying ? Float(playbackSpeed) : 0
                     }
+                }
+            )
+            .ignoresSafeArea()
+
+            VideoScrubOverlay(
+                isLocked: isLocked,
+                duration: duration,
+                currentTime: currentTime,
+                onBegan: { startTime in
+                    guard !castManager.isConnected else { return }
+                    hideTask?.cancel()
+                    scrubWasPlaying = isPlaying
+                    player.pause()
+                    isPlaying = false
+                    videoScrubTime = startTime
+                    videoScrubStartTime = startTime
+                    isVideoScrubbing = true
+                    isScrubbing = true
+                    beginScrubbing()
+                },
+                onChange: { scrubTime in
+                    videoScrubTime = scrubTime
+                    seekSmoothly(to: scrubTime)
+                },
+                onEnded: { finalTime in
+                    currentTime = finalTime
+                    isVideoScrubbing = false
+                    isScrubbing = false
+                    endScrubbing()
+                    seekSmoothly(to: finalTime)
+                    if scrubWasPlaying {
+                        player.rate = Float(playbackSpeed)
+                        isPlaying = true
+                    }
+                    scheduleHide()
                 }
             )
             .ignoresSafeArea()
@@ -477,6 +526,26 @@ struct PlayerView: View {
         }
         .padding(.top, 16).transition(.opacity)
         .animation(.easeInOut(duration: 0.15), value: isSpeedBoosted)
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var videoScrubFeedback: some View {
+        let delta = videoScrubTime - videoScrubStartTime
+        let absDelta = abs(delta)
+        let sign = delta >= 0 ? "+" : "-"
+        HStack(spacing: 8) {
+            Text(sign + absDelta.playerTimeString)
+                .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                .foregroundStyle(delta >= 0 ? Color.green : Color.red)
+            Text(videoScrubTime.playerTimeString)
+                .font(.system(size: 13, weight: .regular).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+        .animation(.easeOut(duration: 0.15), value: isVideoScrubbing)
         .allowsHitTesting(false)
     }
 
@@ -569,8 +638,31 @@ struct PlayerView: View {
                 set: { playbackSpeed = Double($0) }
             ),
             onSeek: { time in seekTo(time) },
-            onSliderDragStart: { hideTask?.cancel() },
-            onSliderDragEnd: { scheduleHide() },
+            onSliderDragStart: {
+                hideTask?.cancel()
+                videoScrubStartTime = currentTime
+                videoScrubTime = currentTime
+                scrubWasPlaying = isPlaying
+                player?.pause()
+                isPlaying = false
+                isScrubbing = true
+                isVideoScrubbing = true
+                beginScrubbing()
+            },
+            onSliderDragChange: { dragTime in
+                videoScrubTime = dragTime
+                seekSmoothly(to: dragTime)
+            },
+            onSliderDragEnd: {
+                isVideoScrubbing = false
+                isScrubbing = false
+                endScrubbing()
+                if scrubWasPlaying {
+                    player?.rate = Float(playbackSpeed)
+                    isPlaying = true
+                }
+                scheduleHide()
+            },
             onSpeedTap: { showSpeedPicker = true },
             onFillTap: { isFilled.toggle() },
             isFilled: isFilled,
@@ -864,6 +956,39 @@ struct PlayerView: View {
             isScrubbing = false
         }
         if isPlaying { scheduleHide() }
+    }
+
+    private func beginScrubbing() {
+        player?.automaticallyWaitsToMinimizeStalling = false
+    }
+
+    private func endScrubbing() {
+        isChasing = false
+        player?.automaticallyWaitsToMinimizeStalling = true
+    }
+
+    private func seekSmoothly(to time: Double) {
+        chaseTime = time
+        guard !isChasing else { return }
+        isChasing = true
+        seekChase()
+    }
+
+    private func seekChase() {
+        guard let player else { isChasing = false; return }
+        let target = chaseTime
+        let tolerance = CMTime(seconds: 0.5, preferredTimescale: 600)
+        player.seek(
+            to: CMTime(seconds: target, preferredTimescale: 600),
+            toleranceBefore: tolerance,
+            toleranceAfter: tolerance
+        ) { [self] _ in
+            if chaseTime != target {
+                seekChase()
+            } else {
+                isChasing = false
+            }
+        }
     }
 
     private func scheduleHide() {
@@ -1612,12 +1737,27 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
 // MARK: - Speed Boost Overlay (UIKit long-press, single-touch only)
 
 private final class SingleTouchLongPress: UILongPressGestureRecognizer {
+    private var startLocation: CGPoint = .zero
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         guard (event.allTouches?.count ?? 0) == 1 else {
             state = .failed
             return
         }
+        startLocation = touches.first?.location(in: view) ?? .zero
         super.touchesBegan(touches, with: event)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let location = touches.first?.location(in: view) {
+            let dx = abs(location.x - startLocation.x)
+            let dy = abs(location.y - startLocation.y)
+            if dx > 10 || dy > 10 {
+                state = .failed
+                return
+            }
+        }
+        super.touchesMoved(touches, with: event)
     }
 }
 
@@ -1680,6 +1820,102 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
     }
 }
 #endif
+
+// MARK: - Video Scrub Overlay (horizontal pan → frame scrubbing)
+
+private struct VideoScrubOverlay: UIViewRepresentable {
+    var isLocked: Bool
+    var duration: Double
+    var currentTime: Double
+    var onBegan: (Double) -> Void
+    var onChange: (Double) -> Void
+    var onEnded: (Double) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onBegan: onBegan, onChange: onChange, onEnded: onEnded) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.isLocked = isLocked
+        context.coordinator.duration = duration
+        context.coordinator.currentTime = currentTime
+        context.coordinator.onBegan = onBegan
+        context.coordinator.onChange = onChange
+        context.coordinator.onEnded = onEnded
+
+        guard !context.coordinator.attached, let window = uiView.window else { return }
+        context.coordinator.screenWidth = window.bounds.width
+        context.coordinator.screenHeight = window.bounds.height
+        let gr = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        gr.cancelsTouchesInView = false
+        gr.delaysTouchesEnded = false
+        gr.delegate = context.coordinator
+        window.addGestureRecognizer(gr)
+        context.coordinator.recognizer = gr
+        context.coordinator.attached = true
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.recognizer?.view?.removeGestureRecognizer(coordinator.recognizer!)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var isLocked: Bool = false
+        var duration: Double = 0
+        var currentTime: Double = 0
+        var onBegan: (Double) -> Void
+        var onChange: (Double) -> Void
+        var onEnded: (Double) -> Void
+        var recognizer: UIPanGestureRecognizer?
+        var attached = false
+        var screenWidth: CGFloat = 390
+        var screenHeight: CGFloat = 844
+        var startTime: Double = 0
+
+        init(onBegan: @escaping (Double) -> Void,
+             onChange: @escaping (Double) -> Void,
+             onEnded: @escaping (Double) -> Void) {
+            self.onBegan = onBegan
+            self.onChange = onChange
+            self.onEnded = onEnded
+        }
+
+        @objc func handle(_ gr: UIPanGestureRecognizer) {
+            guard !isLocked, duration > 0 else { return }
+            switch gr.state {
+            case .began:
+                startTime = currentTime
+                onBegan(currentTime)
+            case .changed:
+                let dx = gr.translation(in: gr.view).x
+                let newTime = min(max(startTime + (dx / screenWidth) * duration, 0), duration)
+                onChange(newTime)
+            case .ended, .cancelled:
+                let dx = gr.translation(in: gr.view).x
+                let finalTime = min(max(startTime + (dx / screenWidth) * duration, 0), duration)
+                onEnded(finalTime)
+            default: break
+            }
+        }
+
+        func gestureRecognizerShouldBegin(_ gr: UIGestureRecognizer) -> Bool {
+            guard let pan = gr as? UIPanGestureRecognizer, let view = pan.view else { return true }
+            let v = pan.velocity(in: view)
+            let loc = pan.location(in: view)
+            // Only horizontal pans, and not in the bottom 22% where the progress bar lives
+            let inBottomBar = loc.y > screenHeight * 0.78
+            return abs(v.x) > abs(v.y) * 1.5 && !inBottomBar
+        }
+
+        func gestureRecognizer(_ gr: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    }
+}
 
 // MARK: - PlayerHostingController (iOS only)
 

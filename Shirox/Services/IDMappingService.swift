@@ -76,4 +76,10 @@ final class IDMappingService {
         UserDefaults.standard.set(cache, forKey: cacheKey)
         return id
     }
+
+    func clearCache() {
+        cache = [:]
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        UserDefaults.standard.removeObject(forKey: prefetchedKey)
+    }
 }

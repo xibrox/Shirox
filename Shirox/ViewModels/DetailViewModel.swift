@@ -234,7 +234,7 @@ final class DetailViewModel: ObservableObject {
             isAiring: nil,
             resumeFrom: resumeEpisodeNumber == Int(selectedEpisode?.number ?? 1)
                 ? resumeWatchedSeconds
-                : ContinueWatchingManager.shared.items.first(where: { $0.moduleId == ModuleManager.shared.activeModule?.id && $0.episodeNumber == Int(selectedEpisode?.number ?? 1) })?.watchedSeconds,
+                : ContinueWatchingManager.shared.items.first(where: { $0.moduleId == ModuleManager.shared.activeModule?.id && $0.mediaTitle == (detail?.title ?? "") && $0.episodeNumber == Int(selectedEpisode?.number ?? 1) })?.watchedSeconds,
             detailHref: detailHref,
             streamTitle: stream.title,
             workingDetailHref: detailHref,

@@ -74,4 +74,13 @@ final class ModuleSearchAliasManager: ObservableObject {
     func setLastStreamTitle(moduleId: String, title: String) {
         userDefaults.set(title, forKey: streamTitleKey(moduleId: moduleId))
     }
+
+    func clearAll() {
+        let prefixes = [keyPrefix, "moduleLastSearchResult_", "moduleLastStreamTitle_"]
+        let allKeys = userDefaults.dictionaryRepresentation().keys
+        for key in allKeys where prefixes.contains(where: { key.hasPrefix($0) }) {
+            userDefaults.removeObject(forKey: key)
+        }
+        objectWillChange.send()
+    }
 }

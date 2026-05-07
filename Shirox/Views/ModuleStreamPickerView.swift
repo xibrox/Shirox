@@ -157,7 +157,12 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
         do {
             try await r.load(module: module)
-            let episodes = try await r.fetchEpisodes(url: savedHref)
+            var episodes = try await r.fetchEpisodes(url: savedHref)
+            if episodes.isEmpty {
+                try await Task.sleep(nanoseconds: 800_000_000)
+                if Task.isCancelled { return }
+                episodes = try await r.fetchEpisodes(url: savedHref)
+            }
             availableCount = episodes.count
             currentSearchResultHref = savedHref
 
@@ -196,7 +201,15 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
         do {
             try await r.load(module: module)
-            let results = try await r.search(keyword: keyword)
+            var results = try await r.search(keyword: keyword)
+
+            if results.isEmpty {
+                // Some modules (e.g. animepahe) need a warm session before search works;
+                // retry once automatically before showing "Not Found".
+                try await Task.sleep(nanoseconds: 800_000_000)
+                if Task.isCancelled { return }
+                results = try await r.search(keyword: keyword)
+            }
 
             if results.isEmpty {
                 state = .notFound
@@ -215,7 +228,12 @@ private final class ModuleStreamRowViewModel: ObservableObject {
         currentSearchResultHref = item.href
 
         do {
-            let episodes = try await r.fetchEpisodes(url: item.href)
+            var episodes = try await r.fetchEpisodes(url: item.href)
+            if episodes.isEmpty {
+                try await Task.sleep(nanoseconds: 800_000_000)
+                if Task.isCancelled { return }
+                episodes = try await r.fetchEpisodes(url: item.href)
+            }
             availableCount = episodes.count
 
             if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber) {
@@ -349,7 +367,9 @@ private struct ModuleStreamRow: View {
         }
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
-            if autoPickLastStream,
+            if streams.count == 1 {
+                fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
+            } else if autoPickLastStream,
                isPreferredModule,
                let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: module.id),
                let match = streams.first(where: { $0.title == savedTitle }) {
