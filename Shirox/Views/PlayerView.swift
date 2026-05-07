@@ -1164,8 +1164,11 @@ struct PlayerView: View {
 
     private func loadAndAdvance() async {
         Logger.shared.log("[PlayerView] loadAndAdvance() called", type: "Debug")
-        
-        guard let loader = onWatchNext, let epNum = currentContext?.episodeNumber else {
+
+        guard let epNum = currentContext?.episodeNumber else { return }
+
+        guard let loader = onWatchNext else {
+            if onSequelNeeded != nil { await loadSequel() }
             return
         }
 
