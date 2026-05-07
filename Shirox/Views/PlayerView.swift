@@ -1246,7 +1246,9 @@ struct PlayerView: View {
     }
 
     private func advanceToSequel(_ item: SearchItem) {
-        if let id = pendingSequelMediaID {
+        // Capture before the sheet's onDismiss clears it
+        let capturedMediaID = pendingSequelMediaID
+        if let id = capturedMediaID {
             onSequelAdvanced?(.aniListID(id))
         }
         onSequelAdvanced?(.searchItem(item))
@@ -1271,7 +1273,7 @@ struct PlayerView: View {
                 swapStream(match, episodeNumber: epNum)
                 // swapStream preserves old aniListID — override context with sequel's identity
                 // so ContinueWatching saves episode 1 progress under the correct show
-                if let id = pendingSequelMediaID, let ctx = currentContext {
+                if let id = capturedMediaID, let ctx = currentContext {
                     currentContext = PlayerContext(
                         mediaTitle: item.title,
                         episodeNumber: epNum,
