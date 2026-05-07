@@ -127,15 +127,6 @@ struct PlayerBottomBar: View {
                 }
                 .buttonStyle(.plain)
             }
-            if let onNextEpisodeTap {
-                Button(action: onNextEpisodeTap) {
-                    Image(systemName: "forward.end.fill")
-                        .font(.system(size: iconSize, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: buttonWidth, height: height)
-                }
-                .buttonStyle(.plain)
-            }
             Button(action: onFillTap) {
                 Image(systemName: isFilled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: iconSize - 1, weight: .medium))
@@ -151,6 +142,15 @@ struct PlayerBottomBar: View {
                     .frame(height: height)
             }
             .buttonStyle(.plain)
+            if let onNextEpisodeTap {
+                Button(action: onNextEpisodeTap) {
+                    Image(systemName: "forward.end.fill")
+                        .font(.system(size: iconSize, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: buttonWidth, height: height)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, isPad ? 6 : 4)
         .padding(.vertical, 1)
