@@ -24,6 +24,7 @@ struct DetailView: View {
     @State private var isReversed = false
     @State private var selectedTab = 0
     @State private var showMatchingSearch = false
+    @State private var sequelSearchItem: SearchItem? = nil
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -81,6 +82,14 @@ struct DetailView: View {
         .tint(.primary)
         .toolbar { detailToolbar }
         #endif
+        .navigationDestination(isPresented: Binding(
+            get: { sequelSearchItem != nil },
+            set: { if !$0 { sequelSearchItem = nil } }
+        )) {
+            if let item = sequelSearchItem {
+                DetailView(item: item)
+            }
+        }
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             vm.aniListID = aniListID
@@ -150,7 +159,7 @@ struct DetailView: View {
             if let stream = vm.pendingStream {
                 vm.pendingStream = nil
                 let s = stream
-                DispatchQueue.main.async { vm.selectStream(s) }
+                DispatchQueue.main.async { vm.selectStream(s, onSequelAdvanced: { nav in if case .searchItem(let item) = nav { sequelSearchItem = item } }) }
             } else {
                 vm.cancelStreamLoading()
             }
