@@ -1272,7 +1272,29 @@ struct PlayerView: View {
                 isLoadingNextEpisode = false
                 guard !streams.isEmpty else { return }
                 let match = streams.first(where: { $0.title == currentContext?.streamTitle }) ?? streams[0]
-                swapStream(match, episodeNumber: Int(ep1.number ?? 1))
+                let epNum = Int(ep1.number ?? 1)
+                swapStream(match, episodeNumber: epNum)
+                // swapStream preserves old aniListID — override context with sequel's identity
+                // so ContinueWatching saves episode 1 progress under the correct show
+                if let id = pendingSequelMediaID, let ctx = currentContext {
+                    currentContext = PlayerContext(
+                        mediaTitle: item.title,
+                        episodeNumber: epNum,
+                        episodeTitle: nil,
+                        imageUrl: item.image,
+                        aniListID: id,
+                        malID: nil,
+                        moduleId: ctx.moduleId,
+                        totalEpisodes: nil,
+                        availableEpisodes: nil,
+                        isAiring: nil,
+                        resumeFrom: nil,
+                        detailHref: item.href,
+                        streamTitle: match.title,
+                        workingDetailHref: item.href,
+                        thumbnailUrl: nil
+                    )
+                }
             } catch {
                 isLoadingNextEpisode = false
             }
