@@ -3,6 +3,7 @@ import Charts
 
 struct ProfileStatsView: View {
     let stats: ProfileAnimeStats?
+    var scoreFormat: ScoreFormat = .point10Decimal
     
     var body: some View {
         if let stats = stats {
@@ -13,7 +14,7 @@ struct ProfileStatsView: View {
                     statBox(title: "Episodes", value: "\(stats.episodesWatched)", icon: "play.circle")
                     statBox(title: "Time Watched", value: formatMinutes(stats.minutesWatched), icon: "clock")
                     if stats.meanScore > 0 {
-                        statBox(title: "Mean Score", value: String(format: "%.1f", stats.meanScore), icon: "star")
+                        statBox(title: "Mean Score", value: scoreFormat.displayString(for: stats.meanScore), icon: "star")
                     }
                 }
                 .padding(.horizontal)
@@ -117,6 +118,15 @@ struct ProfileStatsView: View {
         }
     }
     
+    private var scoreChartAxisValues: [Int] {
+        switch scoreFormat {
+        case .point100: return [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        case .point10Decimal, .point10: return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        case .point5: return [1, 2, 3, 4, 5]
+        case .point3: return [1, 2, 3]
+        }
+    }
+
     @ViewBuilder
     private func scoreChart(_ data: [ProfileScoreStat]?) -> some View {
         if let data = data?.sorted(by: { $0.score < $1.score }) {
@@ -136,7 +146,7 @@ struct ProfileStatsView: View {
                 .interpolationMethod(.catmullRom)
             }
             .chartXAxis {
-                AxisMarks(values: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
+                AxisMarks(values: scoreChartAxisValues)
             }
         } else {
             Text("No score data").foregroundStyle(.secondary)

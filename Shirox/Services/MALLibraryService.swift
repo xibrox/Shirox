@@ -128,6 +128,13 @@ final class MALLibraryService {
         try validateResponse(response)
     }
 
+    func deleteEntry(malId: Int) async throws {
+        let url = base.appendingPathComponent("anime/\(malId)/my_list_status")
+        let request = try await MALAuthManager.shared.authorizedRequest(url: url, method: "DELETE")
+        let (_, response) = try await session.data(for: request)
+        try validateResponse(response)
+    }
+
     // MARK: - Status mapping
 
     func mapStatusToMAL(_ s: MediaListStatus) -> String {

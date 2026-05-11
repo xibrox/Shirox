@@ -47,6 +47,10 @@ struct LibraryView: View {
         activeProviderType == .mal ? malAuth.isLoggedIn : anilistAuth.isLoggedIn
     }
 
+    private var scoreFormat: ScoreFormat {
+        activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
+    }
+
     private var displayUsername: String {
         let name = activeProviderType == .mal
             ? (malAuth.username ?? "Profile")
@@ -349,7 +353,7 @@ struct LibraryView: View {
                             }
                             .opacity(0)
 
-                            LibraryRowView(entry: entry) {
+                            LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
                                 selectedEntry = entry
                             }
                         }
@@ -438,17 +442,21 @@ struct LibraryView: View {
         .navigationTitle("Library")
         .searchable(text: $searchText, prompt: "Search library")
         .sheet(item: $selectedEntry) { entry in
-            LibraryEntryEditSheet(entry: entry, media: entry.media) { status, progress, score in
-                if status == .completed {
-                    ContinueWatchingManager.shared.resetProgress(
-                        aniListID: entry.media.id, moduleId: nil, mediaTitle: entry.media.title.searchTitle
-                    )
+            LibraryEntryEditSheet(
+                entry: entry,
+                media: entry.media,
+                onSave: { status, progress, score in
+                    if status == .completed {
+                        ContinueWatchingManager.shared.resetProgress(
+                            aniListID: entry.media.id, moduleId: nil, mediaTitle: entry.media.title.searchTitle
+                        )
+                    }
+                    Task { await vm.update(entry: entry, status: status, progress: progress, score: score) }
+                },
+                onDelete: {
+                    Task { await vm.delete(entry: entry) }
                 }
-
-                Task {
-                    await vm.update(entry: entry, status: status, progress: progress, score: score)
-                }
-            }
+            )
         }
         .sheet(isPresented: $showProfile) {
             if let uid = anilistAuth.userId, let username = anilistAuth.username {
@@ -469,6 +477,7 @@ struct LibraryView: View {
 
 private struct LibraryRowView: View {
     let entry: LibraryEntry
+    var scoreFormat: ScoreFormat = .point10Decimal
     var onEdit: () -> Void = {}
 
     var body: some View {
@@ -496,8 +505,10 @@ private struct LibraryRowView: View {
                 .overlay(alignment: .topTrailing) {
                     if entry.score > 0 {
                         HStack(spacing: 2) {
-                            Image(systemName: "star.fill").font(.system(size: 7))
-                            Text(String(format: entry.score.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.1f", entry.score))
+                            if scoreFormat != .point3 {
+                                Image(systemName: "star.fill").font(.system(size: 7))
+                            }
+                            Text(scoreFormat.displayString(for: entry.score))
                                 .font(.caption2.weight(.bold))
                         }
                         .foregroundStyle(.yellow)
@@ -532,9 +543,11 @@ private struct LibraryRowView: View {
                     }
                     if entry.score > 0 {
                         HStack(spacing: 3) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 9))
-                            Text(String(format: entry.score.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.1f", entry.score))
+                            if scoreFormat != .point3 {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 9))
+                            }
+                            Text(scoreFormat.displayString(for: entry.score))
                                 .font(.caption2.weight(.semibold))
                         }
                         .foregroundStyle(.yellow)

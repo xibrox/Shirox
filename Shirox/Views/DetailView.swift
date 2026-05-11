@@ -529,26 +529,35 @@ struct DetailView: View {
                 season: nil, seasonYear: nil, nextAiringEpisode: nil,
                 relations: nil, type: nil, format: nil
             )
-            LibraryEntryEditSheet(entry: existingEntry, media: tempMedia) { status, progress, score in
-                if status == .completed {
-                    ContinueWatchingManager.shared.resetProgress(aniListID: aid, moduleId: nil, mediaTitle: detail.title)
-                } else if progress > 0 {
-                    ContinueWatchingManager.shared.markWatched(
-                        upThrough: progress, aniListID: aid,
-                        moduleId: ModuleManager.shared.activeModule?.id,
-                        mediaTitle: detail.title, imageUrl: detail.image,
-                        totalEpisodes: detail.episodes.count,
-                        availableEpisodes: detail.episodes.count,
-                        detailHref: vm.detailHref
-                    )
-                }
-                Task {
-                    try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: status, progress: progress, score: score)
-                    if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
-                        existingEntry = AniListProvider.shared.mapEntry(raw)
+            LibraryEntryEditSheet(
+                entry: existingEntry,
+                media: tempMedia,
+                onSave: { status, progress, score in
+                    if status == .completed {
+                        ContinueWatchingManager.shared.resetProgress(aniListID: aid, moduleId: nil, mediaTitle: detail.title)
+                    } else if progress > 0 {
+                        ContinueWatchingManager.shared.markWatched(
+                            upThrough: progress, aniListID: aid,
+                            moduleId: ModuleManager.shared.activeModule?.id,
+                            mediaTitle: detail.title, imageUrl: detail.image,
+                            totalEpisodes: detail.episodes.count,
+                            availableEpisodes: detail.episodes.count,
+                            detailHref: vm.detailHref
+                        )
                     }
-                }
-            }
+                    Task {
+                        try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: status, progress: progress, score: score)
+                        if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                            existingEntry = AniListProvider.shared.mapEntry(raw)
+                        }
+                    }
+                },
+                onDelete: existingEntry != nil ? {
+                    let entryId = existingEntry!.id
+                    existingEntry = nil
+                    Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                } : nil
+            )
             #if os(iOS)
             .presentationDetents([.medium, .large])
             #else

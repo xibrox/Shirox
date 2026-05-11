@@ -9,7 +9,14 @@ final class AniListAuthManager: NSObject, ObservableObject {
     @Published var isLoggedIn = false
     @Published var username: String?
     @Published var avatarURL: String?
-    @Published var userId: Int?
+    @Published var userId: Int? = {
+        let v = UserDefaults.standard.integer(forKey: "anilist_user_id")
+        return v == 0 ? nil : v
+    }()
+    @Published var scoreFormat: ScoreFormat = {
+        let raw = UserDefaults.standard.string(forKey: "anilist_score_format") ?? ""
+        return ScoreFormat(rawValue: raw) ?? .point10Decimal
+    }()
 
     // From https://anilist.co/settings/developer — Redirect URI: shirox://auth
     private let clientId = "38624"
@@ -20,6 +27,9 @@ final class AniListAuthManager: NSObject, ObservableObject {
     private override init() {
         super.init()
         isLoggedIn = accessToken != nil
+        if accessToken != nil {
+            Task { await fetchViewer() }
+        }
     }
 
     // MARK: - Token
@@ -117,6 +127,9 @@ final class AniListAuthManager: NSObject, ObservableObject {
         username = nil
         avatarURL = nil
         userId = nil
+        scoreFormat = .point10Decimal
+        UserDefaults.standard.removeObject(forKey: "anilist_score_format")
+        UserDefaults.standard.removeObject(forKey: "anilist_user_id")
     }
 
     // MARK: - Viewer
@@ -129,6 +142,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             id
             name
             avatar { large }
+            mediaListOptions { scoreFormat }
           }
         }
         """
@@ -154,9 +168,13 @@ final class AniListAuthManager: NSObject, ObservableObject {
                 let id: Int
                 let name: String
                 let avatar: Avatar
+                let mediaListOptions: MediaListOptions?
             }
             struct Avatar: Decodable {
                 let large: String?
+            }
+            struct MediaListOptions: Decodable {
+                let scoreFormat: String?
             }
             let data: ResponseData?
         }
@@ -165,6 +183,12 @@ final class AniListAuthManager: NSObject, ObservableObject {
             userId = viewer.id
             username = viewer.name
             avatarURL = viewer.avatar.large
+            UserDefaults.standard.set(viewer.id, forKey: "anilist_user_id")
+            if let fmt = viewer.mediaListOptions?.scoreFormat {
+                let format = ScoreFormat(rawValue: fmt) ?? .point10Decimal
+                scoreFormat = format
+                UserDefaults.standard.set(format.rawValue, forKey: "anilist_score_format")
+            }
         } else {
             // Token is present but invalid — clear it
             logout()

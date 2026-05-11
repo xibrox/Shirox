@@ -52,7 +52,10 @@ struct ProfileView: View {
                 } else if selectedTab == 2 {
                     ScrollView {
                         scrollableHeader
-                        ProfileStatsView(stats: vm.user?.statistics?.anime)
+                        ProfileStatsView(
+                            stats: vm.user?.statistics?.anime,
+                            scoreFormat: activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
+                        )
                     }
                 } else if selectedTab == 3 {
                     ProfileSocialView(vm: vm, userId: userId, topContent: scrollableHeader)
@@ -105,48 +108,47 @@ struct ProfileView: View {
     private var profileHeader: some View {
         VStack(spacing: 0) {
             // Banner + Avatar Overlap
-            ZStack(alignment: .bottomLeading) {
-                if let banner = vm.user?.bannerImage {
-                    CachedAsyncImage(urlString: banner)
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 140)
-                        .clipped()
-                } else {
-                    Color.accentColor.opacity(0.1)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 120)
-                }
+            GeometryReader { geo in
+                ZStack(alignment: .bottomLeading) {
+                    if let banner = vm.user?.bannerImage {
+                        CachedAsyncImage(urlString: banner)
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: geo.size.width, height: 140)
+                            .clipped()
+                    } else {
+                        Color.accentColor.opacity(0.1)
+                            .frame(width: geo.size.width, height: 120)
+                    }
 
-                // Avatar
-                if let url = vm.user?.avatarURL ?? avatarURL {
-                    CachedAsyncImage(urlString: url)
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                        #if os(iOS)
-                        .overlay(Circle().strokeBorder(Color(UIColor.systemBackground), lineWidth: 3))
-                        #else
-                        .overlay(Circle().strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: 3))
-                        #endif
-                        .shadow(radius: 2)
-                        .offset(x: 20, y: 30)
+                    // Avatar
+                    if let url = vm.user?.avatarURL ?? avatarURL {
+                        CachedAsyncImage(urlString: url)
+                            .frame(width: 80, height: 80)
+                            .clipShape(Circle())
+                            #if os(iOS)
+                            .overlay(Circle().strokeBorder(Color(UIColor.systemBackground), lineWidth: 3))
+                            #else
+                            .overlay(Circle().strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: 3))
+                            #endif
+                            .shadow(radius: 2)
+                            .offset(x: 20, y: 30)
+                    }
                 }
             }
+            .frame(height: vm.user?.bannerImage != nil ? 170 : 150)
             .padding(.bottom, 30) // Space for the offset avatar
             
             HStack(alignment: .center, spacing: 10) {
-                // Username (pushed right by avatar width + leading padding)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(vm.user?.name ?? username)
-                        .font(.title3.weight(.bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                .padding(.leading, 105) // 20 (offset) + 80 (width) + 5 (extra spacing)
-                .layoutPriority(0)
-                
-                Spacer(minLength: 8)
-                
+                // Spacer that matches avatar overlap (20 offset + 80 width + 5 gap)
+                Spacer()
+                    .frame(width: 105)
+
+                Text(vm.user?.name ?? username)
+                    .font(.title3.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                 // Follow Button
                 if !isOwnProfile && (anilistAuth.isLoggedIn || malAuth.isLoggedIn) {
                     Button {
@@ -162,10 +164,10 @@ struct ProfileView: View {
                             .clipShape(Capsule())
                     }
                     .fixedSize(horizontal: true, vertical: false)
-                    .padding(.trailing, 16)
                     .layoutPriority(1)
                 }
             }
+            .padding(.horizontal, 16)
             .padding(.top, 4)
             .frame(maxWidth: .infinity)
 

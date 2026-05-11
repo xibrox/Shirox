@@ -71,6 +71,19 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    func delete(entry: LibraryEntry) async {
+        allEntries.removeAll { $0.media.uniqueId == entry.media.uniqueId }
+        applyFilter()
+        do {
+            try await ProviderManager.shared.call { try await $0.deleteEntry(entryId: entry.id) }
+            cacheValid = false
+        } catch {
+            self.error = error.localizedDescription
+            cacheValid = false
+            await load()
+        }
+    }
+
     // MARK: - Private
 
     private func fetch() async {

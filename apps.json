@@ -2,8 +2,8 @@
   "name": "Shirox",
   "identifier": "com.shirox.altstore",
   "sourceURL": "https://raw.githubusercontent.com/xibrox/Shirox/main/apps.json",
-  "subtitle": "Anime streaming app for iOS",
-  "description": "Shirox is a free, open-source anime streaming app for iOS 17+.\n\nBrowse and watch anime using community-built modules. AniList integration for tracking and discovery.",
+  "subtitle": "Personal anime library manager for iOS",
+  "description": "Shirox is a free, open-source personal anime library manager for iOS 17+.\n\nOrganize and track your anime collection using community-built modules. AniList integration for library management and discovery.",
   "website": "https://github.com/xibrox/Shirox",
   "featuredApps": [
     "com.shirox.app"
@@ -13,8 +13,8 @@
       "name": "Shirox",
       "bundleIdentifier": "com.shirox.app",
       "developerName": "xibrox",
-      "subtitle": "Open-source anime streaming for iOS",
-      "localizedDescription": "Shirox is a free, open-source anime streaming app for iOS 17+.\n\n• Browse anime powered by community modules\n• AniList integration for discovery and tracking\n• Continue Watching — pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
+      "subtitle": "Personal anime library manager for iOS",
+      "localizedDescription": "Shirox is a free, open-source personal anime library manager for iOS 17+.\n\n• Organize your anime collection with community-built modules\n• AniList integration for library management and discovery\n• Continue Watching — pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
       "iconURL": "https://raw.githubusercontent.com/xibrox/Shirox/main/Shirox/shirox-icon.icon/Assets/白-shiro.png",
       "tintColor": "ef4444",
       "category": "entertainment",

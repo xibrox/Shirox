@@ -242,9 +242,18 @@ struct AniListDetailView: View {
         #endif
         .sheet(isPresented: $showLibraryEdit) {
             if let media = vm.media {
-                LibraryEntryEditSheet(entry: existingEntry, media: media) { status, progress, score in
-                    handleLibraryEdit(media: media, status: status, progress: progress, score: score)
-                }
+                LibraryEntryEditSheet(
+                    entry: existingEntry,
+                    media: media,
+                    onSave: { status, progress, score in
+                        handleLibraryEdit(media: media, status: status, progress: progress, score: score)
+                    },
+                    onDelete: existingEntry != nil ? {
+                        let entryId = existingEntry!.id
+                        existingEntry = nil
+                        Task { try? await ProviderManager.shared.call { try await $0.deleteEntry(entryId: entryId) } }
+                    } : nil
+                )
                 #if os(iOS)
                 .presentationDetents([.medium, .large])
 

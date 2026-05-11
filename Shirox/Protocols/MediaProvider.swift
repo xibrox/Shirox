@@ -80,6 +80,7 @@ protocol MediaProvider: AnyObject {
     func fetchLibrary() async throws -> [LibraryEntry]
     func fetchEntry(mediaId: Int) async throws -> LibraryEntry?
     func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double) async throws
+    func deleteEntry(entryId: Int) async throws
 
     // Profile
     func fetchCurrentUser() async throws -> UserProfile

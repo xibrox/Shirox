@@ -67,6 +67,10 @@ final class MALProvider: MediaProvider {
                                                         progress: progress, score: score)
     }
 
+    func deleteEntry(entryId: Int) async throws {
+        try await MALLibraryService.shared.deleteEntry(malId: entryId)
+    }
+
     // MARK: - Profile
 
     func fetchCurrentUser() async throws -> UserProfile {

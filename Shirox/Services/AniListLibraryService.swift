@@ -173,6 +173,19 @@ final class AniListLibraryService {
         _ = try await post(query: mutation, variables: variables)
     }
 
+    // MARK: - Delete entry
+
+    func deleteEntry(entryId: Int) async throws {
+        let mutation = """
+        mutation ($id: Int) {
+          DeleteMediaListEntry(id: $id) {
+            deleted
+          }
+        }
+        """
+        _ = try await post(query: mutation, variables: ["id": entryId])
+    }
+
     // MARK: - Private
 
     private func post(query: String, variables: [String: Any]) async throws -> Data {

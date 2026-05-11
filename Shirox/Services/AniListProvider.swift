@@ -74,6 +74,10 @@ final class AniListProvider: MediaProvider {
                                                            progress: progress, score: score)
     }
 
+    func deleteEntry(entryId: Int) async throws {
+        try await AniListLibraryService.shared.deleteEntry(entryId: entryId)
+    }
+
     // MARK: - Profile
 
     func fetchCurrentUser() async throws -> UserProfile {

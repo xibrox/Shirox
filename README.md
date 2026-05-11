@@ -1,10 +1,10 @@
 # Shirox
 
-Shirox is a free, open-source anime streaming application for iOS 17+, designed with a focus on modern aesthetics.
+Shirox is a free, open-source personal anime library manager for iOS 17+, designed with a focus on modern aesthetics.
 
 ## Features
 
--   **Community Modules**: Browse and watch content powered by modular, community-built source providers.
+-   **Community Modules**: Organize and manage your anime collection powered by modular, community-built content providers.
 -   **AniList Integration**: Seamlessly sync your watch history, discover new titles, and manage your lists with AniList integration.
 -   **Enhanced Social**: Explore user profiles, activity feeds, and interact with the community (Likes, Replies, Follows).
 -   **Continue Watching**: Automatically track your progress and pick up right where you left off.
