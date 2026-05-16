@@ -20,6 +20,8 @@ struct PlayerBottomBar: View {
     var audioTrackCount: Int = 0
     var streamCount: Int = 1
     var onStreamPickerTap: () -> Void = {}
+    var qualityCount: Int = 0
+    var onQualityTap: () -> Void = {}
     var bottomPadding: CGFloat = 24
     var onNextEpisodeTap: (() -> Void)? = nil
     var episodeNumber: Int? = nil
@@ -105,6 +107,15 @@ struct PlayerBottomBar: View {
             if streamCount > 1 {
                 Button(action: onStreamPickerTap) {
                     Image(systemName: "list.bullet")
+                        .font(.system(size: iconSize, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: buttonWidth, height: height)
+                }
+                .buttonStyle(.plain)
+            }
+            if qualityCount > 1 {
+                Button(action: onQualityTap) {
+                    Image(systemName: "4k.tv")
                         .font(.system(size: iconSize, weight: .medium))
                         .foregroundStyle(.white)
                         .frame(width: buttonWidth, height: height)

@@ -126,6 +126,10 @@
 		AA000001000000000000AA32 /* CastOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB16 /* CastOverlayView.swift */; };
 		AA000001000000000000AA50 /* HLSProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB50 /* HLSProxyServer.swift */; };
 		AA000001000000000000AA51 /* HLSProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB50 /* HLSProxyServer.swift */; };
+		AA000001000000000000AC27 /* HLSQualityParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC14 /* HLSQualityParser.swift */; };
+		AA000001000000000000AC28 /* HLSQualityParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC14 /* HLSQualityParser.swift */; };
+		AA000001000000000000AC29 /* PlayerQualityPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC15 /* PlayerQualityPicker.swift */; };
+		AA000001000000000000AC30 /* PlayerQualityPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BC15 /* PlayerQualityPicker.swift */; };
 		AA000001000000000000AA52 /* CastProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB52 /* CastProxyServer.swift */; };
 		AA000001000000000000AA53 /* CastProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB52 /* CastProxyServer.swift */; };
 		AA000001000000000000AA60 /* LibraryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB60 /* LibraryEntry.swift */; };
@@ -280,6 +284,8 @@
 		AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNextEpisodePicker.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB16 /* CastOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastOverlayView.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB50 /* HLSProxyServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSProxyServer.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC14 /* HLSQualityParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSQualityParser.swift; sourceTree = "<group>"; };
+		AA000001000000000000BC15 /* PlayerQualityPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerQualityPicker.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB52 /* CastProxyServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastProxyServer.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB60 /* LibraryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEntry.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB62 /* AniListAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListAuthManager.swift; sourceTree = "<group>"; };
@@ -468,6 +474,7 @@
 				AA000001000000000000BB01 /* SubtitleSettingsManager.swift */,
 				AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */,
 				AA000001000000000000BB50 /* HLSProxyServer.swift */,
+				AA000001000000000000BC14 /* HLSQualityParser.swift */,
 				AA000001000000000000BB52 /* CastProxyServer.swift */,
 				AA000001000000000000BB62 /* AniListAuthManager.swift */,
 				AA000001000000000000BB64 /* AniListLibraryService.swift */,
@@ -566,6 +573,7 @@
 				AA000001000000000000BB12 /* PlayerTopBar.swift */,
 				AA000001000000000000BB13 /* PlayerVolumeSlider.swift */,
 				AA000001000000000000BB15 /* PlayerNextEpisodePicker.swift */,
+				AA000001000000000000BC15 /* PlayerQualityPicker.swift */,
 				200571D6C0BE4034A5875303 /* PlayerSequelPickerSheet.swift */,
 				AA000001000000000000BB16 /* CastOverlayView.swift */,
 			);
@@ -831,6 +839,7 @@
 				AA000001000000000000AA02 /* SubtitleSettingsManager.swift in Sources */,
 				AA000001000000000000AA04 /* VTTSubtitlesLoader.swift in Sources */,
 				AA000001000000000000AA51 /* HLSProxyServer.swift in Sources */,
+				AA000001000000000000AC27 /* HLSQualityParser.swift in Sources */,
 				AA000001000000000000AA52 /* CastProxyServer.swift in Sources */,
 				AA000001000000000000AA61 /* LibraryEntry.swift in Sources */,
 				AA000001000000000000AA63 /* AniListAuthManager.swift in Sources */,
@@ -850,6 +859,7 @@
 				AA000001000000000000AA24 /* PlayerTopBar.swift in Sources */,
 				AA000001000000000000AA26 /* PlayerVolumeSlider.swift in Sources */,
 				AA000001000000000000AA30 /* PlayerNextEpisodePicker.swift in Sources */,
+				AA000001000000000000AC29 /* PlayerQualityPicker.swift in Sources */,
 				7D58CE4C204544BC8F895CB0 /* PlayerSequelPickerSheet.swift in Sources */,
 				AA000001000000000000AA31 /* CastOverlayView.swift in Sources */,
 				1C6D1244BDD3462C8E0CBCD4 /* ContinueWatchingItem.swift in Sources */,
@@ -939,6 +949,7 @@
 				AA000001000000000000AA01 /* SubtitleSettingsManager.swift in Sources */,
 				AA000001000000000000AA03 /* VTTSubtitlesLoader.swift in Sources */,
 				AA000001000000000000AA50 /* HLSProxyServer.swift in Sources */,
+				AA000001000000000000AC28 /* HLSQualityParser.swift in Sources */,
 				AA000001000000000000AA53 /* CastProxyServer.swift in Sources */,
 				AA000001000000000000AA60 /* LibraryEntry.swift in Sources */,
 				AA000001000000000000AA62 /* AniListAuthManager.swift in Sources */,
@@ -958,6 +969,7 @@
 				AA000001000000000000AA23 /* PlayerTopBar.swift in Sources */,
 				AA000001000000000000AA25 /* PlayerVolumeSlider.swift in Sources */,
 				AA000001000000000000AA29 /* PlayerNextEpisodePicker.swift in Sources */,
+				AA000001000000000000AC30 /* PlayerQualityPicker.swift in Sources */,
 				5D6EF31EAB9B4193B5DA08E6 /* PlayerSequelPickerSheet.swift in Sources */,
 				AA000001000000000000AA32 /* CastOverlayView.swift in Sources */,
 				1C7242C86CDC40F6956D4F05 /* ContinueWatchingItem.swift in Sources */,
