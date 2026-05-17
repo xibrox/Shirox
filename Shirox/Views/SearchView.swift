@@ -66,7 +66,7 @@ struct SearchView: View {
         #if os(iOS)
         .toolbarRole(.navigationStack)
         #endif
-        .sheet(isPresented: $showModuleList) {
+        .adaptiveSheet(isPresented: $showModuleList) {
             ModuleListView()
                 .environmentObject(moduleManager)
                 .tint(.primary)
@@ -179,6 +179,7 @@ struct SearchView: View {
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
+                        .tint(.red)
                     }
                 }
             } header: {

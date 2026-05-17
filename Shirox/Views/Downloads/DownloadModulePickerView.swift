@@ -42,7 +42,7 @@ struct DownloadModulePickerView: View {
                     Button("Cancel") { onDismiss() }
                 }
             }
-            .sheet(item: $streamPickerItem, onDismiss: {
+            .adaptiveSheet(item: $streamPickerItem, onDismiss: {
                 guard let stream = chosenStream, let pickerItem = chosenPickerItem else { return }
                 chosenStream = nil
                 chosenPickerItem = nil
@@ -58,7 +58,7 @@ struct DownloadModulePickerView: View {
             }
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 
@@ -104,11 +104,14 @@ private struct DownloadModuleRow: View {
         .onAppear {
             rowVm.startFind()
         }
+        .onDisappear {
+            rowVm.cancelIfSearching()
+        }
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
             onStreamsLoaded(streams, rowVm.selectedEpisodeHref)
         }
-        .sheet(isPresented: $showAllResults) {
+        .adaptiveSheet(isPresented: $showAllResults) {
             if case .searchResults(let items) = rowVm.state {
                 SearchResultsPickerSheet(items: items, module: module) { item in
                     showAllResults = false
@@ -187,7 +190,7 @@ private struct DownloadModuleRow: View {
                         .font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 10) {
+                    LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
                             Button { rowVm.startSelectResult(item, targetEpisodeNumber: episodeNumber) } label: {
                                 SearchResultCard(item: item)
@@ -269,7 +272,14 @@ private final class DownloadModuleRowViewModel: ObservableObject {
 
     func cancel() { currentTask?.cancel(); currentTask = nil; state = .idle }
 
-    func startFind() { persistAlias(); currentTask = Task { await find() } }
+    func cancelIfSearching() {
+        switch state {
+        case .idle, .searchResults, .selectingEpisode, .notFound, .error: break
+        default: currentTask?.cancel(); currentTask = nil; state = .idle
+        }
+    }
+
+    func startFind() { guard case .idle = state else { return }; persistAlias(); currentTask = Task { await find() } }
     func startSelectResult(_ item: SearchItem, targetEpisodeNumber: Int) {
         persistAlias()
         currentTask = Task { await selectResult(item, targetEpisodeNumber: targetEpisodeNumber) }
@@ -418,7 +428,7 @@ private struct SearchResultsPickerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 

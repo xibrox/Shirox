@@ -310,7 +310,7 @@ struct PlayerView: View {
                 set: { playbackSpeed = Double($0) }
             ))
             #if os(iOS)
-            .presentationDetents([.height(320)])
+            .adaptivePresentationDetents([.height(320)])
             #endif
         }
         .sheet(isPresented: $showSubtitleSettings) {
@@ -321,7 +321,7 @@ struct PlayerView: View {
             )
             .id(subtitleTracks?.count ?? 0)
             #if os(iOS)
-            .presentationDetents([.medium, .large])
+            .adaptivePresentationDetents([.medium, .large])
             #endif
         }
         .onChange(of: selectedSubtitleTrack) { _, _ in loadSubtitles() }
@@ -330,7 +330,7 @@ struct PlayerView: View {
             let sheetHeight = CGFloat(60 + 56 * max(1, optionCount))
             audioPickerSheet
                 #if os(iOS)
-                .presentationDetents([.height(sheetHeight)])
+                .adaptivePresentationDetents([.height(sheetHeight)])
                 #endif
         }
         .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
@@ -341,7 +341,7 @@ struct PlayerView: View {
                 swapStream(selected, episodeNumber: nextEpisodeNumber)
             }
             #if os(iOS)
-            .presentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
+            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
             #endif
         }
         .sheet(isPresented: $showSequelPicker, onDismiss: {
@@ -352,7 +352,7 @@ struct PlayerView: View {
                 advanceToSequel(selected)
             }
             #if os(iOS)
-            .presentationDetents([.medium])
+            .adaptivePresentationDetents([.medium])
             #endif
         }
         .sheet(isPresented: $showQualityPicker) {
@@ -362,7 +362,7 @@ struct PlayerView: View {
                 onSelect: selectQuality
             )
             #if os(iOS)
-            .presentationDetents([.height(CGFloat(60 + 56 * max(2, hlsQualities.count + 1)))])
+            .adaptivePresentationDetents([.height(CGFloat(120 + 56 * (hlsQualities.count + 1)))])
             #endif
         }
         .sheet(isPresented: $showInPlayerStreamPicker) {
@@ -370,7 +370,7 @@ struct PlayerView: View {
                 switchQuality(selected)
             }
             #if os(iOS)
-            .presentationDetents([.height(CGFloat(60 + 56 * max(1, availableStreams.count)))])
+            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, availableStreams.count)))])
             #endif
         }
         .focusable()

@@ -92,7 +92,7 @@ struct ProfileSocialView: View {
         .listStyle(.plain)
         .refreshable { await vm.loadSocial(userId: userId, type: selectedSocial) }
         .task { await vm.loadSocial(userId: userId, type: selectedSocial) }
-        .sheet(item: $targetUserId) { uid in
+        .adaptiveSheet(item: $targetUserId) { uid in
             ProfileView(userId: uid, username: targetUsername ?? "Profile", avatarURL: nil)
         }
     }

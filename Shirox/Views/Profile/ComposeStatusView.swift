@@ -39,7 +39,7 @@ struct ComposeStatusView: View {
             }
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 

@@ -380,11 +380,11 @@ struct DownloadedMediaDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showLibraryEdit) {
+        .adaptiveSheet(isPresented: $showLibraryEdit) {
             LibraryEntryEditSheet(entry: existingEntry, media: mediaForSheet) { status, progress, score in
                 handleLibraryEdit(media: mediaForSheet, status: status, progress: progress, score: score)
             }
-            .presentationDetents([.medium, .large])
+            .adaptivePresentationDetents([.medium, .large])
         }
         .alert("Reset Progress", isPresented: $showResetConfirmation) {
             Button("Reset", role: .destructive) {

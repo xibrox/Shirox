@@ -52,7 +52,7 @@ struct ModuleStreamPickerView: View {
             .tint(.primary)
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 
@@ -112,7 +112,19 @@ private final class ModuleStreamRowViewModel: ObservableObject {
         state = .idle
     }
 
+    func cancelIfSearching() {
+        switch state {
+        case .loading, .loadingEpisodes, .loadingStreams:
+            currentTask?.cancel()
+            currentTask = nil
+            state = .idle
+        default:
+            break
+        }
+    }
+
     func startFind() {
+        guard case .idle = state else { return }
         persistSearchTitle()
         let lastUsed = UserDefaults.standard.string(forKey: "lastUsedModuleId")
         let isPreferred = lastUsed != nil ? lastUsed == module.id : ModuleManager.shared.activeModule?.id == module.id
@@ -365,6 +377,9 @@ private struct ModuleStreamRow: View {
         .onAppear {
             rowVm.startFind()
         }
+        .onDisappear {
+            rowVm.cancelIfSearching()
+        }
         .onChange(of: rowVm.readyStreams) { _, streams in
             guard let streams else { return }
             if streams.count == 1 {
@@ -378,7 +393,7 @@ private struct ModuleStreamRow: View {
                 showStreamPicker = true
             }
         }
-        .sheet(isPresented: $showStreamPicker) {
+        .adaptiveSheet(isPresented: $showStreamPicker) {
             if let streams = rowVm.readyStreams {
                 ModuleStreamSelectionView(
                     streams: streams,
@@ -395,7 +410,7 @@ private struct ModuleStreamRow: View {
                 )
             }
         }
-        .sheet(isPresented: $showAllResults) {
+        .adaptiveSheet(isPresented: $showAllResults) {
             if case .searchResults(let items) = rowVm.state {
                 SearchResultsPickerSheet(items: items, module: module) { item in
                     showAllResults = false
@@ -496,7 +511,7 @@ private struct ModuleStreamRow: View {
                         .foregroundStyle(.primary)
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 10) {
+                    LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
                             Button {
                                 rowVm.startSelectResult(item, targetEpisodeNumber: episodeNumber)
@@ -650,7 +665,7 @@ private struct SearchResultsPickerSheet: View {
             #endif
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 
@@ -718,7 +733,7 @@ private struct ModuleStreamSelectionView: View {
             }
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 

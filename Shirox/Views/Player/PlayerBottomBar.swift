@@ -113,7 +113,7 @@ struct PlayerBottomBar: View {
                 }
                 .buttonStyle(.plain)
             }
-            if qualityCount > 1 {
+            if qualityCount >= 1 {
                 Button(action: onQualityTap) {
                     Image(systemName: "4k.tv")
                         .font(.system(size: iconSize, weight: .medium))

@@ -78,7 +78,7 @@ struct LikesSheetView: View {
             }
         }
         .task { await load() }
-        .sheet(item: $selectedUserId) { uid in
+        .adaptiveSheet(item: $selectedUserId) { uid in
             ProfileView(userId: uid, username: selectedUsername ?? "Profile", avatarURL: nil)
         }
     }

@@ -231,27 +231,33 @@ final class AniListProvider: MediaProvider {
         switch n {
         case .airing(let a):
             return ProviderNotification(id: a.id,
-                kind: .airing(episode: a.episode, mediaTitle: a.media?.displayTitle, mediaId: a.media?.id ?? 0),
+                kind: .airing(episode: a.episode, mediaTitle: a.media?.displayTitle,
+                              mediaId: a.media?.id ?? 0, coverImageURL: a.media?.coverImage?.large),
                 createdAt: a.createdAt)
         case .following(let f):
             return ProviderNotification(id: f.id,
-                kind: .following(userId: f.user?.id ?? 0, userName: f.user?.name),
+                kind: .following(userId: f.user?.id ?? 0, userName: f.user?.name,
+                                 avatarURL: f.user?.avatar?.large),
                 createdAt: f.createdAt)
         case .activityMessage(let n):
             return ProviderNotification(id: n.id,
-                kind: .activityMessage(activityId: n.activityId, context: n.context),
+                kind: .activityMessage(activityId: n.activityId, context: n.context,
+                                       avatarURL: n.user?.avatar?.large),
                 createdAt: n.createdAt)
         case .activityReply(let n), .activityReplySubscribed(let n):
             return ProviderNotification(id: n.id,
-                kind: .activityReply(activityId: n.activityId, context: n.context),
+                kind: .activityReply(activityId: n.activityId, context: n.context,
+                                     avatarURL: n.user?.avatar?.large),
                 createdAt: n.createdAt)
         case .activityMention(let n):
             return ProviderNotification(id: n.id,
-                kind: .activityMention(activityId: n.activityId, context: n.context),
+                kind: .activityMention(activityId: n.activityId, context: n.context,
+                                       avatarURL: n.user?.avatar?.large),
                 createdAt: n.createdAt)
         case .activityLike(let n), .activityReplyLike(let n):
             return ProviderNotification(id: n.id,
-                kind: .activityLike(activityId: n.activityId, context: n.context),
+                kind: .activityLike(activityId: n.activityId, context: n.context,
+                                    avatarURL: n.user?.avatar?.large),
                 createdAt: n.createdAt)
         case .mediaDataChange(let n), .mediaMerge(let n), .mediaAddition(let n):
             return ProviderNotification(id: n.id,

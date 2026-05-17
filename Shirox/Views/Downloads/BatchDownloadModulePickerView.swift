@@ -45,7 +45,7 @@ struct BatchDownloadModulePickerView: View {
                     Button("Done") { onDismiss() }
                 }
             }
-            .sheet(item: $streamPickerItem, onDismiss: {
+            .adaptiveSheet(item: $streamPickerItem, onDismiss: {
                 guard let streamTitle = chosenStreamTitle, let pickerItem = chosenPickerItem else { return }
                 chosenStreamTitle = nil
                 chosenPickerItem = nil
@@ -89,7 +89,7 @@ struct BatchDownloadModulePickerView: View {
             }
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 
@@ -239,7 +239,7 @@ private struct BatchDownloadModuleRow: View {
             guard let streams, let item = rowVm.readySearchItem else { return }
             onStreamsForPicker(streams, item)
         }
-        .sheet(isPresented: $showAllResults) {
+        .adaptiveSheet(isPresented: $showAllResults) {
             if case .searchResults(let items) = rowVm.state {
                 BatchSearchResultsPickerSheet(items: items, module: module, episodeCount: episodeNumbers.count) { item in
                     showAllResults = false
@@ -443,7 +443,7 @@ private struct BatchSearchResultsPickerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 

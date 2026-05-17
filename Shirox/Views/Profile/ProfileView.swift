@@ -149,20 +149,28 @@ struct ProfileView: View {
                     .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Follow Button
-                if !isOwnProfile && (anilistAuth.isLoggedIn || malAuth.isLoggedIn) {
+                // Follow Button (AniList only)
+                if !isOwnProfile && activeProviderType == .anilist && anilistAuth.isLoggedIn {
                     Button {
                         Task { await vm.toggleFollow(userId: userId) }
                     } label: {
-                        Text(vm.user?.isFollowing == true ? "Following" : "Follow")
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(vm.user?.isFollowing == true ? Color.primary.opacity(0.1) : Color.accentColor)
-                            .foregroundStyle(vm.user?.isFollowing == true ? Color.primary : Color.white)
-                            .clipShape(Capsule())
+                        Group {
+                            if vm.isTogglingFollow {
+                                ProgressView().tint(.white).scaleEffect(0.75)
+                            } else {
+                                Text(vm.user?.isFollowing == true ? "Following" : "Follow")
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .frame(minWidth: 90)
+                        .background(vm.user?.isFollowing == true ? Color.primary.opacity(0.1) : Color.accentColor)
+                        .foregroundStyle(vm.user?.isFollowing == true ? Color.primary : Color.white)
+                        .clipShape(Capsule())
                     }
+                    .disabled(vm.isTogglingFollow)
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
                 }

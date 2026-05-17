@@ -29,7 +29,7 @@ struct ProfileFavouritesView: View {
                 ContentUnavailableView("No Favourites", systemImage: "heart.slash")
             }
         }
-        .sheet(item: $targetMediaId) { mid in
+        .adaptiveSheet(item: $targetMediaId) { mid in
             AniListDetailView(mediaId: mid)
         }
     }

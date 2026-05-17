@@ -73,7 +73,7 @@ struct NotificationsView: View {
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 
@@ -138,14 +138,50 @@ struct NotificationsView: View {
 
     // MARK: - Row
 
-    private func notificationRow(_ notif: ProviderNotification) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            let (symbol, color) = iconFor(notif)
+    @ViewBuilder
+    private func notificationIcon(_ notif: ProviderNotification) -> some View {
+        let (symbol, color) = iconFor(notif)
+        if let iconImage = notif.kind.iconImage {
+            switch iconImage {
+            case .avatar(let url):
+                ZStack(alignment: .bottomTrailing) {
+                    CachedAsyncImage(urlString: url)
+                        .frame(width: 36, height: 36)
+                        .clipShape(Circle())
+                    Image(systemName: symbol)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 15, height: 15)
+                        .background(Circle().fill(color))
+                        .offset(x: 3, y: 3)
+                }
+                .frame(width: 40, height: 40)
+            case .cover(let url):
+                ZStack(alignment: .bottomTrailing) {
+                    CachedAsyncImage(urlString: url)
+                        .frame(width: 30, height: 42)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                    Image(systemName: symbol)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 15, height: 15)
+                        .background(Circle().fill(color))
+                        .offset(x: 3, y: 3)
+                }
+                .frame(width: 34, height: 46)
+            }
+        } else {
             Image(systemName: symbol)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
                 .frame(width: 26, height: 26)
                 .background(Circle().fill(color))
+        }
+    }
+
+    private func notificationRow(_ notif: ProviderNotification) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            notificationIcon(notif)
 
             VStack(alignment: .leading, spacing: 3) {
                 bodyText(for: notif)
@@ -172,12 +208,12 @@ struct NotificationsView: View {
     @ViewBuilder
     private func bodyText(for notif: ProviderNotification) -> some View {
         switch notif.kind {
-        case .airing(let episode, let mediaTitle, _):
+        case .airing(let episode, let mediaTitle, _, _):
             Text("\(mediaTitle ?? "Anime") ").bold() + Text("episode \(episode) aired")
-        case .following(_, let userName):
+        case .following(_, let userName, _):
             Text(userName ?? "Someone").bold() + Text(" followed you")
-        case .activityMessage(_, let context), .activityReply(_, let context),
-             .activityMention(_, let context), .activityLike(_, let context):
+        case .activityMessage(_, let context, _), .activityReply(_, let context, _),
+             .activityMention(_, let context, _), .activityLike(_, let context, _):
             Text("Activity ") + Text(context ?? "")
         case .mediaChange(let context):
             Text(context ?? "A title was updated")
@@ -197,10 +233,10 @@ struct NotificationsView: View {
 
     private func handleTap(_ notif: ProviderNotification) {
         switch notif.kind {
-        case .airing(_, _, let mediaId):
+        case .airing(_, _, let mediaId, _):
             navMedia = MediaNavItem(id: mediaId)
-        case .activityMessage(let activityId, _), .activityReply(let activityId, _),
-             .activityMention(let activityId, _), .activityLike(let activityId, _):
+        case .activityMessage(let activityId, _, _), .activityReply(let activityId, _, _),
+             .activityMention(let activityId, _, _), .activityLike(let activityId, _, _):
             if let id = activityId { navActivity = ActivityNavItem(id: id) }
         default:
             break

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PlayerSubtitleSettingsView: View {
     @ObservedObject var settings: SubtitleSettingsManager
+    var availableTracks: [SubtitleTrack]?
+    @Binding var selectedTrack: SubtitleTrack?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -9,6 +11,20 @@ struct PlayerSubtitleSettingsView: View {
             Form {
                 Section {
                     Toggle("Show Subtitles", isOn: $settings.enabled)
+                        .tint(.secondary)
+                }
+
+                if let tracks = availableTracks, !tracks.isEmpty {
+                    Section("Subtitle Track") {
+                        trackRow(title: "Default", isActive: selectedTrack == nil) {
+                            selectedTrack = nil
+                        }
+                        ForEach(tracks) { track in
+                            trackRow(title: track.title, isActive: selectedTrack?.id == track.id) {
+                                selectedTrack = track
+                            }
+                        }
+                    }
                 }
 
                 Section("Appearance") {
@@ -35,6 +51,7 @@ struct PlayerSubtitleSettingsView: View {
                     }
 
                     Toggle("Background", isOn: $settings.backgroundEnabled)
+                        .tint(.secondary)
                 }
 
                 Section("Position") {
@@ -70,9 +87,23 @@ struct PlayerSubtitleSettingsView: View {
             .navigationTitle("Subtitle Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func trackRow(title: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if isActive {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(Color.accentColor)
+                        .fontWeight(.semibold)
                 }
             }
         }

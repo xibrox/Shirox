@@ -12,9 +12,17 @@ enum HLSQualityParser {
         var request = URLRequest(url: url, timeoutInterval: 10)
         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
 
-        guard let (data, _) = try? await URLSession.shared.data(for: request),
-              let text = String(data: data, encoding: .utf8),
-              text.contains("#EXT-X-STREAM-INF") else { return [] }
+        guard let (data, response) = try? await URLSession.shared.data(for: request) else {
+            Logger.shared.log("[HLSQuality] Fetch failed for \(url.absoluteString)", type: "Error")
+            return []
+        }
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard let text = String(data: data, encoding: .utf8) else {
+            Logger.shared.log("[HLSQuality] Could not decode response (status=\(statusCode)) for \(url.absoluteString)", type: "Error")
+            return []
+        }
+        Logger.shared.log("[HLSQuality] Fetched \(data.count) bytes status=\(statusCode) isMaster=\(text.contains("#EXT-X-STREAM-INF")) url=\(url.absoluteString)", type: "Stream")
+        guard text.contains("#EXT-X-STREAM-INF") else { return [] }
 
         var levels: [HLSQualityLevel] = []
         let lines = text.components(separatedBy: "\n")
@@ -53,6 +61,8 @@ enum HLSQualityParser {
             }
         }
 
-        return seen.values.sorted { $0.bandwidth > $1.bandwidth }
+        let result = seen.values.sorted { $0.bandwidth > $1.bandwidth }
+        Logger.shared.log("[HLSQuality] Parsed \(result.count) quality levels: \(result.map { "\($0.label)@\($0.bandwidth)" })", type: "Stream")
+        return result
     }
 }

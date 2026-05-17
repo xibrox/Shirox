@@ -65,7 +65,7 @@ struct StreamPickerView: View {
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 320)
         #else
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
         #endif
     }
 

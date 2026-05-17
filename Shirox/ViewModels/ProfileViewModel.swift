@@ -8,6 +8,7 @@ final class ProfileViewModel: ObservableObject {
     private var currentActivityPage = 1
 
     @Published var notifications: [ProviderNotification] = []
+    private var allNotifications: [ProviderNotification] = []
     @Published var followers: [UserProfile] = []
     @Published var hasNextFollowersPage = false
     private var currentFollowersPage = 1
@@ -57,13 +58,34 @@ final class ProfileViewModel: ObservableObject {
     }
 
     func loadNotifications(filter: AniListNotificationFilter? = nil) async {
+        let filterOnly = filter != nil && !allNotifications.isEmpty
         if let filter { notificationFilter = filter }
+        if filterOnly {
+            notifications = applyNotificationFilter(allNotifications)
+            return
+        }
         isLoadingNotifications = true
         defer { isLoadingNotifications = false }
         do {
-            notifications = try await ProviderManager.shared.call { try await $0.fetchNotifications() }
+            allNotifications = try await ProviderManager.shared.call { try await $0.fetchNotifications() }
+            notifications = applyNotificationFilter(allNotifications)
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    private func applyNotificationFilter(_ all: [ProviderNotification]) -> [ProviderNotification] {
+        switch notificationFilter {
+        case .all: return all
+        case .airing: return all.filter { if case .airing = $0.kind { return true }; return false }
+        case .follows: return all.filter { if case .following = $0.kind { return true }; return false }
+        case .activity: return all.filter {
+            switch $0.kind {
+            case .activityMessage, .activityReply, .activityMention, .activityLike: return true
+            default: return false
+            }
+        }
+        case .media: return all.filter { if case .mediaChange = $0.kind { return true }; return false }
         }
     }
 

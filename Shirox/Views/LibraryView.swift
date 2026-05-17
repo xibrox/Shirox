@@ -441,7 +441,7 @@ struct LibraryView: View {
         }
         .navigationTitle("Library")
         .searchable(text: $searchText, prompt: "Search library")
-        .sheet(item: $selectedEntry) { entry in
+        .adaptiveSheet(item: $selectedEntry) { entry in
             LibraryEntryEditSheet(
                 entry: entry,
                 media: entry.media,
@@ -458,7 +458,7 @@ struct LibraryView: View {
                 }
             )
         }
-        .sheet(isPresented: $showProfile) {
+        .adaptiveSheet(isPresented: $showProfile) {
             if let uid = anilistAuth.userId, let username = anilistAuth.username {
                 ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL)
             }
@@ -467,7 +467,7 @@ struct LibraryView: View {
             Button("Log Out", role: .destructive) { malAuth.logout() }
             Button("Cancel", role: .cancel) { }
         }
-        .sheet(isPresented: $showNotifications) {
+        .adaptiveSheet(isPresented: $showNotifications) {
             NotificationsView(vm: profileVM)
         }
     }

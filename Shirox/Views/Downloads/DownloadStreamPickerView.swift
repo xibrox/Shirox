@@ -27,7 +27,7 @@ struct DownloadStreamPickerView: View {
             .tint(.primary)
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 

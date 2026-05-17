@@ -155,7 +155,7 @@ struct DetailView: View {
             vm.loadStreams(for: episode)
         }
         .tint(.primary)
-        .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
+        .adaptiveSheet(isPresented: $vm.showStreamPicker, onDismiss: {
             if let stream = vm.pendingStream {
                 vm.pendingStream = nil
                 let s = stream
@@ -167,17 +167,17 @@ struct DetailView: View {
             StreamPickerView(vm: vm)
         }
         #if os(iOS)
-        .sheet(isPresented: $vm.showDownloadStreamPicker) {
+        .adaptiveSheet(isPresented: $vm.showDownloadStreamPicker) {
             DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
                 vm.downloadWithSelectedStream(stream)
             }
         }
         #endif
-        .sheet(isPresented: $showLibraryEdit) {
+        .adaptiveSheet(isPresented: $showLibraryEdit) {
             libraryEditSheet
         }
         #if os(iOS)
-        .sheet(isPresented: $showBatchDownloadPicker) {
+        .adaptiveSheet(isPresented: $showBatchDownloadPicker) {
             if let detail = vm.detail {
                 BatchDownloadStreamPickerView(
                     mediaTitle: item.title,
@@ -194,7 +194,7 @@ struct DetailView: View {
             }
         }
         #endif
-        .sheet(isPresented: $showMatchingSearch) {
+        .adaptiveSheet(isPresented: $showMatchingSearch) {
             AniListMatchingSearchView(initialTitle: item.title, isLinked: vm.aniListID != nil) { matchedMedia in
                 if let media = matchedMedia {
                     vm.aniListID = media.id
@@ -559,7 +559,7 @@ struct DetailView: View {
                 } : nil
             )
             #if os(iOS)
-            .presentationDetents([.medium, .large])
+            .adaptivePresentationDetents([.medium, .large])
             #else
             .frame(minWidth: 480, minHeight: 360)
             #endif

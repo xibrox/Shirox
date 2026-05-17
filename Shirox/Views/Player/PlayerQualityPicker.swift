@@ -20,6 +20,8 @@ struct PlayerQualityPicker: View {
                             Image(systemName: "checkmark").foregroundStyle(.primary)
                         }
                     }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -35,6 +37,8 @@ struct PlayerQualityPicker: View {
                                 Image(systemName: "checkmark").foregroundStyle(.primary)
                             }
                         }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }

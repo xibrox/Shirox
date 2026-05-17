@@ -53,19 +53,19 @@ struct ProfileActivityView: View {
                 await vm.loadActivity(userId: userId, feed: initialFeed)
             }
         }
-        .sheet(item: $selectedActivity) { activity in
+        .adaptiveSheet(item: $selectedActivity) { activity in
             NavigationStack {
                 ActivityFetchView(activityId: activity.id)
             }
             .presentationDetents([.large])
         }
-        .sheet(isPresented: $showCompose) {
+        .adaptiveSheet(isPresented: $showCompose) {
             ComposeStatusView(profileVM: vm)
         }
-        .sheet(item: $targetUserId) { uid in
+        .adaptiveSheet(item: $targetUserId) { uid in
             ProfileView(userId: uid, username: targetUsername ?? "Profile", avatarURL: nil)
         }
-        .sheet(item: $targetMediaId) { mid in
+        .adaptiveSheet(item: $targetMediaId) { mid in
             AniListDetailView(mediaId: mid)
         }
         .overlay(alignment: .bottomTrailing) {

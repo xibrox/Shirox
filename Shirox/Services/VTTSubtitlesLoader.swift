@@ -29,7 +29,7 @@ enum VTTSubtitlesLoader {
 
     // MARK: Public entry point
 
-    static func load(from urlString: String) async throws -> [SubtitleCue] {
+    static func load(from urlString: String, headers: [String: String] = [:]) async throws -> [SubtitleCue] {
         guard let url = URL(string: urlString) else {
             throw LoadError.invalidURL
         }
@@ -42,6 +42,9 @@ enum VTTSubtitlesLoader {
         request.setValue("*/*", forHTTPHeaderField: "Accept")
         if let host = url.host {
             request.setValue("https://\(host)/", forHTTPHeaderField: "Referer")
+        }
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
         }
 
         let (data, _) = try await URLSession.shared.data(for: request)

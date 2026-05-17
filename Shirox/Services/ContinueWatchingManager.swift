@@ -232,9 +232,12 @@ import Foundation
             matchesShow($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
         })
 
-        // Leave CW alone if it's a real in-progress item, or a placeholder already past this episode
-        if let current, !current.streamUrl.isEmpty || current.episodeNumber > episodeNumber {
-            persist(); return
+        // Leave CW alone if the placeholder is already past this episode, or if there's an
+        // in-progress item for a DIFFERENT episode (don't disturb active progress on another ep).
+        // When the in-progress item IS this episode, proceed and replace it with the next placeholder.
+        if let current {
+            if current.episodeNumber > episodeNumber { persist(); return }
+            if !current.streamUrl.isEmpty && current.episodeNumber != episodeNumber { persist(); return }
         }
 
         removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)

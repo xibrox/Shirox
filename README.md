@@ -50,6 +50,10 @@ Contributions are welcome! Whether it's fixing bugs, adding new features, or imp
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+## Community
+
+Join the Discord server to get support, share modules, and chat with other users: [discord.gg/b9tZSuJj73](https://discord.com/invite/b9tZSuJj73)
+
 ## ⚖️ License
 
 Distributed under the MIT License. See `LICENSE` for more information.

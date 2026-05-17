@@ -157,7 +157,7 @@ struct AniListDetailView: View {
             autoPlayOnLoad = true
             vm.watchEpisode(resumeEpNum)
         }
-        .sheet(isPresented: $vm.showStreamPicker, onDismiss: {
+        .adaptiveSheet(isPresented: $vm.showStreamPicker, onDismiss: {
             if let stream = vm.pendingModuleStream {
                 vm.pendingModuleStream = nil
                 let s = stream
@@ -182,7 +182,7 @@ struct AniListDetailView: View {
                 .environmentObject(moduleManager)
             }
         }
-        .sheet(isPresented: $vm.showFinalStreamPicker, onDismiss: {
+        .adaptiveSheet(isPresented: $vm.showFinalStreamPicker, onDismiss: {
             if let stream = vm.pendingFinalStream {
                 vm.pendingFinalStream = nil
                 let s = stream
@@ -206,7 +206,7 @@ struct AniListDetailView: View {
             )
         }
         #if os(iOS)
-        .sheet(item: $pendingDownloadEpisodeNumber) { item in
+        .adaptiveSheet(item: $pendingDownloadEpisodeNumber) { item in
             let media = vm.media!
             DownloadModulePickerView(
                 mediaId: media.id,
@@ -223,7 +223,7 @@ struct AniListDetailView: View {
             )
             .environmentObject(moduleManager)
         }
-        .sheet(isPresented: $showBatchDownloadPicker) {
+        .adaptiveSheet(isPresented: $showBatchDownloadPicker) {
             if let media = vm.media {
                 BatchDownloadModulePickerView(
                     mediaId: media.id,
@@ -240,7 +240,7 @@ struct AniListDetailView: View {
             }
         }
         #endif
-        .sheet(isPresented: $showLibraryEdit) {
+        .adaptiveSheet(isPresented: $showLibraryEdit) {
             if let media = vm.media {
                 LibraryEntryEditSheet(
                     entry: existingEntry,
@@ -255,7 +255,7 @@ struct AniListDetailView: View {
                     } : nil
                 )
                 #if os(iOS)
-                .presentationDetents([.medium, .large])
+                .adaptivePresentationDetents([.medium, .large])
 
                 #else
 
@@ -1386,7 +1386,7 @@ struct AniListMatchingSearchView: View {
             }
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .adaptivePresentationDetents([.medium, .large])
 
         #else
 

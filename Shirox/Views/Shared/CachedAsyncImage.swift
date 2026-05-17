@@ -195,3 +195,13 @@ struct TVDBPosterImage: View {
             }
     }
 }
+
+extension View {
+    func adaptivePresentationDetents(_ detents: Set<PresentationDetent>) -> some View {
+        #if os(iOS)
+        self.presentationDetents(UIDevice.current.userInterfaceIdiom == .pad ? [.large] : detents)
+        #else
+        self.presentationDetents(detents)
+        #endif
+    }
+}

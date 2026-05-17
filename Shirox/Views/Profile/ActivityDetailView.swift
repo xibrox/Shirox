@@ -91,10 +91,10 @@ struct ActivityDetailView: View {
             async let full: () = loadFullActivity()
             _ = await (replies, likes, full)
         }
-        .sheet(item: $targetUserId) { uid in
+        .adaptiveSheet(item: $targetUserId) { uid in
             ProfileView(userId: uid, username: targetUsername ?? "Profile", avatarURL: nil)
         }
-        .sheet(item: $targetMediaId) { mid in
+        .adaptiveSheet(item: $targetMediaId) { mid in
             AniListDetailView(mediaId: mid)
         }
         #if os(iOS)
@@ -126,10 +126,10 @@ struct ActivityDetailView: View {
         } message: {
             Text("This cannot be undone.")
         }
-        .sheet(isPresented: $showActivityLikes) {
+        .adaptiveSheet(isPresented: $showActivityLikes) {
             LikesSheetView(id: activity.id, type: .activity)
                 #if os(iOS)
-                .presentationDetents([.medium, .large])
+                .adaptivePresentationDetents([.medium, .large])
 
                 #else
 
@@ -137,10 +137,10 @@ struct ActivityDetailView: View {
 
                 #endif
         }
-        .sheet(item: $showLikesForReply) { target in
+        .adaptiveSheet(item: $showLikesForReply) { target in
             LikesSheetView(id: target.id, type: .activityReply)
                 #if os(iOS)
-                .presentationDetents([.medium, .large])
+                .adaptivePresentationDetents([.medium, .large])
 
                 #else
 

@@ -5,6 +5,8 @@ import SwiftUI
 struct ContinueWatchingSection: View {
     let items: [ContinueWatchingItem]
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var selectedForDetail: ContinueWatchingItem?
+    @State private var selectedForAniList: ContinueWatchingItem?
 
     private var cardWidth: CGFloat {
         sizeClass == .regular ? 260 : 210
@@ -35,6 +37,20 @@ struct ContinueWatchingSection: View {
                 .padding(.horizontal, 16)
             }
         }
+        .navigationDestination(item: $selectedForDetail) { item in
+            if let href = item.detailHref, let mid = item.moduleId {
+                DetailView(
+                    item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href),
+                    moduleId: mid,
+                    aniListID: item.aniListID
+                )
+            }
+        }
+        .navigationDestination(item: $selectedForAniList) { item in
+            if let aid = item.aniListID {
+                AniListDetailView(mediaId: aid, preloadedMedia: nil)
+            }
+        }
     }
 
     // MARK: - Per-item interaction (mirrors AnimeSection pattern)
@@ -49,7 +65,7 @@ struct ContinueWatchingSection: View {
                 ContinueWatchingCardDisplay(item: item)
             }
             .buttonStyle(.plain)
-            .contextMenu { removeButton(for: item) }
+            .contextMenu { contextMenuItems(for: item) }
         } else if item.streamUrl.isEmpty, let href = item.detailHref, let mid = item.moduleId {
             // Module Up Next — navigate to detail, activating the correct module first
             NavigationLink {
@@ -58,19 +74,20 @@ struct ContinueWatchingSection: View {
                 ContinueWatchingCardDisplay(item: item)
             }
             .buttonStyle(.plain)
-            .contextMenu { removeButton(for: item) }
+            .contextMenu { contextMenuItems(for: item) }
         } else {
             // In-progress item — resume directly with stored URL; PlayerView re-fetches if expired
             Button { resume(item) } label: {
                 ContinueWatchingCardDisplay(item: item)
             }
             .buttonStyle(.plain)
-            .contextMenu { removeButton(for: item) }
+            .contextMenu { contextMenuItems(for: item) }
         }
     }
 
     private func resume(_ item: ContinueWatchingItem) {
         guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
+        Logger.shared.log("[Subtitles] CW resume: item.subtitle=\(item.subtitle ?? "nil") item.subtitleHeaders=\(item.subtitleHeaders?.count ?? -1) item.allSubtitles=\(item.allSubtitles?.count ?? -1) item.detailHref=\(item.detailHref ?? "nil") item.moduleId=\(item.moduleId ?? "nil")", type: "Debug")
 
         // Ensure the correct module is active
         if let mid = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
@@ -81,7 +98,9 @@ struct ContinueWatchingSection: View {
             title: item.streamTitle ?? item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: url,
             headers: item.headers ?? [:],
-            subtitle: item.subtitle
+            subtitle: item.subtitle,
+            subtitleHeaders: item.subtitleHeaders ?? [:],
+            allSubtitles: item.allSubtitles
         )
 
         let context = PlayerContext(
@@ -194,11 +213,29 @@ struct ContinueWatchingSection: View {
         let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
 
         #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
         #endif
     }
 
-    private func removeButton(for item: ContinueWatchingItem) -> some View {
+    @ViewBuilder
+    private func contextMenuItems(for item: ContinueWatchingItem) -> some View {
+        if let href = item.detailHref, let mid = item.moduleId {
+            Button {
+                if let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
+                    ModuleManager.shared.selectModule(module)
+                }
+                selectedForDetail = item
+            } label: {
+                Label("View Details", systemImage: "list.bullet.below.rectangle")
+            }
+        }
+        if item.aniListID != nil {
+            Button {
+                selectedForAniList = item
+            } label: {
+                Label("View on AniList", systemImage: "tv")
+            }
+        }
         Button(role: .destructive) {
             ContinueWatchingManager.shared.remove(item)
         } label: {
