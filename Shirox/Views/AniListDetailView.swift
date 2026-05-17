@@ -546,7 +546,7 @@ struct AniListDetailView: View {
             }
         }()
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired, onSequelNeeded: onSequelNeeded, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } })
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired, onSequelNeeded: onSequelNeeded, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } })
     }
     #endif
 
@@ -899,6 +899,7 @@ struct AniListDetailView: View {
                                 onDownload: sel ? nil : {
                                     pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep)
                                 },
+                                onTryOtherStream: { vm.watchEpisode(ep) },
                                 isSelectionMode: sel,
                                 isSelected: selected
                             )
@@ -912,7 +913,8 @@ struct AniListDetailView: View {
                                 totalEpisodes: totalEpisodes,
                                 aniListProgress: existingEntry?.progress,
                                 aniListStatus: existingEntry?.status,
-                                onTap: { tapEpisode(ep, media: media) }
+                                onTap: { tapEpisode(ep, media: media) },
+                                onTryOtherStream: { vm.watchEpisode(ep) }
                             )
                             #endif
                         }
@@ -1038,11 +1040,12 @@ private struct AniListEpisodeRowContainer: View {
     let aniListStatus: MediaListStatus?
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
+    var onTryOtherStream: (() -> Void)? = nil
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
-    
+
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
 
@@ -1115,6 +1118,7 @@ private struct AniListEpisodeRowContainer: View {
                 }
             } : nil,
             onDownload: onDownload,
+            onTryOtherStream: onTryOtherStream,
             isSelectionMode: isSelectionMode,
             isSelected: isSelected,
             downloadState: downloadState

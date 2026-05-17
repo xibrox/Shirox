@@ -480,7 +480,7 @@ struct DetailView: View {
 
         let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: storedStreams.count > 1 ? nil : onExpired)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
     }
     #endif
 
@@ -1125,6 +1125,7 @@ struct DetailView: View {
                             onDownload: sel ? nil : {
                                 vm.loadDownloadStreams(for: episode)
                             },
+                            onTryOtherStream: { vm.loadStreams(for: episode) },
                             isSelectionMode: sel,
                             isSelected: selected
                         )
@@ -1138,7 +1139,8 @@ struct DetailView: View {
                             aniListID: vm.aniListID ?? aniListID,
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
-                            onTap: { tapEpisode(episode) }
+                            onTap: { tapEpisode(episode) },
+                            onTryOtherStream: { vm.loadStreams(for: episode) }
                         )
                         #endif
                     }
@@ -1172,11 +1174,12 @@ private struct ModuleEpisodeRowContainer: View {
     let aniListStatus: MediaListStatus?
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
+    var onTryOtherStream: (() -> Void)? = nil
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
-    
+
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
 
@@ -1263,6 +1266,7 @@ private struct ModuleEpisodeRowContainer: View {
                         }
                     } : nil,
                     onDownload: onDownload,
+                    onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
                     isSelected: isSelected,
                     downloadState: downloadState
@@ -1303,6 +1307,7 @@ private struct ModuleEpisodeRowContainer: View {
                         }
                     } : nil,
                     onDownload: onDownload,
+                    onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
                     isSelected: isSelected,
                     downloadState: downloadState

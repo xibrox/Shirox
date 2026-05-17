@@ -12,6 +12,7 @@ struct ThumbnailEpisodeRow: View {
     var allPreviousWatched: Bool = false
     var onTogglePreviousWatched: (() -> Void)? = nil
     var onDownload: (() -> Void)? = nil
+    var onTryOtherStream: (() -> Void)? = nil
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     var downloadState: DownloadState? = nil
@@ -165,6 +166,12 @@ struct ThumbnailEpisodeRow: View {
                 } else {
                     Button { onMarkWatched?() } label: {
                         Label("Mark as Watched", systemImage: "checkmark.circle")
+                    }
+                }
+                if let onTryOtherStream {
+                    Divider()
+                    Button { onTryOtherStream() } label: {
+                        Label("Try Other Stream", systemImage: "arrow.triangle.2.circlepath")
                     }
                 }
                 if let onTogglePreviousWatched {
