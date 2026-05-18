@@ -1,5 +1,19 @@
 import SwiftUI
 
+// MARK: - VM Store
+
+@MainActor
+private final class ModuleStreamVMStore: ObservableObject {
+    var viewModels: [String: ModuleStreamRowViewModel] = [:]
+
+    func get(for module: ModuleDefinition, mediaId: Int?, animeTitle: String, episodeNumber: Int) -> ModuleStreamRowViewModel {
+        if let vm = viewModels[module.id] { return vm }
+        let vm = ModuleStreamRowViewModel(module: module, mediaId: mediaId, animeTitle: animeTitle, targetEpisodeNumber: episodeNumber)
+        viewModels[module.id] = vm
+        return vm
+    }
+}
+
 // MARK: - Sheet
 
 struct ModuleStreamPickerView: View {
@@ -11,6 +25,7 @@ struct ModuleStreamPickerView: View {
 
     @EnvironmentObject private var moduleManager: ModuleManager
     @AppStorage("useDefaultExtension") private var useDefaultExtension = false
+    @StateObject private var vmStore = ModuleStreamVMStore()
 
     private var visibleModules: [ModuleDefinition] {
         if useDefaultExtension, let active = moduleManager.activeModule {
@@ -27,7 +42,8 @@ struct ModuleStreamPickerView: View {
                         module: module,
                         mediaId: mediaId,
                         animeTitle: animeTitle,
-                        episodeNumber: episodeNumber
+                        episodeNumber: episodeNumber,
+                        rowVm: vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
                     ) { streams, selectedStream, episodeHref, availableCount in
                         moduleManager.selectModule(module)
                         onDismiss()
@@ -333,7 +349,7 @@ private struct ModuleStreamRow: View {
     let episodeNumber: Int
     let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?) -> Void
 
-    @StateObject private var rowVm: ModuleStreamRowViewModel
+    @ObservedObject var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
     @State private var showStreamPicker = false
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
@@ -343,6 +359,7 @@ private struct ModuleStreamRow: View {
         mediaId: Int?,
         animeTitle: String,
         episodeNumber: Int,
+        rowVm: ModuleStreamRowViewModel,
         onStreamsLoaded: @escaping ([StreamResult], StreamResult?, String?, Int?) -> Void
     ) {
         self.module = module
@@ -350,12 +367,7 @@ private struct ModuleStreamRow: View {
         self.animeTitle = animeTitle
         self.episodeNumber = episodeNumber
         self.onStreamsLoaded = onStreamsLoaded
-        _rowVm = StateObject(wrappedValue: ModuleStreamRowViewModel(
-            module: module,
-            mediaId: mediaId,
-            animeTitle: animeTitle,
-            targetEpisodeNumber: episodeNumber
-        ))
+        self._rowVm = ObservedObject(wrappedValue: rowVm)
     }
 
     private var isPreferredModule: Bool {
@@ -607,6 +619,7 @@ private struct SearchResultCard: View {
                 .foregroundStyle(.primary)
         }
         .frame(width: 72)
+        .contentShape(Rectangle())
     }
 }
 

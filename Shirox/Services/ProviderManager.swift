@@ -55,8 +55,11 @@ final class ProviderManager: ObservableObject {
             if fallbackActive { fallbackActive = false }
             return result
         } catch {
-            guard isFallbackEligible(error), let fallback else { throw error }
+            let eligible = isFallbackEligible(error)
+            Logger.shared.log("ProviderManager fallback check — error: \(error), eligible: \(eligible), fallback: \(fallback?.providerType.rawValue ?? "nil")", type: "Provider")
+            guard eligible, let fallback else { throw error }
             fallbackActive = true
+            Logger.shared.log("ProviderManager switching to fallback: \(fallback.providerType.rawValue)", type: "Provider")
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(30))
                 self?.fallbackActive = false
@@ -70,6 +73,13 @@ final class ProviderManager: ObservableObject {
         if let pe = error as? ProviderError { return pe.isFallbackEligible }
         if let urlError = error as? URLError {
             return urlError.code != .cancelled
+        }
+        if let aniError = error as? AniListError {
+            switch aniError {
+            case .httpError(let code): return code == 403 || code >= 500
+            case .rateLimited: return true
+            default: return false
+            }
         }
         return false
     }

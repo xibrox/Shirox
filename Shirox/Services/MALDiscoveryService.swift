@@ -65,22 +65,30 @@ final class MALDiscoveryService {
 
     // MARK: - Fetch helpers
 
-    private func fetchList(_ path: String, queryItems: [URLQueryItem] = []) async throws -> [JikanAnime] {
+    private func fetchList(_ path: String, queryItems: [URLQueryItem] = [], retrying: Bool = false) async throws -> [JikanAnime] {
         var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "sfw", value: "true")] + queryItems
         let (data, response) = try await session.data(from: components.url!)
         if let http = response as? HTTPURLResponse {
-            if http.statusCode == 429 { throw ProviderError.serverError(429) }
+            if http.statusCode == 429 {
+                if retrying { throw ProviderError.serverError(429) }
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                return try await fetchList(path, queryItems: queryItems, retrying: true)
+            }
             if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
         }
         return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data.filter { $0.mal_id > 0 }
     }
 
-    private func fetchSingle(_ path: String) async throws -> JikanAnime {
+    private func fetchSingle(_ path: String, retrying: Bool = false) async throws -> JikanAnime {
         let url = base.appendingPathComponent(path)
         let (data, response) = try await session.data(from: url)
         if let http = response as? HTTPURLResponse {
-            if http.statusCode == 429 { throw ProviderError.serverError(429) }
+            if http.statusCode == 429 {
+                if retrying { throw ProviderError.serverError(429) }
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                return try await fetchSingle(path, retrying: true)
+            }
             if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
         }
         return try JSONDecoder().decode(JikanSingle<JikanAnime>.self, from: data).data

@@ -1,6 +1,20 @@
 #if os(iOS)
 import SwiftUI
 
+// MARK: - VM Store
+
+@MainActor
+private final class DownloadVMStore: ObservableObject {
+    var viewModels: [String: DownloadModuleRowViewModel] = [:]
+
+    func get(for module: ModuleDefinition, mediaId: Int?, animeTitle: String, episodeNumber: Int) -> DownloadModuleRowViewModel {
+        if let vm = viewModels[module.id] { return vm }
+        let vm = DownloadModuleRowViewModel(module: module, mediaId: mediaId, animeTitle: animeTitle, targetEpisodeNumber: episodeNumber)
+        viewModels[module.id] = vm
+        return vm
+    }
+}
+
 struct DownloadModulePickerView: View {
     let mediaId: Int?
     let animeTitle: String
@@ -9,6 +23,7 @@ struct DownloadModulePickerView: View {
     let onStreamsLoaded: ([StreamResult], String?) -> Void
 
     @EnvironmentObject private var moduleManager: ModuleManager
+    @StateObject private var vmStore = DownloadVMStore()
     @State private var streamPickerItem: StreamPickerItem? = nil
     @State private var chosenStream: StreamResult? = nil
     @State private var chosenPickerItem: StreamPickerItem? = nil
@@ -28,7 +43,8 @@ struct DownloadModulePickerView: View {
                         module: module,
                         mediaId: mediaId,
                         animeTitle: animeTitle,
-                        episodeNumber: episodeNumber
+                        episodeNumber: episodeNumber,
+                        rowVm: vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
                     ) { streams, episodeHref in
                         streamPickerItem = StreamPickerItem(streams: streams, episodeHref: episodeHref, module: module)
                     }
@@ -77,22 +93,18 @@ private struct DownloadModuleRow: View {
     let episodeNumber: Int
     let onStreamsLoaded: ([StreamResult], String?) -> Void
 
-    @StateObject private var rowVm: DownloadModuleRowViewModel
+    @ObservedObject var rowVm: DownloadModuleRowViewModel
     @State private var showAllResults = false
 
     init(module: ModuleDefinition, mediaId: Int?, animeTitle: String, episodeNumber: Int,
+         rowVm: DownloadModuleRowViewModel,
          onStreamsLoaded: @escaping ([StreamResult], String?) -> Void) {
         self.module = module
         self.mediaId = mediaId
         self.animeTitle = animeTitle
         self.episodeNumber = episodeNumber
         self.onStreamsLoaded = onStreamsLoaded
-        _rowVm = StateObject(wrappedValue: DownloadModuleRowViewModel(
-            module: module,
-            mediaId: mediaId,
-            animeTitle: animeTitle,
-            targetEpisodeNumber: episodeNumber
-        ))
+        self._rowVm = ObservedObject(wrappedValue: rowVm)
     }
 
     var body: some View {
@@ -378,6 +390,7 @@ private struct SearchResultCard: View {
                 .frame(width: 72, height: 32, alignment: .topLeading).foregroundStyle(.primary)
         }
         .frame(width: 72)
+        .contentShape(Rectangle())
     }
 }
 

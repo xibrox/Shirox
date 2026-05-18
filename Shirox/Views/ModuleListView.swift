@@ -113,9 +113,9 @@ struct ModuleListView: View {
         #else
         .background(Color(.windowBackgroundColor))
         #endif
-        .onTapGesture {
+        .simultaneousGesture(TapGesture().onEnded {
             isTextFieldFocused = false
-        }
+        })
         .onChange(of: moduleURL) { _, _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
@@ -261,6 +261,7 @@ struct ModuleListView: View {
             .opacity(isDown ? 0.45 : 1.0)
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
         .animation(.easeOut(duration: 0.2), value: isSelected)
         .animation(.easeOut(duration: 0.2), value: providerManager.fallbackActive)
     }
@@ -308,6 +309,7 @@ struct ModuleListView: View {
             .background(isActive ? Color.primary.opacity(0.08) : Color.black.opacity(0.001), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
         .animation(.easeOut(duration: 0.2), value: isActive)
     }
 

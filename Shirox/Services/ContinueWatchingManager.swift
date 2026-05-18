@@ -34,6 +34,7 @@ import Foundation
     /// At ≥ 90%: marks episode watched and queues the next one as a placeholder.
     /// Enforces the one-item-per-show invariant via removeAllShowItems.
     func save(_ item: ContinueWatchingItem) {
+        Logger.shared.log("[CW] save called: ep=\(item.episodeNumber) streamUrl=\(item.streamUrl.isEmpty ? "placeholder" : "inprog") watched=\(item.watchedSeconds)/\(item.totalSeconds) title=\(item.mediaTitle)", type: "Debug")
         var newItems = items
         removeAllShowItems(for: item, in: &newItems)
 
@@ -44,9 +45,18 @@ import Foundation
         if item.totalSeconds > 0 && item.watchedSeconds / item.totalSeconds >= watchedThreshold {
             markWatched(item)
             let nextEp = item.episodeNumber + 1
-            let effectiveCap = item.availableEpisodes ?? item.totalEpisodes
-            let isLastEpisode = effectiveCap.map { item.episodeNumber >= $0 } ?? false
-            if !isLastEpisode, let placeholder = makePlaceholder(
+            Logger.shared.log("[CW] save threshold crossed: ep=\(item.episodeNumber) isAiring=\(String(describing: item.isAiring)) totalEps=\(String(describing: item.totalEpisodes)) availableEps=\(String(describing: item.availableEpisodes)) title=\(item.mediaTitle)", type: "Debug")
+            // Only block "Up Next" when the show is explicitly finished with a confirmed episode
+            // count. For airing/unknown shows, always create the placeholder — stale placeholders
+            // are cleaned up by notifyNewEpisodesAvailable when the detail view reloads.
+            let isLastEpisode: Bool
+            if item.isAiring == false, let cap = item.totalEpisodes {
+                isLastEpisode = item.episodeNumber >= cap
+            } else {
+                isLastEpisode = false
+            }
+            Logger.shared.log("[CW] isLastEpisode=\(isLastEpisode)", type: "Debug")
+            let placeholder = makePlaceholder(
                 episodeNumber: nextEp, from: item,
                 aniListID: item.aniListID, moduleId: item.moduleId,
                 mediaTitle: item.mediaTitle, imageUrl: nil,
@@ -54,19 +64,24 @@ import Foundation
                 availableEpisodes: item.availableEpisodes,
                 isAiring: item.isAiring,
                 detailHref: item.detailHref
-            ) {
+            )
+            Logger.shared.log("[CW] placeholder for ep\(nextEp): \(placeholder == nil ? "nil (not created)" : "created")", type: "Debug")
+            if !isLastEpisode, let placeholder {
                 newItems.insert(placeholder, at: 0)
                 if newItems.count > maxItems { newItems = Array(newItems.prefix(maxItems)) }
             }
             items = newItems
             persist()
+            Logger.shared.log("[CW] save done: items=\(items.map { "\($0.episodeNumber)\($0.streamUrl.isEmpty ? "P" : "I")" }.joined(separator: ",")) title=\(item.mediaTitle)", type: "Debug")
             return
         }
 
+        Logger.shared.log("[CW] save inprog: ep=\(item.episodeNumber) watched=\(item.watchedSeconds)/\(item.totalSeconds) title=\(item.mediaTitle)", type: "Debug")
         newItems.insert(item, at: 0)
         if newItems.count > maxItems { newItems = Array(newItems.prefix(maxItems)) }
         items = newItems
         persist()
+        Logger.shared.log("[CW] save done: items=\(items.map { "\($0.episodeNumber)\($0.streamUrl.isEmpty ? "P" : "I")" }.joined(separator: ",")) title=\(item.mediaTitle)", type: "Debug")
     }
 
     /// Removes an item by its id.
@@ -393,26 +408,28 @@ import Foundation
         let srcMediaTitle = source?.mediaTitle    ?? mediaTitle
         let srcDetailHref = source?.detailHref    ?? detailHref
 
-        // Use the most restrictive total episodes count available
-        var srcTotalEps = source?.totalEpisodes
-        if let total = totalEpisodes {
-            if srcTotalEps == nil || total < srcTotalEps! {
-                srcTotalEps = total
-            }
-        }
+        // Use the largest known totalEpisodes — stale module counts are often 1 and would
+        // incorrectly cap a multi-episode show if we took the minimum or first-non-nil.
+        let srcTotalEps = [totalEpisodes, source?.totalEpisodes].compactMap { $0 }.max()
 
         // availableEpisodes — how many are currently aired; may be < total for ongoing shows
         let srcAvailable = availableEpisodes ?? source?.availableEpisodes
         let srcIsAiring = isAiring ?? source?.isAiring
 
-        guard !srcImageUrl.isEmpty else { return nil }
+        // Allow empty imageUrl — card display falls back to TVDB thumbnail or gray placeholder
 
-        // If we've passed the currently available (aired) episode count, do not create a placeholder.
-        // This makes the CW card disappear when the user is caught up on an ongoing show.
-        let cap = srcAvailable ?? srcTotalEps
-        if let cap, cap > 0, episodeNumber > cap {
-            Logger.shared.log("[CW] Caught up (ep \(episodeNumber) > available \(cap)), no placeholder created.", type: "General")
-            return nil
+        // Only block "Up Next" for explicitly-finished shows with a confirmed episode count.
+        // For airing or unknown shows, always allow the placeholder — stale ones are cleaned
+        // up by notifyNewEpisodesAvailable when the detail view reloads.
+        if srcIsAiring == false {
+            // For completed shows, totalEpisodes is the definitive cap.
+            // availableEpisodes is often the module's lazy-loaded count (can be as low as 1)
+            // and is meaningless for completed shows where all episodes have aired.
+            let cap = srcTotalEps
+            if let cap, cap > 0, episodeNumber > cap {
+                Logger.shared.log("[CW] No more episodes (ep \(episodeNumber) > cap \(cap)), no placeholder created.", type: "General")
+                return nil
+            }
         }
 
         return ContinueWatchingItem(
@@ -454,6 +471,7 @@ import Foundation
             if existing.streamUrl.isEmpty {
                 // If the updated cap reveals that the user is actually caught up, makePlaceholder will return nil
                 // and the stale "Up Next" placeholder will be automatically deleted.
+                Logger.shared.log("[CW] notifyNew: re-evaluating placeholder ep=\(existing.episodeNumber) avail=\(availableEpisodes) totalEps=\(String(describing: totalEpisodes ?? existing.totalEpisodes)) isAiring=\(String(describing: isAiring ?? existing.isAiring)) title=\(mediaTitle)", type: "Debug")
                 if let updated = makePlaceholder(
                     episodeNumber: existing.episodeNumber, from: existing,
                     aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle,
@@ -461,6 +479,8 @@ import Foundation
                     availableEpisodes: availableEpisodes, isAiring: isAiring ?? existing.isAiring, detailHref: detailHref ?? existing.detailHref
                 ) {
                     arr.insert(updated, at: 0)
+                } else {
+                    Logger.shared.log("[CW] notifyNew: placeholder ep=\(existing.episodeNumber) was DELETED (makePlaceholder returned nil)", type: "Debug")
                 }
             } else {
                 // Real in-progress item: forcefully override with the latest accurate counts

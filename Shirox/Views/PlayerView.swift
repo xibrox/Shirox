@@ -51,6 +51,7 @@ struct PlayerView: View {
     @State private var isFilled = false
     @State private var isScrubbing = false
     @State private var hideTask: Task<Void, Never>? = nil
+    @State private var autoAdvanceTask: Task<Void, Never>? = nil
     @State private var timeObserver: Any? = nil
     @State private var rateObserver: NSKeyValueObservation? = nil
     @State private var loadingOpacity = 0.8
@@ -80,8 +81,8 @@ struct PlayerView: View {
     // Settings
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
-    @AppStorage("playerAutoNext") private var autoNextEpisode = true
-    @AppStorage("playerWatchedPercentage") private var watchedPercentage: Double = 90
+    @AppStorage("autoNextEpisode") private var autoNextEpisode = true
+    @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90
     @State private var playbackSpeed: Double = 1.0
     @State private var volume: Float = 1.0
     @State private var showSpeedPicker = false
@@ -243,6 +244,8 @@ struct PlayerView: View {
         }
         .onDisappear {
             hideTask?.cancel()
+            autoAdvanceTask?.cancel()
+            autoAdvanceTask = nil
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
             rateObserver?.invalidate()
             player?.pause()
@@ -338,7 +341,7 @@ struct PlayerView: View {
             nextEpisodeNumber = 0
         }) {
             PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
-                swapStream(selected, episodeNumber: nextEpisodeNumber)
+                swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams)
             }
             #if os(iOS)
             .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
@@ -1351,7 +1354,7 @@ struct PlayerView: View {
 
     private func setupPlaybackEndObserver(for item: AVPlayerItem) {
         NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { _ in
-            Task { @MainActor in
+            autoAdvanceTask = Task { @MainActor in
                 isPlaying = false
                 withAnimation { showControls = true }
                 if autoNextEpisode { await loadAndAdvance() }
@@ -1397,6 +1400,7 @@ struct PlayerView: View {
         isLoadingNextEpisode = true
         do {
             let result = try await loader(epNum)
+            guard !Task.isCancelled else { isLoadingNextEpisode = false; return }
 
             guard let result = result else {
                 isLoadingNextEpisode = false
@@ -1419,7 +1423,7 @@ struct PlayerView: View {
             let exactTitleMatch = result.streams.first { $0.title == currentContext?.streamTitle }
             if let exactMatch = exactTitleMatch {
                 Logger.shared.log("[PlayerView] Found exact stream title match: \(exactMatch.title)", type: "Debug")
-                swapStream(exactMatch, episodeNumber: result.episodeNumber)
+                swapStream(exactMatch, episodeNumber: result.episodeNumber, allStreams: result.streams)
                 return
             }
 
@@ -1434,11 +1438,11 @@ struct PlayerView: View {
 
             if let match {
                 Logger.shared.log("[PlayerView] Auto-selected stream: \(match.title)", type: "Debug")
-                swapStream(match, episodeNumber: result.episodeNumber)
+                swapStream(match, episodeNumber: result.episodeNumber, allStreams: result.streams)
             }
             else if result.streams.count == 1 {
                 Logger.shared.log("[PlayerView] Auto-selected single stream: \(result.streams[0].title)", type: "Debug")
-                swapStream(result.streams[0], episodeNumber: result.episodeNumber)
+                swapStream(result.streams[0], episodeNumber: result.episodeNumber, allStreams: result.streams)
             }
             else {
                 Logger.shared.log("[PlayerView] Showing stream picker with \(result.streams.count) streams", type: "Debug")
@@ -1491,7 +1495,7 @@ struct PlayerView: View {
                 guard !streams.isEmpty else { return }
                 let match = streams.first(where: { $0.title == currentContext?.streamTitle }) ?? streams[0]
                 let epNum = Int(ep1.number ?? 1)
-                swapStream(match, episodeNumber: epNum)
+                swapStream(match, episodeNumber: epNum, allStreams: streams)
                 // swapStream preserves old aniListID — override context with sequel's identity
                 // so ContinueWatching saves episode 1 progress under the correct show
                 if let id = capturedMediaID, let ctx = currentContext {
@@ -1565,10 +1569,11 @@ struct PlayerView: View {
         scheduleHide()
     }
 
-    private func swapStream(_ next: StreamResult, episodeNumber: Int) {
+    private func swapStream(_ next: StreamResult, episodeNumber: Int, allStreams: [StreamResult] = []) {
         didTrackEpisode = false
         // onWatchNext confirmed ep `episodeNumber` exists. If availableEpisodes is stale
-        // (set lower), bump it so saveProgress() creates a "Up Next N+1" placeholder.
+        // (set lower), bump it so saveProgress() correctly sees ep N as non-last.
+        let preSwapAvailableEpisodes = currentContext?.availableEpisodes
         if let ctx = currentContext, let avail = ctx.availableEpisodes, avail < episodeNumber {
             currentContext = PlayerContext(
                 mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber,
@@ -1602,8 +1607,14 @@ struct PlayerView: View {
         didSeekToResume = true
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
+        if !allStreams.isEmpty { availableStreams = allStreams }
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
+            // Don't carry the bumped availableEpisodes into the new episode's context — it makes
+            // the new episode look like the last available, causing saveProgress() to skip the
+            // "Up Next N+1" placeholder if auto-next fails or is disabled. Use the pre-bump value
+            // (or nil if it was bumped), so isLastEpisode relies on totalEpisodes instead.
+            let nextAvailableEpisodes = preSwapAvailableEpisodes.flatMap { $0 < episodeNumber ? nil : $0 }
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: nextAvailableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
         }
         audioGroup = nil
         Task {

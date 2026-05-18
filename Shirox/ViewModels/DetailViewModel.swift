@@ -229,9 +229,9 @@ final class DetailViewModel: ObservableObject {
             aniListID: aniListID,
             malID: aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
             moduleId: ModuleManager.shared.activeModule?.id,
-            totalEpisodes: episodeCount,
+            totalEpisodes: aniListMedia?.episodes ?? episodeCount,
             availableEpisodes: episodeCount,
-            isAiring: nil,
+            isAiring: aniListMedia.map { $0.status == "RELEASING" },
             resumeFrom: resumeEpisodeNumber == Int(selectedEpisode?.number ?? 1)
                 ? resumeWatchedSeconds
                 : ContinueWatchingManager.shared.items.first(where: { $0.moduleId == ModuleManager.shared.activeModule?.id && $0.mediaTitle == (detail?.title ?? "") && $0.episodeNumber == Int(selectedEpisode?.number ?? 1) })?.watchedSeconds,

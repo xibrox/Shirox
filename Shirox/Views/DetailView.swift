@@ -143,7 +143,8 @@ struct DetailView: View {
                     mediaTitle: detail.title,
                     availableEpisodes: detail.episodes.count,
                     imageUrl: detail.image,
-                    totalEpisodes: detail.episodes.count,
+                    totalEpisodes: vm.aniListMedia?.episodes ?? detail.episodes.count,
+                    isAiring: vm.aniListMedia.map { $0.status == "RELEASING" },
                     detailHref: vm.detailHref
                 )
             }

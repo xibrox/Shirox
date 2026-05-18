@@ -49,7 +49,6 @@ struct ThumbnailEpisodeRow: View {
                         CachedAsyncImage(urlString: thumb)
                             .aspectRatio(16/9, contentMode: .fill)
                             .frame(width: 100, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
                             .overlay(
                                 ZStack {
                                     if isComplete {
@@ -60,6 +59,7 @@ struct ThumbnailEpisodeRow: View {
                                     }
                                 }
                             )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
                         ZStack {
                             RoundedRectangle(cornerRadius: 8)
@@ -171,7 +171,7 @@ struct ThumbnailEpisodeRow: View {
                 if let onTryOtherStream {
                     Divider()
                     Button { onTryOtherStream() } label: {
-                        Label("Try Other Stream", systemImage: "arrow.triangle.2.circlepath")
+                        Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
                     }
                 }
                 if let onTogglePreviousWatched {

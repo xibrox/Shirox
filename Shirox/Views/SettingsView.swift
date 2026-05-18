@@ -5,7 +5,7 @@ struct SettingsView: View {
     @AppStorage("forceLandscape") private var forceLandscape = false
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
-    @AppStorage("autoNextEpisode") private var autoNextEpisode = false
+    @AppStorage("autoNextEpisode") private var autoNextEpisode = true
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true

@@ -9,6 +9,7 @@ private struct GraphQLResponse<T: Decodable>: Decodable {
 
 private struct GraphQLError: Decodable {
     let message: String
+    let status: Int?
 }
 
 // MARK: - Page response structures
@@ -257,6 +258,7 @@ final class AniListService {
         let data = try await post(query: query, variables: ["id": id])
         let response = try JSONDecoder().decode(GraphQLResponse<MediaData>.self, from: data)
         if let errors = response.errors {
+            if errors.contains(where: { $0.status == 403 }) { throw AniListError.httpError(403) }
             throw AniListError.graphQL(errors.map(\.message).joined(separator: ", "))
         }
         guard let media = response.data?.Media else {
@@ -271,6 +273,7 @@ final class AniListService {
         let data = try await post(query: query, variables: variables)
         let response = try JSONDecoder().decode(GraphQLResponse<PageData>.self, from: data)
         if let errors = response.errors {
+            if errors.contains(where: { $0.status == 403 }) { throw AniListError.httpError(403) }
             throw AniListError.graphQL(errors.map(\.message).joined(separator: ", "))
         }
         return response.data?.Page.media ?? []
