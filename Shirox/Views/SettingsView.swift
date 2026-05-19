@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
     @AppStorage("autoNextEpisode") private var autoNextEpisode = true
+    @AppStorage("autoSkipSegments") private var autoSkipSegments = true
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
@@ -107,6 +108,11 @@ struct SettingsView: View {
                     }
                     Toggle("Auto Next Episode", isOn: $autoNextEpisode)
                         .tint(.secondary)
+                    Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
+                        .tint(.secondary)
+                    Text("Automatically skip intros, recaps, credits, and previews")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
                         .tint(.secondary)
                     VStack(alignment: .leading, spacing: 12) {
