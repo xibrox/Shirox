@@ -502,6 +502,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         tvdbCache(for: provider)[id] != nil
     }
 
+    func cachedSeason(for id: Int, provider: ProviderType = .anilist) -> Int? {
+        tvdbCache(for: provider)[id]?.season
+    }
+
     func getCachedArtwork(for id: Int, provider: ProviderType = .anilist) -> (poster: String?, fanart: String?) {
         if let c = tvdbCache(for: provider)[id] {
             return (formatURL(c.posterPath), formatURL(c.fanartPath))
