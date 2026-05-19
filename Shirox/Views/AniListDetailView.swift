@@ -18,6 +18,7 @@ struct AniListDetailView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var auth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
     @State private var showLibraryEdit = false
@@ -47,6 +48,10 @@ struct AniListDetailView: View {
         self.preloadedMedia = preloadedMedia
         self.resumeEpisodeNumber = resumeEpisodeNumber
         self.resumeWatchedSeconds = resumeWatchedSeconds
+    }
+
+    private var activeProvider: any MediaProvider {
+        vm.media?.provider == .mal ? MALProvider.shared : AniListProvider.shared
     }
 
     var body: some View {
