@@ -550,9 +550,13 @@ struct DetailView: View {
 
     @ViewBuilder
     private var libraryEditSheet: some View {
-        if let aid = vm.aniListID, let detail = vm.detail {
+        if (vm.aniListID != nil || malID != nil), let detail = vm.detail {
+            let aid = vm.aniListID
+            let mid = malID
+            let sheetProvider: ProviderType = aid != nil ? .anilist : .mal
+            let sheetId = aid ?? mid ?? 0
             let tempMedia = Media(
-                id: aid, idMal: nil, provider: .anilist,
+                id: sheetId, idMal: mid, provider: sheetProvider,
                 title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
                 coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
                 bannerImage: nil, description: detail.description,
@@ -562,7 +566,7 @@ struct DetailView: View {
                 relations: nil, type: nil, format: nil
             )
             LibraryEntryEditSheet(
-                entry: existingEntry,
+                entry: existingEntry ?? existingMALEntry,
                 media: tempMedia,
                 onSave: { status, progress, score in
                     if status == .completed {
@@ -578,16 +582,27 @@ struct DetailView: View {
                         )
                     }
                     Task {
-                        try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: status, progress: progress, score: score)
-                        if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
-                            existingEntry = AniListProvider.shared.mapEntry(raw)
+                        if let aid, AniListAuthManager.shared.isLoggedIn {
+                            try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: status, progress: progress, score: score)
+                            if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                                existingEntry = AniListProvider.shared.mapEntry(raw)
+                            }
+                        }
+                        if let mid, malAuth.isLoggedIn {
+                            try? await MALProvider.shared.updateEntry(mediaId: mid, status: status, progress: progress, score: score)
+                            existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: mid)
                         }
                     }
                 },
-                onDelete: existingEntry != nil ? {
-                    let entryId = existingEntry!.id
-                    existingEntry = nil
-                    Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                onDelete: (existingEntry != nil || existingMALEntry != nil) ? {
+                    if let entryId = existingEntry?.id, AniListAuthManager.shared.isLoggedIn {
+                        existingEntry = nil
+                        Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                    }
+                    if let mid, malAuth.isLoggedIn {
+                        existingMALEntry = nil
+                        Task { try? await MALProvider.shared.deleteEntry(entryId: mid) }
+                    }
                 } : nil
             )
             #if os(iOS)
