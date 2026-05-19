@@ -512,29 +512,36 @@ struct DetailView: View {
     #if os(iOS)
     @ToolbarContentBuilder
     private var detailToolbar: some ToolbarContent {
-        if AniListAuthManager.shared.isLoggedIn {
+        if (AniListAuthManager.shared.isLoggedIn && vm.aniListID != nil) || (malAuth.isLoggedIn && malID != nil) {
             ToolbarItem(placement: .topBarTrailing) {
-                if let aid = vm.aniListID {
-                    Menu {
-                        Button {
-                            Task {
-                                isLoadingEntry = true
+                Menu {
+                    Button {
+                        Task {
+                            isLoadingEntry = true
+                            if let aid = vm.aniListID, AniListAuthManager.shared.isLoggedIn {
                                 if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
                                     existingEntry = AniListProvider.shared.mapEntry(raw)
                                 }
-                                isLoadingEntry = false
-                                showLibraryEdit = true
                             }
-                        } label: { Label("Edit Library Entry", systemImage: "pencil") }
+                            if let mid = malID, malAuth.isLoggedIn {
+                                existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: mid)
+                            }
+                            isLoadingEntry = false
+                            showLibraryEdit = true
+                        }
+                    } label: { Label("Edit Library Entry", systemImage: "pencil") }
+                    if AniListAuthManager.shared.isLoggedIn {
                         Button { showMatchingSearch = true } label: {
                             Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
                         }
-                    } label: { libraryEditButtonLabel }
-                    .disabled(isLoadingEntry)
-                } else {
-                    Button { showMatchingSearch = true } label: {
-                        Image(systemName: "link.badge.plus").font(.system(size: 17, weight: .medium))
                     }
+                } label: { libraryEditButtonLabel }
+                .disabled(isLoadingEntry)
+            }
+        } else if AniListAuthManager.shared.isLoggedIn {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showMatchingSearch = true } label: {
+                    Image(systemName: "link.badge.plus").font(.system(size: 17, weight: .medium))
                 }
             }
         }
