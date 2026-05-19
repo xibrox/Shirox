@@ -24,6 +24,7 @@ struct PlayerBottomBar: View {
     var onQualityTap: () -> Void = {}
     var bottomPadding: CGFloat = 24
     var onNextEpisodeTap: (() -> Void)? = nil
+    var hasActiveSkipSegment: Bool = false
     var episodeNumber: Int? = nil
     var tvdbEpisodeTitle: String? = nil
     var mediaTitle: String? = nil
@@ -96,6 +97,7 @@ struct PlayerBottomBar: View {
             .background(Color.white.opacity(0.2), in: Capsule())
         }
         .buttonStyle(.plain)
+        .opacity(hasActiveSkipSegment ? 0 : 1)
     }
 
     @ViewBuilder private var rightButtonGroup: some View {
