@@ -56,6 +56,10 @@ struct PlayerView: View {
     @State private var rateObserver: NSKeyValueObservation? = nil
     @State private var loadingOpacity = 0.8
     @State private var didSeekToResume = false
+    @State private var skipSegments: SkipSegments?
+    @State private var activeSkipSegment: SkipSegmentType?
+    @State private var skippedSegments: Set<SkipSegmentType> = []
+    @AppStorage("autoSkipSegments") private var autoSkipSegments: Bool = true
 
     // AniList tracking
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
@@ -205,6 +209,19 @@ struct PlayerView: View {
 
             if isLocked && controlsEnabled {
                 lockOverlayView
+            }
+
+            if let segment = activeSkipSegment, !castManager.isConnected {
+                VStack {
+                    Spacer()
+                    HStack {
+                        PlayerSkipButton(segmentType: segment, onSkip: skipToSegmentEnd)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 68)
+                }
+                .ignoresSafeArea()
             }
         }
         .ignoresSafeArea()
@@ -725,6 +742,7 @@ struct PlayerView: View {
             onQualityTap: { showQualityPicker = true },
             bottomPadding: bottomPad,
             onNextEpisodeTap: (onWatchNext != nil || onSequelNeeded != nil) ? { Task { @MainActor in await loadAndAdvance() } } : nil,
+            hasActiveSkipSegment: activeSkipSegment != nil,
             episodeNumber: currentContext?.episodeNumber,
             tvdbEpisodeTitle: tvdbEpisodeTitle,
             mediaTitle: currentContext?.mediaTitle
@@ -987,6 +1005,15 @@ struct PlayerView: View {
         scheduleHide()
     }
 
+    private func skipToSegmentEnd() {
+        guard let type = activeSkipSegment,
+              let seg = skipSegments?.segment(for: type) else { return }
+        skippedSegments.insert(type)
+        activeSkipSegment = nil
+        player?.seek(to: CMTime(seconds: seg.endMs / 1000, preferredTimescale: 600),
+                     toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
     private func skip(by seconds: Double) {
         if castManager.isConnected {
             castManager.skip(by: seconds)
@@ -1193,10 +1220,44 @@ struct PlayerView: View {
                     DispatchQueue.main.async { videoReady = true }
                 }
             }
+            if let segments = skipSegments {
+                let timeMs = currentTime * 1000
+                var newActive: SkipSegmentType? = nil
+                for type in SkipSegmentType.allCases {
+                    if let seg = segments.segment(for: type) {
+                        let start = seg.startMs ?? 0
+                        if timeMs >= start && timeMs < seg.endMs {
+                            newActive = type
+                            break
+                        }
+                    }
+                }
+                if autoSkipSegments {
+                    if let type = newActive, !skippedSegments.contains(type),
+                       let seg = segments.segment(for: type) {
+                        skippedSegments.insert(type)
+                        p?.seek(to: CMTime(seconds: seg.endMs / 1000, preferredTimescale: 600))
+                    }
+                    activeSkipSegment = nil
+                } else {
+                    activeSkipSegment = newActive
+                }
+            }
             if let p { updateNowPlaying(player: p) }
         }
 
         setupPlaybackEndObserver(for: item)
+
+        skipSegments = nil
+        activeSkipSegment = nil
+        skippedSegments = []
+        if let aid = currentContext?.aniListID, let ep = currentContext?.episodeNumber {
+            Task {
+                let result = await SkipTimestampsService.shared.fetchSegments(aniListID: aid, episodeNumber: ep)
+                skipSegments = result
+            }
+        }
+
         scheduleHide()
         #if os(iOS)
         setupRemoteCommands(player: p)
@@ -1638,6 +1699,16 @@ struct PlayerView: View {
         loadSubtitles()
         tvdbEpisodeTitle = nil
         loadTVDBTitle()
+        skipSegments = nil
+        activeSkipSegment = nil
+        skippedSegments = []
+        if let aid = currentContext?.aniListID {
+            let ep = episodeNumber
+            Task {
+                let result = await SkipTimestampsService.shared.fetchSegments(aniListID: aid, episodeNumber: ep)
+                skipSegments = result
+            }
+        }
         if let p = player { updateNowPlaying(player: p) }
         scheduleHide()
     }
