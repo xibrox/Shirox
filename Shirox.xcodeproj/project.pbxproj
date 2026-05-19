@@ -106,6 +106,8 @@
 		AA000001000000000000AA06 /* AirPlayButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB03 /* AirPlayButton.swift */; };
 		AA000001000000000000AA07 /* PlayerBottomBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB04 /* PlayerBottomBar.swift */; };
 		AA000001000000000000AA08 /* PlayerBottomBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB04 /* PlayerBottomBar.swift */; };
+		18F4065BFF4047A09A00EEE5 /* PlayerSkipButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1109C42D2A9243E4A2B847A4 /* PlayerSkipButton.swift */; };
+		46B312DF49C04D7CAE110968 /* PlayerSkipButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1109C42D2A9243E4A2B847A4 /* PlayerSkipButton.swift */; };
 		AA000001000000000000AA09 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB05 /* PlayerCenterControls.swift */; };
 		AA000001000000000000AA10 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB05 /* PlayerCenterControls.swift */; };
 		AA000001000000000000AA11 /* PlayerDoubleTapSeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000BB06 /* PlayerDoubleTapSeek.swift */; };
@@ -280,6 +282,7 @@
 		AA000001000000000000BB02 /* VTTSubtitlesLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VTTSubtitlesLoader.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB03 /* AirPlayButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayButton.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB04 /* PlayerBottomBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBottomBar.swift; sourceTree = "<group>"; };
+		1109C42D2A9243E4A2B847A4 /* PlayerSkipButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSkipButton.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB05 /* PlayerCenterControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCenterControls.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB06 /* PlayerDoubleTapSeek.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerDoubleTapSeek.swift; sourceTree = "<group>"; };
 		AA000001000000000000BB07 /* PlayerProgressSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProgressSlider.swift; sourceTree = "<group>"; };
@@ -574,6 +577,7 @@
 			children = (
 				AA000001000000000000BB03 /* AirPlayButton.swift */,
 				AA000001000000000000BB04 /* PlayerBottomBar.swift */,
+				1109C42D2A9243E4A2B847A4 /* PlayerSkipButton.swift */,
 				AA000001000000000000BB05 /* PlayerCenterControls.swift */,
 				AA000001000000000000BB06 /* PlayerDoubleTapSeek.swift */,
 				AA000001000000000000BB07 /* PlayerProgressSlider.swift */,
@@ -861,6 +865,7 @@
 				AA000001000000000000AA71 /* LibraryView.swift in Sources */,
 				AA000001000000000000AA06 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA08 /* PlayerBottomBar.swift in Sources */,
+				18F4065BFF4047A09A00EEE5 /* PlayerSkipButton.swift in Sources */,
 				AA000001000000000000AA10 /* PlayerCenterControls.swift in Sources */,
 				AA000001000000000000AA12 /* PlayerDoubleTapSeek.swift in Sources */,
 				AA000001000000000000AA14 /* PlayerProgressSlider.swift in Sources */,
@@ -974,6 +979,7 @@
 				AA000001000000000000AA70 /* LibraryView.swift in Sources */,
 				AA000001000000000000AA05 /* AirPlayButton.swift in Sources */,
 				AA000001000000000000AA07 /* PlayerBottomBar.swift in Sources */,
+				46B312DF49C04D7CAE110968 /* PlayerSkipButton.swift in Sources */,
 				AA000001000000000000AA09 /* PlayerCenterControls.swift in Sources */,
 				AA000001000000000000AA11 /* PlayerDoubleTapSeek.swift in Sources */,
 				AA000001000000000000AA13 /* PlayerProgressSlider.swift in Sources */,
