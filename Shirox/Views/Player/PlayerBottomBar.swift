@@ -25,6 +25,7 @@ struct PlayerBottomBar: View {
     var bottomPadding: CGFloat = 24
     var onNextEpisodeTap: (() -> Void)? = nil
     var hasActiveSkipSegment: Bool = false
+    var skipSegments: SkipSegments? = nil
     var episodeNumber: Int? = nil
     var tvdbEpisodeTitle: String? = nil
     var mediaTitle: String? = nil
@@ -71,6 +72,7 @@ struct PlayerBottomBar: View {
                 currentTime: $currentTime,
                 duration: duration,
                 bufferProgress: bufferProgress,
+                skipSegments: skipSegments,
                 onSeek: onSeek,
                 onDragStart: onSliderDragStart,
                 onDragChange: onSliderDragChange,
