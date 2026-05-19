@@ -88,12 +88,12 @@ struct AniListDetailView: View {
         .navigationTitle(vm.media?.title.displayTitle ?? "")
         #if os(iOS)
         .toolbar {
-            if auth.isLoggedIn {
+            if auth.isLoggedIn || malAuth.isLoggedIn {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task {
                             isLoadingEntry = true
-                            existingEntry = try? await ProviderManager.shared.call { try await $0.fetchEntry(mediaId: mediaId) }
+                            existingEntry = try? await activeProvider.fetchEntry(mediaId: mediaId)
                             isLoadingEntry = false
                             showLibraryEdit = true
                         }
@@ -134,8 +134,8 @@ struct AniListDetailView: View {
                 })?.episodeNumber ?? 1
                 selectedRangeIndex = (currentEp - 1) / 100
             }
-            if auth.isLoggedIn {
-                existingEntry = try? await ProviderManager.shared.call { try await $0.fetchEntry(mediaId: mediaId) }
+            if auth.isLoggedIn || malAuth.isLoggedIn {
+                existingEntry = try? await activeProvider.fetchEntry(mediaId: mediaId)
             }
 
             if let media = vm.media {
@@ -255,8 +255,9 @@ struct AniListDetailView: View {
                     },
                     onDelete: existingEntry != nil ? {
                         let entryId = existingEntry!.id
+                        let provider = activeProvider
                         existingEntry = nil
-                        Task { try? await ProviderManager.shared.call { try await $0.deleteEntry(entryId: entryId) } }
+                        Task { try? await provider.deleteEntry(entryId: entryId) }
                     } : nil
                 )
                 #if os(iOS)
@@ -294,10 +295,9 @@ struct AniListDetailView: View {
                 detailHref: nil
             )
         }
+        let provider = activeProvider
         Task {
-            try? await ProviderManager.shared.call {
-                try await $0.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
-            }
+            try? await provider.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
         }
     }
 
