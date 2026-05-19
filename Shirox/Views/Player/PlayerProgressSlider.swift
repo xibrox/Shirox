@@ -120,7 +120,7 @@ struct PlayerProgressSlider: View {
                 .offset(x: originX)
             }
         }
-        .frame(width: geo.size.width, height: barHeight)
+        .frame(width: geo.size.width, height: barHeight, alignment: .leading)
     }
 
     private func subBarFill(L: Double, R: Double, value: Double, subWidth: CGFloat) -> CGFloat {

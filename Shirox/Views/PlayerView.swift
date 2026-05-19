@@ -59,6 +59,7 @@ struct PlayerView: View {
     @State private var skipSegments: SkipSegments?
     @State private var activeSkipSegment: SkipSegmentType?
     @State private var skippedSegments: Set<SkipSegmentType> = []
+    @State private var skip85ButtonFrame: CGRect = .zero
     @AppStorage("autoSkipSegments") private var autoSkipSegments: Bool = true
 
     // AniList tracking
@@ -211,20 +212,20 @@ struct PlayerView: View {
                 lockOverlayView
             }
 
-            if let segment = activeSkipSegment, !castManager.isConnected {
-                VStack {
-                    Spacer()
-                    HStack {
-                        PlayerSkipButton(segmentType: segment, onSkip: skipToSegmentEnd)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 68)
+            if let segment = activeSkipSegment, !castManager.isConnected, skip85ButtonFrame != .zero {
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                    PlayerSkipButton(segmentType: segment, onSkip: skipToSegmentEnd)
+                        .offset(x: skip85ButtonFrame.minX, y: skip85ButtonFrame.minY)
                 }
                 .ignoresSafeArea()
+                .allowsHitTesting(true)
             }
         }
         .ignoresSafeArea()
+        .onPreferenceChange(Skip85ButtonFramePreferenceKey.self) { frame in
+            if frame != .zero { skip85ButtonFrame = frame }
+        }
         .onAppear {
             // Sync subtitleTracks from currentStream — safer than relying on init-time @State override
             if subtitleTracks == nil, let tracks = currentStream.allSubtitles, !tracks.isEmpty {
@@ -1237,9 +1238,11 @@ struct PlayerView: View {
                     if let type = newActive, !skippedSegments.contains(type),
                        let seg = segments.segment(for: type) {
                         skippedSegments.insert(type)
+                        activeSkipSegment = nil
                         p?.seek(to: CMTime(seconds: seg.endMs / 1000, preferredTimescale: 600))
+                    } else {
+                        activeSkipSegment = newActive
                     }
-                    activeSkipSegment = nil
                 } else {
                     activeSkipSegment = newActive
                 }

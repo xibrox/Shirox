@@ -9,7 +9,7 @@ struct DownloadStreamPickerView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(streams, id: \.url) { stream in
+                ForEach(streams) { stream in
                     DownloadStreamRow(stream: stream) {
                         onSelect(stream)
                         dismiss()

@@ -412,12 +412,38 @@ final class DownloadManager: NSObject, ObservableObject {
     }
     
     private func startDownload(_ item: DownloadItem) {
-        let isHLS = item.streamURL.absoluteString.contains(".m3u8")
-        if isHLS {
-            startHLS(item)
-        } else {
-            startMP4(item)
+        // Mark downloading immediately so processQueue() doesn't re-fire while probing.
+        updateState(item.id, .downloading)
+        let id = item.id
+        let url = item.streamURL
+        let headers = item.headers
+        Task {
+            let isHLS = await Self.detectIsHLS(url: url, headers: headers)
+            await MainActor.run {
+                guard let current = self.items.first(where: { $0.id == id }),
+                      current.state == .downloading else { return }
+                if isHLS { self.startHLS(current) } else { self.startMP4(current) }
+            }
         }
+    }
+
+    private static func detectIsHLS(url: URL, headers: [String: String]) async -> Bool {
+        let urlStr = url.absoluteString.lowercased()
+        if urlStr.contains(".m3u8") { return true }
+        if urlStr.contains(".mp4") || urlStr.contains(".mkv") || urlStr.contains(".webm") {
+            return false
+        }
+        var req = URLRequest(url: url, timeoutInterval: 10)
+        req.httpMethod = "HEAD"
+        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        if let (_, response) = try? await URLSession.shared.data(for: req),
+           let http = response as? HTTPURLResponse {
+            let ct = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
+            if ct.contains("mpegurl") || ct.contains("m3u") { return true }
+            if ct.hasPrefix("video/") { return false }
+        }
+        // Ambiguous (HEAD failed or no useful Content-Type): default to HLS.
+        return true
     }
     
     private func startHLS(_ item: DownloadItem) {
@@ -520,20 +546,27 @@ final class DownloadManager: NSObject, ObservableObject {
     }
     
     private func shouldAutoRetry(error: Error, item: DownloadItem) -> Bool {
+        guard item.retryCount < 5 else { return false }
         let nsError = error as NSError
-        guard nsError.domain == NSURLErrorDomain else { return false }
-        
-        let transientCodes: [Int] = [
-            NSURLErrorTimedOut,
-            NSURLErrorCannotConnectToHost,
-            NSURLErrorNetworkConnectionLost,
-            NSURLErrorDNSLookupFailed,
-            NSURLErrorResourceUnavailable,
-            NSURLErrorNotConnectedToInternet,
-            NSURLErrorBackgroundSessionWasDisconnected
-        ]
-        
-        return transientCodes.contains(nsError.code) && item.retryCount < 5
+
+        if nsError.domain == NSURLErrorDomain {
+            let transientCodes: [Int] = [
+                NSURLErrorTimedOut,
+                NSURLErrorCannotConnectToHost,
+                NSURLErrorNetworkConnectionLost,
+                NSURLErrorDNSLookupFailed,
+                NSURLErrorResourceUnavailable,
+                NSURLErrorNotConnectedToInternet,
+                NSURLErrorBackgroundSessionWasDisconnected
+            ]
+            return transientCodes.contains(nsError.code)
+        }
+
+        if nsError.domain == "DownloadManager" {
+            return (500..<600).contains(nsError.code)
+        }
+
+        return false
     }
     
     private func persist() {
@@ -586,6 +619,18 @@ extension DownloadManager: URLSessionDownloadDelegate {
                     self.updateError(self.items[idx].id, NSError(domain: "DownloadManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Download task lost context"]))
                 }
             }
+            return
+        }
+        // URLSession invokes this delegate for any completed transfer, including
+        // non-2xx — the error body would otherwise be saved as if it were the video.
+        if let http = downloadTask.response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            try? FileManager.default.removeItem(at: location)
+            let err = NSError(
+                domain: "DownloadManager",
+                code: http.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Server returned HTTP \(http.statusCode)"]
+            )
+            Task { @MainActor in self.updateError(id, err) }
             return
         }
         let finalName = "\(id.uuidString).mp4"

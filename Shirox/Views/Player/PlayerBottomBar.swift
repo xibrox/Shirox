@@ -1,5 +1,13 @@
 import SwiftUI
 
+struct Skip85ButtonFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
 struct PlayerBottomBar: View {
     @Binding var currentTime: Double
     let duration: Double
@@ -100,6 +108,14 @@ struct PlayerBottomBar: View {
         }
         .buttonStyle(.plain)
         .opacity(hasActiveSkipSegment ? 0 : 1)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: Skip85ButtonFramePreferenceKey.self,
+                    value: proxy.frame(in: .global)
+                )
+            }
+        )
     }
 
     @ViewBuilder private var rightButtonGroup: some View {

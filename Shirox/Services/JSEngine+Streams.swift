@@ -28,10 +28,13 @@ func parseStreamResults(from obj: [String: Any]) -> [StreamResult] {
 
     var results: [StreamResult] = []
 
+    var seen = Set<String>()
+
     if let streams = obj["streams"] as? [[String: Any]] {
         for stream in streams {
             guard let urlStr = stream["streamUrl"] as? String ?? stream["url"] as? String,
                   let url = URL(string: urlStr) else { continue }
+            guard seen.insert(urlStr).inserted else { continue }
             let title = stream["title"] as? String ?? "Stream"
             let headers = stream["headers"] as? [String: String] ?? [:]
             results.append(StreamResult(title: title, url: url, headers: headers,
@@ -41,6 +44,7 @@ func parseStreamResults(from obj: [String: Any]) -> [StreamResult] {
     } else if let streams = obj["streams"] as? [String] {
         for (i, urlStr) in streams.enumerated() {
             guard let url = URL(string: urlStr) else { continue }
+            guard seen.insert(urlStr).inserted else { continue }
             results.append(StreamResult(title: "Stream \(i + 1)", url: url, headers: [:],
                                         subtitle: subtitleUrl, subtitleHeaders: subtitleHeaders,
                                         allSubtitles: allSubtitles))
