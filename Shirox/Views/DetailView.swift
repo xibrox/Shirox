@@ -8,6 +8,9 @@ struct DetailView: View {
     var aniListID: Int?
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @State private var malID: Int? = nil
+    @State private var existingMALEntry: LibraryEntry? = nil
     @State private var isSynopsisExpanded = false
     @State private var selectedSeason = 0
     @State private var showResetConfirmation = false
@@ -106,6 +109,18 @@ struct DetailView: View {
                 }
             }
 
+            if malAuth.isLoggedIn {
+                let aid = vm.aniListID ?? aniListID
+                if let aid {
+                    Task {
+                        malID = await IDMappingService.shared.malId(forAnilistId: aid)
+                        if let mid = malID {
+                            existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: mid)
+                        }
+                    }
+                }
+            }
+
             if let mid = moduleId, ModuleManager.shared.activeModule?.id != mid,
                let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
                 Task {
@@ -154,6 +169,15 @@ struct DetailView: View {
             guard let episode = episodes.first(where: { Int($0.number) == resumeEpNum }) else { return }
             autoPlayOnLoad = true
             vm.loadStreams(for: episode)
+        }
+        .onChange(of: vm.aniListID) { _, newAID in
+            guard malAuth.isLoggedIn, let aid = newAID, malID == nil else { return }
+            Task {
+                malID = await IDMappingService.shared.malId(forAnilistId: aid)
+                if let mid = malID {
+                    existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: mid)
+                }
+            }
         }
         .tint(.primary)
         .adaptiveSheet(isPresented: $vm.showStreamPicker, onDismiss: {
