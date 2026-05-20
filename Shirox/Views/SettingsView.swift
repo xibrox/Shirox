@@ -117,7 +117,7 @@ struct SettingsView: View {
                         .tint(.secondary)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("Show Button At")
+                            Text("Episode Progress Threshold")
                             Spacer()
                             Text("\(Int(watchedPercentage))%")
                                 .font(.headline)

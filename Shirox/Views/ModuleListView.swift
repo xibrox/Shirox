@@ -75,6 +75,9 @@ struct ModuleListView: View {
             #endif
             .scrollContentBackground(.hidden)
             #if os(iOS)
+            .scrollDismissesKeyboard(.immediately)
+            #endif
+            #if os(iOS)
             .background(Color(.systemBackground))
             #else
             .background(Color(NSColor.windowBackgroundColor))
@@ -113,9 +116,6 @@ struct ModuleListView: View {
         #else
         .background(Color(.windowBackgroundColor))
         #endif
-        .simultaneousGesture(TapGesture().onEnded {
-            isTextFieldFocused = false
-        })
         .onChange(of: moduleURL) { _, _ in
             addModuleError = nil
             moduleManager.errorMessage = nil

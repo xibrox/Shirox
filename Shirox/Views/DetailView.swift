@@ -42,7 +42,7 @@ struct DetailView: View {
         ZStack {
             platformBackground.ignoresSafeArea()
             if vm.isLoadingDetail && vm.detail == nil {
-                loadingView
+                detailLoadingSkeleton
             } else if let detail = vm.detail {
                 detailScrollView(detail: detail)
             } else if let error = vm.errorMessage {
@@ -726,16 +726,65 @@ struct DetailView: View {
         }
     }
 
-    // MARK: - Loading / Error (unchanged)
+    // MARK: - Loading skeleton
     @ViewBuilder
-    private var loadingView: some View {
-        VStack(spacing: 15) {
-            ProgressView()
-            Text("Loading details…")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private var detailLoadingSkeleton: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                heroSection
+
+                HStack(spacing: 8) {
+                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 68, height: 20)
+                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 52, height: 20)
+                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 44, height: 20)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .shimmer()
+
+                #if os(iOS)
+                VStack(alignment: .leading, spacing: 10) {
+                    RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 88, height: 20)
+                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
+                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
+                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 240)
+                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 13).frame(maxWidth: 160)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .shimmer()
+                #endif
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 96, height: 20)
+                        Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 28, height: 20)
+                        Spacer()
+                        Circle().fill(Color.secondary.opacity(0.3)).frame(width: 36, height: 36)
+                    }
+                    .padding(.bottom, 12)
+
+                    ForEach(0..<7, id: \.self) { _ in
+                        HStack(spacing: 14) {
+                            RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.35)).frame(width: 100, height: 56)
+                            VStack(alignment: .leading, spacing: 7) {
+                                RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 190)
+                                RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 11).frame(maxWidth: 110)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 10)
+                        Divider()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                .shimmer()
+            }
+            .padding(.bottom, 30)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .coordinateSpace(name: "detailScroll")
+        .ignoresSafeArea(edges: .top)
     }
 
     @ViewBuilder
@@ -1124,7 +1173,24 @@ struct DetailView: View {
             }
             #endif
 
-            if detail.episodes.isEmpty && !vm.isLoadingEpisodes {
+            if vm.isLoadingEpisodes && detail.episodes.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(0..<8, id: \.self) { _ in
+                        HStack(spacing: 14) {
+                            RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.35)).frame(width: 100, height: 56)
+                            VStack(alignment: .leading, spacing: 7) {
+                                RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 190)
+                                RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 11).frame(maxWidth: 110)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 10)
+                        Divider()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .shimmer()
+            } else if detail.episodes.isEmpty {
                 Text("No episodes found.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

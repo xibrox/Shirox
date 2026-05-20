@@ -59,8 +59,7 @@ struct AniListDetailView: View {
             if let media = vm.media {
                 content(media: media)
             } else if vm.isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                loadingSkeletonView
             } else if let error = vm.error {
                 ContentUnavailableView(
                     "Couldn't Load",
@@ -299,6 +298,105 @@ struct AniListDetailView: View {
         Task {
             try? await provider.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
         }
+    }
+
+    // MARK: - Loading skeleton
+    @ViewBuilder
+    private var loadingSkeletonView: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.35))
+                        .frame(height: 420)
+                        .shimmer()
+
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: platformBackground.opacity(0.2), location: 0.45),
+                            .init(color: platformBackground, location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 420)
+
+                    HStack(alignment: .bottom, spacing: 14) {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.secondary.opacity(0.35))
+                            .frame(width: 110, height: 165)
+                            .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.4)).frame(height: 20).frame(maxWidth: 180)
+                            HStack(spacing: 8) {
+                                Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 54, height: 18)
+                                Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 66, height: 18)
+                                Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 40, height: 18)
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+                    .shimmer()
+                }
+                .frame(height: 420)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 6) {
+                        ForEach([70, 82, 52, 65, 56] as [CGFloat], id: \.self) { w in
+                            Capsule().fill(Color.secondary.opacity(0.35)).frame(width: w, height: 24)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .shimmer()
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 88, height: 20)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 240)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 13).frame(maxWidth: 160)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .shimmer()
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 96, height: 20)
+                            Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 28, height: 20)
+                            Spacer()
+                            Circle().fill(Color.secondary.opacity(0.3)).frame(width: 36, height: 36)
+                        }
+                        .padding(.bottom, 12)
+
+                        ForEach(0..<8, id: \.self) { _ in
+                            HStack(spacing: 14) {
+                                RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.35)).frame(width: 100, height: 56)
+                                VStack(alignment: .leading, spacing: 7) {
+                                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 190)
+                                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 11).frame(maxWidth: 110)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 10)
+                            Divider()
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 20)
+                    .shimmer()
+                }
+            }
+            .padding(.bottom, 30)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .ignoresSafeArea(edges: .top)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Content
