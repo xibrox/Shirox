@@ -41,13 +41,6 @@ final class CloudflareBypassManager {
         guard let host = url.host else { return }
         if cookie(for: host) != nil { return }
 
-        // .default() persists cookies across app launches — reuse a prior cf_clearance if still valid
-        if let persisted = await persistedCFClearance(for: host) {
-            Logger.shared.log("[CFBypass] Reusing persisted cf_clearance for \(host)", type: "Debug")
-            store(cookie: persisted, for: host)
-            return
-        }
-
         let webView = makeHiddenWebView()
 
         #if os(iOS)
@@ -81,8 +74,9 @@ final class CloudflareBypassManager {
         let config = WKWebViewConfiguration()
         // Shared process pool gives the WebKit process accumulated state across bypass calls.
         config.processPool = Self.sharedProcessPool
-        // .default() stores cookies on disk — cf_clearance survives across sessions.
-        config.websiteDataStore = .default()
+        // Isolated store so cookies from other WKWebViews (e.g. module fetches) don't
+        // appear here and confuse the cf_clearance poll.
+        config.websiteDataStore = .nonPersistent()
 
         let antiBot = """
         (function() {
@@ -149,28 +143,15 @@ final class CloudflareBypassManager {
     private func cfClearanceCookie(for host: String, in webView: WKWebView) async -> String? {
         return await withCheckedContinuation { continuation in
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
-                let names = cookies.map { "\($0.name)@\($0.domain)" }.joined(separator: ", ")
-                if !cookies.isEmpty {
-                    Logger.shared.log("[CFBypass] Cookies in store: \(names)", type: "Debug")
+                let hostCookies = cookies.filter {
+                    let domain = $0.domain.hasPrefix(".") ? String($0.domain.dropFirst()) : $0.domain
+                    return host == domain || host.hasSuffix("." + domain)
                 }
-                let value = cookies.first(where: {
-                    guard $0.name == "cf_clearance" else { return false }
-                    let domain = $0.domain.hasPrefix(".") ? String($0.domain.dropFirst()) : $0.domain
-                    return host == domain || host.hasSuffix("." + domain)
-                })?.value
-                continuation.resume(returning: value)
-            }
-        }
-    }
-
-    private func persistedCFClearance(for host: String) async -> String? {
-        return await withCheckedContinuation { continuation in
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-                let value = cookies.first(where: {
-                    guard $0.name == "cf_clearance" else { return false }
-                    let domain = $0.domain.hasPrefix(".") ? String($0.domain.dropFirst()) : $0.domain
-                    return host == domain || host.hasSuffix("." + domain)
-                })?.value
+                if !hostCookies.isEmpty {
+                    let names = hostCookies.map(\.name).joined(separator: ", ")
+                    Logger.shared.log("[CFBypass] Cookies for \(host): \(names)", type: "Debug")
+                }
+                let value = hostCookies.first(where: { $0.name == "cf_clearance" })?.value
                 continuation.resume(returning: value)
             }
         }
