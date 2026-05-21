@@ -1218,7 +1218,11 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         guard let webView = webView, let host = webView.url?.host else { return }
         let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
         cookieStore.getAllCookies { cookies in
-            if let cf = cookies.first(where: { $0.name == "cf_clearance" && $0.domain.contains(host) }) {
+            if let cf = cookies.first(where: {
+                guard $0.name == "cf_clearance" else { return false }
+                let domain = $0.domain.hasPrefix(".") ? String($0.domain.dropFirst()) : $0.domain
+                return host == domain || host.hasSuffix("." + domain)
+            }) {
                 Task { @MainActor in
                     CloudflareBypassManager.shared.store(cookie: cf.value, for: host)
                 }

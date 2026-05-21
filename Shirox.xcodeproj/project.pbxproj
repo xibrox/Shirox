@@ -208,6 +208,8 @@
 		C87DD0B0D130C4EB05398B5E /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F86905022F880BD82F1BFA75 /* UserProfile.swift */; };
 		CA620998EF1BCA1D9C95B49D /* AniListDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B92A34FBA9ACC730D8F6D9 /* AniListDetailViewModel.swift */; };
 		CC14EF9C84C3E8BE5456C77D /* SearchItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAE3976E02954E212D46BD4 /* SearchItem.swift */; };
+		CF000001000000000000CF02 /* CloudflareBypassManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000001000000000000CF01 /* CloudflareBypassManager.swift */; };
+		CF000001000000000000CF03 /* CloudflareBypassManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000001000000000000CF01 /* CloudflareBypassManager.swift */; };
 		CFB5FFD7B8B6D26BD966878F /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F30DA63DC7CE67CF8EB5D8A /* EpisodeLink.swift */; };
 		CFD5A40FA6E74CB3ADB60000 /* LikesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */; };
 		D0E5AFA00D4E6868A52A1123 /* JSEngine+Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51053A55A3C1D2682EB7719D /* JSEngine+Streams.swift */; };
@@ -215,8 +217,6 @@
 		DD000001000000000000AA01 /* ThumbnailEpisodeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */; };
 		DD000001000000000000AA02 /* ThumbnailEpisodeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */; };
 		E2883C1FAC254280A1483D82 /* ContinueWatchingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */; };
-		CF000001000000000000CF02 /* CloudflareBypassManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000001000000000000CF01 /* CloudflareBypassManager.swift */; };
-		CF000001000000000000CF03 /* CloudflareBypassManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000001000000000000CF01 /* CloudflareBypassManager.swift */; };
 		E2A6544D9407734FABCFD57D /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEA5105668982AD0021041F /* SearchView.swift */; };
 		E2DCF99DA506F27794A1B6CD /* Pods_Shirox_iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F51FC1BEA042BB8C4C9820F9 /* Pods_Shirox_iOS.framework */; };
 		EA5B1C17081C02D59196F61C /* ModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 330313A7F7AB1EF362097130 /* ModuleListView.swift */; };
@@ -242,7 +242,6 @@
 
 /* Begin PBXFileReference section */
 		0B300B7DC66C44EAB3DE289B /* ContinueWatchingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingManager.swift; sourceTree = "<group>"; };
-		CF000001000000000000CF01 /* CloudflareBypassManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassManager.swift; sourceTree = "<group>"; };
 		0F6021362F71CCC800CEC66D /* shirox-icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "shirox-icon.icon"; sourceTree = "<group>"; };
 		1109C42D2A9243E4A2B847A4 /* PlayerSkipButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSkipButton.swift; sourceTree = "<group>"; };
 		11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleStreamPickerView.swift; sourceTree = "<group>"; };
@@ -341,6 +340,7 @@
 		B6B720E10D4EE0F2136F17C7 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
 		BCAB52C5F226579CA37CC9E5 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
 		BECC2087556541BAE47BDA6B /* DetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailViewModel.swift; sourceTree = "<group>"; };
+		CF000001000000000000CF01 /* CloudflareBypassManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassManager.swift; sourceTree = "<group>"; };
 		CFD5A40FA6E74CB3ADB51EBC /* LikesSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikesSheetView.swift; sourceTree = "<group>"; };
 		D45C2EB3A834F43B2863C70F /* MALProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MALProvider.swift; sourceTree = "<group>"; };
 		D63F1849AA2515C53BE08A22 /* AnimeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimeCardView.swift; sourceTree = "<group>"; };
@@ -1129,13 +1129,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.70;
+				MARKETING_VERSION = 0.0.71;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1154,14 +1154,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.70;
+				MARKETING_VERSION = 0.0.71;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -1179,13 +1179,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.70;
+				MARKETING_VERSION = 0.0.71;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1265,14 +1265,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 67;
+				CURRENT_PROJECT_VERSION = 68;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.70;
+				MARKETING_VERSION = 0.0.71;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

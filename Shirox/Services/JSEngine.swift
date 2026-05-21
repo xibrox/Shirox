@@ -386,10 +386,15 @@ final class JSEngine: ObservableObject {
     }
 
     static func isTurnstileResponse(status: Int, body: String) -> Bool {
-        guard status == 403 || status == 503 else { return false }
-        return body.contains("cf-turnstile") ||
-               body.contains("challenges.cloudflare.com") ||
-               body.contains("__cf_chl_")
+        let lower = body.lowercased()
+        guard lower.contains("cloudflare") else { return false }
+        return lower.contains("cf-turnstile") ||
+               lower.contains("challenges.cloudflare.com") ||
+               lower.contains("__cf_chl_") ||
+               lower.contains("jschl") ||
+               lower.contains("challenge-platform") ||
+               lower.contains("cf-spinner") ||
+               lower.contains("ray id")
     }
 
     static func jsStringLiteral(_ string: String) -> String {
