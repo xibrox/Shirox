@@ -145,16 +145,45 @@ final class JSEngine: ObservableObject {
 
             Task {
                 do {
-                    let (data, response) = try await self.session.data(for: request)
-                    guard let httpResponse = response as? HTTPURLResponse else {
+                    // CF cookie injection
+                    if let host = url.host,
+                       let cfCookie = await CloudflareBypassManager.shared.cookie(for: host) {
+                        let existing = request.value(forHTTPHeaderField: "Cookie") ?? ""
+                        request.setValue(
+                            existing.isEmpty ? "cf_clearance=\(cfCookie)" : "\(existing); cf_clearance=\(cfCookie)",
+                            forHTTPHeaderField: "Cookie"
+                        )
+                    }
+
+                    var (data, response) = try await self.session.data(for: request)
+                    guard var httpResponse = response as? HTTPURLResponse else {
                         reject.call(withArguments: ["No response data"])
                         return
                     }
+                    var responseText = String(data: data, encoding: .utf8) ?? ""
 
-                    let responseText = String(data: data, encoding: .utf8) ?? ""
+                    // CF reactive retry on Turnstile challenge
+                    if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
+                        try? await CloudflareBypassManager.shared.triggerBypass(for: url)
+                        if let host = url.host,
+                           let cfCookie = await CloudflareBypassManager.shared.cookie(for: host) {
+                            var retryRequest = request
+                            let existing = retryRequest.value(forHTTPHeaderField: "Cookie") ?? ""
+                            retryRequest.setValue(
+                                existing.isEmpty ? "cf_clearance=\(cfCookie)" : "\(existing); cf_clearance=\(cfCookie)",
+                                forHTTPHeaderField: "Cookie"
+                            )
+                            let (retryData, retryResponse) = try await self.session.data(for: retryRequest)
+                            if let retryHTTP = retryResponse as? HTTPURLResponse {
+                                data = retryData
+                                httpResponse = retryHTTP
+                                responseText = String(data: retryData, encoding: .utf8) ?? ""
+                            }
+                        }
+                    }
+
                     let status = httpResponse.statusCode
 
-                    // Build headers dict
                     var headersDict: [String: String] = [:]
                     for (key, value) in httpResponse.allHeaderFields {
                         headersDict[String(describing: key)] = String(describing: value)
@@ -354,6 +383,13 @@ final class JSEngine: ObservableObject {
                 cont.resume(with: result)
             }
         }
+    }
+
+    static func isTurnstileResponse(status: Int, body: String) -> Bool {
+        guard status == 403 || status == 503 else { return false }
+        return body.contains("cf-turnstile") ||
+               body.contains("challenges.cloudflare.com") ||
+               body.contains("__cf_chl_")
     }
 
     static func jsStringLiteral(_ string: String) -> String {
