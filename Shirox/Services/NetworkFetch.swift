@@ -779,6 +779,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         let totalTasks = (shouldCaptureHTML ? 1 : 0) + (shouldCaptureCookies ? 1 : 0)
 
         if totalTasks == 0 {
+            extractCFClearanceCookie()
             stopMonitoring(reason: "timeout")
             return
         }
@@ -786,6 +787,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         let checkCompletion = {
             completedTasks += 1
             if completedTasks >= totalTasks {
+                self.extractCFClearanceCookie()
                 self.stopMonitoring(reason: "timeout_with_data")
             }
         }
@@ -1210,6 +1212,18 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         }, 1000);
         """
         webView.evaluateJavaScript(jsInteraction, completionHandler: nil)
+    }
+
+    private func extractCFClearanceCookie() {
+        guard let webView = webView, let host = webView.url?.host else { return }
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        cookieStore.getAllCookies { cookies in
+            if let cf = cookies.first(where: { $0.name == "cf_clearance" && $0.domain.contains(host) }) {
+                Task { @MainActor in
+                    CloudflareBypassManager.shared.store(cookie: cf.value, for: host)
+                }
+            }
+        }
     }
 
     private func stopMonitoring(reason: String) {
