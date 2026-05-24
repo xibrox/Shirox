@@ -330,6 +330,8 @@ import Foundation
         let ref = arr.first(where: {
             matchesShow($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
         })
+        // Don't move CW backward — if placeholder already points past episodeNumber, leave it.
+        if let ref, ref.episodeNumber > episodeNumber { persist(); return }
         removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)
 
         // 2. Queue up the NEXT episode (N + 1) as a placeholder, if it exists
