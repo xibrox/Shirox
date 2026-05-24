@@ -123,18 +123,16 @@ final class JSEngine: ObservableObject {
 
             let method = (methodVal.isNull || methodVal.isUndefined) ? "GET" : (methodVal.toString() ?? "GET")
             let body: String? = (bodyVal.isNull || bodyVal.isUndefined) ? nil : bodyVal.toString()
+            // Extract headers before entering the Task (JSValue is not Sendable)
+            let jsHeaders = (!headersVal.isUndefined && !headersVal.isNull)
+                ? (headersVal.toDictionary() as? [String: String] ?? [:])
+                : [String: String]()
 
             var request = URLRequest(url: url)
             request.httpMethod = method
             request.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
-
-            // Apply headers from JS
-            if !headersVal.isUndefined, !headersVal.isNull {
-                if let dict = headersVal.toDictionary() as? [String: String] {
-                    for (key, value) in dict {
-                        request.setValue(value, forHTTPHeaderField: key)
-                    }
-                }
+            for (key, value) in jsHeaders {
+                request.setValue(value, forHTTPHeaderField: key)
             }
 
             if let body, let bodyData = body.data(using: .utf8) {
@@ -145,12 +143,13 @@ final class JSEngine: ObservableObject {
 
             Task {
                 do {
-                    // CF cookie injection
+                    // CF cookie injection — inject all bypass session cookies, not just cf_clearance,
+                    // because some APIs (e.g. AllAnime) require additional Turnstile session cookies.
                     if let host = url.host,
-                       let cfCookie = await CloudflareBypassManager.shared.cookie(for: host) {
+                       let bypassHeader = await CloudflareBypassManager.shared.fullCookieHeader(for: host) {
                         let existing = request.value(forHTTPHeaderField: "Cookie") ?? ""
                         request.setValue(
-                            existing.isEmpty ? "cf_clearance=\(cfCookie)" : "\(existing); cf_clearance=\(cfCookie)",
+                            existing.isEmpty ? bypassHeader : "\(existing); \(bypassHeader)",
                             forHTTPHeaderField: "Cookie"
                         )
                     }
@@ -162,19 +161,21 @@ final class JSEngine: ObservableObject {
                     }
                     var responseText = String(data: data, encoding: .utf8) ?? ""
 
-                    // CF reactive retry on Turnstile challenge
+                    // CF reactive retry: solve challenge, then retry via URLSession using all
+                    // bypass cookies + the WKWebView's UA so CF sees the same session identity.
                     if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
                         try? await CloudflareBypassManager.shared.triggerBypass(for: url)
                         if let host = url.host,
-                           let cfCookie = await CloudflareBypassManager.shared.cookie(for: host) {
+                           let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: host) {
                             var retryRequest = request
-                            let existing = retryRequest.value(forHTTPHeaderField: "Cookie") ?? ""
-                            retryRequest.setValue(
-                                existing.isEmpty ? "cf_clearance=\(cfCookie)" : "\(existing); cf_clearance=\(cfCookie)",
-                                forHTTPHeaderField: "Cookie"
-                            )
+                            retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
+                            if !info.userAgent.isEmpty {
+                                retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
+                            }
+                            Logger.shared.log("[CFBypass] URLSession retry cookie=\(info.cookieHeader.prefix(60))", type: "Debug")
                             let (retryData, retryResponse) = try await self.session.data(for: retryRequest)
                             if let retryHTTP = retryResponse as? HTTPURLResponse {
+                                Logger.shared.log("[CFBypass] URLSession retry status=\(retryHTTP.statusCode)", type: "Debug")
                                 data = retryData
                                 httpResponse = retryHTTP
                                 responseText = String(data: retryData, encoding: .utf8) ?? ""
@@ -386,6 +387,7 @@ final class JSEngine: ObservableObject {
     }
 
     static func isTurnstileResponse(status: Int, body: String) -> Bool {
+        guard status == 403 || status == 503 else { return false }
         let lower = body.lowercased()
         guard lower.contains("cloudflare") else { return false }
         return lower.contains("cf-turnstile") ||
@@ -393,8 +395,7 @@ final class JSEngine: ObservableObject {
                lower.contains("__cf_chl_") ||
                lower.contains("jschl") ||
                lower.contains("challenge-platform") ||
-               lower.contains("cf-spinner") ||
-               lower.contains("ray id")
+               lower.contains("cf-spinner")
     }
 
     static func jsStringLiteral(_ string: String) -> String {

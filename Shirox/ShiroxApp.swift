@@ -202,6 +202,7 @@ private struct MacSidebarView: View {
 
 private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
+    @ObservedObject private var cfManager = CloudflareBypassManager.shared
     @State private var selectedTab = 0
     #if targetEnvironment(macCatalyst)
     @State private var sidebarTab: SidebarTab = .home
@@ -289,6 +290,16 @@ private struct RootTabView: View {
             ToastView()
                 .allowsHitTesting(false)
         }
+        #if os(iOS)
+        .overlay {
+            if cfManager.activeBypassWebView != nil {
+                CloudflareBypassSheetView()
+                    .ignoresSafeArea()
+                    .transition(.move(edge: .bottom))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: cfManager.activeBypassWebView == nil)
+        #endif
         #if targetEnvironment(macCatalyst)
         .onAppear {
             guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }

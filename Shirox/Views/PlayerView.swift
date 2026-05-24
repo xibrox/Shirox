@@ -324,6 +324,12 @@ struct PlayerView: View {
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .onChange(of: videoReady) { _, ready in
+            if ready {
+                withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
+                scheduleHide()
+            }
+        }
         #endif
         .sheet(isPresented: $showSpeedPicker) {
             PlayerSpeedPicker(selectedSpeed: Binding(
@@ -957,6 +963,7 @@ struct PlayerView: View {
     private func togglePlayPause() {
         if castManager.isConnected {
             if isPlaying { castManager.pause() } else { castManager.play() }
+            withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
             scheduleHide()
             return
         }
@@ -969,6 +976,7 @@ struct PlayerView: View {
             player.rate = Float(playbackSpeed)
             isPlaying = true
         }
+        withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
         scheduleHide()
     }
 
@@ -1239,6 +1247,13 @@ struct PlayerView: View {
         tvdbEpisodeTitle = TVDBMappingService.shared.getCachedEpisode(for: aniListID, episodeNumber: ep)?.title
         guard tvdbEpisodeTitle == nil else { return }
         Task {
+            // Try Anira per-episode first for accurate title
+            let aniraEp = await TVDBMappingService.shared.fetchAniraEpisode(id: aniListID, episodeNumber: ep)
+            if let title = aniraEp?.title, !title.isEmpty {
+                await MainActor.run { tvdbEpisodeTitle = title }
+                return
+            }
+            // Fall back to TVDB / bulk episode list
             let eps = await TVDBMappingService.shared.getEpisodes(for: aniListID)
             await MainActor.run {
                 tvdbEpisodeTitle = eps.first(where: { $0.episode == ep })?.title

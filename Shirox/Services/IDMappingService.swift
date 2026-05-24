@@ -25,15 +25,6 @@ final class IDMappingService {
     }
 
     private struct AniraMapping: Decodable {
-        let anilistId: Int?
-        let malId: Int?
-        let imdb_id: String?
-        let tmdb_show_id: Int?
-        let tmdb_movie_id: Int?
-        let media_type: String?
-    }
-
-    private struct AniraBulkMapping: Decodable {
         let anilist_id: Int?
         let mal_id: Int?
         let imdb_id: String?
@@ -41,6 +32,8 @@ final class IDMappingService {
         let tmdb_movie_id: Int?
         let media_type: String?
     }
+
+    private typealias AniraBulkMapping = AniraMapping
 
     // MARK: - Bulk prefetch
 
@@ -101,10 +94,10 @@ final class IDMappingService {
     func anilistId(forMALId malId: Int) async -> Int? {
         let key = "mal-\(malId)"
         if let cached = cache[key] { return cached }
-        guard let url = URL(string: "https://api.anira.dev/mappings/mal/\(malId)"),
+        guard let url = URL(string: "https://api.anira.dev/mappings/\(malId)?mapping_key=myanimelist"),
               let (data, _) = try? await URLSession.shared.data(from: url),
-              let mapping = try? JSONDecoder().decode(AniraMapping.self, from: data),
-              let id = mapping.anilistId else { return nil }
+              let mappings = try? JSONDecoder().decode([AniraMapping].self, from: data),
+              let id = mappings.first?.anilist_id else { return nil }
         cache[key] = id
         UserDefaults.standard.set(cache, forKey: cacheKey)
         return id
@@ -113,17 +106,17 @@ final class IDMappingService {
     func malId(forAnilistId anilistId: Int) async -> Int? {
         let key = "anilist-\(anilistId)"
         if let cached = cache[key] { return cached }
-        guard let url = URL(string: "https://api.anira.dev/mappings/\(anilistId)"),
+        guard let url = URL(string: "https://api.anira.dev/mappings/\(anilistId)?mapping_key=anilist"),
               let (data, _) = try? await URLSession.shared.data(from: url),
-              let mapping = try? JSONDecoder().decode(AniraMapping.self, from: data),
-              let id = mapping.malId else { return nil }
+              let mappings = try? JSONDecoder().decode([AniraMapping].self, from: data),
+              let id = mappings.first?.mal_id else { return nil }
         cache[key] = id
         UserDefaults.standard.set(cache, forKey: cacheKey)
         return id
     }
 
     func imdbId(forAnilistId anilistId: Int) async -> String? {
-        if let cached = mediaCache[anilistId] { return cached.imdbId }
+        if let cached = mediaCache[anilistId], let id = cached.imdbId { return id }
         await fetchMediaMapping(forAnilistId: anilistId)
         return mediaCache[anilistId]?.imdbId
     }
@@ -132,7 +125,7 @@ final class IDMappingService {
         if let cached = mediaCache[anilistId] {
             if let showId = cached.tmdbShowId { return (showId, false) }
             if let movieId = cached.tmdbMovieId { return (movieId, true) }
-            return nil
+            if cached.imdbId != nil { return nil }
         }
         await fetchMediaMapping(forAnilistId: anilistId)
         guard let cached = mediaCache[anilistId] else { return nil }
@@ -142,9 +135,10 @@ final class IDMappingService {
     }
 
     private func fetchMediaMapping(forAnilistId anilistId: Int) async {
-        guard let url = URL(string: "https://api.anira.dev/mappings/\(anilistId)"),
+        guard let url = URL(string: "https://api.anira.dev/mappings/\(anilistId)?mapping_key=anilist"),
               let (data, _) = try? await URLSession.shared.data(from: url),
-              let m = try? JSONDecoder().decode(AniraMapping.self, from: data)
+              let mappings = try? JSONDecoder().decode([AniraMapping].self, from: data),
+              let m = mappings.first
         else { return }
         let mapping = MediaMapping(imdbId: m.imdb_id, tmdbShowId: m.tmdb_show_id,
                                    tmdbMovieId: m.tmdb_movie_id, mediaType: m.media_type)

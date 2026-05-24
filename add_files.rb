@@ -28,7 +28,8 @@ new_files = [
   ['Shirox/Services/MALProvider.swift',          'Shirox/Services'],
   ['Shirox/Services/IDMappingService.swift',     'Shirox/Services'],
   # Views
-  ['Shirox/Views/Shared/ProviderStatusBanner.swift', 'Shirox/Views/Shared'],
+  ['Shirox/Views/Shared/ProviderStatusBanner.swift',       'Shirox/Views/Shared'],
+  ['Shirox/Views/Shared/CloudflareBypassSheetView.swift',  'Shirox/Views/Shared'],
 ]
 
 def find_or_create_group(project, group_path)

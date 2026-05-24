@@ -180,9 +180,25 @@ final class DetailViewModel: ObservableObject {
         streamsTask = Task {
             do {
                 let streams = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
-                pendingStreams = streams.sorted { $0.title < $1.title }
+                let sorted = streams.sorted { $0.title < $1.title }
                 isLoadingStreams = false
-                showDownloadStreamPicker = true
+
+                let autoPickLastStream = UserDefaults.standard.bool(forKey: "autoPickLastStream")
+                let moduleId = ModuleManager.shared.activeModule?.id ?? ""
+                let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: moduleId)
+
+                if sorted.count == 1 {
+                    pendingStreams = sorted
+                    downloadWithSelectedStream(sorted[0])
+                } else if autoPickLastStream,
+                          let title = savedTitle,
+                          let match = sorted.first(where: { $0.title == title }) {
+                    pendingStreams = sorted
+                    downloadWithSelectedStream(match)
+                } else {
+                    pendingStreams = sorted
+                    showDownloadStreamPicker = true
+                }
             } catch {
                 if (error as? CancellationError) != nil { return }
                 isLoadingStreams = false
