@@ -1547,7 +1547,7 @@ private struct ModuleEpisodeRowContainer: View {
                 )
             }
         }
-        .task {
+        .task(id: aniListID) {
             guard let aid = aniListID else { return }
             aniMapEpisode = await TVDBMappingService.shared.getEpisode(for: aid, episodeNumber: epNum)
             if aniMapEpisode?.thumbnail == nil {

@@ -690,43 +690,33 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     func getEpisode(for id: Int, episodeNumber: Int, provider: ProviderType = .anilist) async -> AniMapEpisode? {
         // 1. In-memory cache (checks both .episode and .absolute fields)
         if let hit = getCachedEpisode(for: id, provider: provider, episodeNumber: episodeNumber) {
-            Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → cache hit (episode:\(hit.episode) absolute:\(hit.absolute ?? -1))", type: "Debug")
             return hit
         }
 
         // 2. Fresh network fetch + check both fields
         let eps = await getEpisodes(for: id, provider: provider)
-        Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → fetched \(eps.count) eps, first.episode=\(eps.first?.episode ?? -1) first.absolute=\(eps.first?.absolute ?? -1)", type: "Debug")
         if let hit = eps.first(where: { $0.episode == episodeNumber })
                      ?? eps.first(where: { $0.absolute == episodeNumber }) {
-            Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → step2 hit (episode:\(hit.episode) absolute:\(hit.absolute ?? -1))", type: "Debug")
             return hit
         }
 
         // 3. Offset fallback — ensures epOffset is cached, then tries ±offset variants
         _ = await getTVDBId(for: id, provider: provider)
         let offset = cachedEpOffset(for: id, provider: provider) ?? 0
-        Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → offset=\(offset)", type: "Debug")
-        guard offset > 0 else {
-            Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → no offset, returning nil", type: "Debug")
-            return nil
-        }
+        guard offset > 0 else { return nil }
 
         // Module absolute → AniList-relative (e.g. 25 − 24 = 1)
         let relative = episodeNumber - offset
         if relative > 0, let hit = eps.first(where: { $0.episode == relative }) {
-            Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → offset-relative hit ep=\(relative)", type: "Debug")
             return hit
         }
 
         // AniList-relative → absolute (e.g. 1 + 24 = 25)
         let absolute = episodeNumber + offset
         if let hit = eps.first(where: { $0.episode == absolute }) {
-            Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → offset-absolute hit ep=\(absolute)", type: "Debug")
             return hit
         }
 
-        Logger.shared.log("[getEpisode] id=\(id) ep=\(episodeNumber) → all steps failed, nil", type: "Debug")
         return nil
     }
 
