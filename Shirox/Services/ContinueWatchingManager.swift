@@ -160,6 +160,16 @@ import Foundation
                     : media.episodes
                 let isAiring = media.status == "RELEASING"
 
+                // Reconcile watched keys: mark all eps 1...progress as watched locally (highest wins).
+                if entry.progress > 0 {
+                    for ep in 1...entry.progress {
+                        if let key = Self.watchedKey(aniListID: media.id, moduleId: nil,
+                                                     mediaTitle: media.title.displayTitle, episodeNumber: ep) {
+                            watchedKeys.insert(key)
+                        }
+                    }
+                }
+
                 // Don't create a placeholder if the user is already caught up on all aired episodes
                 if let avail = availableEpisodes, nextEp > avail { continue }
 
@@ -182,13 +192,6 @@ import Foundation
                         aniListUpdatedAt: entry.updatedAt
                     ) {
                         newItems.insert(placeholder, at: 0)
-                    }
-                    // Also mark all episodes up to entry.progress as watched
-                    for ep in 1...entry.progress {
-                        if let key = Self.watchedKey(aniListID: media.id, moduleId: existing.moduleId,
-                                                     mediaTitle: media.title.displayTitle, episodeNumber: ep) {
-                            watchedKeys.insert(key)
-                        }
                     }
                 } else if let existing, let updatedAt = entry.updatedAt {
                     // Refresh aniListUpdatedAt on existing items so sort order stays current
@@ -222,6 +225,33 @@ import Foundation
             
         } catch {
             Logger.shared.log("[CW] Sync failed: \(error.localizedDescription)", type: "Error")
+        }
+    }
+
+    /// Syncs local watched keys from MAL's watching/rewatching list.
+    /// Highest wins: only inserts keys, never removes. Uses cached aniListID mapping
+    /// to build keys compatible with `watchedKey` (which is keyed by aniListID, not malID).
+    func syncWithMAL() async {
+        guard MALAuthManager.shared.isLoggedIn else { return }
+        do {
+            let library = try await MALLibraryService.shared.fetchLibrary()
+            let active = library.filter {
+                $0.list_status.status == "watching" || $0.list_status.status == "rewatching"
+            }
+            for entry in active {
+                let progress = entry.list_status.num_episodes_watched ?? 0
+                guard progress > 0 else { continue }
+                let aniListID = IDMappingService.shared.cachedAnilistId(forMALId: entry.node.id)
+                for ep in 1...progress {
+                    if let key = Self.watchedKey(aniListID: aniListID, moduleId: nil,
+                                                 mediaTitle: entry.node.title, episodeNumber: ep) {
+                        watchedKeys.insert(key)
+                    }
+                }
+            }
+            persist()
+        } catch {
+            Logger.shared.log("[CW] MAL sync failed: \(error.localizedDescription)", type: "Error")
         }
     }
 
