@@ -370,6 +370,89 @@ import Foundation
         persist()
     }
 
+    /// Unified entry point for all UI mark/unmark calls.
+    ///
+    /// Mark watched: applies local (1...ep) + pushes to AniList/MAL. Returns `.applied`.
+    /// Mark unwatched: clears local ep + any orphaned keys above ep. If remote progress would
+    /// decrease, returns `.needsConfirmation` — local is already applied; caller shows a dialog.
+    func markEpisode(_ ep: Int, asWatched: Bool, context: MarkContext) async -> MarkResult {
+        if asWatched {
+            markWatched(
+                upThrough: ep,
+                aniListID: context.aniListID, moduleId: context.moduleId,
+                mediaTitle: context.mediaTitle, imageUrl: context.imageUrl,
+                totalEpisodes: context.totalEpisodes, availableEpisodes: context.availableEpisodes,
+                detailHref: context.detailHref
+            )
+            await pushRemoteProgress(ep: ep, context: context)
+            return .applied
+        }
+
+        // Local: standard single-ep unmark (removes key + updates CW placeholder).
+        markUnwatched(
+            aniListID: context.aniListID, moduleId: context.moduleId,
+            mediaTitle: context.mediaTitle, episodeNumber: ep,
+            imageUrl: context.imageUrl, totalEpisodes: context.totalEpisodes,
+            availableEpisodes: context.availableEpisodes, detailHref: context.detailHref
+        )
+        // Clear orphaned watched keys for episodes above ep.
+        let keysAbove = watchedKeys.filter { key in
+            if let aid = context.aniListID, key.hasPrefix("a:\(aid):") {
+                let suffix = key.dropFirst("a:\(aid):".count)
+                return Int(suffix).map { $0 > ep } ?? false
+            }
+            if let mid = context.moduleId, !mid.isEmpty {
+                let canonical = context.mediaTitle.trimmingCharacters(in: .whitespaces).lowercased()
+                let prefix = "m:\(mid):\(canonical):"
+                if key.hasPrefix(prefix) {
+                    let suffix = key.dropFirst(prefix.count)
+                    return Int(suffix).map { $0 > ep } ?? false
+                }
+            }
+            return false
+        }
+        if !keysAbove.isEmpty {
+            watchedKeys.subtract(keysAbove)
+            persist()
+        }
+
+        // Check if remote progress would drop — return confirmation payload if so.
+        let proposedProgress = ep - 1
+        let aniListLoggedIn = AniListAuthManager.shared.isLoggedIn
+        let malLoggedIn = MALAuthManager.shared.isLoggedIn
+        let aniFrom = context.currentAniListProgress
+        let malFrom = context.currentMALProgress
+        let aniNeedsDowngrade = aniListLoggedIn && (aniFrom.map { $0 > proposedProgress } ?? false)
+        let malNeedsDowngrade = malLoggedIn && (malFrom.map { $0 > proposedProgress } ?? false)
+
+        guard aniNeedsDowngrade || malNeedsDowngrade else { return .applied }
+
+        let capturedContext = context
+        let capturedProposed = proposedProgress
+        let capturedAniListLoggedIn = aniListLoggedIn
+        let capturedMalLoggedIn = malLoggedIn
+
+        return .needsConfirmation(RemoteDowngrade(
+            newProgress: capturedProposed,
+            anilistFrom: aniNeedsDowngrade ? aniFrom : nil,
+            malFrom: malNeedsDowngrade ? malFrom : nil,
+            confirm: {
+                let remoteStatus: MediaListStatus = capturedProposed == 0 ? .planning : .current
+                if let aid = capturedContext.aniListID, capturedAniListLoggedIn {
+                    try? await AniListLibraryService.shared.updateEntry(
+                        mediaId: aid, status: remoteStatus, progress: capturedProposed, score: 0)
+                }
+                let malID = capturedContext.malID
+                    ?? capturedContext.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) }
+                if let mid = malID, capturedMalLoggedIn {
+                    try? await MALProvider.shared.updateEntry(
+                        mediaId: mid, status: remoteStatus, progress: capturedProposed, score: 0)
+                }
+            },
+            localOnly: {}
+        ))
+    }
+
     // MARK: - Private Helpers
 
     private func matchesShow(_ item: ContinueWatchingItem,
