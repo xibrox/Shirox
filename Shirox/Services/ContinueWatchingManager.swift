@@ -425,27 +425,6 @@ import Foundation
             imageUrl: context.imageUrl, totalEpisodes: context.totalEpisodes,
             availableEpisodes: context.availableEpisodes, detailHref: context.detailHref
         )
-        // Clear orphaned watched keys for episodes above ep.
-        let keysAbove = watchedKeys.filter { key in
-            if let aid = context.aniListID, key.hasPrefix("a:\(aid):") {
-                let suffix = key.dropFirst("a:\(aid):".count)
-                return Int(suffix).map { $0 > ep } ?? false
-            }
-            if let mid = context.moduleId, !mid.isEmpty {
-                let canonical = context.mediaTitle.trimmingCharacters(in: .whitespaces).lowercased()
-                let prefix = "m:\(mid):\(canonical):"
-                if key.hasPrefix(prefix) {
-                    let suffix = key.dropFirst(prefix.count)
-                    return Int(suffix).map { $0 > ep } ?? false
-                }
-            }
-            return false
-        }
-        if !keysAbove.isEmpty {
-            watchedKeys.subtract(keysAbove)
-            persist()
-        }
-
         // Check if remote progress would drop — return confirmation payload if so.
         let proposedProgress = ep - 1
         let aniListLoggedIn = AniListAuthManager.shared.isLoggedIn

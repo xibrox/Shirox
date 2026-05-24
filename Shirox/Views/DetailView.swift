@@ -1449,12 +1449,8 @@ private struct ModuleEpisodeRowContainer: View {
             return 1.0
         }
         
-        if let status = aniListStatus, status != .planning {
-            if status == .completed {
-                return 1.0
-            } else if let p = aniListProgress, epNum <= p {
-                return 1.0
-            }
+        if aniListStatus == .completed {
+            return 1.0
         }
 
         let mid = moduleId

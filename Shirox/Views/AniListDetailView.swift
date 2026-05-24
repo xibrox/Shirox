@@ -1278,12 +1278,8 @@ private struct AniListEpisodeRowContainer: View {
                                       mediaTitle: mediaTitle, episodeNumber: ep) {
             return 1.0
         }
-        if let status = aniListStatus, status != .planning {
-            if status == .completed {
-                return 1.0
-            } else if let p = aniListProgress, ep <= p {
-                return 1.0
-            }
+        if aniListStatus == .completed {
+            return 1.0
         }
         guard let item = continueWatching.items
             .first(where: { $0.aniListID == mediaId && $0.episodeNumber == ep }),
