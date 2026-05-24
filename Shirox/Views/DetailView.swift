@@ -1468,48 +1468,6 @@ private struct ModuleEpisodeRowContainer: View {
         return min(item.watchedSeconds / item.totalSeconds, 1.0)
     }
 
-    private var allPreviousWatched: Bool {
-        guard let moduleId else { return false }
-        return epNum > 1 && (1..<epNum).allSatisfy {
-            continueWatching.isWatched(aniListID: nil, moduleId: moduleId,
-                                       mediaTitle: mediaTitle, episodeNumber: $0)
-        }
-    }
-
-    private func handleTogglePrevious() {
-        let mid = moduleId
-        let ctx = markContext
-        let fresh = (1..<epNum).allSatisfy {
-            ContinueWatchingManager.shared.isWatched(
-                aniListID: aniListID, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
-        }
-        if fresh {
-            ContinueWatchingManager.shared.markUnwatched(
-                upThrough: epNum, aniListID: aniListID, moduleId: mid, mediaTitle: mediaTitle)
-            let aniFrom = aniListProgress
-            let aniNeedsDowngrade = AniListAuthManager.shared.isLoggedIn && (aniFrom.map { $0 > 0 } ?? false)
-            if aniNeedsDowngrade, let aid = aniListID {
-                pendingDowngrade = RemoteDowngrade(
-                    newProgress: 0,
-                    anilistFrom: aniFrom,
-                    malFrom: nil,
-                    confirm: {
-                        try? await AniListLibraryService.shared.updateEntry(
-                            mediaId: aid, status: .planning, progress: 0, score: 0)
-                        _ = ctx
-                    },
-                    localOnly: {}
-                )
-            }
-        } else {
-            ContinueWatchingManager.shared.markWatched(
-                upThrough: epNum - 1,
-                aniListID: aniListID, moduleId: mid, mediaTitle: mediaTitle,
-                imageUrl: ctx.imageUrl, totalEpisodes: ctx.totalEpisodes,
-                availableEpisodes: ctx.availableEpisodes, detailHref: ctx.detailHref)
-        }
-    }
-
     var body: some View {
         Group {
             if aniListID != nil {
@@ -1537,8 +1495,6 @@ private struct ModuleEpisodeRowContainer: View {
                         ContinueWatchingManager.shared.resetEpisodeProgress(
                             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
                     },
-                    allPreviousWatched: allPreviousWatched,
-                    onTogglePreviousWatched: epNum > 1 ? { handleTogglePrevious() } : nil,
                     onDownload: onDownload,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
@@ -1568,8 +1524,6 @@ private struct ModuleEpisodeRowContainer: View {
                         ContinueWatchingManager.shared.resetEpisodeProgress(
                             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
                     },
-                    allPreviousWatched: allPreviousWatched,
-                    onTogglePreviousWatched: epNum > 1 ? { handleTogglePrevious() } : nil,
                     onDownload: onDownload,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,

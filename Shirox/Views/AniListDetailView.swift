@@ -1292,45 +1292,6 @@ private struct AniListEpisodeRowContainer: View {
         return min(item.watchedSeconds / item.totalSeconds, 1.0)
     }
 
-    private var allPreviousWatched: Bool {
-        ep > 1 && (1..<ep).allSatisfy {
-            continueWatching.isWatched(aniListID: mediaId, moduleId: nil,
-                                       mediaTitle: mediaTitle, episodeNumber: $0)
-        }
-    }
-
-    private func handleTogglePrevious() {
-        let ctx = markContext
-        let fresh = (1..<ep).allSatisfy {
-            ContinueWatchingManager.shared.isWatched(
-                aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: $0)
-        }
-        if fresh {
-            ContinueWatchingManager.shared.markUnwatched(
-                upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle)
-            let aniFrom = aniListProgress
-            if AniListAuthManager.shared.isLoggedIn && (aniFrom.map { $0 > 0 } ?? false) {
-                pendingDowngrade = RemoteDowngrade(
-                    newProgress: 0,
-                    anilistFrom: aniFrom,
-                    malFrom: nil,
-                    confirm: {
-                        try? await AniListLibraryService.shared.updateEntry(
-                            mediaId: mediaId, status: .planning, progress: 0, score: 0)
-                        _ = ctx
-                    },
-                    localOnly: {}
-                )
-            }
-        } else {
-            ContinueWatchingManager.shared.markWatched(
-                upThrough: ep - 1,
-                aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle,
-                imageUrl: ctx.imageUrl, totalEpisodes: ctx.totalEpisodes,
-                availableEpisodes: nil, detailHref: nil)
-        }
-    }
-
     var body: some View {
         ThumbnailEpisodeRow(
             number: ep,
@@ -1356,8 +1317,6 @@ private struct AniListEpisodeRowContainer: View {
                 ContinueWatchingManager.shared.resetEpisodeProgress(
                     aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: ep)
             },
-            allPreviousWatched: allPreviousWatched,
-            onTogglePreviousWatched: ep > 1 ? { handleTogglePrevious() } : nil,
             onDownload: onDownload,
             onTryOtherStream: onTryOtherStream,
             isSelectionMode: isSelectionMode,
