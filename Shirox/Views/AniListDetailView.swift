@@ -21,8 +21,11 @@ struct AniListDetailView: View {
     @ObservedObject private var malAuth = MALAuthManager.shared
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
+    @AppStorage("dualSync") private var dualSync = false
     @State private var showLibraryEdit = false
     @State private var existingEntry: LibraryEntry? = nil
+    @State private var existingMALEntry: LibraryEntry? = nil
+    @State private var showMALEdit = false
     @State private var isLoadingEntry = false
     #if os(iOS)
     @State private var pendingDownloadEpisodeNumber: DownloadEpisodeItem? = nil
@@ -52,6 +55,15 @@ struct AniListDetailView: View {
 
     private var activeProvider: any MediaProvider {
         vm.media?.provider == .mal ? MALProvider.shared : AniListProvider.shared
+    }
+
+    private var malMediaId: Int? {
+        guard let media = vm.media, media.provider == .anilist else { return nil }
+        return media.idMal
+    }
+
+    private var isDualAvailable: Bool {
+        auth.isLoggedIn && malAuth.isLoggedIn && malMediaId != nil
     }
 
     var body: some View {
@@ -87,12 +99,47 @@ struct AniListDetailView: View {
         .navigationTitle(vm.media?.title.displayTitle ?? "")
         #if os(iOS)
         .toolbar {
-            if auth.isLoggedIn || malAuth.isLoggedIn {
+            if isDualAvailable && !dualSync {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            Task {
+                                isLoadingEntry = true
+                                existingEntry = try? await AniListProvider.shared.fetchEntry(mediaId: mediaId)
+                                isLoadingEntry = false
+                                showLibraryEdit = true
+                            }
+                        } label: { Label("Edit on AniList", systemImage: "pencil") }
+                        Button {
+                            Task {
+                                isLoadingEntry = true
+                                if let idMal = malMediaId {
+                                    existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
+                                }
+                                isLoadingEntry = false
+                                showMALEdit = true
+                            }
+                        } label: { Label("Edit on MyAnimeList", systemImage: "pencil") }
+                    } label: {
+                        if isLoadingEntry {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "pencil.circle")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .disabled(isLoadingEntry)
+                }
+            } else if auth.isLoggedIn || malAuth.isLoggedIn {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task {
                             isLoadingEntry = true
                             existingEntry = try? await activeProvider.fetchEntry(mediaId: mediaId)
+                            if isDualAvailable && dualSync, let idMal = malMediaId {
+                                existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
+                            }
                             isLoadingEntry = false
                             showLibraryEdit = true
                         }
@@ -135,6 +182,9 @@ struct AniListDetailView: View {
             }
             if auth.isLoggedIn || malAuth.isLoggedIn {
                 existingEntry = try? await activeProvider.fetchEntry(mediaId: mediaId)
+            }
+            if malAuth.isLoggedIn, let idMal = vm.media?.idMal, vm.media?.provider == .anilist {
+                existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
             }
 
             if let media = vm.media {
@@ -246,17 +296,22 @@ struct AniListDetailView: View {
         #endif
         .adaptiveSheet(isPresented: $showLibraryEdit) {
             if let media = vm.media {
+                let shouldSyncMAL = isDualAvailable && dualSync
                 LibraryEntryEditSheet(
                     entry: existingEntry,
                     media: media,
                     onSave: { status, progress, score in
-                        handleLibraryEdit(media: media, status: status, progress: progress, score: score)
+                        handleLibraryEdit(media: media, status: status, progress: progress, score: score, alsoUpdateMAL: shouldSyncMAL)
                     },
                     onDelete: existingEntry != nil ? {
                         let entryId = existingEntry!.id
                         let provider = activeProvider
                         existingEntry = nil
                         Task { try? await provider.deleteEntry(entryId: entryId) }
+                        if shouldSyncMAL, let idMal = malMediaId {
+                            existingMALEntry = nil
+                            Task { try? await MALProvider.shared.deleteEntry(entryId: idMal) }
+                        }
                     } : nil
                 )
                 #if os(iOS)
@@ -269,9 +324,43 @@ struct AniListDetailView: View {
                 #endif
             }
         }
+        .adaptiveSheet(isPresented: $showMALEdit) {
+            if let media = vm.media, let idMal = malMediaId {
+                let malMedia = Media(
+                    id: idMal, idMal: idMal, provider: .mal,
+                    title: media.title, coverImage: media.coverImage,
+                    bannerImage: nil, description: nil, episodes: media.episodes,
+                    status: nil, averageScore: nil, genres: nil,
+                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                    relations: nil, type: nil, format: nil
+                )
+                LibraryEntryEditSheet(
+                    entry: existingMALEntry,
+                    media: malMedia,
+                    onSave: { status, progress, score in
+                        if var updated = existingMALEntry {
+                            updated.status = status
+                            updated.progress = progress
+                            updated.score = score
+                            existingMALEntry = updated
+                        }
+                        Task { try? await MALProvider.shared.updateEntry(mediaId: idMal, status: status, progress: progress, score: score) }
+                    },
+                    onDelete: existingMALEntry != nil ? {
+                        existingMALEntry = nil
+                        Task { try? await MALProvider.shared.deleteEntry(entryId: idMal) }
+                    } : nil
+                )
+                #if os(iOS)
+                .adaptivePresentationDetents([.medium, .large])
+                #else
+                .frame(minWidth: 480, minHeight: 360)
+                #endif
+            }
+        }
     }
 
-    private func handleLibraryEdit(media: Media, status: MediaListStatus, progress: Int, score: Double) {
+    private func handleLibraryEdit(media: Media, status: MediaListStatus, progress: Int, score: Double, alsoUpdateMAL: Bool = false) {
         if var updated = existingEntry {
             updated.status = status
             updated.progress = progress
@@ -297,6 +386,15 @@ struct AniListDetailView: View {
         let provider = activeProvider
         Task {
             try? await provider.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
+            if alsoUpdateMAL, let idMal = malMediaId {
+                if var updated = existingMALEntry {
+                    updated.status = status
+                    updated.progress = progress
+                    updated.score = score
+                    existingMALEntry = updated
+                }
+                try? await MALProvider.shared.updateEntry(mediaId: idMal, status: status, progress: progress, score: score)
+            }
         }
     }
 
