@@ -1323,11 +1323,11 @@ private struct AniListEpisodeRowContainer: View {
                 )
             }
         } else {
-            Task {
-                let result = await ContinueWatchingManager.shared.markEpisode(
-                    ep - 1, asWatched: true, context: ctx)
-                if case .needsConfirmation(let d) = result { pendingDowngrade = d }
-            }
+            ContinueWatchingManager.shared.markWatched(
+                upThrough: ep - 1,
+                aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle,
+                imageUrl: ctx.imageUrl, totalEpisodes: ctx.totalEpisodes,
+                availableEpisodes: nil, detailHref: nil)
         }
     }
 

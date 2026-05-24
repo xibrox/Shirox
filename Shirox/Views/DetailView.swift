@@ -1502,11 +1502,11 @@ private struct ModuleEpisodeRowContainer: View {
                 )
             }
         } else {
-            Task {
-                let result = await ContinueWatchingManager.shared.markEpisode(
-                    epNum - 1, asWatched: true, context: ctx)
-                if case .needsConfirmation(let d) = result { pendingDowngrade = d }
-            }
+            ContinueWatchingManager.shared.markWatched(
+                upThrough: epNum - 1,
+                aniListID: aniListID, moduleId: mid, mediaTitle: mediaTitle,
+                imageUrl: ctx.imageUrl, totalEpisodes: ctx.totalEpisodes,
+                availableEpisodes: ctx.availableEpisodes, detailHref: ctx.detailHref)
         }
     }
 

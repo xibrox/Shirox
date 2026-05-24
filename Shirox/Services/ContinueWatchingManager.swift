@@ -408,11 +408,10 @@ import Foundation
     func markEpisode(_ ep: Int, asWatched: Bool, context: MarkContext) async -> MarkResult {
         if asWatched {
             markWatched(
-                upThrough: ep,
                 aniListID: context.aniListID, moduleId: context.moduleId,
-                mediaTitle: context.mediaTitle, imageUrl: context.imageUrl,
-                totalEpisodes: context.totalEpisodes, availableEpisodes: context.availableEpisodes,
-                detailHref: context.detailHref
+                mediaTitle: context.mediaTitle, episodeNumber: ep,
+                imageUrl: context.imageUrl, totalEpisodes: context.totalEpisodes,
+                availableEpisodes: context.availableEpisodes, detailHref: context.detailHref
             )
             await pushRemoteProgress(ep: ep, context: context)
             return .applied
