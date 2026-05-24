@@ -1415,9 +1415,26 @@ private struct ModuleEpisodeRowContainer: View {
 
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
+    @State private var pendingDowngrade: RemoteDowngrade? = nil
 
     private var moduleId: String? { ModuleManager.shared.activeModule?.id }
     private var epNum: Int { Int(episode.number) }
+
+    private var markContext: MarkContext {
+        MarkContext(
+            aniListID: aniListID,
+            malID: aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
+            moduleId: moduleId,
+            mediaTitle: mediaTitle,
+            imageUrl: itemImage.isEmpty ? nil : itemImage,
+            totalEpisodes: totalEpisodes,
+            availableEpisodes: nil,
+            detailHref: detailHref,
+            currentAniListProgress: aniListProgress,
+            currentMALProgress: nil,
+            currentAniListStatus: aniListStatus
+        )
+    }
 
     private var downloadState: DownloadState? {
         downloadManager.items.first { 
@@ -1459,6 +1476,40 @@ private struct ModuleEpisodeRowContainer: View {
         }
     }
 
+    private func handleTogglePrevious() {
+        let mid = moduleId
+        let ctx = markContext
+        let fresh = (1..<epNum).allSatisfy {
+            ContinueWatchingManager.shared.isWatched(
+                aniListID: aniListID, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
+        }
+        if fresh {
+            ContinueWatchingManager.shared.markUnwatched(
+                upThrough: epNum, aniListID: aniListID, moduleId: mid, mediaTitle: mediaTitle)
+            let aniFrom = aniListProgress
+            let aniNeedsDowngrade = AniListAuthManager.shared.isLoggedIn && (aniFrom.map { $0 > 0 } ?? false)
+            if aniNeedsDowngrade, let aid = aniListID {
+                pendingDowngrade = RemoteDowngrade(
+                    newProgress: 0,
+                    anilistFrom: aniFrom,
+                    malFrom: nil,
+                    confirm: {
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: aid, status: .planning, progress: 0, score: 0)
+                        _ = ctx
+                    },
+                    localOnly: {}
+                )
+            }
+        } else {
+            Task {
+                let result = await ContinueWatchingManager.shared.markEpisode(
+                    epNum - 1, asWatched: true, context: ctx)
+                if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+            }
+        }
+    }
+
     var body: some View {
         Group {
             if aniListID != nil {
@@ -1469,35 +1520,25 @@ private struct ModuleEpisodeRowContainer: View {
                     progress: progress,
                     onTap: onTap,
                     onMarkWatched: {
-                        ContinueWatchingManager.shared.markWatched(
-                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
-                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                        Task {
+                            let result = await ContinueWatchingManager.shared.markEpisode(
+                                epNum, asWatched: true, context: markContext)
+                            if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                        }
                     },
                     onMarkUnwatched: {
-                        ContinueWatchingManager.shared.markUnwatched(
-                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
-                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                        Task {
+                            let result = await ContinueWatchingManager.shared.markEpisode(
+                                epNum, asWatched: false, context: markContext)
+                            if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                        }
                     },
                     onResetProgress: {
                         ContinueWatchingManager.shared.resetEpisodeProgress(
-                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
+                            aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
                     },
                     allPreviousWatched: allPreviousWatched,
-                    onTogglePreviousWatched: epNum > 1 ? {
-                        let mid = ModuleManager.shared.activeModule?.id
-                        let fresh = (1..<epNum).allSatisfy {
-                            ContinueWatchingManager.shared.isWatched(
-                                aniListID: nil, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
-                        }
-                        if fresh {
-                            ContinueWatchingManager.shared.markUnwatched(
-                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle)
-                        } else {
-                            ContinueWatchingManager.shared.markWatched(
-                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle,
-                                imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
-                        }
-                    } : nil,
+                    onTogglePreviousWatched: epNum > 1 ? { handleTogglePrevious() } : nil,
                     onDownload: onDownload,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
@@ -1510,41 +1551,52 @@ private struct ModuleEpisodeRowContainer: View {
                     progress: progress,
                     onTap: onTap,
                     onMarkWatched: {
-                        ContinueWatchingManager.shared.markWatched(
-                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
-                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                        Task {
+                            let result = await ContinueWatchingManager.shared.markEpisode(
+                                epNum, asWatched: true, context: markContext)
+                            if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                        }
                     },
                     onMarkUnwatched: {
-                        ContinueWatchingManager.shared.markUnwatched(
-                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
-                            imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
+                        Task {
+                            let result = await ContinueWatchingManager.shared.markEpisode(
+                                epNum, asWatched: false, context: markContext)
+                            if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                        }
                     },
                     onResetProgress: {
                         ContinueWatchingManager.shared.resetEpisodeProgress(
-                            aniListID: nil, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
+                            aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
                     },
                     allPreviousWatched: allPreviousWatched,
-                    onTogglePreviousWatched: epNum > 1 ? {
-                        let mid = ModuleManager.shared.activeModule?.id
-                        let fresh = (1..<epNum).allSatisfy {
-                            ContinueWatchingManager.shared.isWatched(
-                                aniListID: nil, moduleId: mid, mediaTitle: mediaTitle, episodeNumber: $0)
-                        }
-                        if fresh {
-                            ContinueWatchingManager.shared.markUnwatched(
-                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle)
-                        } else {
-                            ContinueWatchingManager.shared.markWatched(
-                                upThrough: epNum, aniListID: nil, moduleId: mid, mediaTitle: mediaTitle,
-                                imageUrl: itemImage, totalEpisodes: totalEpisodes, detailHref: detailHref)
-                        }
-                    } : nil,
+                    onTogglePreviousWatched: epNum > 1 ? { handleTogglePrevious() } : nil,
                     onDownload: onDownload,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
                     isSelected: isSelected,
                     downloadState: downloadState
                 )
+            }
+        }
+        .confirmationDialog(
+            "Update tracking progress?",
+            isPresented: Binding(get: { pendingDowngrade != nil }, set: { if !$0 { pendingDowngrade = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let d = pendingDowngrade {
+                Button("Update everywhere (ep \(d.newProgress))") {
+                    Task { await d.confirm(); pendingDowngrade = nil }
+                }
+                Button("This device only") { d.localOnly(); pendingDowngrade = nil }
+                Button("Cancel", role: .cancel) { pendingDowngrade = nil }
+            }
+        } message: {
+            if let d = pendingDowngrade {
+                let parts = [
+                    d.anilistFrom.map { "AniList: \($0) → \(d.newProgress)" },
+                    d.malFrom.map { "MAL: \($0) → \(d.newProgress)" }
+                ].compactMap { $0 }
+                Text(parts.joined(separator: "\n"))
             }
         }
         .task(id: aniListID) {
