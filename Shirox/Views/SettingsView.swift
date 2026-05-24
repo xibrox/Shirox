@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage("useDefaultExtension") private var useDefaultExtension = false
     @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
+    @AppStorage("dualSync") private var dualSync = false
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
@@ -135,6 +136,10 @@ struct SettingsView: View {
                         }
                         if malAuth.isLoggedIn {
                             Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
+                                .tint(.secondary)
+                        }
+                        if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
+                            Toggle("Sync edits to both services", isOn: $dualSync)
                                 .tint(.secondary)
                         }
                         Text("Automatically update your watch progress as you watch.")
