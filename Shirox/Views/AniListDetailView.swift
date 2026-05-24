@@ -1249,6 +1249,23 @@ private struct AniListEpisodeRowContainer: View {
 
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
+    @State private var pendingDowngrade: RemoteDowngrade? = nil
+
+    private var markContext: MarkContext {
+        MarkContext(
+            aniListID: mediaId,
+            malID: IDMappingService.shared.cachedMalId(forAnilistId: mediaId),
+            moduleId: nil,
+            mediaTitle: mediaTitle,
+            imageUrl: coverImage,
+            totalEpisodes: totalEpisodes,
+            availableEpisodes: nil,
+            detailHref: nil,
+            currentAniListProgress: aniListProgress,
+            currentMALProgress: nil,
+            currentAniListStatus: aniListStatus
+        )
+    }
 
     private var downloadState: DownloadState? {
         downloadManager.items.first { 
@@ -1282,6 +1299,38 @@ private struct AniListEpisodeRowContainer: View {
         }
     }
 
+    private func handleTogglePrevious() {
+        let ctx = markContext
+        let fresh = (1..<ep).allSatisfy {
+            ContinueWatchingManager.shared.isWatched(
+                aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: $0)
+        }
+        if fresh {
+            ContinueWatchingManager.shared.markUnwatched(
+                upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle)
+            let aniFrom = aniListProgress
+            if AniListAuthManager.shared.isLoggedIn && (aniFrom.map { $0 > 0 } ?? false) {
+                pendingDowngrade = RemoteDowngrade(
+                    newProgress: 0,
+                    anilistFrom: aniFrom,
+                    malFrom: nil,
+                    confirm: {
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: mediaId, status: .planning, progress: 0, score: 0)
+                        _ = ctx
+                    },
+                    localOnly: {}
+                )
+            }
+        } else {
+            Task {
+                let result = await ContinueWatchingManager.shared.markEpisode(
+                    ep - 1, asWatched: true, context: ctx)
+                if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+            }
+        }
+    }
+
     var body: some View {
         ThumbnailEpisodeRow(
             number: ep,
@@ -1290,40 +1339,52 @@ private struct AniListEpisodeRowContainer: View {
             progress: progress,
             onTap: onTap,
             onMarkWatched: {
-                ContinueWatchingManager.shared.markWatched(
-                    aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: ep,
-                    imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
+                Task {
+                    let result = await ContinueWatchingManager.shared.markEpisode(
+                        ep, asWatched: true, context: markContext)
+                    if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                }
             },
             onMarkUnwatched: {
-                ContinueWatchingManager.shared.markUnwatched(
-                    aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: ep,
-                    imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
+                Task {
+                    let result = await ContinueWatchingManager.shared.markEpisode(
+                        ep, asWatched: false, context: markContext)
+                    if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                }
             },
             onResetProgress: {
                 ContinueWatchingManager.shared.resetEpisodeProgress(
                     aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: ep)
             },
             allPreviousWatched: allPreviousWatched,
-            onTogglePreviousWatched: ep > 1 ? {
-                let fresh = (1..<ep).allSatisfy {
-                    ContinueWatchingManager.shared.isWatched(
-                        aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle, episodeNumber: $0)
-                }
-                if fresh {
-                    ContinueWatchingManager.shared.markUnwatched(
-                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle)
-                } else {
-                    ContinueWatchingManager.shared.markWatched(
-                        upThrough: ep, aniListID: mediaId, moduleId: nil, mediaTitle: mediaTitle,
-                        imageUrl: coverImage, totalEpisodes: totalEpisodes, detailHref: nil)
-                }
-            } : nil,
+            onTogglePreviousWatched: ep > 1 ? { handleTogglePrevious() } : nil,
             onDownload: onDownload,
             onTryOtherStream: onTryOtherStream,
             isSelectionMode: isSelectionMode,
             isSelected: isSelected,
             downloadState: downloadState
         )
+        .confirmationDialog(
+            "Update tracking progress?",
+            isPresented: Binding(get: { pendingDowngrade != nil }, set: { if !$0 { pendingDowngrade = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let d = pendingDowngrade {
+                Button("Update everywhere (ep \(d.newProgress))") {
+                    Task { await d.confirm(); pendingDowngrade = nil }
+                }
+                Button("This device only") { d.localOnly(); pendingDowngrade = nil }
+                Button("Cancel", role: .cancel) { pendingDowngrade = nil }
+            }
+        } message: {
+            if let d = pendingDowngrade {
+                let parts = [
+                    d.anilistFrom.map { "AniList: \($0) → \(d.newProgress)" },
+                    d.malFrom.map { "MAL: \($0) → \(d.newProgress)" }
+                ].compactMap { $0 }
+                Text(parts.joined(separator: "\n"))
+            }
+        }
         .task {
             aniMapEpisode = await TVDBMappingService.shared.getEpisode(for: mediaId, episodeNumber: ep, provider: provider)
             if aniMapEpisode?.thumbnail == nil {
