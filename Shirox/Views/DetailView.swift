@@ -1549,14 +1549,7 @@ private struct ModuleEpisodeRowContainer: View {
         }
         .task {
             guard let aid = aniListID else { return }
-            if aniMapEpisode == nil {
-                aniMapEpisode = TVDBMappingService.shared.getCachedEpisode(for: aid, episodeNumber: epNum)
-                if aniMapEpisode == nil {
-                    let eps = await TVDBMappingService.shared.getEpisodes(for: aid)
-                    aniMapEpisode = eps.first(where: { $0.episode == epNum })
-                }
-            }
-            // If episode was found but has no thumbnail, fall back to series fanart
+            aniMapEpisode = await TVDBMappingService.shared.getEpisode(for: aid, episodeNumber: epNum)
             if aniMapEpisode?.thumbnail == nil {
                 let artwork = await TVDBMappingService.shared.getArtwork(for: aid)
                 fallbackThumbnail = artwork.fanart ?? artwork.poster
