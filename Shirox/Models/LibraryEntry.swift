@@ -59,4 +59,5 @@ struct LibraryEntry: Identifiable, Codable {
     var score: Double     // 0–10
     var updatedAt: Int?   // Unix timestamp
     var customListName: String? // non-nil when entry belongs to a custom list
+    var timesRewatched: Int?
 }

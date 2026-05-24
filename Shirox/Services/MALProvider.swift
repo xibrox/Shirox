@@ -138,7 +138,8 @@ final class MALProvider: MediaProvider {
             progress: e.list_status.num_episodes_watched ?? 0,
             score: Double(e.list_status.score ?? 0),
             updatedAt: nil,
-            customListName: nil
+            customListName: nil,
+            timesRewatched: e.list_status.num_times_rewatched
         )
     }
 }

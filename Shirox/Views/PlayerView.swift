@@ -813,6 +813,7 @@ struct PlayerView: View {
 
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
     @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
+    @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
 
     private func trackAniListProgress() {
         guard let episodeNumber = currentContext?.episodeNumber else { return }
@@ -833,11 +834,29 @@ struct PlayerView: View {
                     } else {
                         resolvedAniListID = nil
                     }
-                    if let resolvedAniListID {
-                        try? await provider.updateEntry(mediaId: resolvedAniListID, status: status, progress: episodeNumber, score: 0)
-                    } else {
+                    guard let resolvedAniListID else {
                         Logger.shared.log("[Tracking] AniList tracking skipped: no AniList ID available", type: "Warning")
+                        continue
                     }
+                    if let current = try? await provider.fetchEntry(mediaId: resolvedAniListID) {
+                        if current.status == .completed {
+                            let isSingleEp = currentContext?.totalEpisodes == 1
+                            if isSingleEp {
+                                let newRepeat = (current.timesRewatched ?? 0) + 1
+                                Logger.shared.log("[Tracking] AniList rewatch (single-ep): repeat → \(newRepeat)", type: "Info")
+                                try? await AniListLibraryService.shared.updateEntry(mediaId: resolvedAniListID, status: .completed, progress: episodeNumber, repeat: newRepeat)
+                            } else {
+                                Logger.shared.log("[Tracking] AniList rewatch: setting REPEATING at ep \(episodeNumber)", type: "Info")
+                                try? await AniListLibraryService.shared.updateEntry(mediaId: resolvedAniListID, status: .repeating, progress: episodeNumber)
+                            }
+                            continue
+                        }
+                        if skipReWatchTracking && episodeNumber <= current.progress {
+                            Logger.shared.log("[Tracking] AniList skip: ep \(episodeNumber) <= tracked \(current.progress)", type: "Info")
+                            continue
+                        }
+                    }
+                    try? await provider.updateEntry(mediaId: resolvedAniListID, status: status, progress: episodeNumber, score: 0)
                 case .mal:
                     guard malTrackingEnabled else { continue }
                     let resolvedMALID: Int?
@@ -848,15 +867,33 @@ struct PlayerView: View {
                     } else {
                         resolvedMALID = nil
                     }
-                    if let resolvedMALID {
-                        do {
-                            try await provider.updateEntry(mediaId: resolvedMALID, status: status, progress: episodeNumber, score: 0)
-                            Logger.shared.log("[Tracking] MAL progress updated: ep \(episodeNumber), malId \(resolvedMALID)", type: "Info")
-                        } catch {
-                            Logger.shared.log("[Tracking] MAL update failed: \(error)", type: "Error")
-                        }
-                    } else {
+                    guard let resolvedMALID else {
                         Logger.shared.log("[Tracking] MAL tracking skipped: no MAL ID available", type: "Warning")
+                        continue
+                    }
+                    if let current = try? await provider.fetchEntry(mediaId: resolvedMALID) {
+                        if current.status == .completed {
+                            let isSingleEp = currentContext?.totalEpisodes == 1
+                            if isSingleEp {
+                                let newRepeat = (current.timesRewatched ?? 0) + 1
+                                Logger.shared.log("[Tracking] MAL rewatch (single-ep): num_times_rewatched → \(newRepeat)", type: "Info")
+                                try? await MALLibraryService.shared.updateEntry(malId: resolvedMALID, status: .completed, progress: episodeNumber, score: 0, numTimesRewatched: newRepeat)
+                            } else {
+                                Logger.shared.log("[Tracking] MAL rewatch: setting rewatching at ep \(episodeNumber)", type: "Info")
+                                try? await MALLibraryService.shared.updateEntry(malId: resolvedMALID, status: .repeating, progress: episodeNumber, score: 0)
+                            }
+                            continue
+                        }
+                        if skipReWatchTracking && episodeNumber <= current.progress {
+                            Logger.shared.log("[Tracking] MAL skip: ep \(episodeNumber) <= tracked \(current.progress)", type: "Info")
+                            continue
+                        }
+                    }
+                    do {
+                        try await provider.updateEntry(mediaId: resolvedMALID, status: status, progress: episodeNumber, score: 0)
+                        Logger.shared.log("[Tracking] MAL progress updated: ep \(episodeNumber), malId \(resolvedMALID)", type: "Info")
+                    } catch {
+                        Logger.shared.log("[Tracking] MAL update failed: \(error)", type: "Error")
                     }
                 }
             }

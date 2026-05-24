@@ -48,6 +48,7 @@ final class MALLibraryService {
         let status: String?
         let score: Int?
         let num_episodes_watched: Int?
+        let num_times_rewatched: Int?
         let updated_at: String?
     }
 
@@ -92,7 +93,7 @@ final class MALLibraryService {
     func fetchEntry(malId: Int) async throws -> MALListEntry? {
         var components = URLComponents(url: base.appendingPathComponent("anime/\(malId)"),
                                        resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "fields", value: "my_list_status,num_episodes,status,mean,genres,synopsis,start_season,media_type,main_picture")]
+        components.queryItems = [URLQueryItem(name: "fields", value: "my_list_status{status,score,num_episodes_watched,num_times_rewatched,updated_at},num_episodes,status,mean,genres,synopsis,start_season,media_type,main_picture")]
         let request = try await MALAuthManager.shared.authorizedRequest(url: components.url!)
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode == 404 { return nil }
@@ -116,13 +117,14 @@ final class MALLibraryService {
 
     // MARK: - Update entry
 
-    func updateEntry(malId: Int, status: MediaListStatus, progress: Int, score: Double) async throws {
+    func updateEntry(malId: Int, status: MediaListStatus, progress: Int, score: Double, numTimesRewatched: Int? = nil) async throws {
         let url = base.appendingPathComponent("anime/\(malId)/my_list_status")
         var request = try await MALAuthManager.shared.authorizedRequest(url: url, method: "PATCH")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let malStatus = mapStatusToMAL(status)
         let scoreInt = Int(score)
-        let body = "status=\(malStatus)&num_watched_episodes=\(progress)&score=\(scoreInt)"
+        var body = "status=\(malStatus)&num_watched_episodes=\(progress)&score=\(scoreInt)"
+        if let numTimesRewatched { body += "&num_times_rewatched=\(numTimesRewatched)" }
         request.httpBody = body.data(using: .utf8)
         let (_, response) = try await session.data(for: request)
         try validateResponse(response)

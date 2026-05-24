@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
     @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
+    @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
     @AppStorage("useDefaultExtension") private var useDefaultExtension = false
     @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
@@ -142,6 +143,8 @@ struct SettingsView: View {
                             Toggle("Sync edits to both services", isOn: $dualSync)
                                 .tint(.secondary)
                         }
+                        Toggle("Never reduce progress", isOn: $skipReWatchTracking)
+                            .tint(.secondary)
                         Text("Automatically update your watch progress as you watch.")
                             .font(.caption)
                             .foregroundStyle(.secondary)

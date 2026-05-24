@@ -171,7 +171,7 @@ final class AniListProvider: MediaProvider {
     func mapEntry(_ e: AniListRawEntry) -> LibraryEntry {
         LibraryEntry(id: e.id, media: mapMedia(e.media), status: e.status,
                      progress: e.progress, score: e.score, updatedAt: e.updatedAt,
-                     customListName: e.customListName)
+                     customListName: e.customListName, timesRewatched: e.repeat)
     }
 
     func mapUser(_ u: AniListUser) -> UserProfile {

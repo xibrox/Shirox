@@ -9,6 +9,7 @@ struct AniListRawEntry {
     let score: Double
     let updatedAt: Int?
     let customListName: String?
+    let `repeat`: Int
 }
 
 final class AniListLibraryService {
@@ -90,7 +91,8 @@ final class AniListLibraryService {
                     progress: raw.progress,
                     score: raw.score,
                     updatedAt: raw.updatedAt,
-                    customListName: customName
+                    customListName: customName,
+                    repeat: 0
                 ))
             }
         }
@@ -108,6 +110,7 @@ final class AniListLibraryService {
             status
             progress
             score
+            repeat
             updatedAt
             media {
               id
@@ -137,6 +140,7 @@ final class AniListLibraryService {
                 let status: MediaListStatus
                 let progress: Int
                 let score: Double
+                let `repeat`: Int
                 let updatedAt: Int?
                 let media: AniListMedia
             }
@@ -144,7 +148,7 @@ final class AniListLibraryService {
         }
 
         guard let raw = try JSONDecoder().decode(Response.self, from: data).data?.MediaList else { return nil }
-        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil)
+        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil, repeat: raw.repeat)
     }
 
     // MARK: - Fetch list (by status, kept for compatibility)
@@ -156,10 +160,10 @@ final class AniListLibraryService {
 
     // MARK: - Update entry
 
-    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil) async throws {
+    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil) async throws {
         let mutation = """
-        mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
-          SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
+        mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int) {
+          SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat) {
             id
           }
         }
@@ -170,6 +174,7 @@ final class AniListLibraryService {
             "progress": progress
         ]
         if let score { variables["score"] = score }
+        if let repeatCount { variables["repeat"] = repeatCount }
         _ = try await post(query: mutation, variables: variables)
     }
 
