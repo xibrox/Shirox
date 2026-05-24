@@ -544,13 +544,43 @@ import Foundation
     private static func watchedKey(aniListID: Int?, moduleId: String?,
                                     mediaTitle: String, episodeNumber: Int) -> String? {
         if let aid = aniListID { return "a:\(aid):\(episodeNumber)" }
-        if let mid = moduleId, !mid.isEmpty { return "m:\(mid):\(mediaTitle):\(episodeNumber)" }
+        if let mid = moduleId, !mid.isEmpty {
+            let canonical = mediaTitle.trimmingCharacters(in: .whitespaces).lowercased()
+            return "m:\(mid):\(canonical):\(episodeNumber)"
+        }
         return nil
     }
 
     // MARK: - Migrations
 
     private func runLegacyDataMigration() async {
+        // Re-key module entries stored with non-canonical (mixed-case/padded) mediaTitle.
+        let nonCanonicalModuleKeys = watchedKeys.filter { key in
+            guard key.hasPrefix("m:") else { return false }
+            let parts = key.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
+            guard parts.count == 4 else { return false }
+            let storedTitle = String(parts[2])
+            let canonical = storedTitle.trimmingCharacters(in: .whitespaces).lowercased()
+            return storedTitle != canonical
+        }
+        if !nonCanonicalModuleKeys.isEmpty {
+            var updated = watchedKeys
+            for key in nonCanonicalModuleKeys {
+                let parts = key.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
+                guard parts.count == 4 else { continue }
+                let mid = String(parts[1])
+                let title = String(parts[2])
+                let ep = String(parts[3])
+                let canonical = title.trimmingCharacters(in: .whitespaces).lowercased()
+                updated.remove(key)
+                updated.insert("m:\(mid):\(canonical):\(ep)")
+            }
+            await MainActor.run {
+                watchedKeys = updated
+                persist()
+            }
+        }
+
         let legacyItems = items.filter { $0.isAiring == nil }
         guard !legacyItems.isEmpty else { return }
 
