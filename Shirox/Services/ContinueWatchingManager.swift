@@ -418,14 +418,8 @@ import Foundation
             return .applied
         }
 
-        // Local: standard single-ep unmark (removes key + updates CW placeholder).
-        markUnwatched(
-            aniListID: context.aniListID, moduleId: context.moduleId,
-            mediaTitle: context.mediaTitle, episodeNumber: ep,
-            imageUrl: context.imageUrl, totalEpisodes: context.totalEpisodes,
-            availableEpisodes: context.availableEpisodes, detailHref: context.detailHref
-        )
-        // Check if remote progress would drop — return confirmation payload if so.
+        // Check downgrade BEFORE touching local state — if confirmation is needed,
+        // defer the unmark into the closures so Cancel leaves the episode intact.
         let proposedProgress = ep - 1
         let aniListLoggedIn = AniListAuthManager.shared.isLoggedIn
         let malLoggedIn = MALAuthManager.shared.isLoggedIn
@@ -434,32 +428,67 @@ import Foundation
         let aniNeedsDowngrade = aniListLoggedIn && (aniFrom.map { $0 > proposedProgress } ?? false)
         let malNeedsDowngrade = malLoggedIn && (malFrom.map { $0 > proposedProgress } ?? false)
 
-        guard aniNeedsDowngrade || malNeedsDowngrade else { return .applied }
+        if aniNeedsDowngrade || malNeedsDowngrade {
+            let capturedContext = context
+            let capturedProposed = proposedProgress
+            let capturedAniListLoggedIn = aniListLoggedIn
+            let capturedMalLoggedIn = malLoggedIn
 
-        let capturedContext = context
-        let capturedProposed = proposedProgress
-        let capturedAniListLoggedIn = aniListLoggedIn
-        let capturedMalLoggedIn = malLoggedIn
+            return .needsConfirmation(RemoteDowngrade(
+                newProgress: capturedProposed,
+                anilistFrom: aniNeedsDowngrade ? aniFrom : nil,
+                malFrom: malNeedsDowngrade ? malFrom : nil,
+                confirm: {
+                    self.applyLocalUnmark(ep: ep, context: capturedContext)
+                    let remoteStatus: MediaListStatus = capturedProposed == 0 ? .planning : .current
+                    if let aid = capturedContext.aniListID, capturedAniListLoggedIn {
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: aid, status: remoteStatus, progress: capturedProposed, score: 0)
+                    }
+                    let malID = capturedContext.malID
+                        ?? capturedContext.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) }
+                    if let mid = malID, capturedMalLoggedIn {
+                        try? await MALProvider.shared.updateEntry(
+                            mediaId: mid, status: remoteStatus, progress: capturedProposed, score: 0)
+                    }
+                },
+                localOnly: {
+                    self.applyLocalUnmark(ep: ep, context: capturedContext)
+                }
+            ))
+        }
 
-        return .needsConfirmation(RemoteDowngrade(
-            newProgress: capturedProposed,
-            anilistFrom: aniNeedsDowngrade ? aniFrom : nil,
-            malFrom: malNeedsDowngrade ? malFrom : nil,
-            confirm: {
-                let remoteStatus: MediaListStatus = capturedProposed == 0 ? .planning : .current
-                if let aid = capturedContext.aniListID, capturedAniListLoggedIn {
-                    try? await AniListLibraryService.shared.updateEntry(
-                        mediaId: aid, status: remoteStatus, progress: capturedProposed, score: 0)
+        // No remote downgrade — apply local unmark immediately.
+        applyLocalUnmark(ep: ep, context: context)
+        return .applied
+    }
+
+    private func applyLocalUnmark(ep: Int, context: MarkContext) {
+        markUnwatched(
+            aniListID: context.aniListID, moduleId: context.moduleId,
+            mediaTitle: context.mediaTitle, episodeNumber: ep,
+            imageUrl: context.imageUrl, totalEpisodes: context.totalEpisodes,
+            availableEpisodes: context.availableEpisodes, detailHref: context.detailHref
+        )
+        let keysAbove = watchedKeys.filter { key in
+            if let aid = context.aniListID, key.hasPrefix("a:\(aid):") {
+                let suffix = key.dropFirst("a:\(aid):".count)
+                return Int(suffix).map { $0 > ep } ?? false
+            }
+            if let mid = context.moduleId, !mid.isEmpty {
+                let canonical = context.mediaTitle.trimmingCharacters(in: .whitespaces).lowercased()
+                let prefix = "m:\(mid):\(canonical):"
+                if key.hasPrefix(prefix) {
+                    let suffix = key.dropFirst(prefix.count)
+                    return Int(suffix).map { $0 > ep } ?? false
                 }
-                let malID = capturedContext.malID
-                    ?? capturedContext.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) }
-                if let mid = malID, capturedMalLoggedIn {
-                    try? await MALProvider.shared.updateEntry(
-                        mediaId: mid, status: remoteStatus, progress: capturedProposed, score: 0)
-                }
-            },
-            localOnly: {}
-        ))
+            }
+            return false
+        }
+        if !keysAbove.isEmpty {
+            watchedKeys.subtract(keysAbove)
+            persist()
+        }
     }
 
     // MARK: - Private Helpers
