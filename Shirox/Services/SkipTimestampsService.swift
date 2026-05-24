@@ -17,21 +17,55 @@ final class SkipTimestampsService {
         let key = CacheKey(aniListID: aniListID, episodeNumber: episodeNumber)
         if let cached = cache[key] { return cached }
 
+        let tvdbSeason: Int
+        let epoffset: Int
+        if let mapping = await TVDBMappingService.shared.getTVDBId(for: aniListID) {
+            tvdbSeason = mapping.season.flatMap { $0 > 0 ? $0 : nil } ?? 1
+            epoffset = TVDBMappingService.shared.cachedEpOffset(for: aniListID) ?? 0
+        } else {
+            tvdbSeason = 1
+            epoffset = 0
+        }
+        // If episodeNumber > epoffset the module uses absolute/TVDB numbering —
+        // convert to AniList-relative for Anira and use the value directly as tvdbEpisode.
+        let isAbsolute = epoffset > 0 && episodeNumber > epoffset
+        let aniListEpisode = isAbsolute ? episodeNumber - epoffset : episodeNumber
+        let tvdbEpisode = isAbsolute ? episodeNumber : episodeNumber + epoffset
+
+        // 1. Try Anira per-episode endpoint first (has intro/outro in seconds)
+        let aniraEp = await TVDBMappingService.shared.fetchAniraEpisode(id: aniListID, episodeNumber: aniListEpisode)
+        if let skips = aniraEp?.skips, !skips.isEmpty {
+            var result = SkipSegments()
+            for skip in skips {
+                let seg = SkipSegments.Segment(startMs: skip.start * 1000, endMs: skip.end * 1000)
+                switch skip.type {
+                case "op", "mixed-op": result.intro = seg
+                case "ed", "mixed-ed": result.credits = seg
+                case "recap": result.recap = seg
+                default: break
+                }
+            }
+            cache[key] = result
+            return result
+        }
+
+        // 2. Fall back to introdb / theIntroDB
         let imdbID = await IDMappingService.shared.imdbId(forAnilistId: aniListID)
         let tmdb = await IDMappingService.shared.tmdbId(forAnilistId: aniListID)
         let isMovie = tmdb?.isMovie ?? false
 
-        let season: Int
-        if let s = TVDBMappingService.shared.cachedSeason(for: aniListID), s > 0 {
-            season = s
-        } else {
-            season = 1
+        async let introDBResult = fetchIntroDB(imdbID: imdbID, season: tvdbSeason, episode: tvdbEpisode, isMovie: isMovie)
+        async let theIntroDBResult = fetchTheIntroDB(tmdbID: tmdb?.id, season: tvdbSeason, episode: tvdbEpisode, isMovie: isMovie)
+
+        var (introDB, theIntroDB) = await (introDBResult, theIntroDBResult)
+
+        // If tvdbEpisode returned nothing and differs from the raw episode number, retry with the raw number
+        if introDB?.hasSegments != true && tvdbEpisode != episodeNumber {
+            introDB = await fetchIntroDB(imdbID: imdbID, season: tvdbSeason, episode: episodeNumber, isMovie: isMovie)
         }
-
-        async let introDBResult = fetchIntroDB(imdbID: imdbID, season: season, episode: episodeNumber, isMovie: isMovie)
-        async let theIntroDBResult = fetchTheIntroDB(tmdbID: tmdb?.id, season: season, episode: episodeNumber, isMovie: isMovie)
-
-        let (introDB, theIntroDB) = await (introDBResult, theIntroDBResult)
+        if theIntroDB == nil && tvdbEpisode != episodeNumber {
+            theIntroDB = await fetchTheIntroDB(tmdbID: tmdb?.id, season: tvdbSeason, episode: episodeNumber, isMovie: isMovie)
+        }
         let segments = merge(introdb: introDB, theintrodb: theIntroDB)
         cache[key] = segments
         return segments
@@ -102,6 +136,7 @@ private struct IntroDBResponse: Decodable {
     let intro: Segment?
     let recap: Segment?
     let outro: Segment?
+    var hasSegments: Bool { intro != nil || recap != nil || outro != nil }
 }
 
 private struct TheIntroDBResponse: Decodable {
