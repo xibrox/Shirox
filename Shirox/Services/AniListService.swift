@@ -403,7 +403,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private let mappingEndpoint = "https://api.anira.dev/mappings/"
     private let tvdbEndpoint = "https://api4.thetvdb.com/v4"
     private let apiKey = "4cd66d53-3c21-45a7-9dd2-e4a9c2ed20a8"
-    private let cacheKey = "tvdb_mappings_cache_v3"
+    private let cacheKey = "tvdb_mappings_cache_v4"
     private let malCacheKey = "tvdb_mal_mappings_cache_v1"
 
     @Published private var token: String?
@@ -413,6 +413,8 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     struct CachedData: Codable {
         let tid: Int
         var season: Int?
+        var epOffset: Int?
+        var epOffsetFetched: Bool?  // nil = old entry (pre-epOffset), true = fetched fresh
         var posterPath: String?
         var fanartPath: String?
     }
@@ -420,9 +422,24 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private var malCache: [Int: CachedData] = [:]     // keyed by MAL ID
     private var episodeCache: [Int: [AniMapEpisode]] = [:]
     private var malEpisodeCache: [Int: [AniMapEpisode]] = [:]
+    private var aniraEpisodeCache: [String: AniraEpisodeResponse] = [:]
+
+    struct AniraEpisodeResponse: Decodable {
+        struct Skip: Decodable {
+            let type: String
+            let start: Double
+            let end: Double
+        }
+        let episode: Int
+        let title: String?
+        let description: String?
+        let thumbnail: String?
+        let skips: [Skip]?
+    }
 
     private static let session: URLSession = {
         let cfg = URLSessionConfiguration.default
+        cfg.urlCache = nil
         cfg.timeoutIntervalForRequest = 10
         cfg.timeoutIntervalForResource = 20
         return URLSession(configuration: cfg)
@@ -475,19 +492,23 @@ enum BrowseCategory: String, CaseIterable, Hashable {
 
     func getTVDBId(for id: Int, provider: ProviderType = .anilist) async -> (id: Int, season: Int?)? {
         let cached = tvdbCache(for: provider)[id]
-        if let cached { return cached.tid > 0 ? (cached.tid, cached.season) : nil }
+        // Only return from cache if we have a definitive result:
+        // - tid < 0 means we already know there's no mapping
+        // - epOffsetFetched == true means the entry was populated from a full fresh fetch
+        if let cached, cached.tid < 0 { return nil }
+        if let cached, cached.epOffsetFetched == true { return (cached.tid, cached.season) }
         do {
             let key = mappingKey(for: provider)
             guard let url = URL(string: "\(mappingEndpoint)\(id)?mapping_key=\(key)") else { return nil }
             let (data, _) = try await Self.session.data(for: URLRequest(url: url))
-            struct Mapping: Decodable { let tvdb_id: Int?; let tvdb_season: Int? }
+            struct Mapping: Decodable { let tvdb_id: Int?; let tvdb_season: Int?; let tvdb_epoffset: Int? }
             let results = try JSONDecoder().decode([Mapping].self, from: data)
             if let first = results.first, let tid = first.tvdb_id {
-                setTVDBCache(CachedData(tid: tid, season: first.tvdb_season), id: id, provider: provider)
+                setTVDBCache(CachedData(tid: tid, season: first.tvdb_season, epOffset: first.tvdb_epoffset, epOffsetFetched: true), id: id, provider: provider)
                 provider == .mal ? saveMALCache() : saveCache()
                 return (tid, first.tvdb_season)
             } else {
-                setTVDBCache(CachedData(tid: -1, season: nil), id: id, provider: provider)
+                setTVDBCache(CachedData(tid: -1, season: nil, epOffsetFetched: true), id: id, provider: provider)
                 provider == .mal ? saveMALCache() : saveCache()
             }
         } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
@@ -504,6 +525,21 @@ enum BrowseCategory: String, CaseIterable, Hashable {
 
     func cachedSeason(for id: Int, provider: ProviderType = .anilist) -> Int? {
         tvdbCache(for: provider)[id]?.season
+    }
+
+    func cachedEpOffset(for id: Int, provider: ProviderType = .anilist) -> Int? {
+        tvdbCache(for: provider)[id]?.epOffset
+    }
+
+    func fetchAniraEpisode(id: Int, episodeNumber: Int, mappingKey: String = "anilist") async -> AniraEpisodeResponse? {
+        let key = "\(id)-\(episodeNumber)-\(mappingKey)"
+        if let cached = aniraEpisodeCache[key] { return cached }
+        guard let url = URL(string: "https://api.anira.dev/media/\(id)/episodes/\(episodeNumber)?mapping_key=\(mappingKey)"),
+              let (data, _) = try? await Self.session.data(for: URLRequest(url: url)),
+              let result = try? JSONDecoder().decode(AniraEpisodeResponse.self, from: data)
+        else { return nil }
+        aniraEpisodeCache[key] = result
+        return result
     }
 
     func getCachedArtwork(for id: Int, provider: ProviderType = .anilist) -> (poster: String?, fanart: String?) {
@@ -649,27 +685,48 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             ?? eps?.first(where: { $0.absolute == episodeNumber })
     }
 
+    /// Resolves episode metadata for a given episode number, handling absolute/relative
+    /// numbering mismatches via a four-step waterfall.
+    func getEpisode(for id: Int, episodeNumber: Int, provider: ProviderType = .anilist) async -> AniMapEpisode? {
+        // 1. In-memory cache (checks both .episode and .absolute fields)
+        if let hit = getCachedEpisode(for: id, provider: provider, episodeNumber: episodeNumber) {
+            return hit
+        }
+
+        // 2. Fresh network fetch + check both fields
+        let eps = await getEpisodes(for: id, provider: provider)
+        if let hit = eps.first(where: { $0.episode == episodeNumber })
+                     ?? eps.first(where: { $0.absolute == episodeNumber }) {
+            return hit
+        }
+
+        // 3. Offset fallback — ensures epOffset is cached, then tries ±offset variants
+        _ = await getTVDBId(for: id, provider: provider)
+        let offset = cachedEpOffset(for: id, provider: provider) ?? 0
+        guard offset > 0 else { return nil }
+
+        // Module absolute → AniList-relative (e.g. 25 − 24 = 1)
+        let relative = episodeNumber - offset
+        if relative > 0, let hit = eps.first(where: { $0.episode == relative }) {
+            return hit
+        }
+
+        // AniList-relative → absolute (e.g. 1 + 24 = 25)
+        let absolute = episodeNumber + offset
+        if let hit = eps.first(where: { $0.episode == absolute }) {
+            return hit
+        }
+
+        return nil
+    }
+
     func getEpisodes(for id: Int, provider: ProviderType = .anilist) async -> [AniMapEpisode] {
         if provider != .mal { return await getEpisodesAniList(id) }
         if let cached = malEpisodeCache[id] { return cached }
 
-        // 1. Try TVDB first using the MAL ID mapping
-        if let mapping = await getTVDBId(for: id, provider: ProviderType.mal), mapping.id > 0 {
-            let tvdbEps = await fetchTVDBEpisodes(tid: mapping.id, season: mapping.season ?? 1)
-            if !tvdbEps.isEmpty {
-                let mapped = tvdbEps.map { te in
-                    AniMapEpisode(absolute: te.number, airdate: nil, description: te.overview,
-                                  episode: te.number, filler_type: nil, mal_id: nil,
-                                  season: te.seasonNumber, thumbnail: formatURL(te.image), title: te.name)
-                }
-                malEpisodeCache[id] = mapped
-                return mapped
-            }
-        }
-
-        // 2. Fall back to anira MAL episodes endpoint
+        // 1. Try Anira MAL episodes endpoint first
         do {
-            guard let url = URL(string: "https://api.anira.dev/media/\(id)/episodes?mapping_key=myanimelist") else { return [] }
+            guard let url = URL(string: "https://api.anira.dev/media/\(id)/episodes?mapping_key=myanimelist") else { throw URLError(.badURL) }
             let (data, _) = try await Self.session.data(for: URLRequest(url: url))
             var results = try JSONDecoder().decode([AniMapEpisode].self, from: data)
             results = results.map { ep in
@@ -694,14 +751,31 @@ enum BrowseCategory: String, CaseIterable, Hashable {
                                         season: ep.season, thumbnail: ep.thumbnail, title: title)
                 }
             }
-            malEpisodeCache[id] = results
-            return results
+            if !results.isEmpty {
+                malEpisodeCache[id] = results
+                return results
+            }
         } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
             return []
         } catch {
             Logger.shared.log("Anira MAL episodes error: \(error)", type: "Error")
-            return []
         }
+
+        // 2. Fall back to TVDB
+        if let mapping = await getTVDBId(for: id, provider: ProviderType.mal), mapping.id > 0 {
+            let tvdbEps = await fetchTVDBEpisodes(tid: mapping.id, season: mapping.season ?? 1)
+            if !tvdbEps.isEmpty {
+                let mapped = tvdbEps.map { te in
+                    AniMapEpisode(absolute: te.number, airdate: nil, description: te.overview,
+                                  episode: te.number, filler_type: nil, mal_id: nil,
+                                  season: te.seasonNumber, thumbnail: formatURL(te.image), title: te.name)
+                }
+                malEpisodeCache[id] = mapped
+                return mapped
+            }
+        }
+
+        return []
     }
 
     private func formatURL(_ path: String?) -> String? {
