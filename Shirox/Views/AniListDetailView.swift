@@ -1325,22 +1325,19 @@ private struct AniListEpisodeRowContainer: View {
         )
         .alert(
             "Update tracking progress?",
-            isPresented: Binding(get: { pendingDowngrade != nil }, set: { if !$0 { pendingDowngrade = nil } })
-        ) {
-            if let d = pendingDowngrade {
-                Button("Update everywhere (ep \(d.newProgress))") {
-                    Task { await d.confirm(); pendingDowngrade = nil }
-                }
-                Button("This device only", role: .cancel) { d.localOnly(); pendingDowngrade = nil }
+            isPresented: Binding(get: { pendingDowngrade != nil }, set: { if !$0 { pendingDowngrade = nil } }),
+            presenting: pendingDowngrade
+        ) { d in
+            Button("Update everywhere (ep \(d.newProgress))") {
+                Task { await d.confirm(); pendingDowngrade = nil }
             }
-        } message: {
-            if let d = pendingDowngrade {
-                let parts = [
-                    d.anilistFrom.map { "AniList: \($0) → \(d.newProgress)" },
-                    d.malFrom.map { "MAL: \($0) → \(d.newProgress)" }
-                ].compactMap { $0 }
-                Text(parts.joined(separator: "\n"))
-            }
+            Button("This device only", role: .cancel) { d.localOnly(); pendingDowngrade = nil }
+        } message: { d in
+            let parts = [
+                d.anilistFrom.map { "AniList: \($0) → \(d.newProgress)" },
+                d.malFrom.map { "MAL: \($0) → \(d.newProgress)" }
+            ].compactMap { $0 }
+            Text(parts.joined(separator: "\n"))
         }
         .task {
             aniMapEpisode = await TVDBMappingService.shared.getEpisode(for: mediaId, episodeNumber: ep, provider: provider)
