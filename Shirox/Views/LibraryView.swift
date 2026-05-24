@@ -25,8 +25,15 @@ struct LibraryView: View {
     private var sortOrder: LibrarySortOrder {
         LibrarySortOrder(rawValue: sortOrderRaw) ?? .score
     }
+    @AppStorage("dualSync") private var dualSync = false
     @State private var selectedGenres: Set<String> = []
     @State private var selectedEntry: LibraryEntry? = nil
+    @State private var pendingEntry: LibraryEntry? = nil
+    @State private var showProviderPicker = false
+    @State private var otherEntry: LibraryEntry? = nil
+    @State private var otherMedia: Media? = nil
+    @State private var showOtherSheet = false
+    @State private var isLoadingOtherEntry = false
     #if os(iOS)
     @State private var presentationWindow: UIWindow?
     #endif
@@ -354,7 +361,12 @@ struct LibraryView: View {
                             .opacity(0)
 
                             LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-                                selectedEntry = entry
+                                if anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
+                                    pendingEntry = entry
+                                    showProviderPicker = true
+                                } else {
+                                    selectedEntry = entry
+                                }
                             }
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -451,12 +463,115 @@ struct LibraryView: View {
                             aniListID: entry.media.id, moduleId: nil, mediaTitle: entry.media.title.searchTitle
                         )
                     }
-                    Task { await vm.update(entry: entry, status: status, progress: progress, score: score) }
+                    Task {
+                        await vm.update(entry: entry, status: status, progress: progress, score: score)
+                        if dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                            if activeProviderType == .anilist, let idMal = entry.media.idMal {
+                                try? await MALProvider.shared.updateEntry(mediaId: idMal, status: status, progress: progress, score: score)
+                            } else if activeProviderType == .mal {
+                                if let aniListId = await IDMappingService.shared.anilistId(forMALId: entry.media.id) {
+                                    try? await AniListProvider.shared.updateEntry(mediaId: aniListId, status: status, progress: progress, score: score)
+                                }
+                            }
+                        }
+                    }
                 },
                 onDelete: {
-                    Task { await vm.delete(entry: entry) }
+                    Task {
+                        await vm.delete(entry: entry)
+                        if dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                            if activeProviderType == .anilist, let idMal = entry.media.idMal {
+                                try? await MALProvider.shared.deleteEntry(entryId: idMal)
+                            } else if activeProviderType == .mal {
+                                if let aniListId = await IDMappingService.shared.anilistId(forMALId: entry.media.id),
+                                   let aniListEntry = try? await AniListProvider.shared.fetchEntry(mediaId: aniListId) {
+                                    try? await AniListProvider.shared.deleteEntry(entryId: aniListEntry.id)
+                                }
+                            }
+                        }
+                    }
                 }
             )
+        }
+        .confirmationDialog("Edit on which service?", isPresented: $showProviderPicker, titleVisibility: .visible) {
+            Button("Edit on AniList") {
+                guard let entry = pendingEntry else { return }
+                if activeProviderType == .anilist {
+                    selectedEntry = entry
+                } else {
+                    isLoadingOtherEntry = true
+                    Task {
+                        if let aniListId = await IDMappingService.shared.anilistId(forMALId: entry.media.id) {
+                            let fetched = try? await AniListProvider.shared.fetchEntry(mediaId: aniListId)
+                            let aniListMedia = Media(
+                                id: aniListId, idMal: entry.media.id, provider: .anilist,
+                                title: entry.media.title, coverImage: entry.media.coverImage,
+                                bannerImage: nil, description: nil, episodes: entry.media.episodes,
+                                status: nil, averageScore: nil, genres: nil,
+                                season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                                relations: nil, type: nil, format: nil
+                            )
+                            otherEntry = fetched
+                            otherMedia = aniListMedia
+                            showOtherSheet = true
+                        }
+                        isLoadingOtherEntry = false
+                    }
+                }
+            }
+            Button("Edit on MyAnimeList") {
+                guard let entry = pendingEntry else { return }
+                if activeProviderType == .mal {
+                    selectedEntry = entry
+                } else {
+                    guard let idMal = entry.media.idMal else { return }
+                    isLoadingOtherEntry = true
+                    Task {
+                        let fetched = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
+                        let malMedia = Media(
+                            id: idMal, idMal: idMal, provider: .mal,
+                            title: entry.media.title, coverImage: entry.media.coverImage,
+                            bannerImage: nil, description: nil, episodes: entry.media.episodes,
+                            status: nil, averageScore: nil, genres: nil,
+                            season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                            relations: nil, type: nil, format: nil
+                        )
+                        otherEntry = fetched
+                        otherMedia = malMedia
+                        showOtherSheet = true
+                        isLoadingOtherEntry = false
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingEntry = nil }
+        }
+        .adaptiveSheet(isPresented: $showOtherSheet) {
+            if let media = otherMedia {
+                LibraryEntryEditSheet(
+                    entry: otherEntry,
+                    media: media,
+                    onSave: { status, progress, score in
+                        Task {
+                            if media.provider == .mal {
+                                try? await MALProvider.shared.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
+                            } else {
+                                try? await AniListProvider.shared.updateEntry(mediaId: media.id, status: status, progress: progress, score: score)
+                            }
+                        }
+                    },
+                    onDelete: otherEntry != nil ? {
+                        Task {
+                            if media.provider == .mal {
+                                try? await MALProvider.shared.deleteEntry(entryId: media.id)
+                            } else if let entry = otherEntry {
+                                try? await AniListProvider.shared.deleteEntry(entryId: entry.id)
+                            }
+                        }
+                        otherEntry = nil
+                        showOtherSheet = false
+                    } : nil
+                )
+            }
         }
         .adaptiveSheet(isPresented: $showProfile) {
             if let uid = anilistAuth.userId, let username = anilistAuth.username {
