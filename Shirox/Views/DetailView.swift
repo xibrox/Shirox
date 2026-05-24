@@ -1449,10 +1449,6 @@ private struct ModuleEpisodeRowContainer: View {
             return 1.0
         }
         
-        if aniListStatus == .completed {
-            return 1.0
-        }
-
         let mid = moduleId
         guard let item = continueWatching.items.first(where: {
                   (($0.aniListID != nil && $0.aniListID == aniListID) ||

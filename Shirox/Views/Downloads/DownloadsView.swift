@@ -736,10 +736,6 @@ private struct DownloadedEpisodeRowContainer: View {
                                       mediaTitle: mediaTitle, episodeNumber: ep) {
             return 1.0
         }
-        if let status = aniListStatus, status != .planning {
-            if status == .completed { return 1.0 }
-            if let p = aniListProgress, ep <= p { return 1.0 }
-        }
         guard let cwItem = continueWatching.items.first(where: {
             ($0.aniListID != nil && $0.aniListID == aniListID && $0.episodeNumber == ep) ||
             ($0.mediaTitle == mediaTitle && $0.moduleId == moduleId && $0.episodeNumber == ep)
