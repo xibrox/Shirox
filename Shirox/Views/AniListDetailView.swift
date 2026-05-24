@@ -1331,7 +1331,8 @@ private struct AniListEpisodeRowContainer: View {
             Button("Update everywhere (ep \(d.newProgress))") {
                 Task { await d.confirm(); pendingDowngrade = nil }
             }
-            Button("This device only", role: .cancel) { d.localOnly(); pendingDowngrade = nil }
+            Button("This device only") { d.localOnly(); pendingDowngrade = nil }
+            Button("Cancel", role: .cancel) { pendingDowngrade = nil }
         } message: { d in
             let parts = [
                 d.anilistFrom.map { "AniList: \($0) → \(d.newProgress)" },
