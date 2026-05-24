@@ -1532,17 +1532,15 @@ private struct ModuleEpisodeRowContainer: View {
                 )
             }
         }
-        .confirmationDialog(
+        .alert(
             "Update tracking progress?",
-            isPresented: Binding(get: { pendingDowngrade != nil }, set: { if !$0 { pendingDowngrade = nil } }),
-            titleVisibility: .visible
+            isPresented: Binding(get: { pendingDowngrade != nil }, set: { if !$0 { pendingDowngrade = nil } })
         ) {
             if let d = pendingDowngrade {
                 Button("Update everywhere (ep \(d.newProgress))") {
                     Task { await d.confirm(); pendingDowngrade = nil }
                 }
-                Button("This device only") { d.localOnly(); pendingDowngrade = nil }
-                Button("Cancel", role: .cancel) { pendingDowngrade = nil }
+                Button("This device only", role: .cancel) { d.localOnly(); pendingDowngrade = nil }
             }
         } message: {
             if let d = pendingDowngrade {

@@ -786,23 +786,23 @@ private struct DownloadedEpisodeRowContainer: View {
                 }
             }
         }
-        .confirmationDialog("Lower remote progress?",
-            isPresented: Binding(get: { pendingDowngrade != nil },
-                                 set: { if !$0 { pendingDowngrade = nil } }),
-            titleVisibility: .visible
+        .alert(
+            "Update tracking progress?",
+            isPresented: Binding(get: { pendingDowngrade != nil }, set: { if !$0 { pendingDowngrade = nil } })
         ) {
             if let d = pendingDowngrade {
-                Button("Update everywhere") {
-                    Task { await d.confirm() }
-                    pendingDowngrade = nil
+                Button("Update everywhere (ep \(d.newProgress))") {
+                    Task { await d.confirm(); pendingDowngrade = nil }
                 }
-                Button("This device only", role: .cancel) {
-                    d.localOnly()
-                    pendingDowngrade = nil
-                }
-                Button("Cancel", role: .destructive) {
-                    pendingDowngrade = nil
-                }
+                Button("This device only", role: .cancel) { d.localOnly(); pendingDowngrade = nil }
+            }
+        } message: {
+            if let d = pendingDowngrade {
+                let parts = [
+                    d.anilistFrom.map { "AniList: \($0) → \(d.newProgress)" },
+                    d.malFrom.map { "MAL: \($0) → \(d.newProgress)" }
+                ].compactMap { $0 }
+                Text(parts.joined(separator: "\n"))
             }
         }
     }
