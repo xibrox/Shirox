@@ -1325,13 +1325,7 @@ private struct AniListEpisodeRowContainer: View {
             downloadState: downloadState
         )
         .task {
-            if aniMapEpisode == nil {
-                aniMapEpisode = TVDBMappingService.shared.getCachedEpisode(for: mediaId, provider: provider, episodeNumber: ep)
-                if aniMapEpisode == nil {
-                    let eps = await TVDBMappingService.shared.getEpisodes(for: mediaId, provider: provider)
-                    aniMapEpisode = eps.first(where: { $0.episode == ep })
-                }
-            }
+            aniMapEpisode = await TVDBMappingService.shared.getEpisode(for: mediaId, episodeNumber: ep, provider: provider)
             if aniMapEpisode?.thumbnail == nil {
                 let artwork = await TVDBMappingService.shared.getArtwork(for: mediaId, provider: provider)
                 fallbackThumbnail = artwork.fanart ?? artwork.poster
