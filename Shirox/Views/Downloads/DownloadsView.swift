@@ -711,8 +711,25 @@ private struct DownloadedEpisodeRowContainer: View {
 
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @State private var thumbnail: String?
+    @State private var pendingDowngrade: RemoteDowngrade? = nil
 
     private var ep: Int { item.episodeNumber }
+
+    private var markContext: MarkContext {
+        MarkContext(
+            aniListID: aniListID,
+            malID: aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
+            moduleId: moduleId,
+            mediaTitle: mediaTitle,
+            imageUrl: item.imageUrl,
+            totalEpisodes: nil,
+            availableEpisodes: nil,
+            detailHref: item.detailHref,
+            currentAniListProgress: aniListProgress,
+            currentMALProgress: nil,
+            currentAniListStatus: aniListStatus
+        )
+    }
 
     private var progress: Double? {
         if continueWatching.isWatched(aniListID: aniListID, moduleId: moduleId,
@@ -738,16 +755,18 @@ private struct DownloadedEpisodeRowContainer: View {
             progress: progress,
             onTap: onTap,
             onMarkWatched: {
-                ContinueWatchingManager.shared.markWatched(
-                    aniListID: aniListID, moduleId: moduleId,
-                    mediaTitle: mediaTitle, episodeNumber: ep,
-                    imageUrl: item.imageUrl, totalEpisodes: nil, detailHref: nil)
+                Task {
+                    let result = await ContinueWatchingManager.shared.markEpisode(
+                        ep, asWatched: true, context: markContext)
+                    if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                }
             },
             onMarkUnwatched: {
-                ContinueWatchingManager.shared.markUnwatched(
-                    aniListID: aniListID, moduleId: moduleId,
-                    mediaTitle: mediaTitle, episodeNumber: ep,
-                    imageUrl: item.imageUrl, totalEpisodes: nil, detailHref: nil)
+                Task {
+                    let result = await ContinueWatchingManager.shared.markEpisode(
+                        ep, asWatched: false, context: markContext)
+                    if case .needsConfirmation(let d) = result { pendingDowngrade = d }
+                }
             },
             onResetProgress: {
                 ContinueWatchingManager.shared.resetEpisodeProgress(
@@ -764,6 +783,25 @@ private struct DownloadedEpisodeRowContainer: View {
                     if let thumb = episodes.first(where: { $0.episode == ep })?.thumbnail {
                         thumbnail = thumb
                     }
+                }
+            }
+        }
+        .confirmationDialog("Lower remote progress?",
+            isPresented: Binding(get: { pendingDowngrade != nil },
+                                 set: { if !$0 { pendingDowngrade = nil } }),
+            titleVisibility: .visible
+        ) {
+            if let d = pendingDowngrade {
+                Button("Update everywhere") {
+                    Task { await d.confirm() }
+                    pendingDowngrade = nil
+                }
+                Button("This device only", role: .cancel) {
+                    d.localOnly()
+                    pendingDowngrade = nil
+                }
+                Button("Cancel", role: .destructive) {
+                    pendingDowngrade = nil
                 }
             }
         }
