@@ -77,7 +77,12 @@ final class MALDiscoveryService {
             }
             if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
         }
-        return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data.filter { $0.mal_id > 0 }
+        var seen = Set<Int>()
+        return try JSONDecoder().decode(JikanPage<JikanAnime>.self, from: data).data.filter {
+            guard $0.mal_id > 0 else { return false }
+            guard let imgUrl = $0.images?.jpg?.image_url, !imgUrl.isEmpty, !imgUrl.contains("qm_50") else { return false }
+            return seen.insert($0.mal_id).inserted
+        }
     }
 
     private func fetchSingle(_ path: String, retrying: Bool = false) async throws -> JikanAnime {

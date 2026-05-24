@@ -149,11 +149,7 @@ struct LibraryEntryEditSheet: View {
                     progress = total
                 }
             }
-            .confirmationDialog(
-                "Remove from Library",
-                isPresented: $showDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
+            .alert("Remove from Library", isPresented: $showDeleteConfirmation) {
                 Button("Remove", role: .destructive) {
                     onDelete?()
                     dismiss()
