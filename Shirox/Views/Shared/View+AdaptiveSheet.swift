@@ -74,6 +74,17 @@ extension View {
 }
 
 extension View {
+    @ViewBuilder
+    func navigationSplitViewColumnWidthIfAvailable(_ width: CGFloat) -> some View {
+        if #available(iOS 16, macOS 13, *) {
+            self.navigationSplitViewColumnWidth(width)
+        } else {
+            self
+        }
+    }
+}
+
+extension View {
     func adaptiveSheet<Content: View>(
         isPresented: Binding<Bool>,
         onDismiss: (() -> Void)? = nil,

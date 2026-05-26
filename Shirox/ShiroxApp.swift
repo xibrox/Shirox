@@ -193,7 +193,7 @@ private struct MacSidebarView: View {
 
             Spacer()
         }
-        .navigationSplitViewColumnWidth(220)
+        .navigationSplitViewColumnWidthIfAvailable(220)
     }
 }
 #endif
