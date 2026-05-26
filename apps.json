@@ -3,7 +3,7 @@
   "identifier": "com.shirox.altstore",
   "sourceURL": "https://raw.githubusercontent.com/xibrox/Shirox/main/apps.json",
   "subtitle": "Personal anime library manager for iOS",
-  "description": "Shirox is a free, open-source personal anime library manager for iOS 17+.\n\nOrganize and track your anime collection using community-built modules. AniList integration for library management and discovery.",
+  "description": "Shirox is a free, open-source personal anime library manager for iOS 15+.\n\nOrganize and track your anime collection using community-built modules. AniList integration for library management and discovery.",
   "website": "https://github.com/xibrox/Shirox",
   "featuredApps": [
     "com.shirox.app"
@@ -14,7 +14,7 @@
       "bundleIdentifier": "com.shirox.app",
       "developerName": "xibrox",
       "subtitle": "Personal anime library manager for iOS",
-      "localizedDescription": "Shirox is a free, open-source personal anime library manager for iOS 17+.\n\n• Organize your anime collection with community-built modules\n• AniList integration for library management and discovery\n• Continue Watching — pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
+      "localizedDescription": "Shirox is a free, open-source personal anime library manager for iOS 15+.\n\n• Organize your anime collection with community-built modules\n• AniList integration for library management and discovery\n• Continue Watching — pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
       "iconURL": "https://raw.githubusercontent.com/xibrox/Shirox/main/Shirox/shirox-icon.icon/Assets/白-shiro.png",
       "tintColor": "ef4444",
       "category": "entertainment",
@@ -27,13 +27,13 @@
       },
       "versions": [
         {
-          "version": "0.0.76",
-          "buildVersion": "73",
+          "version": "0.0.77",
+          "buildVersion": "74",
           "date": "2026-05-24",
           "localizedDescription": "Beta release",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
           "size": 6271081,
-          "minOSVersion": "17.0"
+          "minOSVersion": "15.0"
         }
       ]
     }

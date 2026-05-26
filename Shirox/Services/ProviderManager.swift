@@ -61,7 +61,7 @@ final class ProviderManager: ObservableObject {
             fallbackActive = true
             Logger.shared.log("ProviderManager switching to fallback: \(fallback.providerType.rawValue)", type: "Provider")
             Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
                 self?.fallbackActive = false
             }
             return try await operation(fallback)

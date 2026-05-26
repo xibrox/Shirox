@@ -194,6 +194,14 @@
 		AB025E2E3D6CA162A38BD43F /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
 		AD000001000000000000AS02 /* View+AdaptiveSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001000000000000AS01 /* View+AdaptiveSheet.swift */; };
 		AD000001000000000000AS03 /* View+AdaptiveSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000001000000000000AS01 /* View+AdaptiveSheet.swift */; };
+		AD000002000000000000CV02 /* ContentUnavailableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000002000000000000CV01 /* ContentUnavailableView.swift */; };
+		AD000002000000000000CV03 /* ContentUnavailableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000002000000000000CV01 /* ContentUnavailableView.swift */; };
+		AD000003000000000000NS02 /* NavigationStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000003000000000000NS01 /* NavigationStack.swift */; };
+		AD000003000000000000NS03 /* NavigationStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000003000000000000NS01 /* NavigationStack.swift */; };
+		AD000004000000000000PD02 /* PresentationDetent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000004000000000000PD01 /* PresentationDetent.swift */; };
+		AD000004000000000000PD03 /* PresentationDetent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000004000000000000PD01 /* PresentationDetent.swift */; };
+		AD000005000000000000LC02 /* LabeledContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000005000000000000LC01 /* LabeledContent.swift */; };
+		AD000005000000000000LC03 /* LabeledContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD000005000000000000LC01 /* LabeledContent.swift */; };
 		AD77ACB8F3145563F32E6E40 /* ModuleStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D0E50598C525B8540DE986 /* ModuleStreamPickerView.swift */; };
 		AFD909B8E23B2E6F048F0869 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD942143248855B7D74F9E0C /* SettingsView.swift */; };
 		B28F4CA7C301FB3448693046 /* ModuleJSRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9D9A88BECF75FEF1BA4E1D /* ModuleJSRunner.swift */; };
@@ -346,6 +354,10 @@
 		AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
 		AB7865FCF14B6C0E49BCD85B /* AniListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListDetailView.swift; sourceTree = "<group>"; };
 		AD000001000000000000AS01 /* View+AdaptiveSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+AdaptiveSheet.swift"; sourceTree = "<group>"; };
+		AD000002000000000000CV01 /* ContentUnavailableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentUnavailableView.swift; sourceTree = "<group>"; };
+		AD000003000000000000NS01 /* NavigationStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStack.swift; sourceTree = "<group>"; };
+		AD000004000000000000PD01 /* PresentationDetent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationDetent.swift; sourceTree = "<group>"; };
+		AD000005000000000000LC01 /* LabeledContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabeledContent.swift; sourceTree = "<group>"; };
 		ADD6C63415A5CB6EC7D37707 /* MALDiscoveryService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MALDiscoveryService.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		AF205A19072F2230848F6A66 /* MALAuthManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MALAuthManager.swift; sourceTree = "<group>"; };
@@ -609,6 +621,10 @@
 			children = (
 				DC614E8CAD2D4CC7A9652480 /* CachedAsyncImage.swift */,
 				AD000001000000000000AS01 /* View+AdaptiveSheet.swift */,
+				AD000002000000000000CV01 /* ContentUnavailableView.swift */,
+				AD000003000000000000NS01 /* NavigationStack.swift */,
+				AD000004000000000000PD01 /* PresentationDetent.swift */,
+				AD000005000000000000LC01 /* LabeledContent.swift */,
 				AA11BB22CC33DD44EE55FF63 /* MarkdownText.swift */,
 				DD000001000000000000BB01 /* ThumbnailEpisodeRow.swift */,
 				MD000001000000000000MD01 /* MarkdownText.swift */,
@@ -977,6 +993,10 @@
 				7A2F29854EAC49CBBA429793 /* ContinueWatchingCard.swift in Sources */,
 				748517C4AE504A939CC1610F /* CachedAsyncImage.swift in Sources */,
 				AD000001000000000000AS02 /* View+AdaptiveSheet.swift in Sources */,
+				AD000002000000000000CV02 /* ContentUnavailableView.swift in Sources */,
+				AD000003000000000000NS02 /* NavigationStack.swift in Sources */,
+				AD000004000000000000PD02 /* PresentationDetent.swift in Sources */,
+				AD000005000000000000LC02 /* LabeledContent.swift in Sources */,
 				AA11BB22CC33DD44EE55FF62 /* MarkdownText.swift in Sources */,
 				DD000001000000000000AA01 /* ThumbnailEpisodeRow.swift in Sources */,
 				MD000001000000000000MD02 /* MarkdownText.swift in Sources */,
@@ -1102,6 +1122,10 @@
 				C6D6D30B21704A758C1EC4FD /* ContinueWatchingCard.swift in Sources */,
 				70F287DD43E84880B274852E /* CachedAsyncImage.swift in Sources */,
 				AD000001000000000000AS03 /* View+AdaptiveSheet.swift in Sources */,
+				AD000002000000000000CV03 /* ContentUnavailableView.swift in Sources */,
+				AD000003000000000000NS03 /* NavigationStack.swift in Sources */,
+				AD000004000000000000PD03 /* PresentationDetent.swift in Sources */,
+				AD000005000000000000LC03 /* LabeledContent.swift in Sources */,
 				AA11BB22CC33DD44EE55FF61 /* MarkdownText.swift in Sources */,
 				DD000001000000000000AA02 /* ThumbnailEpisodeRow.swift in Sources */,
 				MD000001000000000000MD03 /* MarkdownText.swift in Sources */,
@@ -1196,7 +1220,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -1217,13 +1241,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 73;
+				CURRENT_PROJECT_VERSION = 74;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.76;
+				MARKETING_VERSION = 0.0.77;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1242,14 +1266,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 73;
+				CURRENT_PROJECT_VERSION = 74;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.76;
+				MARKETING_VERSION = 0.0.77;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -1267,13 +1291,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 73;
+				CURRENT_PROJECT_VERSION = 74;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.76;
+				MARKETING_VERSION = 0.0.77;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
@@ -1335,7 +1359,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -1353,14 +1377,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 73;
+				CURRENT_PROJECT_VERSION = 74;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.76;
+				MARKETING_VERSION = 0.0.77;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;

@@ -66,105 +66,117 @@ struct AniListDetailView: View {
         auth.isLoggedIn && malAuth.isLoggedIn && malMediaId != nil
     }
 
-    var body: some View {
-        Group {
-            if let media = vm.media {
-                content(media: media)
-            } else if vm.isLoading {
-                loadingSkeletonView
-            } else if let error = vm.error {
-                ContentUnavailableView(
-                    "Couldn't Load",
-                    systemImage: "wifi.slash",
-                    description: Text(error)
-                )
-            }
+    @ViewBuilder private var loadedContent: some View {
+        if let media = vm.media {
+            content(media: media)
+        } else if vm.isLoading {
+            loadingSkeletonView
+        } else if let error = vm.error {
+            ContentUnavailableView(
+                "Couldn't Load",
+                systemImage: "wifi.slash",
+                description: Text(error)
+            )
         }
+    }
+
+    private var navBase: AnyView {
+        AnyView(loadedContent
         .onAppear {
             #if os(iOS)
             PlayerPresenter.shared.resetToAppOrientation()
             #endif
             isReversed = EpisodeSortManager.shared.isReversed(for: "anilist_\(mediaId)")
         }
-        .onChange(of: isReversed) { _, newValue in
+        .onChange(of: isReversed) { newValue in
             EpisodeSortManager.shared.setReversed(newValue, for: "anilist_\(mediaId)")
         }
         .frame(maxWidth: .infinity)
-        .tint(.primary)
+        .tint(.primary))
+    }
+
+    private var navTitled: AnyView {
+        AnyView(navBase
         #if os(iOS)
         .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackgroundHidden()
         #endif
-        .navigationTitle(vm.media?.title.displayTitle ?? "")
+        .navigationTitle(vm.media?.title.displayTitle ?? ""))
+    }
+
+    #if os(iOS)
+    @ViewBuilder private var editToolbarButton: some View {
+        if isDualAvailable && !dualSync {
+            Menu {
+                Button {
+                    Task {
+                        isLoadingEntry = true
+                        existingEntry = try? await AniListProvider.shared.fetchEntry(mediaId: mediaId)
+                        isLoadingEntry = false
+                        showLibraryEdit = true
+                    }
+                } label: { Label("Edit on AniList", systemImage: "pencil") }
+                Button {
+                    Task {
+                        isLoadingEntry = true
+                        if let idMal = malMediaId {
+                            existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
+                        }
+                        isLoadingEntry = false
+                        showMALEdit = true
+                    }
+                } label: { Label("Edit on MyAnimeList", systemImage: "pencil") }
+            } label: {
+                if isLoadingEntry {
+                    ProgressView().scaleEffect(0.8)
+                } else {
+                    Image(systemName: "pencil.circle")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .disabled(isLoadingEntry)
+        } else if auth.isLoggedIn || malAuth.isLoggedIn {
+            Button {
+                Task {
+                    isLoadingEntry = true
+                    existingEntry = try? await activeProvider.fetchEntry(mediaId: mediaId)
+                    if isDualAvailable && dualSync, let idMal = malMediaId {
+                        existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
+                    }
+                    isLoadingEntry = false
+                    showLibraryEdit = true
+                }
+            } label: {
+                if isLoadingEntry {
+                    ProgressView().scaleEffect(0.8)
+                } else {
+                    Image(systemName: "pencil.circle")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .disabled(isLoadingEntry)
+        }
+    }
+    #endif
+
+    private var navContent: AnyView {
+        AnyView(navTitled
         #if os(iOS)
-        .toolbar {
-            if isDualAvailable && !dualSync {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            Task {
-                                isLoadingEntry = true
-                                existingEntry = try? await AniListProvider.shared.fetchEntry(mediaId: mediaId)
-                                isLoadingEntry = false
-                                showLibraryEdit = true
-                            }
-                        } label: { Label("Edit on AniList", systemImage: "pencil") }
-                        Button {
-                            Task {
-                                isLoadingEntry = true
-                                if let idMal = malMediaId {
-                                    existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
-                                }
-                                isLoadingEntry = false
-                                showMALEdit = true
-                            }
-                        } label: { Label("Edit on MyAnimeList", systemImage: "pencil") }
-                    } label: {
-                        if isLoadingEntry {
-                            ProgressView().scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "pencil.circle")
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                    .disabled(isLoadingEntry)
-                }
-            } else if auth.isLoggedIn || malAuth.isLoggedIn {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task {
-                            isLoadingEntry = true
-                            existingEntry = try? await activeProvider.fetchEntry(mediaId: mediaId)
-                            if isDualAvailable && dualSync, let idMal = malMediaId {
-                                existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
-                            }
-                            isLoadingEntry = false
-                            showLibraryEdit = true
-                        }
-                    } label: {
-                        if isLoadingEntry {
-                            ProgressView().scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "pencil.circle")
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                    .disabled(isLoadingEntry)
-                }
-            }
-        }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { editToolbarButton } }
         #endif
-        .navigationDestination(isPresented: Binding(
-            get: { sequelMediaId != nil },
-            set: { if !$0 { sequelMediaId = nil } }
-        )) {
-            if let id = sequelMediaId {
-                AniListDetailView(mediaId: id)
-            }
-        }
+        .background(
+            NavigationLink(
+                destination: Group { if let id = sequelMediaId { AniListDetailView(mediaId: id) } },
+                isActive: Binding(get: { sequelMediaId != nil }, set: { if !$0 { sequelMediaId = nil } })
+            ) { EmptyView() }
+        ))
+    }
+
+    var body: some View {
+        navContent
         .task {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             await vm.load(id: mediaId, preloaded: preloadedMedia)
@@ -205,7 +217,7 @@ struct AniListDetailView: View {
                 }
             }
         }
-        .onChange(of: vm.media?.id) { _, _ in
+        .onChange(of: vm.media?.id) { _ in
             guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber else { return }
             guard vm.media?.episodes != nil else { return }
             autoPlayOnLoad = true
@@ -1491,7 +1503,7 @@ struct AniListMatchingSearchView: View {
                         .foregroundStyle(.secondary)
                     TextField("Search AniList...", text: $searchText)
                         .textFieldStyle(.plain)
-                        .onChange(of: searchText) { _, _ in performSearch() }
+                        .onChange(of: searchText) { _ in performSearch() }
                     
                     if !searchText.isEmpty {
                         Button { searchText = "" } label: {

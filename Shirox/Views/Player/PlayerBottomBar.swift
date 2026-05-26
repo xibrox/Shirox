@@ -202,39 +202,41 @@ struct PlayerBottomBar: View {
 }
 
 // MARK: - Preview
-#Preview("Default") {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        VStack {
-            Spacer()
-            PlayerBottomBar(
-                currentTime: .constant(135),
-                duration: 1440,
-                playbackSpeed: .constant(1.0),
-                onSeek: { _ in },
-                onSpeedTap: {},
-                onSkip85: {},
-                onSubtitleSettingsTap: {}
-            )
+struct PlayerBottomBar_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack {
+                Spacer()
+                PlayerBottomBar(
+                    currentTime: .constant(135),
+                    duration: 1440,
+                    playbackSpeed: .constant(1.0),
+                    onSeek: { _ in },
+                    onSpeedTap: {},
+                    onSkip85: {},
+                    onSubtitleSettingsTap: {}
+                )
+            }
         }
-    }
-}
+        .previewDisplayName("Default")
 
-#Preview("With Subtitles & Speed") {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        VStack {
-            Spacer()
-            PlayerBottomBar(
-                currentTime: .constant(720),
-                duration: 1440,
-                playbackSpeed: .constant(1.5),
-                onSeek: { _ in },
-                onSpeedTap: {},
-                onSkip85: {},
-                onSubtitleSettingsTap: {},
-                hasSubtitles: true
-            )
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack {
+                Spacer()
+                PlayerBottomBar(
+                    currentTime: .constant(720),
+                    duration: 1440,
+                    playbackSpeed: .constant(1.5),
+                    onSeek: { _ in },
+                    onSpeedTap: {},
+                    onSkip85: {},
+                    onSubtitleSettingsTap: {},
+                    hasSubtitles: true
+                )
+            }
         }
+        .previewDisplayName("With Subtitles & Speed")
     }
 }

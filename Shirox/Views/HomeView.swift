@@ -68,7 +68,7 @@ struct HomeView: View {
             .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackgroundHidden()
             #endif
         }
         .task { await vm.load() }
@@ -159,7 +159,7 @@ private struct FeaturedCarousel: View {
                 GeometryReader { geo in
                     Color.clear
                         .onAppear { containerWidth = geo.size.width }
-                        .onChange(of: geo.size.width) { _, w in containerWidth = w }
+                        .onChange(of: geo.size.width) { w in containerWidth = w }
                 }
             )
             .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
@@ -324,7 +324,7 @@ private struct MacFeaturedCarousel: View {
                                 HStack(spacing: 8) {
                                     if let score = media.averageScore {
                                         Label("\(score)%", systemImage: "star.fill")
-                                            .font(.caption).fontWeight(.semibold)
+                                            .font(.caption.weight(.semibold))
                                             .foregroundStyle(.yellow)
                                     }
                                     if let genres = media.genres, !genres.isEmpty {
@@ -528,7 +528,7 @@ private struct FeaturedCard: View {
             HStack(spacing: 8) {
                 if let score = media.averageScore {
                     Label("\(score)%", systemImage: "star.fill")
-                        .font(.caption).fontWeight(.semibold)
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.yellow)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)

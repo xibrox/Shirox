@@ -29,9 +29,11 @@ struct PlayerSkipButton: View {
     }
 }
 
-#Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        PlayerSkipButton(segmentType: .intro, onSkip: {})
+struct PlayerSkipButton_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            PlayerSkipButton(segmentType: .intro, onSkip: {})
+        }
     }
 }

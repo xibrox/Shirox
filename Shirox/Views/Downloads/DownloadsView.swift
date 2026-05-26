@@ -354,10 +354,10 @@ struct DownloadedMediaDetailView: View {
             .ignoresSafeArea(edges: .top)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackgroundHidden()
         .toolbar {
-            if auth.isLoggedIn, aniListID != nil {
-                ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .topBarTrailing) {
+                if auth.isLoggedIn, aniListID != nil {
                     Button {
                         showLibraryEdit = true
                     } label: {

@@ -4,11 +4,10 @@ import Charts
 struct ProfileStatsView: View {
     let stats: ProfileAnimeStats?
     var scoreFormat: ScoreFormat = .point10Decimal
-    
+
     var body: some View {
         if let stats = stats {
             VStack(spacing: 20) {
-                // Main stats summary
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     statBox(title: "Total Anime", value: "\(stats.count)", icon: "play.tv")
                     statBox(title: "Episodes", value: "\(stats.episodesWatched)", icon: "play.circle")
@@ -19,44 +18,85 @@ struct ProfileStatsView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 10)
-                
-                // Charts
-                VStack(alignment: .leading, spacing: 15) {
-                    Text("Status Distribution")
-                        .font(.headline)
-                        .padding(.horizontal)
-                    
-                    statusChart(stats.statuses)
-                        .frame(height: 200)
-                        .padding(.horizontal)
-                    
-                    Divider().padding(.horizontal)
-                    
-                    Text("Genre Distribution")
-                        .font(.headline)
-                        .padding(.horizontal)
-                    
-                    genreChart(stats.genres)
-                        .frame(height: 250)
-                        .padding(.horizontal)
-                    
-                    Divider().padding(.horizontal)
-                    
-                    Text("Score Distribution")
-                        .font(.headline)
-                        .padding(.horizontal)
-                    
-                    scoreChart(stats.scores)
-                        .frame(height: 200)
-                        .padding(.horizontal)
-                        .padding(.bottom, 30)
+
+                if #available(iOS 16, *) {
+                    chartsSection(stats: stats)
+                } else {
+                    statsListFallback(stats: stats)
                 }
             }
         } else {
             ContentUnavailableView("No Stats", systemImage: "chart.bar.xaxis")
         }
     }
-    
+
+    @available(iOS 16, *)
+    @ViewBuilder
+    private func chartsSection(stats: ProfileAnimeStats) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Status Distribution")
+                .font(.headline)
+                .padding(.horizontal)
+
+            statusChart(stats.statuses)
+                .frame(height: 200)
+                .padding(.horizontal)
+
+            Divider().padding(.horizontal)
+
+            Text("Genre Distribution")
+                .font(.headline)
+                .padding(.horizontal)
+
+            genreChart(stats.genres)
+                .frame(height: 250)
+                .padding(.horizontal)
+
+            Divider().padding(.horizontal)
+
+            Text("Score Distribution")
+                .font(.headline)
+                .padding(.horizontal)
+
+            scoreChart(stats.scores)
+                .frame(height: 200)
+                .padding(.horizontal)
+                .padding(.bottom, 30)
+        }
+    }
+
+    @ViewBuilder
+    private func statsListFallback(stats: ProfileAnimeStats) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let statuses = stats.statuses {
+                Text("Status Distribution")
+                    .font(.headline)
+                    .padding(.horizontal)
+                ForEach(statuses.filter { $0.count > 0 }, id: \.status) { s in
+                    HStack {
+                        Text(s.status.capitalized).padding(.horizontal)
+                        Spacer()
+                        Text("\(s.count)").foregroundStyle(.secondary).padding(.horizontal)
+                    }
+                }
+                Divider().padding(.horizontal)
+            }
+            if let genres = stats.genres?.sorted(by: { $0.count > $1.count }).prefix(10) {
+                Text("Top Genres")
+                    .font(.headline)
+                    .padding(.horizontal)
+                ForEach(Array(genres), id: \.genre) { g in
+                    HStack {
+                        Text(g.genre).padding(.horizontal)
+                        Spacer()
+                        Text("\(g.count)").foregroundStyle(.secondary).padding(.horizontal)
+                    }
+                }
+            }
+        }
+        .padding(.bottom, 30)
+    }
+
     private func statBox(title: String, value: String, icon: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -71,7 +111,8 @@ struct ProfileStatsView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.1)))
     }
-    
+
+    @available(iOS 16, *)
     @ViewBuilder
     private func statusChart(_ data: [ProfileStatusStat]?) -> some View {
         if let data = data?.filter({ $0.count > 0 }) {
@@ -89,7 +130,7 @@ struct ProfileStatsView: View {
             }
             .chartLegend(.hidden)
             .chartYAxis {
-                AxisMarks(values: .automatic) { value in
+                AxisMarks(values: .automatic) { _ in
                     AxisValueLabel()
                 }
             }
@@ -97,7 +138,8 @@ struct ProfileStatsView: View {
             Text("No status data").foregroundStyle(.secondary)
         }
     }
-    
+
+    @available(iOS 16, *)
     @ViewBuilder
     private func genreChart(_ data: [ProfileGenreStat]?) -> some View {
         if let data = data?.sorted(by: { $0.count > $1.count }).prefix(10) {
@@ -117,7 +159,7 @@ struct ProfileStatsView: View {
             Text("No genre data").foregroundStyle(.secondary)
         }
     }
-    
+
     private var scoreChartAxisValues: [Int] {
         switch scoreFormat {
         case .point100: return [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -127,6 +169,7 @@ struct ProfileStatsView: View {
         }
     }
 
+    @available(iOS 16, *)
     @ViewBuilder
     private func scoreChart(_ data: [ProfileScoreStat]?) -> some View {
         if let data = data?.sorted(by: { $0.score < $1.score }) {
@@ -137,7 +180,7 @@ struct ProfileStatsView: View {
                 )
                 .foregroundStyle(Color.primary.opacity(0.3).gradient)
                 .interpolationMethod(.catmullRom)
-                
+
                 LineMark(
                     x: .value("Score", item.score),
                     y: .value("Count", item.count)
@@ -152,7 +195,7 @@ struct ProfileStatsView: View {
             Text("No score data").foregroundStyle(.secondary)
         }
     }
-    
+
     private func formatMinutes(_ mins: Int) -> String {
         let days = mins / 1440
         let hours = (mins % 1440) / 60

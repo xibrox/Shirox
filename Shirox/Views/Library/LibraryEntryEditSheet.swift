@@ -143,8 +143,8 @@ struct LibraryEntryEditSheet: View {
                 }
             }
             .onAppear { normalizeScoreIfNeeded() }
-            .onChange(of: anilistAuth.scoreFormat) { _, _ in normalizeScoreIfNeeded() }
-            .onChange(of: status) { _, newStatus in
+            .onChange(of: anilistAuth.scoreFormat) { _ in normalizeScoreIfNeeded() }
+            .onChange(of: status) { newStatus in
                 if newStatus == .completed, let total = media.episodes {
                     progress = total
                 }

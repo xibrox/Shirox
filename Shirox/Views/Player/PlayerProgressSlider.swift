@@ -131,14 +131,16 @@ struct PlayerProgressSlider: View {
 }
 
 // MARK: - Preview
-#Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        PlayerProgressSlider(
-            currentTime: .constant(135),
-            duration: 1440,
-            onSeek: { _ in }
-        )
-        .padding(.horizontal, 24)
+struct PlayerProgressSlider_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            PlayerProgressSlider(
+                currentTime: .constant(135),
+                duration: 1440,
+                onSeek: { _ in }
+            )
+            .padding(.horizontal, 24)
+        }
     }
 }

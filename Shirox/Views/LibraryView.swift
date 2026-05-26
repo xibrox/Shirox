@@ -157,7 +157,6 @@ struct LibraryView: View {
                     .font(.caption)
             }
         }
-        .menuOrder(.fixed)
     }
 
     // MARK: - Login prompt
@@ -266,7 +265,6 @@ struct LibraryView: View {
                             .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
                     )
                 }
-                .menuOrder(.fixed)
                 .menuIndicator(.hidden)
                 .foregroundStyle(.primary)
                 .buttonStyle(.plain)
@@ -319,7 +317,6 @@ struct LibraryView: View {
                                 .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
                         )
                     }
-                    .menuOrder(.fixed)
                     .menuIndicator(.hidden)
                     .foregroundStyle(.primary)
                     .buttonStyle(.plain)
@@ -442,13 +439,13 @@ struct LibraryView: View {
                 .first { $0.isKeyWindow }
         }
         #endif
-        .onChange(of: anilistAuth.isLoggedIn) { _, newValue in
+        .onChange(of: anilistAuth.isLoggedIn) { newValue in
             if newValue { Task { await vm.load() } }
         }
-        .onChange(of: malAuth.isLoggedIn) { _, newValue in
+        .onChange(of: malAuth.isLoggedIn) { newValue in
             if newValue { Task { await vm.load() } }
         }
-        .onChange(of: providerManager.fallbackActive) { _, _ in
+        .onChange(of: providerManager.fallbackActive) { _ in
             Task { await vm.refresh() }
         }
         .navigationTitle("Library")

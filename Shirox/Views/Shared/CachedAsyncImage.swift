@@ -198,10 +198,15 @@ struct TVDBPosterImage: View {
 
 extension View {
     func adaptivePresentationDetents(_ detents: Set<PresentationDetent>) -> some View {
-        #if os(iOS)
-        self.presentationDetents(UIDevice.current.userInterfaceIdiom == .pad ? [.large] : detents)
-        #else
-        self.presentationDetents(detents)
-        #endif
+        if #available(iOS 16, *) {
+            let system = Set(detents.map { $0.asSystemDetent })
+            #if os(iOS)
+            return AnyView(self.presentationDetents(UIDevice.current.userInterfaceIdiom == .pad ? [SwiftUI.PresentationDetent.large] : system))
+            #else
+            return AnyView(self.presentationDetents(system))
+            #endif
+        } else {
+            return AnyView(self)
+        }
     }
 }

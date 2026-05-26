@@ -97,13 +97,8 @@ struct ActivityDetailView: View {
         .adaptiveSheet(item: $targetMediaId) { mid in
             AniListDetailView(mediaId: mid)
         }
-        #if os(iOS)
-        .presentationDetents([.large])
-
-        #else
-
+        #if !os(iOS)
         .frame(minWidth: 480, minHeight: 360)
-
         #endif
         .alert("Delete Activity?", isPresented: $confirmDeleteActivity) {
             Button("Delete", role: .destructive) {
@@ -272,7 +267,7 @@ struct ActivityDetailView: View {
             } label: {
                 Text("\(likeCount)")
                     .foregroundStyle(isLiked ? .pink : .secondary)
-                    .contentTransition(.numericText())
+                    
             }
             .buttonStyle(.plain)
         }
@@ -347,7 +342,7 @@ struct ActivityDetailView: View {
                     } label: {
                         Text("\(count)")
                             .foregroundStyle(liked ? .pink : .secondary)
-                            .contentTransition(.numericText())
+                            
                     }
                     .buttonStyle(.plain)
                 }
@@ -372,9 +367,9 @@ struct ActivityDetailView: View {
         VStack(spacing: 8) {
             Divider()
             HStack(alignment: .bottom, spacing: 10) {
-                TextField("Add a comment…", text: $replyText, axis: .vertical)
+                TextField("Add a comment…", text: $replyText)
                     .font(.callout)
-                    .lineLimit(1...5)
+                    .lineLimit(5)
                     .padding(.vertical, 6)
 
                 Button {

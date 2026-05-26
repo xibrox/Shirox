@@ -37,19 +37,41 @@ struct ContinueWatchingSection: View {
                 .padding(.horizontal, 16)
             }
         }
-        .navigationDestination(item: $selectedForDetail) { item in
-            if let href = item.detailHref, let mid = item.moduleId {
-                DetailView(
-                    item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href),
-                    moduleId: mid,
-                    aniListID: item.aniListID
-                )
+        .background(
+            Group {
+                NavigationLink(
+                    destination: detailDestination,
+                    isActive: Binding(
+                        get: { selectedForDetail != nil },
+                        set: { if !$0 { selectedForDetail = nil } }
+                    )
+                ) { EmptyView() }
+                NavigationLink(
+                    destination: aniListDestination,
+                    isActive: Binding(
+                        get: { selectedForAniList != nil },
+                        set: { if !$0 { selectedForAniList = nil } }
+                    )
+                ) { EmptyView() }
             }
+        )
+    }
+
+    @ViewBuilder
+    private var detailDestination: some View {
+        if let item = selectedForDetail, let href = item.detailHref, let mid = item.moduleId {
+            DetailView(
+                item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href),
+                moduleId: mid,
+                aniListID: item.aniListID
+            )
         }
-        .navigationDestination(item: $selectedForAniList) { item in
-            if let aid = item.aniListID {
-                AniListDetailView(mediaId: aid, preloadedMedia: nil)
-            }
+    }
+
+    @ViewBuilder
+    private var aniListDestination: some View {
+        if let item = selectedForAniList, let aid = item.aniListID {
+            AniListDetailView(mediaId: aid, preloadedMedia: nil)
         }
     }
 

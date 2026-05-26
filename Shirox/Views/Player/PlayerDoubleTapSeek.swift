@@ -74,7 +74,7 @@ struct PlayerDoubleTapSeek: View {
                         if isLeft { onSeekBackward(); showFeedback(left: true) }
                         else      { onSeekForward();  showFeedback(left: false) }
                         Task {
-                            try? await Task.sleep(for: .milliseconds(350))
+                            try? await Task.sleep(nanoseconds: 350_000_000)
                             didDoubleTap = false
                         }
                     },
@@ -92,7 +92,7 @@ struct PlayerDoubleTapSeek: View {
             leftTask?.cancel()
             withAnimation(.easeOut(duration: 0.15)) { showLeftFeedback = true }
             leftTask = Task {
-                try? await Task.sleep(for: .seconds(0.6))
+                try? await Task.sleep(nanoseconds: 600_000_000)
                 guard !Task.isCancelled else { return }
                 withAnimation(.easeOut(duration: 0.25)) { showLeftFeedback = false }
             }
@@ -100,7 +100,7 @@ struct PlayerDoubleTapSeek: View {
             rightTask?.cancel()
             withAnimation(.easeOut(duration: 0.15)) { showRightFeedback = true }
             rightTask = Task {
-                try? await Task.sleep(for: .seconds(0.6))
+                try? await Task.sleep(nanoseconds: 600_000_000)
                 guard !Task.isCancelled else { return }
                 withAnimation(.easeOut(duration: 0.25)) { showRightFeedback = false }
             }
@@ -175,7 +175,7 @@ private struct FullScreenSeekView: UIViewRepresentable {
             let isLeft = gr.location(in: gr.view).x < (gr.view?.bounds.width ?? 0) / 2
             if isLeft { onSeekLeft() } else { onSeekRight() }
             Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(400))
+                try? await Task.sleep(nanoseconds: 400_000_000)
                 self?.didDoubleTap = false
             }
         }
@@ -203,14 +203,16 @@ private final class SingleTouchTapGR: UITapGestureRecognizer {
 }
 #endif
 
-#Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        PlayerDoubleTapSeek(
-            onSingleTap: { print("single tap") },
-            onSeekBackward: { print("seek backward") },
-            onSeekForward: { print("seek forward") },
-            seekAmount: 10
-        )
+struct PlayerDoubleTapSeek_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            PlayerDoubleTapSeek(
+                onSingleTap: { print("single tap") },
+                onSeekBackward: { print("seek backward") },
+                onSeekForward: { print("seek forward") },
+                seekAmount: 10
+            )
+        }
     }
 }

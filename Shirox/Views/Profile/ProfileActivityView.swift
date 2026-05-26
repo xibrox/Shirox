@@ -57,7 +57,7 @@ struct ProfileActivityView: View {
             NavigationStack {
                 ActivityFetchView(activityId: activity.id)
             }
-            .presentationDetents([.large])
+    
         }
         .adaptiveSheet(isPresented: $showCompose) {
             ComposeStatusView(profileVM: vm)

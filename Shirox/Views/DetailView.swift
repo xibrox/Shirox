@@ -84,18 +84,16 @@ struct DetailView: View {
         mainContent
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackgroundHidden()
         .tint(.primary)
         .toolbar { detailToolbar }
         #endif
-        .navigationDestination(isPresented: Binding(
-            get: { sequelSearchItem != nil },
-            set: { if !$0 { sequelSearchItem = nil } }
-        )) {
-            if let item = sequelSearchItem {
-                DetailView(item: item)
-            }
-        }
+        .background(
+            NavigationLink(
+                destination: Group { if let item = sequelSearchItem { DetailView(item: item) } },
+                isActive: Binding(get: { sequelSearchItem != nil }, set: { if !$0 { sequelSearchItem = nil } })
+            ) { EmptyView() }
+        )
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             vm.aniListID = aniListID
@@ -147,10 +145,10 @@ struct DetailView: View {
             }
             isReversed = EpisodeSortManager.shared.isReversed(for: "\(moduleId ?? "unknown")_\(item.id)")
         }
-        .onChange(of: isReversed) { _, newValue in
+        .onChange(of: isReversed) { newValue in
             EpisodeSortManager.shared.setReversed(newValue, for: "\(moduleId ?? "unknown")_\(item.id)")
         }
-        .onChange(of: vm.detail?.episodes) {
+        .onChange(of: vm.detail?.episodes) { _ in
             guard !autoPlayOnLoad else { return }
 
             if let detail = vm.detail, !detail.episodes.isEmpty {
@@ -173,7 +171,7 @@ struct DetailView: View {
             autoPlayOnLoad = true
             vm.loadStreams(for: episode)
         }
-        .onChange(of: vm.aniListID) { _, newAID in
+        .onChange(of: vm.aniListID) { newAID in
             guard malAuth.isLoggedIn, let aid = newAID, malID == nil else { return }
             Task {
                 malID = await IDMappingService.shared.malId(forAnilistId: aid)

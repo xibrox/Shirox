@@ -84,13 +84,8 @@ struct ProfileView: View {
                 await vm.loadActivity(userId: userId, feed: .mine)
             }
         }
-        #if os(iOS)
-        .presentationDetents([.large])
-
-        #else
-
+        #if !os(iOS)
         .frame(minWidth: 480, minHeight: 360)
-
         #endif
         .confirmationDialog("Log out of \(activeProviderType == .mal ? "MyAnimeList" : "AniList")?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) {

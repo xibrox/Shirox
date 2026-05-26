@@ -94,7 +94,7 @@ struct SettingsView: View {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
                         .tint(.secondary)
                         #if os(iOS)
-                        .onChange(of: forceLandscape) { _, _ in
+                        .onChange(of: forceLandscape) { _ in
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
                         }
                         #endif

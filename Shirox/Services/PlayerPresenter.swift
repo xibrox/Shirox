@@ -205,15 +205,29 @@ final class PlayerPresenter: ObservableObject {
     func requestRotation(to orientation: UIInterfaceOrientationMask) {
         #if !targetEnvironment(macCatalyst)
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation)) { _ in }
+        if #available(iOS 16, *) {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation)) { _ in }
+        } else {
+            let value: Int
+            switch orientation {
+            case .portrait: value = UIInterfaceOrientation.portrait.rawValue
+            case .landscapeLeft: value = UIInterfaceOrientation.landscapeLeft.rawValue
+            case .landscapeRight: value = UIInterfaceOrientation.landscapeRight.rawValue
+            default: value = UIInterfaceOrientation.portrait.rawValue
+            }
+            UIDevice.current.setValue(value, forKey: "orientation")
+            UINavigationController.attemptRotationToDeviceOrientation()
+        }
         #endif
     }
 
     func refreshSupportedOrientations() {
-        for scene in UIApplication.shared.connectedScenes {
-            guard let windowScene = scene as? UIWindowScene else { continue }
-            for window in windowScene.windows {
-                window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        if #available(iOS 16, *) {
+            for scene in UIApplication.shared.connectedScenes {
+                guard let windowScene = scene as? UIWindowScene else { continue }
+                for window in windowScene.windows {
+                    window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                }
             }
         }
     }

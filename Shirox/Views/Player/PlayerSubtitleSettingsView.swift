@@ -103,7 +103,7 @@ struct PlayerSubtitleSettingsView: View {
                 if isActive {
                     Image(systemName: "checkmark")
                         .foregroundStyle(Color.accentColor)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 14, weight: .semibold))
                 }
             }
         }

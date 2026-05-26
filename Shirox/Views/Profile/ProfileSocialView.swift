@@ -30,7 +30,7 @@ struct ProfileSocialView: View {
             .padding(.vertical, 8)
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
-            .onChange(of: selectedSocial) { _, newValue in
+            .onChange(of: selectedSocial) { newValue in
                 Task { await vm.loadSocial(userId: userId, type: newValue) }
             }
 

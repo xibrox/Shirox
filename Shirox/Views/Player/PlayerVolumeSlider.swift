@@ -65,15 +65,17 @@ struct PlayerVolumeSlider: View {
     }
 }
 
-#Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        VStack(spacing: 32) {
-            PlayerVolumeSlider(volume: .constant(0))
-            PlayerVolumeSlider(volume: .constant(0.2))
-            PlayerVolumeSlider(volume: .constant(0.5))
-            PlayerVolumeSlider(volume: .constant(0.9))
+struct PlayerVolumeSlider_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 32) {
+                PlayerVolumeSlider(volume: .constant(0))
+                PlayerVolumeSlider(volume: .constant(0.2))
+                PlayerVolumeSlider(volume: .constant(0.5))
+                PlayerVolumeSlider(volume: .constant(0.9))
+            }
+            .padding(.horizontal, 24)
         }
-        .padding(.horizontal, 24)
     }
 }

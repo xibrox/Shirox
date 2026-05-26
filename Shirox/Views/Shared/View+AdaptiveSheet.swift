@@ -36,6 +36,44 @@ extension View {
 }
 
 extension View {
+    @ViewBuilder
+    func persistentSystemOverlaysHidden() -> some View {
+        if #available(iOS 16, *) {
+            self.persistentSystemOverlays(.hidden)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func hideScrollContentBackground() -> some View {
+        if #available(iOS 16, *) {
+            self.scrollContentBackground(.hidden)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func toolbarBackgroundHidden() -> some View {
+        if #available(iOS 16, macOS 13, *) {
+            self.toolbarBackground(.hidden, for: .navigationBar)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func scrollDismissesKeyboardImmediately() -> some View {
+        if #available(iOS 16, *) {
+            self.scrollDismissesKeyboard(.immediately)
+        } else {
+            self
+        }
+    }
+}
+
+extension View {
     func adaptiveSheet<Content: View>(
         isPresented: Binding<Bool>,
         onDismiss: (() -> Void)? = nil,

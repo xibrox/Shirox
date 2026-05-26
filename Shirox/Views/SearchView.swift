@@ -43,29 +43,26 @@ struct SearchView: View {
                     history.add(vm.query)
                     vm.search(usingModule: usingModule)
                 }
-                .onChange(of: vm.query) { _, new in
+                .onChange(of: vm.query) { new in
                     if new.isEmpty {
                         vm.clearResults()
                     } else if (vm.hasResults || vm.hasSearched) && !vm.isLoading {
                         vm.clearResults()
                     }
                 }
-                .onChange(of: moduleManager.moduleReadyId) { _, newId in
+                .onChange(of: moduleManager.moduleReadyId) { newId in
                     guard !vm.query.isEmpty, newId != nil else { return }
                     vm.search(usingModule: true)
                 }
-                .onChange(of: moduleManager.activeModule) { _, newModule in
+                .onChange(of: moduleManager.activeModule) { newModule in
                     guard !vm.query.isEmpty, newModule == nil else { return }
                     vm.search(usingModule: false)
                 }
-                .onChange(of: providerManager.orderedProviders.first?.providerType) { _, _ in
+                .onChange(of: providerManager.orderedProviders.first?.providerType) { _ in
                     guard !vm.query.isEmpty, !usingModule else { return }
                     vm.search(usingModule: false)
                 }
         }
-        #if os(iOS)
-        .toolbarRole(.navigationStack)
-        #endif
         .adaptiveSheet(isPresented: $showModuleList) {
             ModuleListView()
                 .environmentObject(moduleManager)
@@ -76,7 +73,7 @@ struct SearchView: View {
             GeometryReader { geo in
                 Color.clear
                     .onAppear { isLandscape = geo.size.width > geo.size.height }
-                    .onChange(of: geo.size) { _, size in isLandscape = size.width > size.height }
+                    .onChange(of: geo.size) { size in isLandscape = size.width > size.height }
             }
         )
         #endif
@@ -298,7 +295,7 @@ private struct SearchActivationObserver: View {
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
-            .onChange(of: isSearching) { _, active in
+            .onChange(of: isSearching) { active in
                 if active { onActivate() }
             }
     }
@@ -350,8 +347,7 @@ struct AniListCardView: View {
             .overlay(alignment: .topTrailing) {
                 if let score = media.averageScore {
                     Label("\(score)%", systemImage: "star.fill")
-                        .font(.caption2)
-                        .fontWeight(.bold)
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.yellow)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)

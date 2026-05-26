@@ -73,9 +73,9 @@ struct ModuleListView: View {
             #else
             .listStyle(.inset)
             #endif
-            .scrollContentBackground(.hidden)
+            .hideScrollContentBackground()
             #if os(iOS)
-            .scrollDismissesKeyboard(.immediately)
+            .scrollDismissesKeyboardImmediately()
             #endif
             #if os(iOS)
             .background(Color(.systemBackground))
@@ -116,7 +116,7 @@ struct ModuleListView: View {
         #else
         .background(Color(.windowBackgroundColor))
         #endif
-        .onChange(of: moduleURL) { _, _ in
+        .onChange(of: moduleURL) { _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
         }

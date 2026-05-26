@@ -271,7 +271,7 @@ struct PlayerView: View {
             tearDownNowPlaying()
             castManager.disconnect()
         }
-        .onChange(of: volume) { _, newVolume in
+        .onChange(of: volume) { newVolume in
             player?.volume = newVolume
             #if canImport(GoogleCast)
             if castManager.isConnected {
@@ -279,7 +279,7 @@ struct PlayerView: View {
             }
             #endif
         }
-        .onChange(of: playbackSpeed) { _, newSpeed in
+        .onChange(of: playbackSpeed) { newSpeed in
             #if canImport(GoogleCast)
             if castManager.isConnected {
                 GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.setPlaybackRate(Float(newSpeed))
@@ -288,20 +288,20 @@ struct PlayerView: View {
             #endif
             if isPlaying { player?.rate = Float(newSpeed) }
         }
-        .onChange(of: castManager.isConnected) { _, connected in
+        .onChange(of: castManager.isConnected) { connected in
             if connected {
                 castCurrentMedia()
                 player?.pause()
                 isPlaying = false
             }
         }
-        .onChange(of: castManager.isPlaying) { _, playing in
+        .onChange(of: castManager.isPlaying) { playing in
             if castManager.isConnected { isPlaying = playing }
         }
-        .onChange(of: castManager.currentPosition) { _, pos in
+        .onChange(of: castManager.currentPosition) { pos in
             if castManager.isConnected && !isScrubbing { currentTime = pos }
         }
-        .onChange(of: castManager.duration) { _, dur in
+        .onChange(of: castManager.duration) { dur in
             if castManager.isConnected && dur > 0 { duration = dur }
         }
         #if os(iOS)
@@ -323,8 +323,8 @@ struct PlayerView: View {
             }
         }
         .statusBarHidden(true)
-        .persistentSystemOverlays(.hidden)
-        .onChange(of: videoReady) { _, ready in
+        .persistentSystemOverlaysHidden()
+        .onChange(of: videoReady) { ready in
             if ready {
                 withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
                 scheduleHide()
@@ -335,10 +335,7 @@ struct PlayerView: View {
             PlayerSpeedPicker(selectedSpeed: Binding(
                 get: { Float(playbackSpeed) },
                 set: { playbackSpeed = Double($0) }
-            ))
-            #if os(iOS)
-            .adaptivePresentationDetents([.height(320)])
-            #endif
+            ))            .adaptivePresentationDetents([.height(320)])
         }
         .sheet(isPresented: $showSubtitleSettings) {
             PlayerSubtitleSettingsView(
@@ -346,19 +343,13 @@ struct PlayerView: View {
                 availableTracks: subtitleTracks,
                 selectedTrack: $selectedSubtitleTrack
             )
-            .id(subtitleTracks?.count ?? 0)
-            #if os(iOS)
-            .adaptivePresentationDetents([.medium, .large])
-            #endif
+            .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
         }
-        .onChange(of: selectedSubtitleTrack) { _, _ in loadSubtitles() }
+        .onChange(of: selectedSubtitleTrack) { _ in loadSubtitles() }
         .sheet(isPresented: $showAudioPicker) {
             let optionCount = audioGroup?.options.count ?? 0
             let sheetHeight = CGFloat(60 + 56 * max(1, optionCount))
-            audioPickerSheet
-                #if os(iOS)
-                .adaptivePresentationDetents([.height(sheetHeight)])
-                #endif
+            audioPickerSheet                .adaptivePresentationDetents([.height(sheetHeight)])
         }
         .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
             nextEpisodeStreams = []
@@ -366,10 +357,7 @@ struct PlayerView: View {
         }) {
             PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
                 swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams)
-            }
-            #if os(iOS)
-            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
-            #endif
+            }            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
         }
         .sheet(isPresented: $showSequelPicker, onDismiss: {
             sequelResults = []
@@ -377,59 +365,21 @@ struct PlayerView: View {
         }) {
             PlayerSequelPickerSheet(results: sequelResults) { selected in
                 advanceToSequel(selected)
-            }
-            #if os(iOS)
-            .adaptivePresentationDetents([.medium])
-            #endif
+            }            .adaptivePresentationDetents([.medium])
         }
-        .sheet(isPresented: $showQualityPicker) {
-            PlayerQualityPicker(
-                qualities: hlsQualities,
-                selectedBandwidth: $selectedQualityBandwidth,
-                onSelect: selectQuality
-            )
-            #if os(iOS)
-            .adaptivePresentationDetents([.height(CGFloat(120 + 56 * (hlsQualities.count + 1)))])
-            #endif
-        }
+        .sheet(isPresented: $showQualityPicker) { qualityPickerSheet }
         .sheet(isPresented: $showInPlayerStreamPicker) {
             PlayerNextEpisodePicker(streams: availableStreams, title: "Choose Quality") { selected in
                 switchQuality(selected)
-            }
-            #if os(iOS)
-            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, availableStreams.count)))])
-            #endif
+            }            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, availableStreams.count)))])
         }
-        .focusable()
-        .focusEffectDisabled()
-        .onKeyPress(.space) {
-            togglePlayPause()
-            return .handled
-        }
-        .onKeyPress(KeyEquivalent("k")) {
-            togglePlayPause()
-            return .handled
-        }
-        .onKeyPress(.leftArrow) {
-            skip(by: -Double(skipShort))
-            scheduleHide()
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            skip(by: Double(skipShort))
-            scheduleHide()
-            return .handled
-        }
-        .onKeyPress(KeyEquivalent("j")) {
-            skip(by: -Double(skipLong))
-            scheduleHide()
-            return .handled
-        }
-        .onKeyPress(KeyEquivalent("l")) {
-            skip(by: Double(skipLong))
-            scheduleHide()
-            return .handled
-        }
+        .playerKeyboardShortcuts(
+            togglePlayPause: togglePlayPause,
+            skip: { skip(by: $0) },
+            scheduleHide: scheduleHide,
+            skipShort: skipShort,
+            skipLong: skipLong
+        )
     }
 
     // MARK: - Extracted UI Components
@@ -966,7 +916,7 @@ struct PlayerView: View {
         isScrubbing = true
         player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
+            try? await Task.sleep(nanoseconds: 300_000_000)
             isScrubbing = false
         }
     }
@@ -981,7 +931,7 @@ struct PlayerView: View {
         currentTime = time
         player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(500))
+            try? await Task.sleep(nanoseconds: 500_000_000)
             isScrubbing = false
         }
         if isPlaying { scheduleHide() }
@@ -1024,7 +974,7 @@ struct PlayerView: View {
         hideTask?.cancel()
         guard isPlaying else { return }
         hideTask = Task {
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
             guard !Task.isCancelled else { return }
             withAnimation(.easeInOut(duration: 0.3)) { showControls = false }
         }
@@ -1663,6 +1613,15 @@ struct PlayerView: View {
     }
 
     @ViewBuilder
+    private var qualityPickerSheet: some View {
+        PlayerQualityPicker(
+            qualities: hlsQualities,
+            selectedBandwidth: $selectedQualityBandwidth,
+            onSelect: selectQuality
+        )
+        .adaptivePresentationDetents([.height(CGFloat(120 + 56 * (hlsQualities.count + 1)))])
+    }
+
     private var audioPickerSheet: some View {
         VStack(spacing: 0) {
             Text("Audio Track").font(.headline).padding(.vertical, 16)
@@ -1693,6 +1652,33 @@ struct PlayerView: View {
         #else
         return true
         #endif
+    }
+}
+
+// MARK: - Keyboard Shortcuts Helper
+
+private extension View {
+    @ViewBuilder
+    func playerKeyboardShortcuts(
+        togglePlayPause: @escaping () -> Void,
+        skip: @escaping (Double) -> Void,
+        scheduleHide: @escaping () -> Void,
+        skipShort: Int,
+        skipLong: Int
+    ) -> some View {
+        if #available(iOS 17, *) {
+            self
+                .focusable()
+                .focusEffectDisabled()
+                .onKeyPress(.space) { togglePlayPause(); return .handled }
+                .onKeyPress(KeyEquivalent("k")) { togglePlayPause(); return .handled }
+                .onKeyPress(.leftArrow) { skip(-Double(skipShort)); scheduleHide(); return .handled }
+                .onKeyPress(.rightArrow) { skip(Double(skipShort)); scheduleHide(); return .handled }
+                .onKeyPress(KeyEquivalent("j")) { skip(-Double(skipLong)); scheduleHide(); return .handled }
+                .onKeyPress(KeyEquivalent("l")) { skip(Double(skipLong)); scheduleHide(); return .handled }
+        } else {
+            self
+        }
     }
 }
 
@@ -1983,7 +1969,7 @@ class PlayerHostingController<Content: View>: UIHostingController<Content> {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
-        safeAreaRegions = []
+        if #available(iOS 16.4, *) { safeAreaRegions = [] }
         let coordinator = DragToDismissCoordinator(viewController: self)
         panCoordinator = coordinator
         let pan = UIPanGestureRecognizer(target: coordinator, action: #selector(DragToDismissCoordinator.handlePan(_:)))
