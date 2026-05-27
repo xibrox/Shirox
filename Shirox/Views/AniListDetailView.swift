@@ -231,7 +231,7 @@ struct AniListDetailView: View {
                 vm.pendingModuleStreamEpisodeHref = nil
                 let avail = vm.pendingModuleStreamAvailableCount
                 vm.pendingModuleStreamAvailableCount = nil
-                DispatchQueue.main.async { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
             } else if !vm.showFinalStreamPicker {
                 vm.dismissModulePicker()
             }
@@ -256,7 +256,7 @@ struct AniListDetailView: View {
                 vm.pendingFinalStreamEpisodeHref = nil
                 let avail = vm.pendingFinalStreamAvailableCount
                 vm.pendingFinalStreamAvailableCount = nil
-                DispatchQueue.main.async { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
             } else {
                 vm.dismissFinalPicker()
             }

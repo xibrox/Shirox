@@ -329,6 +329,15 @@ struct SettingsView: View {
                     }
                 }
                 #endif
+
+                Section {
+                    LabeledContent("Version") {
+                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                        let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                        Text("\(version) (\(build))")
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .navigationTitle("Settings")
             #if os(iOS)

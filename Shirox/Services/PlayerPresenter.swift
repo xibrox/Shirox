@@ -38,7 +38,7 @@ final class PlayerPresenter: ObservableObject {
             .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController }
             .first
 
-        if let presented = root?.presentedViewController {
+        if let presented = root?.presentedViewController, !presented.isBeingDismissed {
             return findTopViewController(presented)
         }
 
