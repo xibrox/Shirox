@@ -56,7 +56,7 @@ Join the Discord server to get support, share modules, and chat with other users
 
 ## ☕ Support
 
-If you enjoy Shirox and want to support development, consider buying me a coffee!
+If you enjoy Shirox and want to support development, consider supporting the project!
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/xibrox)
 
