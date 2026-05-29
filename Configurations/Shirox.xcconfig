@@ -1,0 +1,7 @@
+APP_NAME = Shirox
+DEVELOPMENT_TEAM = JRMTH65Z3H
+PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app
+CODE_SIGN_STYLE = Automatic
+
+// Optional local overrides (ignored in Git)
+#include? "Shirox.local.xcconfig"
