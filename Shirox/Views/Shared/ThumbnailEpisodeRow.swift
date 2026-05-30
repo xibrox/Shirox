@@ -20,6 +20,8 @@ struct ThumbnailEpisodeRow: View {
     private var adaptiveBackground: Color {
         #if os(iOS)
         Color(uiColor: .systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(nsColor: .windowBackgroundColor)
         #endif

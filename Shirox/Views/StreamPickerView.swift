@@ -46,7 +46,7 @@ struct StreamPickerView: View {
                     }
                     #if os(iOS)
                     .listStyle(.insetGrouped)
-                    #else
+                    #elseif !os(tvOS)
                     .listStyle(.inset)
                     #endif
                 }

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 extension JSEngine {
     func fetchStreams(episodeUrl: String) async throws -> [StreamResult] {

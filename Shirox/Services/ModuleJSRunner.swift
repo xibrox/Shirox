@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 #if os(tvOS)
     import FakeWebKit

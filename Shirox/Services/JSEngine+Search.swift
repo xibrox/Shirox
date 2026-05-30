@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 extension JSEngine {
     func search(keyword: String) async throws -> [SearchItem] {

@@ -1,5 +1,6 @@
 import Foundation
 @preconcurrency import JavaScriptCore
+import Combine
 
 @MainActor
 final class JSEngine: ObservableObject {

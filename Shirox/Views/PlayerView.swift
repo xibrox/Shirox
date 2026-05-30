@@ -1,6 +1,8 @@
 import SwiftUI
 import AVKit
 import MediaPlayer
+import Combine
+
 #if os(iOS)
 import AVFoundation
 #endif
@@ -163,6 +165,9 @@ struct PlayerView: View {
                                videoGravity: isFilled ? .resizeAspectFill : .resizeAspect)
                     .ignoresSafeArea()
                     .overlay { videoLoadingOverlay }
+                #elseif os(tvOS)
+                // TODO: add compatible player view
+                EmptyView()
                 #else
                 MacVideoPlayerView(player: player).ignoresSafeArea()
                 #endif
@@ -1289,7 +1294,7 @@ struct PlayerView: View {
         if let urlStr = artworkUrl, artworkCache[urlStr] == nil, let url = URL(string: urlStr) {
             Task { @MainActor in
                 guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
-                #if os(iOS)
+                #if os(iOS) || os(tvOS)
                 guard let image = UIImage(data: data) else { return }
                 #else
                 guard let image = NSImage(data: data) else { return }

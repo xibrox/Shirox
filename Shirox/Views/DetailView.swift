@@ -35,6 +35,8 @@ struct DetailView: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif

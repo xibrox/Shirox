@@ -1,3 +1,5 @@
+import Combine
+
 #if os(tvOS)
     import FakeWebKit
 #else
@@ -525,10 +527,14 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
 
         let userScript = WKUserScript(source: jsCode, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         config.userContentController.addUserScript(userScript)
+        #if !os(tvOS)
         config.userContentController.add(self, name: "networkLogger")
+        #endif
 
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1920, height: 1080), configuration: config)
+        #if !os(tvOS)
         webView?.navigationDelegate = self
+        #endif
         webView?.customUserAgent = URLSession.randomUserAgent
     }
 
@@ -555,7 +561,12 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
         // WKWebView ignores Cookie headers on URLRequest. Inject via a WKUserScript at
         // document start so cookies are visible to the page's own JavaScript before it runs.
         let ucc = webView.configuration.userContentController
+
+        #if !os(tvOS)
+        // TODO: implement in FakeWebKit
         ucc.removeAllUserScripts()
+        #endif
+        
         if let cookieHeader = headers["Cookie"] ?? headers["cookie"], !cookieHeader.isEmpty {
             let cookieJS = cookieHeader
                 .components(separatedBy: ";")
@@ -648,6 +659,7 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
     }
 }
 
+#if !os(tvOS)
 extension NetworkFetchSimpleMonitor: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {}
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
@@ -657,7 +669,9 @@ extension NetworkFetchSimpleMonitor: WKNavigationDelegate {
         return .allow
     }
 }
+#endif
 
+#if !os(tvOS)
 extension NetworkFetchSimpleMonitor: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "networkLogger",
@@ -667,6 +681,7 @@ extension NetworkFetchSimpleMonitor: WKScriptMessageHandler {
         }
     }
 }
+#endif
 
 // MARK: - NetworkFetchManager
 
@@ -696,10 +711,13 @@ class NetworkFetchManager: NSObject, ObservableObject {
     /// Clears all WKWebView cookies so a new module starts with a clean session.
     static func clearCookies() {
         Task { @MainActor in
+            #if !os(tvOS)
+            // TODO: add in FakeWebKit
             await WKWebsiteDataStore.default().removeData(
                 ofTypes: [WKWebsiteDataTypeCookies],
                 modifiedSince: .distantPast
             )
+            #endif
         }
     }
 }
@@ -1088,10 +1106,14 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
 
         let userScript = WKUserScript(source: jsCode, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         config.userContentController.addUserScript(userScript)
+        #if !os(tvOS)
         config.userContentController.add(self, name: "networkLogger")
+        #endif
 
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1920, height: 1080), configuration: config)
+        #if !os(tvOS)
         webView?.navigationDelegate = self
+        #endif
         webView?.customUserAgent = URLSession.randomUserAgent
     }
 
@@ -1165,6 +1187,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
             return
         }
 
+        #if !os(tvOS)
         let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
         Task {
             for cookie in cookiesToInject {
@@ -1174,6 +1197,9 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
             }
             doLoad()
         }
+        #else
+        doLoad()
+        #endif
     }
 
     private func performCustomInteractions() {
@@ -1231,6 +1257,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
     }
 
     private func extractCFClearanceCookie() {
+        #if !os(tvOS)
         guard let webView = webView, let host = webView.url?.host else { return }
         let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
         cookieStore.getAllCookies { cookies in
@@ -1248,6 +1275,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
                 CloudflareBypassManager.shared.store(cookie: cf.value, cookieHeader: fullHeader, for: host)
             }
         }
+        #endif
     }
 
     private func stopMonitoring(reason: String) {
@@ -1295,6 +1323,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
     }
 }
 
+#if !os(tvOS)
 extension NetworkFetchMonitor: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {}
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
@@ -1304,7 +1333,9 @@ extension NetworkFetchMonitor: WKNavigationDelegate {
         return .allow
     }
 }
+#endif
 
+#if !os(tvOS)
 extension NetworkFetchMonitor: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "networkLogger",
@@ -1336,3 +1367,4 @@ extension NetworkFetchMonitor: WKScriptMessageHandler {
         }
     }
 }
+#endif

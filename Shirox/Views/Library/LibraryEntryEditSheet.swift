@@ -37,20 +37,28 @@ struct LibraryEntryEditSheet: View {
         switch scoreFormat {
         case .point100:
             HStack {
+                #if !os(tvOS)
                 Slider(value: $score, in: 0...100, step: 1)
+                #endif
                 Text(score == 0 ? "—" : String(Int(score)))
                     .monospacedDigit()
                     .frame(width: 36)
             }
         case .point10Decimal:
             HStack {
+                #if !os(tvOS)
                 Slider(value: $score, in: 0...10, step: 0.5)
+                #endif
                 Text(score == 0 ? "—" : (score.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(score)) : String(format: "%.1f", score)))
                     .monospacedDigit()
                     .frame(width: 36)
             }
         case .point10:
+            #if !os(tvOS)
             Stepper(score == 0 ? "No score" : "\(Int(score)) / 10", value: $score, in: 0...10, step: 1)
+            #else
+            EmptyView()
+            #endif
         case .point5:
             HStack(spacing: 8) {
                 Button { score = 0 } label: {
@@ -99,11 +107,13 @@ struct LibraryEntryEditSheet: View {
 
                 if status != .completed {
                     Section("Progress") {
+                        #if !os(tvOS)
                         Stepper(
                             "\(progress) episode\(progress == 1 ? "" : "s") watched",
                             value: $progress,
                             in: 0...(media.episodes ?? 9999)
                         )
+                        #endif
                         if let total = media.episodes {
                             Text("of \(total) total")
                                 .font(.caption)

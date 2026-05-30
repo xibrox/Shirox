@@ -1,3 +1,5 @@
+import Combine
+
 #if os(iOS)
 import Foundation
 import Network

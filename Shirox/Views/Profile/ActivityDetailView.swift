@@ -230,6 +230,8 @@ struct ActivityDetailView: View {
                         .clipShape(Circle())
                         #if os(iOS)
                         .overlay(Circle().stroke(Color(UIColor.systemBackground), lineWidth: 1.5))
+                        #elseif os(tvOS)
+                        // TODO: add back overlay
                         #else
                         .overlay(Circle().stroke(Color(NSColor.windowBackgroundColor), lineWidth: 1.5))
                         #endif

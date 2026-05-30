@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct SettingsView: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
@@ -125,7 +126,9 @@ struct SettingsView: View {
                                 .font(.headline)
                                 .monospacedDigit()
                         }
+                        #if !os(tvOS)
                         Slider(value: $watchedPercentage, in: 50...100, step: 1)
+                        #endif
                     }
                 }
 
@@ -518,7 +521,9 @@ struct LogEntryRow: View {
             Text(entry.message)
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.primary)
+                #if !os(tvOS)
                 .textSelection(.enabled)
+                #endif
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 12)

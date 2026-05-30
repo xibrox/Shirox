@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 #if os(tvOS)
 import FakeWebKit
@@ -78,9 +79,12 @@ final class CacheManager: ObservableObject {
     }
 
     func clearWebsiteData() async {
+        #if !os(tvOS)
+        // TODO: Update FakeWebkit to support these
         let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
         let store = WKWebsiteDataStore.default()
         await store.removeData(ofTypes: dataTypes, modifiedSince: .distantPast)
+        #endif
     }
 
     func clearTempFiles() {

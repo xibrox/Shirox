@@ -380,6 +380,7 @@ struct LibraryView: View {
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowBackground(Color.clear)
+                        #if !os(tvOS)
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             Button {
                                 Task {
@@ -395,6 +396,7 @@ struct LibraryView: View {
                             }
                             .tint(.green)
                         }
+                        #endif
                     }
                 }
                 .listStyle(.plain)

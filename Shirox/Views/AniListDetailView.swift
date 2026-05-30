@@ -41,6 +41,8 @@ struct AniListDetailView: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif
@@ -1494,6 +1496,8 @@ struct AniListMatchingSearchView: View {
         ZStack {
             #if os(macOS)
             Color(NSColor.windowBackgroundColor).ignoresSafeArea()
+            #elseif os(tvOS)
+            Color.clear
             #else
             Color(UIColor.systemBackground).ignoresSafeArea()
             #endif

@@ -17,7 +17,9 @@ struct ProfileSocialView: View {
             if let topContent {
                 topContent
                     .listRowInsets(EdgeInsets())
+                    #if !os(tvOS)
                     .listRowSeparator(.hidden)
+                    #endif
                     .listRowBackground(Color.clear)
             }
 
@@ -28,7 +30,9 @@ struct ProfileSocialView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 4)
             .padding(.vertical, 8)
+            #if !os(tvOS)
             .listRowSeparator(.hidden)
+            #endif
             .listRowBackground(Color.clear)
             .onChangeOf(selectedSocial) { newValue in
                 Task { await vm.loadSocial(userId: userId, type: newValue) }
@@ -37,7 +41,9 @@ struct ProfileSocialView: View {
             if vm.isLoadingSocial && users.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity)
+                    #if !os(tvOS)
                     .listRowSeparator(.hidden)
+                    #endif
                     .listRowBackground(Color.clear)
             } else if users.isEmpty {
                 ContentUnavailableView {
@@ -45,7 +51,9 @@ struct ProfileSocialView: View {
                 } description: {
                     Text(selectedSocial == .followers ? "No followers yet." : "Not following anyone yet.")
                 }
+                #if !os(tvOS)
                 .listRowSeparator(.hidden)
+                #endif
                 .listRowBackground(Color.clear)
             } else {
                 ForEach(users) { user in

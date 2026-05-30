@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - ContinueWatchingSection
 
@@ -385,7 +386,7 @@ struct ContinueWatchingCardDisplay: View {
 /// per URL, not re-firing on every SwiftUI update cycle.
 private struct CardThumbnail: View {
     let urlString: String
-    #if os(iOS)
+    #if os(iOS) || os(tvOS)
     @State private var platformImage: UIImage?
     private static let cache = NSCache<NSString, UIImage>()
     #else
@@ -396,7 +397,7 @@ private struct CardThumbnail: View {
     var body: some View {
         Group {
             if let platformImage {
-                #if os(iOS)
+                #if os(iOS) || os(tvOS)
                 Image(uiImage: platformImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -416,7 +417,7 @@ private struct CardThumbnail: View {
                 return
             }
             guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
             guard let loaded = UIImage(data: data) else { return }
             #else
             guard let loaded = NSImage(data: data) else { return }

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 // Raw library entry using AniListMedia — mapped to LibraryEntry (with Media) by AniListProvider.
 struct AniListRawEntry {

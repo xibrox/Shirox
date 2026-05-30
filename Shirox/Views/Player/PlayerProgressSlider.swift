@@ -39,6 +39,7 @@ struct PlayerProgressSlider: View {
                     .overlay {
                         Color.clear
                             .contentShape(Rectangle())
+                            #if !os(tvOS)
                             .gesture(
                                 DragGesture(minimumDistance: 0)
                                     .onChanged { value in
@@ -58,6 +59,7 @@ struct PlayerProgressSlider: View {
                                         onDragEnd?()
                                     }
                             )
+                            #endif
                     }
             }
             .frame(height: 28)

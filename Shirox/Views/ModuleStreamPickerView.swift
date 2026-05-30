@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - VM Store
 
@@ -53,9 +54,10 @@ struct ModuleStreamPickerView: View {
             }
             #if os(iOS)
             .listStyle(.insetGrouped)
-            #else
+            #elseif !os(tvOS)
             .listStyle(.inset)
             #endif
+
             .navigationTitle("Watch Episode \(episodeNumber)")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -731,7 +733,7 @@ private struct ModuleStreamSelectionView: View {
                     }
                     #if os(iOS)
                     .listStyle(.insetGrouped)
-                    #else
+                    #elseif !os(tvOS)
                     .listStyle(.inset)
                     #endif
                 }

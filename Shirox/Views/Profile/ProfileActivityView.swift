@@ -75,6 +75,8 @@ struct ProfileActivityView: View {
                         .font(.title3.weight(.semibold))
                         #if os(iOS)
                         .foregroundStyle(Color(UIColor.systemBackground))
+                        #elseif os(tvOS)
+                        // TODO: add back foreground color
                         #else
                         .foregroundStyle(Color(NSColor.windowBackgroundColor))
                         #endif
@@ -147,12 +149,16 @@ struct ProfileActivityView: View {
                 if let topContent {
                     topContent
                         .listRowInsets(EdgeInsets())
+                        #if !os(tvOS)
                         .listRowSeparator(.hidden)
+                        #endif
                         .listRowBackground(Color.clear)
                 }
                 ForEach(vm.activity) { item in
                     activityCard(item)
+                        #if !os(tvOS)
                         .listRowSeparator(.hidden)
+                        #endif
                         .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
                         .listRowBackground(Color.clear)
                 }
@@ -172,7 +178,9 @@ struct ProfileActivityView: View {
                         }
                     }
                     .padding(.vertical, 10)
+                    #if !os(tvOS)
                     .listRowSeparator(.hidden)
+                    #endif
                     .listRowBackground(Color.clear)
                 }
             }

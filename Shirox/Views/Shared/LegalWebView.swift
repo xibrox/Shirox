@@ -126,9 +126,10 @@ private struct _WebViewBridge: UIViewRepresentable {
         guard let html, !context.coordinator.hasLoaded else { return }
         context.coordinator.hasLoaded = true
         #if os(tvOS)
-        uiView.loadHTMLString(html, baseURL: baseURL?.absoluteString)
+            // TODO: Update FakeWebkit to support baseurl type URL
+            uiView.loadHTMLString(html, baseURL: baseURL?.absoluteString)
         #else
-        uiView.loadHTMLString(html, baseURL: baseURL)
+            uiView.loadHTMLString(html, baseURL: baseURL)
         #endif
     }
 

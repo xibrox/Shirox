@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 final class ModuleSearchAliasManager: ObservableObject {
     nonisolated(unsafe) static let shared = ModuleSearchAliasManager()

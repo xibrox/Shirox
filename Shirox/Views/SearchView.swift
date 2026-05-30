@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct SearchView: View {
     @StateObject private var vm = SearchViewModel()
@@ -170,6 +171,7 @@ struct SearchView: View {
                         Label(query, systemImage: "clock")
                             .foregroundStyle(.primary)
                     }
+                    #if !os(tvOS)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
                             history.remove(query)
@@ -178,6 +180,7 @@ struct SearchView: View {
                         }
                         .tint(.red)
                     }
+                    #endif
                 }
             } header: {
                 HStack {
@@ -191,7 +194,7 @@ struct SearchView: View {
         }
         #if os(iOS)
         .listStyle(.insetGrouped)
-        #else
+        #elseif !os(tvOS)
         .listStyle(.inset)
         #endif
     }

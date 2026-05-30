@@ -1,6 +1,7 @@
 import Foundation
 import AuthenticationServices
 import Security
+import Combine
 
 @MainActor
 final class AniListAuthManager: NSObject, ObservableObject {
@@ -93,8 +94,12 @@ final class AniListAuthManager: NSObject, ObservableObject {
             guard let self, let url = callbackURL, error == nil else { return }
             Task { @MainActor in self.handleCallback(url: url) }
         }
-        session.presentationContextProvider = self
-        session.prefersEphemeralWebBrowserSession = true
+
+        #if !os(tvOS)
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = true
+        #endif
+
         authSession = session
         session.start()
     }
@@ -196,8 +201,10 @@ final class AniListAuthManager: NSObject, ObservableObject {
     }
 }
 
+#if !os(tvOS)
 extension AniListAuthManager: ASWebAuthenticationPresentationContextProviding {
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         MainActor.assumeIsolated { presentationAnchorWindow ?? ASPresentationAnchor() }
     }
 }
+#endif

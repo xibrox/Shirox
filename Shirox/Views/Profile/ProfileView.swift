@@ -122,6 +122,8 @@ struct ProfileView: View {
                             .clipShape(Circle())
                             #if os(iOS)
                             .overlay(Circle().strokeBorder(Color(UIColor.systemBackground), lineWidth: 3))
+                            #elseif os(tvOS)
+                            // TODO: add back overlay
                             #else
                             .overlay(Circle().strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: 3))
                             #endif

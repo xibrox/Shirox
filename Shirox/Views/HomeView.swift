@@ -7,6 +7,8 @@ struct HomeView: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif
@@ -100,6 +102,8 @@ private struct FeaturedCarousel: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif
@@ -249,7 +253,7 @@ private struct FeaturedCarousel: View {
                 selectedTab = (1000 / displayCount) * displayCount
             }
         }
-        #else
+        #elseif !os(tvOS)
         MacFeaturedCarousel(items: realItems)
         #endif
     }

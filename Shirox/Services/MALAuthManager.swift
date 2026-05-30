@@ -1,6 +1,7 @@
 import Foundation
 import AuthenticationServices
 import Security
+import Combine
 
 @MainActor
 final class MALAuthManager: NSObject, ObservableObject {
@@ -103,8 +104,12 @@ final class MALAuthManager: NSObject, ObservableObject {
             guard let self, let url = callbackURL, error == nil else { return }
             Task { await self.handleCallback(url: url) }
         }
-        session.presentationContextProvider = self
-        session.prefersEphemeralWebBrowserSession = false
+
+        #if !os(tvOS)
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = false
+        #endif
+        
         authSession = session
         session.start()
     }
@@ -191,8 +196,10 @@ final class MALAuthManager: NSObject, ObservableObject {
     }
 }
 
+#if !os(tvOS)
 extension MALAuthManager: ASWebAuthenticationPresentationContextProviding {
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         MainActor.assumeIsolated { presentationAnchorWindow ?? ASPresentationAnchor() }
     }
 }
+#endif

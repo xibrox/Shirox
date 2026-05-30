@@ -8,9 +8,11 @@ struct ComposeStatusView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
+                #if !os(tvOS)
                 TextEditor(text: $text)
                     .frame(minHeight: 120)
                     .padding()
+                #endif
                 Divider()
                 Text("\(text.count) / 2000")
                     .font(.caption)

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor final class ContinueWatchingManager: ObservableObject {
     static let shared = ContinueWatchingManager()
