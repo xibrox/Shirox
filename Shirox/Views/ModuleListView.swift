@@ -116,7 +116,7 @@ struct ModuleListView: View {
         #else
         .background(Color(.windowBackgroundColor))
         #endif
-        .onChange(of: moduleURL) { _ in
+        .onChangeOf(moduleURL) { _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
         }

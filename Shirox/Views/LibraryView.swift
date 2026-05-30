@@ -22,6 +22,13 @@ struct LibraryView: View {
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
 
+    #if os(iOS)
+        private let toolbarItemPlacement: [ToolbarItemPlacement] = [ToolbarItemPlacement.topBarLeading, ToolbarItemPlacement.topBarTrailing]
+    #else
+        // TDOO: fix toolbar placement
+        private let toolbarItemPlacement: [ToolbarItemPlacement] = [ToolbarItemPlacement.automatic, ToolbarItemPlacement.automatic]
+    #endif
+
     private var sortOrder: LibrarySortOrder {
         LibrarySortOrder(rawValue: sortOrderRaw) ?? .score
     }
@@ -189,7 +196,12 @@ struct LibraryView: View {
             } label: {
                 Text(activeProviderType == .mal ? "Sign in with MyAnimeList" : "Sign in with AniList")
                     .font(.headline)
-                    .foregroundStyle(Color(.systemBackground))
+                    #if os(iOS)
+                        .foregroundStyle(Color(.systemBackground))
+                    #else
+                        // TODO: fix missing color ( XCAssets )
+                        .foregroundStyle(Color.secondary)
+                    #endif
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(Color.primary, in: Capsule())
@@ -390,10 +402,10 @@ struct LibraryView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: toolbarItemPlacement[0]) {
                 sortMenu
             }
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: toolbarItemPlacement[1]) {
                 if isActiveProviderAuthenticated {
                     HStack(spacing: 10) {
                         if activeProviderType == .anilist {
@@ -439,13 +451,13 @@ struct LibraryView: View {
                 .first { $0.isKeyWindow }
         }
         #endif
-        .onChange(of: anilistAuth.isLoggedIn) { newValue in
+        .onChangeOf(anilistAuth.isLoggedIn) { newValue in
             if newValue { Task { await vm.load() } }
         }
-        .onChange(of: malAuth.isLoggedIn) { newValue in
+        .onChangeOf(malAuth.isLoggedIn) { newValue in
             if newValue { Task { await vm.load() } }
         }
-        .onChange(of: providerManager.fallbackActive) { _ in
+        .onChangeOf(providerManager.fallbackActive) {
             Task { await vm.refresh() }
         }
         .navigationTitle("Library")

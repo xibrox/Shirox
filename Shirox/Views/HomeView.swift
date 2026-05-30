@@ -159,7 +159,7 @@ private struct FeaturedCarousel: View {
                 GeometryReader { geo in
                     Color.clear
                         .onAppear { containerWidth = geo.size.width }
-                        .onChange(of: geo.size.width) { w in containerWidth = w }
+                        .onChangeOf(geo.size.width) { w in containerWidth = w }
                 }
             )
             .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }

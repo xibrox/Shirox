@@ -119,7 +119,7 @@ private struct DownloadModuleRow: View {
         .onDisappear {
             rowVm.cancelIfSearching()
         }
-        .onChange(of: rowVm.readyStreams) { streams in
+        .onChangeOf(rowVm.readyStreams) { streams in
             guard let streams else { return }
             onStreamsLoaded(streams, rowVm.selectedEpisodeHref)
         }

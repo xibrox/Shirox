@@ -33,7 +33,14 @@ final class PlayerPresenter: ObservableObject {
 
     nonisolated private init() {}
 
-    #if os(iOS)
+
+    #if !os(iOS)
+
+    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, from sourceView: Any? = nil) {
+        // TODO: implement this function for tv and macos
+    }
+
+    #else
     static func findTopViewController(_ viewController: UIViewController? = nil) -> UIViewController? {
         let root = viewController ?? UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController }

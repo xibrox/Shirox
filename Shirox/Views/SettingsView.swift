@@ -94,7 +94,7 @@ struct SettingsView: View {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
                         .tint(.secondary)
                         #if os(iOS)
-                        .onChange(of: forceLandscape) { _ in
+                        .onChangeOf(forceLandscape) {
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
                         }
                         #endif
@@ -331,6 +331,14 @@ struct SettingsView: View {
                 #endif
 
                 Section {
+                    ForEach([LegalPage.imprint, .privacy, .contributors, .licenses], id: \.title) { page in
+                        NavigationLink {
+                            LegalWebView(page: page)
+                        } label: {
+                            Text(page.title)
+                        }
+                    }
+
                     LabeledContent("Version") {
                         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
                         let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"

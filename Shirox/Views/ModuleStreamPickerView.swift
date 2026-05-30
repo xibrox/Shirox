@@ -392,8 +392,9 @@ private struct ModuleStreamRow: View {
         .onDisappear {
             rowVm.cancelIfSearching()
         }
-        .onChange(of: rowVm.readyStreams) { streams in
+        .onChangeOf(rowVm.readyStreams) { streams in
             guard let streams else { return }
+            
             if streams.count == 1 {
                 fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
             } else if autoPickLastStream,

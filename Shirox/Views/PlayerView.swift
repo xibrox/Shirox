@@ -271,7 +271,7 @@ struct PlayerView: View {
             tearDownNowPlaying()
             castManager.disconnect()
         }
-        .onChange(of: volume) { newVolume in
+        .onChangeOf(volume) { newVolume in
             player?.volume = newVolume
             #if canImport(GoogleCast)
             if castManager.isConnected {
@@ -279,7 +279,7 @@ struct PlayerView: View {
             }
             #endif
         }
-        .onChange(of: playbackSpeed) { newSpeed in
+        .onChangeOf(playbackSpeed) { newSpeed in
             #if canImport(GoogleCast)
             if castManager.isConnected {
                 GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.setPlaybackRate(Float(newSpeed))
@@ -288,20 +288,20 @@ struct PlayerView: View {
             #endif
             if isPlaying { player?.rate = Float(newSpeed) }
         }
-        .onChange(of: castManager.isConnected) { connected in
+        .onChangeOf(castManager.isConnected) { connected in
             if connected {
                 castCurrentMedia()
                 player?.pause()
                 isPlaying = false
             }
         }
-        .onChange(of: castManager.isPlaying) { playing in
+        .onChangeOf(castManager.isPlaying) { playing in
             if castManager.isConnected { isPlaying = playing }
         }
-        .onChange(of: castManager.currentPosition) { pos in
+        .onChangeOf(castManager.currentPosition) { pos in
             if castManager.isConnected && !isScrubbing { currentTime = pos }
         }
-        .onChange(of: castManager.duration) { dur in
+        .onChangeOf(castManager.duration) { dur in
             if castManager.isConnected && dur > 0 { duration = dur }
         }
         #if os(iOS)
@@ -324,7 +324,7 @@ struct PlayerView: View {
         }
         .statusBarHidden(true)
         .persistentSystemOverlaysHidden()
-        .onChange(of: videoReady) { ready in
+        .onChangeOf(videoReady) { ready in
             if ready {
                 withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
                 scheduleHide()
@@ -345,7 +345,7 @@ struct PlayerView: View {
             )
             .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
         }
-        .onChange(of: selectedSubtitleTrack) { _ in loadSubtitles() }
+        .onChangeOf(selectedSubtitleTrack) { loadSubtitles() }
         .sheet(isPresented: $showAudioPicker) {
             let optionCount = audioGroup?.options.count ?? 0
             let sheetHeight = CGFloat(60 + 56 * max(1, optionCount))

@@ -84,6 +84,9 @@
     <key>LSSupportsOpeningDocumentsInPlace</key>
     <true/>
 
+    <key>LegalBaseURL</key>
+    <string>$(LEGAL_BASE_URL)</string>
+
     <!-- Appstore Release -->
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>

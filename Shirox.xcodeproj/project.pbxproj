@@ -10,7 +10,7 @@
 		0F6021372F71CCC900CEC66D /* shirox-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0F6021362F71CCC800CEC66D /* shirox-icon.icon */; };
 		0F6021382F71CCC900CEC66D /* shirox-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0F6021362F71CCC800CEC66D /* shirox-icon.icon */; };
 		0FB47691410BFA732D132352 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
-		121D9B332FCA527E000FF9B4 /* GoogleCastDynamicCore in Frameworks */ = {isa = PBXBuildFile; productRef = 121D9B322FCA527E000FF9B4 /* GoogleCastDynamicCore */; };
+		121D9B332FCA527E000FF9B4 /* GoogleCastDynamicCore in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = 121D9B322FCA527E000FF9B4 /* GoogleCastDynamicCore */; };
 		121D9B452FCA53AA000FF9B4 /* FakeWebKit in Frameworks */ = {isa = PBXBuildFile; productRef = 121D9B442FCA53AA000FF9B4 /* FakeWebKit */; };
 		121D9B462FCA5603000FF9B4 /* EpisodeLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46B2FCA397700C9BA56 /* EpisodeLink.swift */; };
 		121D9B472FCA5603000FF9B4 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */; };
@@ -135,6 +135,10 @@
 		121D9BBE2FCA563E000FF9B4 /* Color+SystemBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */; };
 		121D9BBF2FCA5642000FF9B4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		121D9BC02FCA564F000FF9B4 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
+		1251C4572FCAD62E002AD0B2 /* GoogleCastDynamicCore in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = 1251C4562FCAD62E002AD0B2 /* GoogleCastDynamicCore */; };
+		1251C4592FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */; };
+		1251C45A2FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */; };
+		1251C45B2FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */; };
 		1279E4E82FCA397700C9BA56 /* PlayerPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4982FCA397700C9BA56 /* PlayerPresenter.swift */; };
 		1279E4E92FCA397700C9BA56 /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4842FCA397700C9BA56 /* DownloadManager.swift */; };
 		1279E4EA2FCA397700C9BA56 /* AniListAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47B2FCA397700C9BA56 /* AniListAuthManager.swift */; };
@@ -389,6 +393,7 @@
 /* Begin PBXFileReference section */
 		0F6021362F71CCC800CEC66D /* shirox-icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "shirox-icon.icon"; sourceTree = "<group>"; };
 		121D9B382FCA5378000FF9B4 /* Shirox_tvOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox_tvOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalWebView.swift; sourceTree = "<group>"; };
 		1279E4652FCA397700C9BA56 /* AniListActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListActivity.swift; sourceTree = "<group>"; };
 		1279E4662FCA397700C9BA56 /* AniListMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListMedia.swift; sourceTree = "<group>"; };
 		1279E4672FCA397700C9BA56 /* AniListNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AniListNotification.swift; sourceTree = "<group>"; };
@@ -529,6 +534,7 @@
 			files = (
 				7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */,
 				FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */,
+				1251C4572FCAD62E002AD0B2 /* GoogleCastDynamicCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -717,6 +723,7 @@
 		1279E4D72FCA397700C9BA56 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
 				1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */,
 				1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */,
 				1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */,
@@ -1026,6 +1033,7 @@
 				121D9B4C2FCA5603000FF9B4 /* Media.swift in Sources */,
 				121D9B4D2FCA5603000FF9B4 /* StreamResult.swift in Sources */,
 				121D9BC02FCA564F000FF9B4 /* ShiroxApp.swift in Sources */,
+				1251C45A2FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */,
 				121D9B4E2FCA5603000FF9B4 /* SkipSegments.swift in Sources */,
 				121D9B4F2FCA5603000FF9B4 /* MarkContext.swift in Sources */,
 				121D9BA52FCA563E000FF9B4 /* ThumbnailEpisodeRow.swift in Sources */,
@@ -1155,6 +1163,7 @@
 				1279E5372FCA397700C9BA56 /* HomeView.swift in Sources */,
 				1279E5382FCA397700C9BA56 /* PlayerTimeFormat.swift in Sources */,
 				1279E5392FCA397700C9BA56 /* LikesSheetView.swift in Sources */,
+				1251C45B2FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */,
 				1279E53A2FCA397700C9BA56 /* StreamResult.swift in Sources */,
 				1279E53B2FCA397700C9BA56 /* HLSQualityParser.swift in Sources */,
 				1279E53C2FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */,
@@ -1284,6 +1293,7 @@
 				1279E5B02FCA397700C9BA56 /* HomeView.swift in Sources */,
 				1279E5B12FCA397700C9BA56 /* PlayerTimeFormat.swift in Sources */,
 				1279E5B22FCA397700C9BA56 /* LikesSheetView.swift in Sources */,
+				1251C4592FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */,
 				1279E5B32FCA397700C9BA56 /* StreamResult.swift in Sources */,
 				1279E5B42FCA397700C9BA56 /* HLSQualityParser.swift in Sources */,
 				1279E5B52FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */,
@@ -1508,6 +1518,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.0.79;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -1615,6 +1626,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.0.79;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
@@ -1694,6 +1706,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 121D9B432FCA53AA000FF9B4 /* XCRemoteSwiftPackageReference "FakeWebKit" */;
 			productName = FakeWebKit;
+		};
+		1251C4562FCAD62E002AD0B2 /* GoogleCastDynamicCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */;
+			productName = GoogleCastDynamicCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
