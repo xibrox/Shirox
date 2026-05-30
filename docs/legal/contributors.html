@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Contributors</title>
+  <style>
+    :root {
+      --page: #f2f2f7;
+      --group: #ffffff;
+      --text: #1c1c1e;
+      --secondary: #636366;
+      --separator: rgba(60, 60, 67, 0.18);
+      --link: #007aff;
+      --avatar-bg: #e5e5ea;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #000000;
+        --group: #1c1c1e;
+        --text: #f2f2f7;
+        --secondary: #aeaeb2;
+        --separator: rgba(84, 84, 88, 0.65);
+        --link: #0a84ff;
+        --avatar-bg: #2c2c2e;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 18px 16px 34px;
+    }
+
+    .intro {
+      margin: 0 0 18px;
+      color: var(--secondary);
+      font-size: 0.95rem;
+    }
+
+    .group {
+      overflow: hidden;
+      border-radius: 24px;
+      background: var(--group);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 76px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--separator);
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .row:last-child { border-bottom: 0; }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: var(--avatar-bg);
+      object-fit: cover;
+    }
+
+    .placeholder {
+      display: grid;
+      place-items: center;
+      color: var(--link);
+      font-weight: 700;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 2px 0 0;
+      color: var(--secondary);
+    }
+
+    .stamp {
+      margin: 14px 2px 0;
+      color: var(--secondary);
+      font-size: 0.86rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="intro">People and community links connected to Shirox.</p>
+
+    <section class="group" aria-label="Contributor list">
+      <a class="row" href="https://github.com/xibrox">
+        <img class="avatar" src="https://github.com/xibrox.png" alt="xibrox GitHub avatar">
+        <div>
+          <h2>xibrox</h2>
+          <p>Owner and original author</p>
+        </div>
+      </a>
+
+      <a class="row" href="https://github.com/undeaDD">
+        <img class="avatar" src="https://github.com/undeaDD.png" alt="undeaDD GitHub avatar">
+        <div>
+          <h2>undeaDD</h2>
+          <p>Contributor</p>
+        </div>
+      </a>
+
+      <a class="row" href="https://github.com/xibrox/Shirox/graphs/contributors">
+        <span class="avatar placeholder" aria-hidden="true">...</span>
+        <div>
+          <h2>Community</h2>
+          <p>More contributors on GitHub</p>
+        </div>
+      </a>
+    </section>
+
+    <p class="stamp">Last updated: May 30, 2026</p>
+  </main>
+</body>
+</html>

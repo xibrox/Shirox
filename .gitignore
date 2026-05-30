@@ -43,6 +43,7 @@ Configurations/Shirox.local.xcconfig
 #
 .claude/
 .gemini/
-docs/
+docs/*
+!docs/legal
 conductor/
 .worktrees
