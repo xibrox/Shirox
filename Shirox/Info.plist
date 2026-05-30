@@ -84,8 +84,8 @@
     <key>LSSupportsOpeningDocumentsInPlace</key>
     <true/>
 
-    <key>LegalBaseURL</key>
-    <string>$(LEGAL_BASE_URL)</string>
+    <key>GithubRepo</key>
+    <string>$(GITHUB_REPO)</string>
 
     <!-- Appstore Release -->
     <key>ITSAppUsesNonExemptEncryption</key>

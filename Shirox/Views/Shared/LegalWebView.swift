@@ -28,29 +28,55 @@ enum LegalPage {
     }
 
     var url: URL? {
-        guard let base = Bundle.main.object(forInfoDictionaryKey: "LegalBaseURL") as? String,
-              !base.isEmpty else { return nil }
-        return URL(string: base + filename)
+        guard let repo = Bundle.main.object(forInfoDictionaryKey: "GithubRepo") as? String,
+              !repo.isEmpty else { return nil }
+        return URL(string: "https://raw.githubusercontent.com/\(repo)/refs/heads/main/docs/legal/\(filename)")
     }
 }
 
 struct LegalWebView: View {
     let page: LegalPage
-    @State private var isLoading = true
+    @State private var html: String?
+    @State private var failed = false
 
     var body: some View {
         Group {
-            if let url = page.url {
-                _WebViewBridge(url: url, isLoading: $isLoading)
+            if failed {
+                ContentUnavailableView("Couldn't Load", systemImage: "wifi.slash")
             } else {
-                ContentUnavailableView("URL not configured", systemImage: "link.slash")
+                // WKWebView is created immediately so WebKit process warms up
+                // while the spinner is visible, not after the fetch completes.
+                _WebViewBridge(html: html)
+                    .ignoresSafeArea()
+                    .overlay { if html == nil { ProgressView() } }
             }
         }
         .navigationTitle(page.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .overlay { if isLoading { ProgressView() } }
+        .task {
+            guard let url = page.url else { failed = true; return }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                html = String(data: data, encoding: .utf8) ?? ""
+            } catch {
+                failed = true
+            }
+        }
+    }
+}
+
+// MARK: - Pre-warmer
+
+/// Call `prewarm()` early (e.g. when SettingsView appears) to spin up the
+/// WebContent process before the user taps, eliminating the freeze on first open.
+@MainActor
+enum LegalWebViewPrewarmer {
+    private static var warmView: WKWebView?
+    static func prewarm() {
+        guard warmView == nil else { return }
+        warmView = WKWebView(frame: .zero)
     }
 }
 
@@ -58,54 +84,49 @@ struct LegalWebView: View {
 
 #if os(macOS)
 private struct _WebViewBridge: NSViewRepresentable {
-    let url: URL
-    @Binding var isLoading: Bool
+    let html: String?
 
-    func makeCoordinator() -> Coordinator { Coordinator($isLoading) }
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> WKWebView {
         let wv = WKWebView()
-        wv.navigationDelegate = context.coordinator
         wv.setValue(false, forKey: "drawsBackground")
-        wv.load(URLRequest(url: url))
         return wv
     }
 
-    func updateNSView(_ nsView: WKWebView, context: Context) {}
+    func updateNSView(_ nsView: WKWebView, context: Context) {
+        guard let html, !context.coordinator.hasLoaded else { return }
+        context.coordinator.hasLoaded = true
+        nsView.loadHTMLString(html, baseURL: nil)
+    }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        @Binding var isLoading: Bool
-        init(_ isLoading: Binding<Bool>) { _isLoading = isLoading }
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { isLoading = false }
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { isLoading = false }
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { isLoading = false }
+    final class Coordinator {
+        var hasLoaded = false
     }
 }
 #else
 private struct _WebViewBridge: UIViewRepresentable {
-    let url: URL
-    @Binding var isLoading: Bool
+    let html: String?
 
-    func makeCoordinator() -> Coordinator { Coordinator($isLoading) }
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> WKWebView {
         let wv = WKWebView()
-        wv.navigationDelegate = context.coordinator
         wv.isOpaque = false
-        wv.backgroundColor = .systemBackground
-        wv.scrollView.backgroundColor = .systemBackground
-        wv.load(URLRequest(url: url))
+        wv.backgroundColor = .systemGroupedBackground
+        wv.scrollView.backgroundColor = .systemGroupedBackground
+        wv.scrollView.contentInsetAdjustmentBehavior = .always
         return wv
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        guard let html, !context.coordinator.hasLoaded else { return }
+        context.coordinator.hasLoaded = true
+        uiView.loadHTMLString(html, baseURL: nil)
+    }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        @Binding var isLoading: Bool
-        init(_ isLoading: Binding<Bool>) { _isLoading = isLoading }
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { isLoading = false }
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { isLoading = false }
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { isLoading = false }
+    final class Coordinator {
+        var hasLoaded = false
     }
 }
 #endif
