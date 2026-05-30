@@ -11,7 +11,7 @@ struct NavigationStack<Content: View>: View {
 
     var body: some View {
         #if !os(iOS)
-            NavigationStack { content }
+            SwiftUI.NavigationStack { content }
         #else
             NavigationView { content }
                 .navigationViewStyle(.stack)

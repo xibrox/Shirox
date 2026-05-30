@@ -95,8 +95,8 @@ struct ShiroxApp: App {
             diskCapacity: 150 * 1024 * 1024,
             diskPath: nil
         )
-        #if !targetEnvironment(macCatalyst) || os(macOS)
-        _ = CastManager.shared
+        #if !os(tvOS) && !targetEnvironment(macCatalyst) || os(macOS)
+            _ = CastManager.shared
         #endif
         ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
     }
