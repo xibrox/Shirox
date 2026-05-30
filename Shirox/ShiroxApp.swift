@@ -52,7 +52,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             // Use playback category so audio plays regardless of mute switch
-            try audioSession.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+            try audioSession.setCategory(.playback, mode: .moviePlayback)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             Logger.shared.log("Failed to configure audio session: \(error)", type: "Error")

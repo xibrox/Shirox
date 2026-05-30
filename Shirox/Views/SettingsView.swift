@@ -635,7 +635,7 @@ struct LogFilter: Identifiable, Hashable {
 }
 
 class LogFilterViewModel: ObservableObject {
-    static let shared = LogFilterViewModel()
+    nonisolated(unsafe) static let shared = LogFilterViewModel()
     
     @Published var filters: [LogFilter] = [] {
         didSet {
@@ -692,7 +692,7 @@ class LogFilterViewModel: ObservableObject {
     }
 }
 
-class Logger {
+class Logger: @unchecked Sendable {
     static let shared = Logger()
 
     struct LogEntry: Identifiable {

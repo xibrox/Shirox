@@ -15,6 +15,7 @@ import UIKit
 @preconcurrency import GoogleCast
 #endif
 
+@MainActor
 final class PlayerPresenter: ObservableObject {
     static let shared = PlayerPresenter()
     
@@ -30,7 +31,7 @@ final class PlayerPresenter: ObservableObject {
     private var orientationObserver: NSObjectProtocol?
     #endif
 
-    private init() {}
+    nonisolated private init() {}
 
     #if os(iOS)
     static func findTopViewController(_ viewController: UIViewController? = nil) -> UIViewController? {
@@ -142,12 +143,14 @@ final class PlayerPresenter: ObservableObject {
             forName: UIDevice.orientationDidChangeNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            let mapped = self?.snapshotCurrentOrientation()
-            // Only update for concrete orientations (ignore faceUp/faceDown/unknown).
-            if let o = mapped, o != .unknown {
-                self?.trackedPlayerOrientation = o
-                if o.isLandscape {
-                    UserDefaults.standard.set(o.rawValue, forKey: "lastLandscapeOrientation")
+            Task { @MainActor [weak self] in
+                let mapped = self?.snapshotCurrentOrientation()
+                // Only update for concrete orientations (ignore faceUp/faceDown/unknown).
+                if let o = mapped, o != .unknown {
+                    self?.trackedPlayerOrientation = o
+                    if o.isLandscape {
+                        UserDefaults.standard.set(o.rawValue, forKey: "lastLandscapeOrientation")
+                    }
                 }
             }
         }
@@ -440,31 +443,32 @@ final class CastManager: NSObject, ObservableObject {
 }
 
 #if canImport(GoogleCast)
-@MainActor
 extension CastManager: GCKSessionManagerListener {
-    func sessionManager(_ sessionManager: GCKSessionManager, didStart session: GCKCastSession) {
-        updateState()
+    nonisolated func sessionManager(_ sessionManager: GCKSessionManager, didStart session: GCKCastSession) {
+        MainActor.assumeIsolated { updateState() }
     }
-    
-    func sessionManager(_ sessionManager: GCKSessionManager, didEnd session: GCKCastSession, withError error: Error?) {
-        updateState()
+
+    nonisolated func sessionManager(_ sessionManager: GCKSessionManager, didEnd session: GCKCastSession, withError error: Error?) {
+        MainActor.assumeIsolated { updateState() }
     }
-    
-    func sessionManager(_ sessionManager: GCKSessionManager, didResumeCastSession session: GCKCastSession) {
-        updateState()
+
+    nonisolated func sessionManager(_ sessionManager: GCKSessionManager, didResumeCastSession session: GCKCastSession) {
+        MainActor.assumeIsolated { updateState() }
     }
 }
 
-@MainActor
 extension CastManager: GCKRemoteMediaClientListener {
-    func remoteMediaClient(_ client: GCKRemoteMediaClient, didUpdate mediaStatus: GCKMediaStatus?) {
-        updateMediaStatus(mediaStatus)
+    nonisolated func remoteMediaClient(_ client: GCKRemoteMediaClient, didUpdate mediaStatus: GCKMediaStatus?) {
+        // GCKMediaStatus is an immutable snapshot; wrap it so the region-isolation
+        // checker allows the send across the actor boundary.
+        struct StatusBox: @unchecked Sendable { let value: GCKMediaStatus? }
+        let box = StatusBox(value: mediaStatus)
+        Task { @MainActor in self.updateMediaStatus(box.value) }
     }
 }
 
-@MainActor
 extension CastManager: GCKRequestDelegate {
-    func request(_ request: GCKRequest, didFailWithError error: GCKError) {
+    nonisolated func request(_ request: GCKRequest, didFailWithError error: GCKError) {
         Logger.shared.log("[Cast] Request failed: \(error.localizedDescription)", type: "Error")
     }
 }

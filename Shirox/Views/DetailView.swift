@@ -125,7 +125,7 @@ struct DetailView: View {
             if let mid = moduleId, ModuleManager.shared.activeModule?.id != mid,
                let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
                 Task {
-                    try? await ModuleManager.shared.selectModule(module)
+                    ModuleManager.shared.selectModule(module)
                     vm.load(item: item)
                 }
             } else {

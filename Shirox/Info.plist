@@ -18,6 +18,8 @@
     <dict>
         <key>NSAllowsArbitraryLoads</key>
         <true/>
+        <key>NSAllowsArbitraryLoadsInWebContent</key>
+        <true/>
     </dict>
     <key>UIApplicationSceneManifest</key>
     <dict>
@@ -81,5 +83,9 @@
     <true/>
     <key>LSSupportsOpeningDocumentsInPlace</key>
     <true/>
+
+    <!-- Appstore Release -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
 </dict>
 </plist>

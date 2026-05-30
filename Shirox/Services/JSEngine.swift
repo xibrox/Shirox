@@ -146,7 +146,7 @@ final class JSEngine: ObservableObject {
                     // CF cookie injection — inject all bypass session cookies, not just cf_clearance,
                     // because some APIs (e.g. AllAnime) require additional Turnstile session cookies.
                     if let host = url.host,
-                       let bypassHeader = await CloudflareBypassManager.shared.fullCookieHeader(for: host) {
+                       let bypassHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
                         let existing = request.value(forHTTPHeaderField: "Cookie") ?? ""
                         request.setValue(
                             existing.isEmpty ? bypassHeader : "\(existing); \(bypassHeader)",

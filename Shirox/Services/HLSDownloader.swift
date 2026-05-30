@@ -28,7 +28,7 @@ actor HLSDownloader {
         url: URL,
         headers: [String: String],
         downloadDir: URL,
-        onProgress: @escaping (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> String {
         Logger.shared.log("[HLS] Downloading manifest: \(url)", type: "Download")
         

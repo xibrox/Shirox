@@ -39,6 +39,8 @@
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
+      enableGPUFrameCaptureMode = "3"
+      enableGPUValidationMode = "1"
       allowLocationSimulation = "YES"
       queueDebuggingEnableBacktraceRecording = "Yes">
       <BuildableProductRunnable
@@ -51,6 +53,13 @@
             ReferencedContainer = "container:Shirox.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "OS_ACTIVITY_MODE"
+            value = "disable"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

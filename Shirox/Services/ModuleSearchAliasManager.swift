@@ -1,7 +1,7 @@
 import Foundation
 
 final class ModuleSearchAliasManager: ObservableObject {
-    static let shared = ModuleSearchAliasManager()
+    nonisolated(unsafe) static let shared = ModuleSearchAliasManager()
     
     private let userDefaults = UserDefaults.standard
     private let keyPrefix = "moduleSearchAlias_"

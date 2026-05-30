@@ -51,7 +51,7 @@ enum MediaListStatus: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct LibraryEntry: Identifiable, Codable {
+struct LibraryEntry: Identifiable, Codable, Sendable {
     let id: Int           // provider's list entry id
     let media: Media      // provider-agnostic media
     var status: MediaListStatus

@@ -3,5 +3,8 @@ DEVELOPMENT_TEAM = JRMTH65Z3H
 PRODUCT_BUNDLE_IDENTIFIER = com.shirox.app
 CODE_SIGN_STYLE = Automatic
 
+// Swift concurrency checking level: minimal | targeted | complete
+SWIFT_STRICT_CONCURRENCY = targeted
+
 // Optional local overrides (ignored in Git)
 #include? "Shirox.local.xcconfig"

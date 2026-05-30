@@ -1,6 +1,6 @@
 import Foundation
 
-final class IDMappingService {
+final class IDMappingService: @unchecked Sendable {
     static let shared = IDMappingService()
     private let cacheKey = "id_mappings_cache"
     private let prefetchedKey = "id_mappings_prefetched"

@@ -241,7 +241,7 @@ struct ContinueWatchingSection: View {
 
     @ViewBuilder
     private func contextMenuItems(for item: ContinueWatchingItem) -> some View {
-        if let href = item.detailHref, let mid = item.moduleId {
+        if let _ = item.detailHref, let mid = item.moduleId {
             Button {
                 if let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
                     ModuleManager.shared.selectModule(module)

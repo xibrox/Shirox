@@ -1,7 +1,7 @@
 import Foundation
 
 final class MALDiscoveryService {
-    static let shared = MALDiscoveryService()
+    nonisolated(unsafe) static let shared = MALDiscoveryService()
     private let base = URL(string: "https://api.jikan.moe/v4")!
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default

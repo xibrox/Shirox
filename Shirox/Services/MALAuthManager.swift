@@ -193,6 +193,6 @@ final class MALAuthManager: NSObject, ObservableObject {
 
 extension MALAuthManager: ASWebAuthenticationPresentationContextProviding {
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        presentationAnchorWindow ?? ASPresentationAnchor()
+        MainActor.assumeIsolated { presentationAnchorWindow ?? ASPresentationAnchor() }
     }
 }

@@ -13,7 +13,7 @@ struct AniListRawEntry {
 }
 
 final class AniListLibraryService {
-    static let shared = AniListLibraryService()
+    nonisolated(unsafe) static let shared = AniListLibraryService()
     private let endpoint = URL(string: "https://graphql.anilist.co")!
     private init() {}
 

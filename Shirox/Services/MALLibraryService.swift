@@ -1,7 +1,7 @@
 import Foundation
 
 final class MALLibraryService {
-    static let shared = MALLibraryService()
+    nonisolated(unsafe) static let shared = MALLibraryService()
     private let base = URL(string: "https://api.myanimelist.net/v2")!
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default

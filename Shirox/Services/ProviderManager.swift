@@ -48,7 +48,7 @@ final class ProviderManager: ObservableObject {
     var primary: (any MediaProvider)? { orderedProviders.first }
     var fallback: (any MediaProvider)? { orderedProviders.count > 1 ? orderedProviders[1] : nil }
 
-    func call<T: Sendable>(_ operation: (any MediaProvider) async throws -> T) async throws -> T {
+    func call<T: Sendable>(_ operation: @MainActor (any MediaProvider) async throws -> T) async throws -> T {
         guard let primary else { throw ProviderError.unauthenticated }
         do {
             let result = try await operation(primary)

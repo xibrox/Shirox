@@ -198,6 +198,6 @@ final class AniListAuthManager: NSObject, ObservableObject {
 
 extension AniListAuthManager: ASWebAuthenticationPresentationContextProviding {
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        presentationAnchorWindow ?? ASPresentationAnchor()
+        MainActor.assumeIsolated { presentationAnchorWindow ?? ASPresentationAnchor() }
     }
 }

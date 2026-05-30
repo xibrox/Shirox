@@ -2,7 +2,7 @@ import Foundation
 import Network
 import Darwin
 
-final class HLSProxyServer {
+final class HLSProxyServer: @unchecked Sendable {
     static let shared = HLSProxyServer()
 
     private var listener: NWListener?
@@ -166,10 +166,11 @@ final class HLSProxyServer {
         if isPartial { header += "Content-Range: bytes \(start)-\(end)/\(fileSize)\r\n" }
         header += "\r\n"
         
+        let seekOffset = UInt64(start)
         connection.send(content: header.data(using: .utf8), completion: .contentProcessed({ _ in
             if isHead { return }
             if let handle = try? FileHandle(forReadingFrom: url) {
-                try? handle.seek(toOffset: UInt64(start))
+                try? handle.seek(toOffset: seekOffset)
                 self.streamFile(handle, connection: connection, remaining: length)
             }
         }))
@@ -186,13 +187,14 @@ final class HLSProxyServer {
     }
 
     private func streamFile(_ handle: FileHandle, connection: NWConnection, remaining: Int64) {
-        var left = remaining
+        final class StreamState: @unchecked Sendable { var left: Int64; init(_ v: Int64) { left = v } }
+        let state = StreamState(remaining)
         let chunk = Int64(128 * 1024)
-        func sendNext() {
-            guard left > 0 else { try? handle.close(); return }
-            let toRead = min(left, chunk)
+        @Sendable func sendNext() {
+            guard state.left > 0 else { try? handle.close(); return }
+            let toRead = min(state.left, chunk)
             if let data = try? handle.read(upToCount: Int(toRead)), !data.isEmpty {
-                left -= Int64(data.count)
+                state.left -= Int64(data.count)
                 connection.send(content: data, isComplete: false, completion: .contentProcessed({ error in
                     if error == nil { sendNext() } else { try? handle.close() }
                 }))

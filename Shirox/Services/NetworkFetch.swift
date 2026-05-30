@@ -1,5 +1,5 @@
 import WebKit
-import JavaScriptCore
+@preconcurrency import JavaScriptCore
 
 // MARK: - Date Formatting Extensions
 
@@ -70,9 +70,10 @@ struct NetworkFetchOptions {
 // MARK: - JSContext Extensions
 
 extension JSContext {
+    @MainActor
     func setupNetworkFetch() {
         let networkFetchNativeFunction: @convention(block) (String, JSValue?, JSValue, JSValue) -> Void = { urlString, optionsValue, resolve, reject in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 var options = NetworkFetchOptions()
 
                 if let optionsDict = optionsValue?.toDictionary() {
@@ -212,9 +213,10 @@ extension JSContext {
         self.evaluateScript(networkFetchDefinition)
     }
 
+    @MainActor
     func setupNetworkFetchSimple() {
         let networkFetchSimpleNativeFunction: @convention(block) (String, JSValue?, JSValue, JSValue) -> Void = { urlString, optionsValue, resolve, reject in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 var timeoutSeconds = 5
                 var htmlContent: String? = nil
                 var headers: [String: String] = [:]
@@ -271,6 +273,7 @@ extension JSContext {
 
 // MARK: - NetworkFetchSimpleManager
 
+@MainActor
 class NetworkFetchSimpleManager: NSObject, ObservableObject {
     static let shared = NetworkFetchSimpleManager()
 
@@ -291,10 +294,8 @@ class NetworkFetchSimpleManager: NSObject, ObservableObject {
             headers: headers
         ) { [weak self] result in
             self?.activeMonitors.removeValue(forKey: monitorId)
-            DispatchQueue.main.async {
-                if !resolve.isUndefined {
-                    resolve.call(withArguments: [result])
-                }
+            if !resolve.isUndefined {
+                resolve.call(withArguments: [result])
             }
         }
     }
@@ -302,6 +303,7 @@ class NetworkFetchSimpleManager: NSObject, ObservableObject {
 
 // MARK: - NetworkFetchSimpleMonitor
 
+@MainActor
 class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
     private var webView: WKWebView?
     private var completionHandler: (([String: Any]) -> Void)?
@@ -332,7 +334,7 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
             loadURL(url: url, headers: headers)
         }
         timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(timeoutSeconds), repeats: false) { [weak self] _ in
-            self?.stopMonitoring()
+            Task { @MainActor [weak self] in self?.stopMonitoring() }
         }
     }
 
@@ -340,8 +342,9 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
         guard let webView = webView else { return }
         addRequest("data:text/html;charset=utf-8,<html_content>")
         webView.loadHTMLString(htmlContent, baseURL: nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.simulateUserInteraction()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            self?.simulateUserInteraction()
         }
     }
 
@@ -562,8 +565,9 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
             ucc.addUserScript(script)
         }
         webView.load(request)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.simulateUserInteraction()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            self?.simulateUserInteraction()
         }
     }
 
@@ -633,10 +637,8 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
     }
 
     private func addRequest(_ urlString: String) {
-        DispatchQueue.main.async {
-            if !self.networkRequests.contains(urlString) {
-                self.networkRequests.append(urlString)
-            }
+        if !networkRequests.contains(urlString) {
+            networkRequests.append(urlString)
         }
     }
 }
@@ -644,11 +646,10 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
 extension NetworkFetchSimpleMonitor: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {}
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if let url = navigationAction.request.url {
-            addRequest(url.absoluteString)
-        }
-        decisionHandler(.allow)
+    @available(iOS 15.0, macOS 13.0, *)
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+        if let url = navigationAction.request.url { addRequest(url.absoluteString) }
+        return .allow
     }
 }
 
@@ -664,6 +665,7 @@ extension NetworkFetchSimpleMonitor: WKScriptMessageHandler {
 
 // MARK: - NetworkFetchManager
 
+@MainActor
 class NetworkFetchManager: NSObject, ObservableObject {
     static let shared = NetworkFetchManager()
 
@@ -680,10 +682,8 @@ class NetworkFetchManager: NSObject, ObservableObject {
 
         monitor.startMonitoring(urlString: urlString, options: options) { [weak self] result in
             self?.activeMonitors.removeValue(forKey: monitorId)
-            DispatchQueue.main.async {
-                if !resolve.isUndefined {
-                    resolve.call(withArguments: [result])
-                }
+            if !resolve.isUndefined {
+                resolve.call(withArguments: [result])
             }
         }
     }
@@ -701,6 +701,7 @@ class NetworkFetchManager: NSObject, ObservableObject {
 
 // MARK: - NetworkFetchMonitor
 
+@MainActor
 class NetworkFetchMonitor: NSObject, ObservableObject {
     private var webView: WKWebView?
     private var completionHandler: (([String: Any]) -> Void)?
@@ -758,10 +759,12 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         }
 
         timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(options.timeoutSeconds), repeats: false) { [weak self] _ in
-            if options.returnHTML || options.returnCookies {
-                self?.captureDataThenComplete()
-            } else {
-                self?.stopMonitoring(reason: "timeout")
+            Task { @MainActor [weak self] in
+                if options.returnHTML || options.returnCookies {
+                    self?.captureDataThenComplete()
+                } else {
+                    self?.stopMonitoring(reason: "timeout")
+                }
             }
         }
     }
@@ -775,7 +778,6 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         let shouldCaptureHTML = options.returnHTML
         let shouldCaptureCookies = options.returnCookies
 
-        var completedTasks = 0
         let totalTasks = (shouldCaptureHTML ? 1 : 0) + (shouldCaptureCookies ? 1 : 0)
 
         if totalTasks == 0 {
@@ -784,37 +786,46 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
             return
         }
 
-        let checkCompletion = {
-            completedTasks += 1
-            if completedTasks >= totalTasks {
-                self.extractCFClearanceCookie()
-                self.stopMonitoring(reason: "timeout_with_data")
-            }
+        // Use a class to hold mutable counter safely across @Sendable boundaries
+        final class CaptureCounter: @unchecked Sendable {
+            var count = 0
+            let total: Int
+            init(_ n: Int) { total = n }
         }
+        let counter = CaptureCounter(totalTasks)
 
         if shouldCaptureHTML {
             webView.evaluateJavaScript("document.documentElement.outerHTML") { [weak self] result, error in
-                DispatchQueue.main.async {
-                    if let html = result as? String, error == nil {
+                let html = result as? String
+                let failed = error != nil
+                Task { @MainActor [weak self] in
+                    if let html = html, !failed {
                         self?.htmlContent = html
                         self?.htmlCaptured = true
                     }
-                    checkCompletion()
+                    counter.count += 1
+                    if counter.count >= counter.total {
+                        self?.extractCFClearanceCookie()
+                        self?.stopMonitoring(reason: "timeout_with_data")
+                    }
                 }
             }
         }
 
         if shouldCaptureCookies {
             captureCookies { [weak self] in
-                DispatchQueue.main.async {
-                    _ = self
-                    checkCompletion()
+                Task { @MainActor [weak self] in
+                    counter.count += 1
+                    if counter.count >= counter.total {
+                        self?.extractCFClearanceCookie()
+                        self?.stopMonitoring(reason: "timeout_with_data")
+                    }
                 }
             }
         }
     }
 
-    private func captureCookies(completion: @escaping () -> Void) {
+    private func captureCookies(completion: @escaping @Sendable () -> Void) {
         guard let webView = webView else {
             completion()
             return
@@ -823,13 +834,10 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
 
         cookieStore.getAllCookies { [weak self] cookies in
-            DispatchQueue.main.async {
-                var cookieDict: [String: String] = [:]
-                for cookie in cookies {
-                    cookieDict[cookie.name] = cookie.value
-                }
-                self?.cookies = cookieDict
-                self?.cookiesCaptured = !cookieDict.isEmpty
+            let dict = cookies.reduce(into: [String: String]()) { $0[$1.name] = $1.value }
+            Task { @MainActor [weak self] in
+                self?.cookies = dict
+                self?.cookiesCaptured = !dict.isEmpty
                 completion()
             }
         }
@@ -1086,10 +1094,11 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         guard let webView = webView else { return }
         addRequest("data:text/html;charset=utf-8,<html_content>")
         webView.loadHTMLString(html, baseURL: nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.performCustomInteractions()
-            if self.options?.returnCookies == true {
-                self.captureCookies {}
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            self?.performCustomInteractions()
+            if self?.options?.returnCookies == true {
+                self?.captureCookies {}
             }
         }
     }
@@ -1135,10 +1144,10 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
             request.setValue(randomReferers.randomElement() ?? "https://www.google.com/", forHTTPHeaderField: "Referer")
         }
 
-        let doLoad = { [weak self] in
-            guard let self else { return }
-            self.webView?.load(request)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+        func doLoad() {
+            webView.load(request)
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
                 self?.performCustomInteractions()
                 if self?.options?.returnCookies == true {
                     self?.captureCookies {}
@@ -1152,12 +1161,14 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
         }
 
         let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
-        let group = DispatchGroup()
-        for cookie in cookiesToInject {
-            group.enter()
-            cookieStore.setCookie(cookie) { group.leave() }
+        Task {
+            for cookie in cookiesToInject {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    cookieStore.setCookie(cookie) { continuation.resume() }
+                }
+            }
+            doLoad()
         }
-        group.notify(queue: .main, execute: doLoad)
     }
 
     private func performCustomInteractions() {
@@ -1266,16 +1277,14 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
     }
 
     private func addRequest(_ urlString: String) {
-        DispatchQueue.main.async {
-            if !self.networkRequests.contains(urlString) {
-                self.networkRequests.append(urlString)
-                if let cutoff = self.options?.cutoff, !cutoff.isEmpty,
-                   urlString.lowercased().contains(cutoff.lowercased()),
-                   !self.cutoffTriggered {
-                    self.cutoffTriggered = true
-                    self.cutoffUrl = urlString
-                    self.stopMonitoring(reason: "cutoff")
-                }
+        if !networkRequests.contains(urlString) {
+            networkRequests.append(urlString)
+            if let cutoff = options?.cutoff, !cutoff.isEmpty,
+               urlString.lowercased().contains(cutoff.lowercased()),
+               !cutoffTriggered {
+                cutoffTriggered = true
+                cutoffUrl = urlString
+                stopMonitoring(reason: "cutoff")
             }
         }
     }
@@ -1284,11 +1293,10 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
 extension NetworkFetchMonitor: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {}
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if let url = navigationAction.request.url {
-            addRequest(url.absoluteString)
-        }
-        decisionHandler(.allow)
+    @available(iOS 15.0, macOS 13.0, *)
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+        if let url = navigationAction.request.url { addRequest(url.absoluteString) }
+        return .allow
     }
 }
 
@@ -1303,26 +1311,22 @@ extension NetworkFetchMonitor: WKScriptMessageHandler {
 
         if let type = body["type"] as? String {
             if type == "click-results", let results = body["results"] as? [String: Any] {
-                DispatchQueue.main.async {
-                    if let waitRes = results["waitResults"] as? [String: Bool] {
-                        self.waitResults.merge(waitRes) { _, new in new }
-                    }
-                    if let clickRes = results["clickResults"] as? [[String: Any]] {
-                        for item in clickRes {
-                            if let sel = item["selector"] as? String,
-                               let success = item["success"] as? Bool, success {
-                                self.elementsClicked.append(sel)
-                            }
+                if let waitRes = results["waitResults"] as? [String: Bool] {
+                    waitResults.merge(waitRes) { _, new in new }
+                }
+                if let clickRes = results["clickResults"] as? [[String: Any]] {
+                    for item in clickRes {
+                        if let sel = item["selector"] as? String,
+                           let success = item["success"] as? Bool, success {
+                            elementsClicked.append(sel)
                         }
                     }
                 }
             } else if type == "cookies", let cookiesData = body["cookies"] as? [String: String] {
-                DispatchQueue.main.async {
-                    for (key, value) in cookiesData {
-                        self.cookies[key] = value
-                    }
-                    self.cookiesCaptured = !self.cookies.isEmpty
+                for (key, value) in cookiesData {
+                    cookies[key] = value
                 }
+                cookiesCaptured = !cookies.isEmpty
             }
         }
     }

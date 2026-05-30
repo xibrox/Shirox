@@ -1454,7 +1454,7 @@ struct PlayerView: View {
                 isLoadingNextEpisode = false
                 guard !streams.isEmpty else { return }
                 let match = streams.first(where: { $0.title == currentContext?.streamTitle }) ?? streams[0]
-                let epNum = Int(ep1.number ?? 1)
+                let epNum = Int(ep1.number)
                 swapStream(match, episodeNumber: epNum, allStreams: streams)
                 // swapStream preserves old aniListID — override context with sequel's identity
                 // so ContinueWatching saves episode 1 progress under the correct show
@@ -1754,7 +1754,7 @@ struct VideoLayerView: UIViewRepresentable {
     var pipTrigger: Int = 0
     var videoGravity: AVLayerVideoGravity = .resizeAspect
 
-    class Coordinator: NSObject, AVPictureInPictureControllerDelegate {
+    class Coordinator: NSObject, AVPictureInPictureControllerDelegate, @unchecked Sendable {
         var pipController: AVPictureInPictureController?
         var lastPipTrigger: Int = 0
         private var foregroundObserver: NSObjectProtocol?
@@ -1766,8 +1766,9 @@ struct VideoLayerView: UIViewRepresentable {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
+                guard let self else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self?.pipController?.stopPictureInPicture()
+                    self.pipController?.stopPictureInPicture()
                 }
             }
         }
