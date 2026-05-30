@@ -7,22 +7,26 @@
   <title>Contributors</title>
   <style>
     :root {
+      --page: #f2f2f7;
       --group: #ffffff;
       --text: #1c1c1e;
       --secondary: #636366;
       --separator: rgba(60, 60, 67, 0.18);
       --link: #007aff;
       --avatar-bg: #e5e5ea;
+      --avatar-border: rgba(0, 0, 0, 0.12);
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
+        --page: #000000;
         --group: #1c1c1e;
         --text: #f2f2f7;
         --secondary: #aeaeb2;
         --separator: rgba(84, 84, 88, 0.65);
         --link: #0a84ff;
         --avatar-bg: #2c2c2e;
+        --avatar-border: rgba(255, 255, 255, 0.12);
       }
     }
 
@@ -30,7 +34,7 @@
 
     body {
       margin: 0;
-      background: "transparent";
+      background: var(--page);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
       font-size: 16px;
@@ -49,56 +53,93 @@
       font-size: 0.95rem;
     }
 
+    .section-label {
+      margin: 0 2px 6px;
+      color: var(--secondary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     .group {
       overflow: hidden;
-      border-radius: 24px;
+      border-radius: 16px;
       background: var(--group);
+      margin-bottom: 28px;
     }
 
     .row {
       display: flex;
       align-items: center;
-      gap: 12px;
-      min-height: 76px;
-      padding: 12px 18px;
+      gap: 14px;
+      min-height: 64px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--separator);
       color: inherit;
       text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .row:last-child { border-bottom: 0; }
 
-    .avatar {
-      width: 48px;
-      height: 48px;
+    .row:active { opacity: 0.6; }
+
+    .avatar-wrap {
       flex: 0 0 auto;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       background: var(--avatar-bg);
-      object-fit: cover;
-    }
-
-    .placeholder {
+      border: 1px solid var(--avatar-border);
+      overflow: hidden;
       display: grid;
       place-items: center;
-      color: var(--link);
-      font-weight: 700;
     }
+
+    .avatar-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .avatar-wrap .icon {
+      width: 26px;
+      height: 26px;
+      object-fit: contain;
+      opacity: 0.7;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .avatar-wrap .icon { filter: invert(1); }
+    }
+
+    .info { flex: 1; min-width: 0; }
 
     h2 {
       margin: 0;
       color: var(--text);
       font-size: 1rem;
       font-weight: 600;
-      letter-spacing: 0;
     }
 
     p {
       margin: 2px 0 0;
       color: var(--secondary);
+      font-size: 0.88rem;
+    }
+
+    .chevron {
+      flex: 0 0 auto;
+      width: 7px;
+      height: 12px;
+      opacity: 0.3;
     }
 
     .stamp {
-      margin: 14px 2px 0;
+      margin: 4px 2px 0;
       color: var(--secondary);
       font-size: 0.86rem;
     }
@@ -108,33 +149,75 @@
   <main>
     <p class="intro">People and community links connected to Shirox.</p>
 
-    <section class="group" aria-label="Contributor list">
-      <a class="row" href="https://github.com/xibrox">
-        <img class="avatar" src="https://github.com/xibrox.png" alt="xibrox GitHub avatar">
-        <div>
+    <p class="section-label">Authors</p>
+    <div class="group" role="list">
+      <a class="row" href="https://github.com/xibrox" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/xibrox.png" alt="xibrox">
+        </div>
+        <div class="info">
           <h2>xibrox</h2>
           <p>Owner and original author</p>
         </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </a>
 
-      <a class="row" href="https://github.com/undeaDD">
-        <img class="avatar" src="https://github.com/undeaDD.png" alt="undeaDD GitHub avatar">
-        <div>
+      <a class="row" href="https://github.com/undeaDD" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/undeaDD.png" alt="undeaDD">
+        </div>
+        <div class="info">
           <h2>undeaDD</h2>
           <p>Contributor</p>
         </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <p class="section-label">Community</p>
+    <div class="group" role="list">
+      <a class="row" href="https://github.com/xibrox/Shirox/graphs/contributors" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img class="icon" src="https://img.icons8.com/ios-glyphs/48/github.png" alt="GitHub">
+        </div>
+        <div class="info">
+          <h2>GitHub</h2>
+          <p>View all contributors</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </a>
 
-      <a class="row" href="https://github.com/xibrox/Shirox/graphs/contributors">
-        <span class="avatar placeholder" aria-hidden="true">...</span>
-        <div>
-          <h2>Community</h2>
-          <p>More contributors on GitHub</p>
+      <a class="row" href="https://discord.com/invite/b9tZSuJj73" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img class="icon" src="https://img.icons8.com/ios-glyphs/48/discord.png" alt="Discord">
         </div>
+        <div class="info">
+          <h2>Discord</h2>
+          <p>Join the community server</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </a>
-    </section>
+    </div>
 
     <p class="stamp">Last updated: May 30, 2026</p>
   </main>
+
+  <script>
+    // Open all links in external browser via custom scheme, falling back to target=_blank
+    document.querySelectorAll('a[href]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        window.open(a.href, '_blank');
+      });
+    });
+  </script>
 </body>
 </html>
