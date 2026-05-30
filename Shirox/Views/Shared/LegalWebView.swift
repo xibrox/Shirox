@@ -65,7 +65,7 @@ struct LegalWebView: View {
         .task {
             // Wait for the push animation to finish before touching WKWebView or the network.
             // This keeps the transition smooth — WKWebView init blocks the main thread on first use.
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 400_000_000)
             transitionDone = true
 
             guard let url = page.url else { failed = true; return }
