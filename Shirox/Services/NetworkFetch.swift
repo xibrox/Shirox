@@ -1,4 +1,9 @@
-import WebKit
+#if os(tvOS)
+    import FakeWebKit
+#else
+    import WebKit
+#endif
+
 @preconcurrency import JavaScriptCore
 
 // MARK: - Date Formatting Extensions

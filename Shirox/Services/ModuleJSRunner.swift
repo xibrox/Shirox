@@ -1,5 +1,11 @@
 import Foundation
-import WebKit
+
+#if os(tvOS)
+    import FakeWebKit
+#else
+    import WebKit
+#endif
+
 @preconcurrency import JavaScriptCore
 
 /// A short-lived, standalone JS runner for a single module.

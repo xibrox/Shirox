@@ -1,5 +1,10 @@
 import Foundation
+
+#if os(tvOS)
+import FakeWebKit
+#else
 import WebKit
+#endif
 
 @MainActor
 final class CacheManager: ObservableObject {

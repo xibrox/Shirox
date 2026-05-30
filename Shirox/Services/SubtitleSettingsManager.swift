@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 @MainActor
 final class SubtitleSettingsManager: ObservableObject {
@@ -76,7 +77,7 @@ final class SubtitleSettingsManager: ObservableObject {
     // MARK: - Color Serialization
 
     private func saveColor(_ color: Color) {
-#if os(iOS)
+#if os(iOS) || os(tvOS)
         let native = UIColor(color)
         var r: CGFloat = 1, g: CGFloat = 1, b: CGFloat = 1, a: CGFloat = 1
         native.getRed(&r, green: &g, blue: &b, alpha: &a)

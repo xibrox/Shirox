@@ -1,4 +1,11 @@
-import WebKit
+import Combine
+import Foundation
+
+#if os(tvOS)
+    import FakeWebKit
+#else
+    import WebKit
+#endif
 
 enum CloudflareBypassError: Error {
     case timeout

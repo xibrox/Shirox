@@ -3,6 +3,9 @@ import SwiftUI
 #if os(iOS)
 import UIKit
 typealias PlatformImage = UIImage
+#elseif os(tvOS)
+import UIKit
+typealias PlatformImage = UIImage
 #else
 import AppKit
 typealias PlatformImage = NSImage
@@ -86,6 +89,12 @@ struct CachedAsyncImage: View {
         Group {
             if let displayImage = platformImage ?? cachedImage {
                 #if os(iOS)
+                Image(uiImage: displayImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(minWidth: 0, minHeight: 0)
+                    .clipped()
+                #elseif os(tvOS)
                 Image(uiImage: displayImage)
                     .resizable()
                     .scaledToFill()
@@ -202,6 +211,8 @@ extension View {
             let system = Set(detents.map { $0.asSystemDetent })
             #if os(iOS)
             return AnyView(self.presentationDetents(UIDevice.current.userInterfaceIdiom == .pad ? [SwiftUI.PresentationDetent.large] : system))
+            #elseif os(tvOS)
+            return AnyView(self.presentationDetents(system))
             #else
             return AnyView(self.presentationDetents(system))
             #endif
