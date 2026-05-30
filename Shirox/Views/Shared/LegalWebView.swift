@@ -38,24 +38,36 @@ struct LegalWebView: View {
     let page: LegalPage
     @State private var html: String?
     @State private var failed = false
+    @State private var transitionDone = false
 
     var body: some View {
         Group {
             if failed {
                 ContentUnavailableView("Couldn't Load", systemImage: "wifi.slash")
-            } else {
-                // WKWebView is created immediately so WebKit process warms up
-                // while the spinner is visible, not after the fetch completes.
-                _WebViewBridge(html: html)
+            } else if transitionDone {
+                _WebViewBridge(html: html, baseURL: page.url)
                     .ignoresSafeArea()
                     .overlay { if html == nil { ProgressView() } }
+            } else {
+                ProgressView()
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(macOS)
+        .background(Color(nsColor: .windowBackgroundColor))
+        #else
+        .background(Color(uiColor: .systemGroupedBackground))
+        #endif
         .navigationTitle(page.title)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task {
+            // Wait for the push animation to finish before touching WKWebView or the network.
+            // This keeps the transition smooth — WKWebView init blocks the main thread on first use.
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            transitionDone = true
+
             guard let url = page.url else { failed = true; return }
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
@@ -67,24 +79,12 @@ struct LegalWebView: View {
     }
 }
 
-// MARK: - Pre-warmer
-
-/// Call `prewarm()` early (e.g. when SettingsView appears) to spin up the
-/// WebContent process before the user taps, eliminating the freeze on first open.
-@MainActor
-enum LegalWebViewPrewarmer {
-    private static var warmView: WKWebView?
-    static func prewarm() {
-        guard warmView == nil else { return }
-        warmView = WKWebView(frame: .zero)
-    }
-}
-
 // MARK: - Platform bridges
 
 #if os(macOS)
 private struct _WebViewBridge: NSViewRepresentable {
     let html: String?
+    let baseURL: URL?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -97,16 +97,15 @@ private struct _WebViewBridge: NSViewRepresentable {
     func updateNSView(_ nsView: WKWebView, context: Context) {
         guard let html, !context.coordinator.hasLoaded else { return }
         context.coordinator.hasLoaded = true
-        nsView.loadHTMLString(html, baseURL: nil)
+        nsView.loadHTMLString(html, baseURL: baseURL)
     }
 
-    final class Coordinator {
-        var hasLoaded = false
-    }
+    final class Coordinator { var hasLoaded = false }
 }
 #else
 private struct _WebViewBridge: UIViewRepresentable {
     let html: String?
+    let baseURL: URL?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -122,11 +121,9 @@ private struct _WebViewBridge: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {
         guard let html, !context.coordinator.hasLoaded else { return }
         context.coordinator.hasLoaded = true
-        uiView.loadHTMLString(html, baseURL: nil)
+        uiView.loadHTMLString(html, baseURL: baseURL)
     }
 
-    final class Coordinator {
-        var hasLoaded = false
-    }
+    final class Coordinator { var hasLoaded = false }
 }
 #endif

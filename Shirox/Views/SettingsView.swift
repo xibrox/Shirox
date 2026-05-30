@@ -346,7 +346,6 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .task { LegalWebViewPrewarmer.prewarm() }
             }
             .navigationTitle("Settings")
             #if os(iOS)
