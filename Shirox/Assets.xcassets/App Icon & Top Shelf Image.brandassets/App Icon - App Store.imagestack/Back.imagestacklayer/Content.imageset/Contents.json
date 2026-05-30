@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "tvos_appstoreicon_back.png",
       "idiom" : "tv"
     }
   ],
