@@ -53,15 +53,15 @@ struct LegalWebView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        #if os(macOS)
-        .background(Color(nsColor: .windowBackgroundColor))
-        #else
-        .background(Color(uiColor: .systemGroupedBackground))
-        #endif
         .navigationTitle(page.title)
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+
+        #if os(macOS)
+            .background(Color(nsColor: .windowBackgroundColor))
+        #elseif os(iOS)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
         #endif
+
         .task {
             // Wait for the push animation to finish before touching WKWebView or the network.
             // This keeps the transition smooth — WKWebView init blocks the main thread on first use.
@@ -107,21 +107,29 @@ private struct _WebViewBridge: UIViewRepresentable {
     let html: String?
     let baseURL: URL?
 
+    let config = WKWebViewConfiguration()
+
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> WKWebView {
-        let wv = WKWebView()
-        wv.isOpaque = false
-        wv.backgroundColor = .systemGroupedBackground
-        wv.scrollView.backgroundColor = .systemGroupedBackground
-        wv.scrollView.contentInsetAdjustmentBehavior = .always
+        let wv = WKWebView(frame: .zero, configuration: config)
+        #if !os(tvOS)
+            wv.isOpaque = false
+            wv.backgroundColor = .systemGroupedBackground
+            wv.scrollView.backgroundColor = .systemGroupedBackground
+            wv.scrollView.contentInsetAdjustmentBehavior = .always
+        #endif
         return wv
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
         guard let html, !context.coordinator.hasLoaded else { return }
         context.coordinator.hasLoaded = true
+        #if os(tvOS)
+        uiView.loadHTMLString(html, baseURL: baseURL?.absoluteString)
+        #else
         uiView.loadHTMLString(html, baseURL: baseURL)
+        #endif
     }
 
     final class Coordinator { var hasLoaded = false }

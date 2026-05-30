@@ -271,14 +271,5 @@
     <p class="stamp">Last updated: May 30, 2026</p>
   </main>
 
-  <script>
-    // Open all links in external browser via custom scheme, falling back to target=_blank
-    document.querySelectorAll('a[href]').forEach(a => {
-      a.addEventListener('click', e => {
-        e.preventDefault();
-        window.open(a.href, '_blank');
-      });
-    });
-  </script>
 </body>
 </html>
