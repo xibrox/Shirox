@@ -6,6 +6,7 @@ import SwiftUI
 struct BatchDownloadStreamPickerView: View {
     let mediaTitle: String
     let imageUrl: String
+    var aniListID: Int? = nil
     let moduleId: String?
     let episodes: [EpisodeLink]  // full EpisodeLink list so we can match by number
     let episodeNumbers: [Int]    // the selected subset to download
@@ -101,7 +102,7 @@ struct BatchDownloadStreamPickerView: View {
         DownloadManager.shared.batchDownload(
             mediaTitle: mediaTitle,
             imageUrl: imageUrl,
-            aniListID: nil,
+            aniListID: aniListID,
             moduleId: moduleId,
             detailHref: nil,
             episodes: episodes,

@@ -98,17 +98,6 @@ struct DetailView: View {
             #if os(iOS)
             if let snap = offlineSnapshot {
                 vm.loadOffline(snapshot: snap)
-                // Soft-online: if internet IS available and the user is logged in, fetch the
-                // current library entry so the AniList edit pencil reflects real progress.
-                // Failure is silent — viewing/playing never depends on this.
-                if let aid = snap.aniListID, AniListAuthManager.shared.isLoggedIn {
-                    Task {
-                        if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
-                            existingEntry = AniListProvider.shared.mapEntry(raw)
-                        }
-                    }
-                }
-                return
             }
             #endif
 
@@ -210,10 +199,7 @@ struct DetailView: View {
             StreamPickerView(vm: vm)
         }
         #if os(iOS)
-        .adaptiveSheet(isPresented: Binding(
-            get: { offlineSnapshot == nil && vm.showDownloadStreamPicker },
-            set: { vm.showDownloadStreamPicker = $0 }
-        )) {
+        .adaptiveSheet(isPresented: $vm.showDownloadStreamPicker) {
             DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
                 vm.downloadWithSelectedStream(stream)
             }
@@ -305,14 +291,12 @@ struct DetailView: View {
             }
         }
         #if os(iOS)
-        .adaptiveSheet(isPresented: Binding(
-            get: { offlineSnapshot == nil && showBatchDownloadPicker },
-            set: { showBatchDownloadPicker = $0 }
-        )) {
+        .adaptiveSheet(isPresented: $showBatchDownloadPicker) {
             if let detail = vm.detail {
                 BatchDownloadStreamPickerView(
                     mediaTitle: item.title,
                     imageUrl: detail.image,
+                    aniListID: vm.aniListID,
                     moduleId: ModuleManager.shared.activeModule?.id,
                     episodes: detail.episodes,
                     episodeNumbers: Array(selectedEpisodeNumbers).sorted(),
@@ -430,17 +414,15 @@ struct DetailView: View {
                 circleIconButton(icon: selectedTab == 0 ? "person.3.fill" : "list.bullet", isActive: selectedTab == 1, size: 16)
             }
             .buttonStyle(.plain)
-            if offlineSnapshot == nil {
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isSelectionMode.toggle()
-                        if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
-                    }
-                } label: {
-                    circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isSelectionMode.toggle()
+                    if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
                 }
-                .buttonStyle(.plain)
+            } label: {
+                circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
             }
+            .buttonStyle(.plain)
         }
     }
     #endif
@@ -463,15 +445,20 @@ struct DetailView: View {
         let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
         
         Button {
-            if let snap = offlineSnapshot {
-                let completed = DownloadManager.shared.items
-                    .filter { $0.mediaTitle == snap.mediaTitle && $0.moduleId == snap.moduleId && $0.state == .completed }
-                    .sorted { $0.episodeNumber < $1.episodeNumber }
-                let target = completed.first(where: { $0.episodeNumber == nextEp }) ?? completed.first
-                if let target { playDownloaded(target) }
+            // Prefer the local file when the target episode is already downloaded.
+            let activeModule = moduleId ?? ModuleManager.shared.activeModule?.id
+            let downloadedTarget = DownloadManager.shared.items.first {
+                $0.mediaTitle == detail.title
+                    && $0.moduleId == activeModule
+                    && $0.episodeNumber == nextEp
+                    && $0.state == .completed
+            }
+            if let downloadedTarget {
+                playDownloaded(downloadedTarget)
             } else if let item {
                 resumeWatching(item: item)
-            } else if let first = detail.episodes.first(where: { Int($0.number) == nextEp }) ?? detail.episodes.first {
+            } else if let first = detail.episodes.first(where: { Int($0.number) == nextEp }) ?? detail.episodes.first,
+                      !first.href.isEmpty {
                 vm.loadStreams(for: first)
             }
         } label: {
@@ -544,6 +531,18 @@ struct DetailView: View {
         let resolvedAniListID = vm.aniListID ?? aniListID
         let currentTitle = vm.detail?.title ?? item.title
         let epNum = Int(episode.number)
+
+        // Prefer the local file when this episode is already downloaded.
+        if let downloaded = DownloadManager.shared.items.first(where: {
+            $0.mediaTitle == currentTitle
+                && $0.moduleId == moduleId
+                && $0.episodeNumber == epNum
+                && $0.state == .completed
+        }) {
+            playDownloaded(downloaded)
+            return
+        }
+
         let cwItem = continueWatching.items.first { cw in
             let showMatches = resolvedAniListID != nil
                 ? cw.aniListID == resolvedAniListID
@@ -552,7 +551,7 @@ struct DetailView: View {
         }
         if let item = cwItem {
             resumeWatching(item: item)
-        } else {
+        } else if !episode.href.isEmpty {
             vm.loadStreams(for: episode)
         }
     }
@@ -636,7 +635,7 @@ struct DetailView: View {
             let aniListLoggedIn = AniListAuthManager.shared.isLoggedIn
             let malLoggedIn = malAuth.isLoggedIn
             let hasAniListEdit = aniListLoggedIn && vm.aniListID != nil
-            let hasMALEdit = malLoggedIn && malID != nil && offlineSnapshot == nil
+            let hasMALEdit = malLoggedIn && malID != nil
             let hasAnyEdit = hasAniListEdit || hasMALEdit
             let bothAvail = hasAniListEdit && hasMALEdit
 
@@ -685,14 +684,12 @@ struct DetailView: View {
                             } label: { Label("Edit on MyAnimeList", systemImage: "pencil") }
                         }
                     }
-                    if offlineSnapshot == nil {
-                        Button { showMatchingSearch = true } label: {
-                            Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
-                        }
+                    Button { showMatchingSearch = true } label: {
+                        Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
                     }
                 } label: { libraryEditButtonLabel }
                 .disabled(isLoadingEntry)
-            } else if offlineSnapshot == nil {
+            } else {
                 Button { showMatchingSearch = true } label: {
                     if isLoadingEntry {
                         ProgressView().scaleEffect(0.8)
@@ -1033,7 +1030,7 @@ struct DetailView: View {
     private func metadataSection(detail: MediaDetail) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                if detail.aliases != "N/A" {
+                if detail.aliases != "N/A" && !detail.aliases.isEmpty {
                     metadataTag(text: detail.aliases)
                 }
             }
@@ -1091,7 +1088,10 @@ struct DetailView: View {
 
     private func episodesSection(detail: MediaDetail) -> some View {
         #if os(iOS)
-        if let snap = offlineSnapshot {
+        // Use the downloaded-only path only when we have a snapshot AND the episode list
+        // contains nothing usable for online streaming (all hrefs empty = snapshot fallback).
+        if let snap = offlineSnapshot,
+           detail.episodes.allSatisfy({ $0.href.isEmpty }) {
             return AnyView(offlineEpisodesSection(detail: detail, snapshot: snap))
         }
         #endif

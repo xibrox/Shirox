@@ -40,16 +40,17 @@ final class DetailViewModel: ObservableObject {
     private var streamsTask: Task<Void, Never>?
 
     func load(item: SearchItem) {
-        guard detail == nil && !isMatchingAniList else { return }
+        guard !isMatchingAniList else { return }
+        guard !item.href.isEmpty else { return }
         detailHref = item.href
-        
+
         // Check if we have a saved mapping first
         if aniListID == nil {
             if let savedID = AniListMappingManager.shared.getMapping(title: item.title) {
                 aniListID = savedID
             }
         }
-        
+
         // If still no ID, try auto-matching
         if aniListID == nil {
             Task {
@@ -69,6 +70,12 @@ final class DetailViewModel: ObservableObject {
                     title: item.title,
                     image: item.image
                 )
+                // When opened from an offline snapshot, fetchDetails returns before
+                // fetchEpisodes — preserve the already-shown episodes so the list
+                // doesn't flash empty during the gap.
+                if let existing = detail, d.episodes.isEmpty {
+                    d.episodes = existing.episodes
+                }
                 detail = d
                 isLoadingDetail = false
 
@@ -287,7 +294,7 @@ final class DetailViewModel: ObservableObject {
             episodeNumber: Int(episode.number),
             episodeTitle: pendingEpisodeTitle,
             imageUrl: detail.image,
-            aniListID: nil,
+            aniListID: aniListID,
             moduleId: ModuleManager.shared.activeModule?.id,
             detailHref: detailHref,
             episodeHref: episode.href,

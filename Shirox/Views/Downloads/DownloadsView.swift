@@ -104,9 +104,10 @@ struct DownloadsView: View {
                                     let posterURLString: String = snap.posterFile
                                         .map { DownloadedMediaSnapshotStore.shared.localFileURL(in: snap, relative: $0).absoluteString }
                                         ?? mediaGroup.imageUrl
+                                    let detailHref = mediaGroup.items.first?.detailHref ?? ""
                                     NavigationLink {
                                         DetailView(
-                                            item: SearchItem(title: snap.mediaTitle, image: posterURLString, href: ""),
+                                            item: SearchItem(title: snap.mediaTitle, image: posterURLString, href: detailHref),
                                             offlineSnapshot: snap,
                                             moduleId: moduleGroup.id,
                                             aniListID: snap.aniListID
