@@ -388,6 +388,12 @@
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
+		AA01000000000000000002AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
+		AA01000000000000000003AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
+		AA01000000000000000004AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
+		AA02000000000000000002AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
+		AA02000000000000000003AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
+		AA02000000000000000004AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -525,6 +531,8 @@
 		CF6B7E2E4A3D9F1B8C0E5A44 /* Shirox.local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shirox.local.xcconfig; sourceTree = "<group>"; };
 		CF6B7E2E4A3D9F1B8C0E5A55 /* Shirox.local.xcconfig.template */ = {isa = PBXFileReference; lastKnownFileType = text; path = Shirox.local.xcconfig.template; sourceTree = "<group>"; };
 		E8D91E43B99205901655CDF0 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshot.swift; sourceTree = "<group>"; };
+		AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshotStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -577,6 +585,7 @@
 				1279E4672FCA397700C9BA56 /* AniListNotification.swift */,
 				1279E4682FCA397700C9BA56 /* AniListUser.swift */,
 				1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */,
+				AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */,
 				1279E46A2FCA397700C9BA56 /* DownloadItem.swift */,
 				1279E46B2FCA397700C9BA56 /* EpisodeLink.swift */,
 				1279E46C2FCA397700C9BA56 /* LibraryEntry.swift */,
@@ -616,6 +625,7 @@
 				1279E4822FCA397700C9BA56 /* CloudflareBypassManager.swift */,
 				1279E4832FCA397700C9BA56 /* ContinueWatchingManager.swift */,
 				1279E4842FCA397700C9BA56 /* DownloadManager.swift */,
+				AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */,
 				1279E4852FCA397700C9BA56 /* EpisodeSortManager.swift */,
 				1279E4862FCA397700C9BA56 /* HLSDownloader.swift */,
 				1279E4872FCA397700C9BA56 /* HLSProxyServer.swift */,
@@ -970,6 +980,8 @@
 				121D9B642FCA5612000FF9B4 /* ContinueWatchingManager.swift in Sources */,
 				121D9B652FCA5612000FF9B4 /* WatchHistoryService.swift in Sources */,
 				121D9B662FCA5612000FF9B4 /* DownloadManager.swift in Sources */,
+				AA01000000000000000002AA /* DownloadedMediaSnapshot.swift in Sources */,
+				AA02000000000000000002AA /* DownloadedMediaSnapshotStore.swift in Sources */,
 				121D9B672FCA5612000FF9B4 /* HLSDownloader.swift in Sources */,
 				121D9B682FCA5612000FF9B4 /* HLSProxyServer.swift in Sources */,
 				121D9B692FCA5612000FF9B4 /* AniListAuthManager.swift in Sources */,
@@ -1083,6 +1095,8 @@
 				2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */,
 				1279E4E82FCA397700C9BA56 /* PlayerPresenter.swift in Sources */,
 				1279E4E92FCA397700C9BA56 /* DownloadManager.swift in Sources */,
+				AA01000000000000000003AA /* DownloadedMediaSnapshot.swift in Sources */,
+				AA02000000000000000003AA /* DownloadedMediaSnapshotStore.swift in Sources */,
 				1279E4EA2FCA397700C9BA56 /* AniListAuthManager.swift in Sources */,
 				1279E4EB2FCA397700C9BA56 /* ProfileStatsView.swift in Sources */,
 				1279E4EC2FCA397700C9BA56 /* ProfileSocialView.swift in Sources */,
@@ -1213,6 +1227,8 @@
 				3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */,
 				1279E5612FCA397700C9BA56 /* PlayerPresenter.swift in Sources */,
 				1279E5622FCA397700C9BA56 /* DownloadManager.swift in Sources */,
+				AA01000000000000000004AA /* DownloadedMediaSnapshot.swift in Sources */,
+				AA02000000000000000004AA /* DownloadedMediaSnapshotStore.swift in Sources */,
 				1279E5632FCA397700C9BA56 /* AniListAuthManager.swift in Sources */,
 				1279E5642FCA397700C9BA56 /* ProfileStatsView.swift in Sources */,
 				1279E5652FCA397700C9BA56 /* ProfileSocialView.swift in Sources */,
