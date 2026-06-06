@@ -1,7 +1,8 @@
 import SwiftUI
+import Combine
 
 final class EpisodeSortManager: ObservableObject {
-    static let shared = EpisodeSortManager()
+    nonisolated(unsafe) static let shared = EpisodeSortManager()
     
     @AppStorage("defaultReverseSort") var defaultReverseSort = false
     

@@ -41,6 +41,8 @@ struct AniListDetailView: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif
@@ -88,7 +90,7 @@ struct AniListDetailView: View {
             #endif
             isReversed = EpisodeSortManager.shared.isReversed(for: "anilist_\(mediaId)")
         }
-        .onChange(of: isReversed) { newValue in
+        .onChangeOf(isReversed) { newValue in
             EpisodeSortManager.shared.setReversed(newValue, for: "anilist_\(mediaId)")
         }
         .frame(maxWidth: .infinity)
@@ -167,12 +169,9 @@ struct AniListDetailView: View {
         #if os(iOS)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { editToolbarButton } }
         #endif
-        .background(
-            NavigationLink(
-                destination: Group { if let id = sequelMediaId { AniListDetailView(mediaId: id) } },
-                isActive: Binding(get: { sequelMediaId != nil }, set: { if !$0 { sequelMediaId = nil } })
-            ) { EmptyView() }
-        ))
+        .navigationDestinationCompat(item: $sequelMediaId) { id in
+            AniListDetailView(mediaId: id)
+        })
     }
 
     var body: some View {
@@ -217,7 +216,7 @@ struct AniListDetailView: View {
                 }
             }
         }
-        .onChange(of: vm.media?.id) { _ in
+        .onChangeOf(vm.media?.id) { _ in
             guard !autoPlayOnLoad, let resumeEpNum = resumeEpisodeNumber else { return }
             guard vm.media?.episodes != nil else { return }
             autoPlayOnLoad = true
@@ -631,7 +630,6 @@ struct AniListDetailView: View {
         }
     }
 
-    #if os(iOS)
     @ViewBuilder
     private func watchButton(media: Media) -> some View {
         let item = continueWatchingItem(for: media)
@@ -761,7 +759,6 @@ struct AniListDetailView: View {
 
         PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired, onSequelNeeded: onSequelNeeded, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } })
     }
-    #endif
 
     // MARK: - Hero
     @ViewBuilder
@@ -1257,7 +1254,10 @@ private struct AniListEpisodeRowContainer: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+
+    #if os(iOS)
     @ObservedObject private var downloadManager = DownloadManager.shared
+    #endif
 
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
@@ -1280,9 +1280,13 @@ private struct AniListEpisodeRowContainer: View {
     }
 
     private var downloadState: DownloadState? {
-        downloadManager.items.first { 
-            $0.aniListID == mediaId && $0.episodeNumber == ep 
-        }?.state
+        #if os(iOS)
+            downloadManager.items.first {
+                $0.aniListID == mediaId && $0.episodeNumber == ep 
+            }?.state
+        #else
+            return nil
+        #endif
     }
 
     private var progress: Double? {
@@ -1492,6 +1496,8 @@ struct AniListMatchingSearchView: View {
         ZStack {
             #if os(macOS)
             Color(NSColor.windowBackgroundColor).ignoresSafeArea()
+            #elseif os(tvOS)
+            Color.clear
             #else
             Color(UIColor.systemBackground).ignoresSafeArea()
             #endif
@@ -1503,7 +1509,7 @@ struct AniListMatchingSearchView: View {
                         .foregroundStyle(.secondary)
                     TextField("Search AniList...", text: $searchText)
                         .textFieldStyle(.plain)
-                        .onChange(of: searchText) { _ in performSearch() }
+                        .onChangeOf(searchText) { performSearch() }
                     
                     if !searchText.isEmpty {
                         Button { searchText = "" } label: {

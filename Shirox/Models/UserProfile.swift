@@ -1,6 +1,6 @@
 import Foundation
 
-struct UserProfile: Identifiable, Codable {
+struct UserProfile: Identifiable, Codable, Sendable {
     let id: Int
     let provider: ProviderType
     let name: String

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Licenses</title>
+  <style>
+    :root {
+      --group: #ffffff;
+      --code: #f9f9fb;
+      --text: #1c1c1e;
+      --secondary: #636366;
+      --separator: rgba(60, 60, 67, 0.18);
+      --link: #007aff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --group: #1c1c1e;
+        --code: #2c2c2e;
+        --text: #f2f2f7;
+        --secondary: #aeaeb2;
+        --separator: rgba(84, 84, 88, 0.65);
+        --link: #0a84ff;
+      }
+    }
+
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+
+    body {
+      margin: 0;
+      background: "transparent";
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 18px 16px 34px;
+    }
+
+    .intro {
+      margin: 0 0 18px;
+      color: var(--secondary);
+      font-size: 0.95rem;
+    }
+
+    .group {
+      overflow: hidden;
+      border-radius: 24px;
+      background: var(--group);
+    }
+
+    section {
+      padding: 18px 18px;
+      border-bottom: 1px solid var(--separator);
+    }
+
+    section:last-child { border-bottom: 0; }
+
+    h2 {
+      margin: 0 0 4px;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--secondary);
+    }
+
+    p + p { margin-top: 10px; }
+
+    a {
+      color: var(--link);
+      text-decoration: none;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 12px 0 0;
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--code);
+      color: var(--secondary);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .meta {
+      color: var(--secondary);
+      font-size: 0.9rem;
+    }
+
+    .stamp {
+      margin: 14px 2px 0;
+      color: var(--secondary);
+      font-size: 0.86rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="intro">Third-party libraries and SDKs used by Shirox and their respective license terms.</p>
+
+    <div class="group">
+      <section>
+        <h2>Google Cast SDK</h2>
+        <p class="meta"><a href="https://github.com/castlabs/google-cast-spm">github.com/castlabs/google-cast-spm</a> · Google APIs Terms of Service</p>
+        <p>Use of the Google Cast SDK is subject to the <a href="https://developers.google.com/terms">Google APIs Terms of Service</a> and the <a href="https://developers.google.com/cast/terms">Google Cast SDK Additional Developer Terms of Service</a>.</p>
+      </section>
+
+      <section>
+        <h2>SwiftLint</h2>
+        <p class="meta"><a href="https://github.com/realm/SwiftLint">github.com/realm/SwiftLint</a> · MIT License · Copyright 2025 The SwiftLint Contributors</p>
+        <p>SwiftLint is used as a build-time development tool for Swift style and convention checks. It is not a runtime media provider, streaming service, or bundled content source.</p>
+      </section>
+
+      <section>
+        <h2>FakeWebKit</h2>
+        <p class="meta"><a href="https://github.com/undeaDD/FakeWebKit">github.com/undeaDD/FakeWebKit</a> · MIT License · Copyright 2026 undeaDD</p>
+        <p>FakeWebKit is used to bring WebKit-style WKWebView features to tvOS where native WKWebView support is not available in the same way as on iOS.</p>
+      </section>
+    </div>
+
+    <p class="stamp">Last updated: May 30, 2026</p>
+  </main>
+</body>
+</html>

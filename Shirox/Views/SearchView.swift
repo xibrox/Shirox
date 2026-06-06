@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct SearchView: View {
     @StateObject private var vm = SearchViewModel()
@@ -43,22 +44,22 @@ struct SearchView: View {
                     history.add(vm.query)
                     vm.search(usingModule: usingModule)
                 }
-                .onChange(of: vm.query) { new in
+                .onChangeOf(vm.query) { new in
                     if new.isEmpty {
                         vm.clearResults()
                     } else if (vm.hasResults || vm.hasSearched) && !vm.isLoading {
                         vm.clearResults()
                     }
                 }
-                .onChange(of: moduleManager.moduleReadyId) { newId in
+                .onChangeOf(moduleManager.moduleReadyId) { newId in
                     guard !vm.query.isEmpty, newId != nil else { return }
                     vm.search(usingModule: true)
                 }
-                .onChange(of: moduleManager.activeModule) { newModule in
+                .onChangeOf(moduleManager.activeModule) { newModule in
                     guard !vm.query.isEmpty, newModule == nil else { return }
                     vm.search(usingModule: false)
                 }
-                .onChange(of: providerManager.orderedProviders.first?.providerType) { _ in
+                .onChangeOf(providerManager.orderedProviders.first?.providerType) {
                     guard !vm.query.isEmpty, !usingModule else { return }
                     vm.search(usingModule: false)
                 }
@@ -73,7 +74,7 @@ struct SearchView: View {
             GeometryReader { geo in
                 Color.clear
                     .onAppear { isLandscape = geo.size.width > geo.size.height }
-                    .onChange(of: geo.size) { size in isLandscape = size.width > size.height }
+                    .onChangeOf(geo.size) { size in isLandscape = size.width > size.height }
             }
         )
         #endif
@@ -170,6 +171,7 @@ struct SearchView: View {
                         Label(query, systemImage: "clock")
                             .foregroundStyle(.primary)
                     }
+                    #if !os(tvOS)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
                             history.remove(query)
@@ -178,6 +180,7 @@ struct SearchView: View {
                         }
                         .tint(.red)
                     }
+                    #endif
                 }
             } header: {
                 HStack {
@@ -191,7 +194,7 @@ struct SearchView: View {
         }
         #if os(iOS)
         .listStyle(.insetGrouped)
-        #else
+        #elseif !os(tvOS)
         .listStyle(.inset)
         #endif
     }
@@ -295,7 +298,7 @@ private struct SearchActivationObserver: View {
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
-            .onChange(of: isSearching) { active in
+            .onChangeOf(isSearching) { active in
                 if active { onActivate() }
             }
     }

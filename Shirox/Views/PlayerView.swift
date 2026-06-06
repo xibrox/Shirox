@@ -1,6 +1,8 @@
 import SwiftUI
 import AVKit
 import MediaPlayer
+import Combine
+
 #if os(iOS)
 import AVFoundation
 #endif
@@ -163,6 +165,9 @@ struct PlayerView: View {
                                videoGravity: isFilled ? .resizeAspectFill : .resizeAspect)
                     .ignoresSafeArea()
                     .overlay { videoLoadingOverlay }
+                #elseif os(tvOS)
+                // TODO: add compatible player view
+                EmptyView()
                 #else
                 MacVideoPlayerView(player: player).ignoresSafeArea()
                 #endif
@@ -271,7 +276,7 @@ struct PlayerView: View {
             tearDownNowPlaying()
             castManager.disconnect()
         }
-        .onChange(of: volume) { newVolume in
+        .onChangeOf(volume) { newVolume in
             player?.volume = newVolume
             #if canImport(GoogleCast)
             if castManager.isConnected {
@@ -279,7 +284,7 @@ struct PlayerView: View {
             }
             #endif
         }
-        .onChange(of: playbackSpeed) { newSpeed in
+        .onChangeOf(playbackSpeed) { newSpeed in
             #if canImport(GoogleCast)
             if castManager.isConnected {
                 GCKCastContext.sharedInstance().sessionManager.currentCastSession?.remoteMediaClient?.setPlaybackRate(Float(newSpeed))
@@ -288,20 +293,20 @@ struct PlayerView: View {
             #endif
             if isPlaying { player?.rate = Float(newSpeed) }
         }
-        .onChange(of: castManager.isConnected) { connected in
+        .onChangeOf(castManager.isConnected) { connected in
             if connected {
                 castCurrentMedia()
                 player?.pause()
                 isPlaying = false
             }
         }
-        .onChange(of: castManager.isPlaying) { playing in
+        .onChangeOf(castManager.isPlaying) { playing in
             if castManager.isConnected { isPlaying = playing }
         }
-        .onChange(of: castManager.currentPosition) { pos in
+        .onChangeOf(castManager.currentPosition) { pos in
             if castManager.isConnected && !isScrubbing { currentTime = pos }
         }
-        .onChange(of: castManager.duration) { dur in
+        .onChangeOf(castManager.duration) { dur in
             if castManager.isConnected && dur > 0 { duration = dur }
         }
         #if os(iOS)
@@ -324,7 +329,7 @@ struct PlayerView: View {
         }
         .statusBarHidden(true)
         .persistentSystemOverlaysHidden()
-        .onChange(of: videoReady) { ready in
+        .onChangeOf(videoReady) { ready in
             if ready {
                 withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
                 scheduleHide()
@@ -345,7 +350,7 @@ struct PlayerView: View {
             )
             .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
         }
-        .onChange(of: selectedSubtitleTrack) { _ in loadSubtitles() }
+        .onChangeOf(selectedSubtitleTrack) { loadSubtitles() }
         .sheet(isPresented: $showAudioPicker) {
             let optionCount = audioGroup?.options.count ?? 0
             let sheetHeight = CGFloat(60 + 56 * max(1, optionCount))
@@ -1289,7 +1294,7 @@ struct PlayerView: View {
         if let urlStr = artworkUrl, artworkCache[urlStr] == nil, let url = URL(string: urlStr) {
             Task { @MainActor in
                 guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
-                #if os(iOS)
+                #if os(iOS) || os(tvOS)
                 guard let image = UIImage(data: data) else { return }
                 #else
                 guard let image = NSImage(data: data) else { return }
@@ -1454,7 +1459,7 @@ struct PlayerView: View {
                 isLoadingNextEpisode = false
                 guard !streams.isEmpty else { return }
                 let match = streams.first(where: { $0.title == currentContext?.streamTitle }) ?? streams[0]
-                let epNum = Int(ep1.number ?? 1)
+                let epNum = Int(ep1.number)
                 swapStream(match, episodeNumber: epNum, allStreams: streams)
                 // swapStream preserves old aniListID — override context with sequel's identity
                 // so ContinueWatching saves episode 1 progress under the correct show
@@ -1754,7 +1759,7 @@ struct VideoLayerView: UIViewRepresentable {
     var pipTrigger: Int = 0
     var videoGravity: AVLayerVideoGravity = .resizeAspect
 
-    class Coordinator: NSObject, AVPictureInPictureControllerDelegate {
+    class Coordinator: NSObject, AVPictureInPictureControllerDelegate, @unchecked Sendable {
         var pipController: AVPictureInPictureController?
         var lastPipTrigger: Int = 0
         private var foregroundObserver: NSObjectProtocol?
@@ -1766,8 +1771,9 @@ struct VideoLayerView: UIViewRepresentable {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
+                guard let self else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self?.pipController?.stopPictureInPicture()
+                    self.pipController?.stopPictureInPicture()
                 }
             }
         }

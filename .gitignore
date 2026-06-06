@@ -35,10 +35,15 @@ Package.resolved
 buildServer.json
 *.ipa
 
+# Local developer xcconfig (contains personal signing identity – never commit)
+#
+Configurations/Shirox.local.xcconfig
+
 # Agent specific
 #
 .claude/
 .gemini/
-docs/
+docs/*
+!docs/legal
 conductor/
 .worktrees

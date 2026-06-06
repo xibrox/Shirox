@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Imprint</title>
+  <style>
+    :root {
+      --group: #ffffff;
+      --text: #1c1c1e;
+      --secondary: #636366;
+      --separator: rgba(60, 60, 67, 0.18);
+      --link: #007aff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --group: #1c1c1e;
+        --text: #f2f2f7;
+        --secondary: #aeaeb2;
+        --separator: rgba(84, 84, 88, 0.65);
+        --link: #0a84ff;
+      }
+    }
+
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+
+    body {
+      margin: 0;
+      background: "transparent";
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 18px 16px 34px;
+    }
+
+    .intro {
+      margin: 0 0 18px;
+      color: var(--secondary);
+      font-size: 0.95rem;
+    }
+
+    .group {
+      overflow: hidden;
+      border-radius: 24px;
+      background: var(--group);
+    }
+
+    section {
+      padding: 18px 18px;
+      border-bottom: 1px solid var(--separator);
+    }
+
+    section:last-child { border-bottom: 0; }
+
+    h2 {
+      margin: 0 0 6px;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--secondary);
+    }
+
+    p + p { margin-top: 10px; }
+
+    a {
+      color: var(--link);
+      text-decoration: none;
+    }
+
+    .label {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .stamp {
+      margin: 14px 2px 0;
+      color: var(--secondary);
+      font-size: 0.86rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="intro">Shirox is an open-source iOS app maintained publicly by its community and project owner.</p>
+
+    <div class="group">
+      <section>
+        <p><span class="label">Name:</span> Shirox</p>
+        <p><span class="label">Repository:</span> <a href="https://github.com/xibrox/Shirox">github.com/xibrox/Shirox</a></p>
+        <p><span class="label">License:</span> MIT License, copyright 2026 ibro.</p>
+      </section>
+
+      <section>
+        <h2>Maintainer</h2>
+        <p>The project owner is reachable through the public GitHub profile <a href="https://github.com/xibrox">xibrox</a>. The author publishes under the name Shirox and does not publish a private residential address on this static project page.</p>
+      </section>
+
+      <section>
+        <h2>No piracy endorsement</h2>
+        <p>Shirox does not endorse, encourage, host, or distribute pirated videos, unauthorized streams, or copyrighted material shared without permission. The app is intended for lawful personal media use, user-controlled libraries, and integrations that users are allowed to access.</p>
+      </section>
+
+      <section>
+        <h2>User responsibility</h2>
+        <p>Users are responsible for the media, sources, modules, links, servers, and remote streams they choose to open with Shirox. This includes self-hosted videos, third-party streams, and community-provided content sources.</p>
+      </section>
+
+      <section>
+        <h2>Third-party content</h2>
+        <p>Community modules and external services are not operated by Shirox unless explicitly stated. The maintainer cannot review or control every source a user may add, and availability of a stream or module does not mean Shirox has verified rights to that content.</p>
+      </section>
+
+      <section>
+        <h2>Rights holders</h2>
+        <p>If you believe a project page, module, or linked resource connected to Shirox infringes your rights, please contact the maintainer through the public repository so the concern can be reviewed.</p>
+      </section>
+
+      <section>
+        <h2>Legal note</h2>
+        <p>This page is informational and intended for an open-source hobby project. Nothing here limits rights, duties, or liability where applicable law does not allow that. If a jurisdiction requires additional provider details for publication, those details will be added before public distribution in that jurisdiction.</p>
+      </section>
+    </div>
+
+    <p class="stamp">Last updated: May 30, 2026</p>
+  </main>
+</body>
+</html>

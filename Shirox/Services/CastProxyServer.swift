@@ -1,3 +1,5 @@
+import Combine
+
 #if os(iOS)
 import Foundation
 import Network
@@ -8,7 +10,7 @@ import UIKit
 /// Chromecast — a separate LAN device — can reach it. Injects auth
 /// headers into every request and rewrites HLS manifest segment URLs
 /// so they also route through the proxy.
-final class CastProxyServer {
+final class CastProxyServer: @unchecked Sendable {
     static let shared = CastProxyServer()
 
     private var listener: NWListener?

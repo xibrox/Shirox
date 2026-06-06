@@ -45,6 +45,7 @@ struct PlayerVolumeSlider: View {
                     Color.clear
                         .frame(height: 44)
                         .contentShape(Rectangle())
+                        #if !os(tvOS)
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
@@ -56,6 +57,7 @@ struct PlayerVolumeSlider: View {
                                     isDragging = false
                                 }
                         )
+                        #endif
                 }
             }
             .frame(height: 44)

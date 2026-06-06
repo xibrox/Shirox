@@ -235,7 +235,7 @@ private struct BatchDownloadModuleRow: View {
         .onAppear {
             rowVm.startFind()
         }
-        .onChange(of: rowVm.readyStreams) { streams in
+        .onChangeOf(rowVm.readyStreams) { streams in
             guard let streams, let item = rowVm.readySearchItem else { return }
             onStreamsForPicker(streams, item)
         }

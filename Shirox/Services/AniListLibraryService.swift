@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 // Raw library entry using AniListMedia — mapped to LibraryEntry (with Media) by AniListProvider.
 struct AniListRawEntry {
@@ -13,7 +14,7 @@ struct AniListRawEntry {
 }
 
 final class AniListLibraryService {
-    static let shared = AniListLibraryService()
+    nonisolated(unsafe) static let shared = AniListLibraryService()
     private let endpoint = URL(string: "https://graphql.anilist.co")!
     private init() {}
 

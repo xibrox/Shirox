@@ -1,5 +1,12 @@
 import Foundation
-import WebKit
+import Combine
+
+#if os(tvOS)
+    import FakeWebKit
+#else
+    import WebKit
+#endif
+
 @preconcurrency import JavaScriptCore
 
 /// A short-lived, standalone JS runner for a single module.
@@ -218,7 +225,7 @@ final class ModuleJSRunner {
                 do {
                     // CF cookie injection
                     if let host = url.host,
-                       let cfCookie = await CloudflareBypassManager.shared.cookie(for: host) {
+                       let cfCookie = CloudflareBypassManager.shared.cookie(for: host) {
                         let existing = request.value(forHTTPHeaderField: "Cookie") ?? ""
                         request.setValue(
                             existing.isEmpty ? "cf_clearance=\(cfCookie)" : "\(existing); cf_clearance=\(cfCookie)",
@@ -237,7 +244,7 @@ final class ModuleJSRunner {
                     if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
                         try? await CloudflareBypassManager.shared.triggerBypass(for: url)
                         if let host = url.host,
-                           let cfCookie = await CloudflareBypassManager.shared.cookie(for: host) {
+                           let cfCookie = CloudflareBypassManager.shared.cookie(for: host) {
                             var retryRequest = request
                             let existing = retryRequest.value(forHTTPHeaderField: "Cookie") ?? ""
                             retryRequest.setValue(

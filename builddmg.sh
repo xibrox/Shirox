@@ -8,20 +8,21 @@ WORKING_LOCATION="$(pwd)"
 APPLICATION_NAME=Shirox
 SCHEME_NAME="Shirox_macOS"
 
-if [ ! -d "$WORKING_LOCATION/$APPLICATION_NAME.xcworkspace" ]; then
-   echo "--- Workspace not found, running pod install ---"
-   pod install
-fi
-
 if [ ! -d "build" ]; then
    mkdir build
 fi
 
 cd build
 
+echo "--- Resolving Swift Package Dependencies ---"
+
+xcodebuild -resolvePackageDependencies \
+   -project "$PROJECT_PATH" \
+   -scheme "$SCHEME_NAME"
+
 echo "--- Building $APPLICATION_NAME for macOS ---"
 
-xcodebuild -workspace "$WORKING_LOCATION/$APPLICATION_NAME.xcworkspace" \
+xcodebuild -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
    -scheme "$SCHEME_NAME" \
    -configuration Release \
    -derivedDataPath "$WORKING_LOCATION/build/DerivedDataMac" \

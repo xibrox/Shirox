@@ -64,26 +64,12 @@ struct NotificationsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .background(
-                Group {
-                    NavigationLink(
-                        destination: Group {
-                            if let item = navActivity {
-                                ActivityFetchView(activityId: item.id)
-                            }
-                        },
-                        isActive: Binding(get: { navActivity != nil }, set: { if !$0 { navActivity = nil } })
-                    ) { EmptyView() }
-                    NavigationLink(
-                        destination: Group {
-                            if let item = navMedia {
-                                AniListDetailView(mediaId: item.id, preloadedMedia: nil)
-                            }
-                        },
-                        isActive: Binding(get: { navMedia != nil }, set: { if !$0 { navMedia = nil } })
-                    ) { EmptyView() }
-                }
-            )
+            .navigationDestinationCompat(item: $navActivity) { item in
+                ActivityFetchView(activityId: item.id)
+            }
+            .navigationDestinationCompat(item: $navMedia) { item in
+                AniListDetailView(mediaId: item.id, preloadedMedia: nil)
+            }
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
         #if os(iOS)

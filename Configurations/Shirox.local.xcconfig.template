@@ -1,0 +1,7 @@
+// Copy this file to Shirox.local.xcconfig (gitignored)
+// cp Configurations/Shirox.local.xcconfig.template Configurations/Shirox.local.xcconfig
+
+APP_NAME = Shirox
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+PRODUCT_BUNDLE_IDENTIFIER = com.yourname.shirox
+CODE_SIGN_STYLE = Automatic

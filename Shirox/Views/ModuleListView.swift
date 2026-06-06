@@ -70,7 +70,7 @@ struct ModuleListView: View {
             }
             #if os(iOS)
             .listStyle(.insetGrouped)
-            #else
+            #elseif !os(tvOS)
             .listStyle(.inset)
             #endif
             .hideScrollContentBackground()
@@ -79,6 +79,8 @@ struct ModuleListView: View {
             #endif
             #if os(iOS)
             .background(Color(.systemBackground))
+            #elseif os(tvOS)
+            // TODO: add back background color
             #else
             .background(Color(NSColor.windowBackgroundColor))
             #endif
@@ -113,10 +115,12 @@ struct ModuleListView: View {
         }
         #if os(iOS)
         .background(Color(.systemBackground))
+        #elseif os(tvOS)
+        // TODO: add back background color
         #else
         .background(Color(.windowBackgroundColor))
         #endif
-        .onChange(of: moduleURL) { _ in
+        .onChangeOf(moduleURL) { _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
         }
@@ -187,6 +191,8 @@ struct ModuleListView: View {
         .padding(.vertical, 12)
         #if os(iOS)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        #elseif os(tvOS)
+        // TODO: add back background color
         #else
         .background(Color(.controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
         #endif

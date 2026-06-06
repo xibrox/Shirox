@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct SettingsView: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
@@ -94,7 +95,7 @@ struct SettingsView: View {
                     Toggle("Force Landscape Mode", isOn: $forceLandscape)
                         .tint(.secondary)
                         #if os(iOS)
-                        .onChange(of: forceLandscape) { _ in
+                        .onChangeOf(forceLandscape) {
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
                         }
                         #endif
@@ -125,7 +126,9 @@ struct SettingsView: View {
                                 .font(.headline)
                                 .monospacedDigit()
                         }
+                        #if !os(tvOS)
                         Slider(value: $watchedPercentage, in: 50...100, step: 1)
+                        #endif
                     }
                 }
 
@@ -331,6 +334,14 @@ struct SettingsView: View {
                 #endif
 
                 Section {
+                    ForEach([LegalPage.imprint, .privacy, .contributors, .licenses], id: \.title) { page in
+                        NavigationLink {
+                            LegalWebView(page: page)
+                        } label: {
+                            Text(page.title)
+                        }
+                    }
+
                     LabeledContent("Version") {
                         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
                         let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
@@ -510,7 +521,9 @@ struct LogEntryRow: View {
             Text(entry.message)
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.primary)
+                #if !os(tvOS)
                 .textSelection(.enabled)
+                #endif
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 12)
@@ -635,7 +648,7 @@ struct LogFilter: Identifiable, Hashable {
 }
 
 class LogFilterViewModel: ObservableObject {
-    static let shared = LogFilterViewModel()
+    nonisolated(unsafe) static let shared = LogFilterViewModel()
     
     @Published var filters: [LogFilter] = [] {
         didSet {
@@ -692,7 +705,7 @@ class LogFilterViewModel: ObservableObject {
     }
 }
 
-class Logger {
+class Logger: @unchecked Sendable {
     static let shared = Logger()
 
     struct LogEntry: Identifiable {

@@ -37,7 +37,7 @@ struct PlayerSubtitleOverlay: View {
 
     // Black outline for light text, white outline for dark text.
     private var outlineColor: Color {
-        #if os(iOS)
+        #if os(iOS) || os(tvOS)
         let ui = UIColor(settings.foregroundColor)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         ui.getRed(&r, green: &g, blue: &b, alpha: &a)

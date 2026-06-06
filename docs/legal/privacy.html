@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Privacy</title>
+  <style>
+    :root {
+      --group: #ffffff;
+      --text: #1c1c1e;
+      --secondary: #636366;
+      --separator: rgba(60, 60, 67, 0.18);
+      --link: #007aff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --group: #1c1c1e;
+        --text: #f2f2f7;
+        --secondary: #aeaeb2;
+        --separator: rgba(84, 84, 88, 0.65);
+        --link: #0a84ff;
+      }
+    }
+
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+
+    body {
+      margin: 0;
+      background: "transparent";
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 18px 16px 34px;
+    }
+
+    .intro {
+      margin: 0 0 18px;
+      color: var(--secondary);
+      font-size: 0.95rem;
+    }
+
+    .group {
+      overflow: hidden;
+      border-radius: 24px;
+      background: var(--group);
+    }
+
+    section {
+      padding: 18px 18px;
+      border-bottom: 1px solid var(--separator);
+    }
+
+    section:last-child { border-bottom: 0; }
+
+    h2 {
+      margin: 0 0 6px;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--secondary);
+    }
+
+    a {
+      color: var(--link);
+      text-decoration: none;
+    }
+
+    .stamp {
+      margin: 14px 2px 0;
+      color: var(--secondary);
+      font-size: 0.86rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="intro">Shirox is a free, open-source anime library manager for iOS. The app focuses on user control, community modules, and local-first library management.</p>
+
+    <div class="group">
+      <section>
+        <h2>No Shirox account</h2>
+        <p>Shirox itself does not run a hosted user account system, sell personal data, or operate a tracking profile for users of the app.</p>
+      </section>
+
+      <section>
+        <h2>Local data</h2>
+        <p>Library entries, playback progress, settings, and module configuration may be stored on your device so the app can provide its core features.</p>
+      </section>
+
+      <section>
+        <h2>Third-party services</h2>
+        <p>Optional features such as AniList sync, community modules, external media sources, AirPlay, Chromecast, or support links can connect to services outside the Shirox project. Those services may process data under their own privacy terms.</p>
+      </section>
+
+      <section>
+        <h2>Open source</h2>
+        <p>Shirox is distributed under the MIT License. You can inspect, modify, and contribute to the source code through the public repository.</p>
+      </section>
+    </div>
+
+    <p class="stamp">Last updated: May 30, 2026</p>
+  </main>
+</body>
+</html>

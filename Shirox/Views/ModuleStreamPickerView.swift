@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - VM Store
 
@@ -53,9 +54,10 @@ struct ModuleStreamPickerView: View {
             }
             #if os(iOS)
             .listStyle(.insetGrouped)
-            #else
+            #elseif !os(tvOS)
             .listStyle(.inset)
             #endif
+
             .navigationTitle("Watch Episode \(episodeNumber)")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -392,8 +394,9 @@ private struct ModuleStreamRow: View {
         .onDisappear {
             rowVm.cancelIfSearching()
         }
-        .onChange(of: rowVm.readyStreams) { streams in
+        .onChangeOf(rowVm.readyStreams) { streams in
             guard let streams else { return }
+            
             if streams.count == 1 {
                 fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
             } else if autoPickLastStream,
@@ -730,7 +733,7 @@ private struct ModuleStreamSelectionView: View {
                     }
                     #if os(iOS)
                     .listStyle(.insetGrouped)
-                    #else
+                    #elseif !os(tvOS)
                     .listStyle(.inset)
                     #endif
                 }

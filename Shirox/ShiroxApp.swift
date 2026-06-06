@@ -18,7 +18,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        #if !targetEnvironment(macCatalyst) && canImport(GoogleCast)
+        #if !targetEnvironment(macCatalyst) || os(macOS) && canImport(GoogleCast)
         let bgTask = application.beginBackgroundTask { }
         Task { @MainActor in
             CastManager.shared.stopCasting()
@@ -36,7 +36,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        #if targetEnvironment(macCatalyst)
+        #if targetEnvironment(macCatalyst) || os(macOS)
         return .all
         #elseif os(iOS)
         if UIDevice.current.userInterfaceIdiom == .pad {
@@ -52,7 +52,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             // Use playback category so audio plays regardless of mute switch
-            try audioSession.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+            try audioSession.setCategory(.playback, mode: .moviePlayback)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             Logger.shared.log("Failed to configure audio session: \(error)", type: "Error")
@@ -95,8 +95,8 @@ struct ShiroxApp: App {
             diskCapacity: 150 * 1024 * 1024,
             diskPath: nil
         )
-        #if !targetEnvironment(macCatalyst)
-        _ = CastManager.shared
+        #if !os(tvOS) && !targetEnvironment(macCatalyst) || os(macOS)
+            _ = CastManager.shared
         #endif
         ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
     }
@@ -107,7 +107,7 @@ struct ShiroxApp: App {
                 .environmentObject(moduleManager)
                 .tint(.primary)
         }
-        #if targetEnvironment(macCatalyst)
+        #if targetEnvironment(macCatalyst) || os(macOS)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings") {
@@ -120,7 +120,7 @@ struct ShiroxApp: App {
     }
 }
 
-#if targetEnvironment(macCatalyst)
+#if targetEnvironment(macCatalyst) || os(macOS)
 enum SidebarTab: CaseIterable {
     case home, library, downloads, settings, search
 
@@ -204,7 +204,7 @@ private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var cfManager = CloudflareBypassManager.shared
     @State private var selectedTab = 0
-    #if targetEnvironment(macCatalyst)
+    #if targetEnvironment(macCatalyst) || os(macOS)
     @State private var sidebarTab: SidebarTab = .home
     #endif
 
@@ -223,6 +223,18 @@ private struct RootTabView: View {
                     case .search:    SearchView()
                     }
                 }
+                #elseif os(macOS)
+                    NavigationSplitView {
+                        MacSidebarView(selection: $sidebarTab)
+                    } detail: {
+                        switch sidebarTab {
+                        case .home:      HomeView()
+                        case .library:   LibraryView()
+                        case .settings:  SettingsView()
+                        case .search:    SearchView()
+                        default: EmptyView()
+                        }
+                    }
                 #else
                 TabView {
                     Tab("Home", systemImage: "house.fill") {
@@ -286,11 +298,13 @@ private struct RootTabView: View {
             selectedTab = 3
             #endif
         }
+        #if os(iOS)
+
         .overlay(alignment: .bottom) {
             ToastView()
                 .allowsHitTesting(false)
         }
-        #if os(iOS)
+
         .overlay {
             if cfManager.activeBypassWebView != nil {
                 CloudflareBypassSheetView()

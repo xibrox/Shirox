@@ -10,7 +10,11 @@ struct NavigationStack<Content: View>: View {
     }
 
     var body: some View {
-        NavigationView { content }
-            .navigationViewStyle(.stack)
+        #if !os(iOS)
+            SwiftUI.NavigationStack { content }
+        #else
+            NavigationView { content }
+                .navigationViewStyle(.stack)
+        #endif
     }
 }

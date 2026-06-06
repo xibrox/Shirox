@@ -7,6 +7,8 @@ struct HomeView: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif
@@ -100,6 +102,8 @@ private struct FeaturedCarousel: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif
@@ -159,7 +163,7 @@ private struct FeaturedCarousel: View {
                 GeometryReader { geo in
                     Color.clear
                         .onAppear { containerWidth = geo.size.width }
-                        .onChange(of: geo.size.width) { w in containerWidth = w }
+                        .onChangeOf(geo.size.width) { w in containerWidth = w }
                 }
             )
             .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
@@ -249,7 +253,7 @@ private struct FeaturedCarousel: View {
                 selectedTab = (1000 / displayCount) * displayCount
             }
         }
-        #else
+        #elseif !os(tvOS)
         MacFeaturedCarousel(items: realItems)
         #endif
     }
@@ -635,7 +639,7 @@ private struct AnimeSection: View {
 // MARK: - Carousel Stretch Preference
 
 private struct CarouselStretchKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    nonisolated(unsafe) static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 

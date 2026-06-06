@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor final class ContinueWatchingManager: ObservableObject {
     static let shared = ContinueWatchingManager()
@@ -142,7 +143,7 @@ import Foundation
 
     /// Syncs local Continue Watching with AniList's "Watching" list.
     func syncWithAniList() async {
-        guard let userId = await AniListAuthManager.shared.userId else { return }
+        guard let userId = AniListAuthManager.shared.userId else { return }
         
         do {
             let library = try await AniListLibraryService.shared.fetchAllLists(userId: userId)

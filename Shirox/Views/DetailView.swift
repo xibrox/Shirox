@@ -35,6 +35,8 @@ struct DetailView: View {
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
         #endif
@@ -88,12 +90,9 @@ struct DetailView: View {
         .tint(.primary)
         .toolbar { detailToolbar }
         #endif
-        .background(
-            NavigationLink(
-                destination: Group { if let item = sequelSearchItem { DetailView(item: item) } },
-                isActive: Binding(get: { sequelSearchItem != nil }, set: { if !$0 { sequelSearchItem = nil } })
-            ) { EmptyView() }
-        )
+        .navigationDestinationCompat(item: $sequelSearchItem) { item in
+            DetailView(item: item)
+        }
         .onAppear {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             vm.aniListID = aniListID
@@ -125,7 +124,7 @@ struct DetailView: View {
             if let mid = moduleId, ModuleManager.shared.activeModule?.id != mid,
                let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
                 Task {
-                    try? await ModuleManager.shared.selectModule(module)
+                    ModuleManager.shared.selectModule(module)
                     vm.load(item: item)
                 }
             } else {
@@ -145,10 +144,10 @@ struct DetailView: View {
             }
             isReversed = EpisodeSortManager.shared.isReversed(for: "\(moduleId ?? "unknown")_\(item.id)")
         }
-        .onChange(of: isReversed) { newValue in
+        .onChangeOf(isReversed) { newValue in
             EpisodeSortManager.shared.setReversed(newValue, for: "\(moduleId ?? "unknown")_\(item.id)")
         }
-        .onChange(of: vm.detail?.episodes) { _ in
+        .onChangeOf(vm.detail?.episodes) { _ in
             guard !autoPlayOnLoad else { return }
 
             if let detail = vm.detail, !detail.episodes.isEmpty {
@@ -171,7 +170,7 @@ struct DetailView: View {
             autoPlayOnLoad = true
             vm.loadStreams(for: episode)
         }
-        .onChange(of: vm.aniListID) { newAID in
+        .onChangeOf(vm.aniListID) { newAID in
             guard malAuth.isLoggedIn, let aid = newAID, malID == nil else { return }
             Task {
                 malID = await IDMappingService.shared.malId(forAnilistId: aid)
@@ -590,6 +589,12 @@ struct DetailView: View {
 
         PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
     }
+    #else
+
+    private func tapEpisode(_ episode: EpisodeLink) {
+        // TODO: implement
+    }
+
     #endif
 
     #if os(iOS)
@@ -1409,7 +1414,10 @@ private struct ModuleEpisodeRowContainer: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+
+    #if os(iOS)
     @ObservedObject private var downloadManager = DownloadManager.shared
+    #endif
 
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var fallbackThumbnail: String?
@@ -1435,10 +1443,14 @@ private struct ModuleEpisodeRowContainer: View {
     }
 
     private var downloadState: DownloadState? {
-        downloadManager.items.first { 
-            $0.episodeHref == episode.href || 
-            ($0.mediaTitle == mediaTitle && $0.episodeNumber == epNum && $0.moduleId == moduleId)
-        }?.state
+        #if os(iOS)
+            downloadManager.items.first {
+                $0.episodeHref == episode.href ||
+                ($0.mediaTitle == mediaTitle && $0.episodeNumber == epNum && $0.moduleId == moduleId)
+            }?.state
+        #else
+            return nil
+        #endif
     }
 
     private var progress: Double? {

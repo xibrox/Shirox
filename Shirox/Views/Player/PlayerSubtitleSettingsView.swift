@@ -28,6 +28,7 @@ struct PlayerSubtitleSettingsView: View {
                 }
 
                 Section("Appearance") {
+                    #if !os(tvOS)
                     ColorPicker("Text Color", selection: $settings.foregroundColor)
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -49,12 +50,14 @@ struct PlayerSubtitleSettingsView: View {
                         }
                         Slider(value: $settings.shadowRadius, in: 0...8, step: 0.5)
                     }
+                    #endif
 
                     Toggle("Background", isOn: $settings.backgroundEnabled)
                         .tint(.secondary)
                 }
 
                 Section("Position") {
+                    #if !os(tvOS)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Bottom Padding")
@@ -64,9 +67,11 @@ struct PlayerSubtitleSettingsView: View {
                         }
                         Slider(value: $settings.bottomPadding, in: 20...200, step: 5)
                     }
+                    #endif
                 }
 
                 Section("Sync") {
+                    #if !os(tvOS)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Delay")
@@ -82,6 +87,7 @@ struct PlayerSubtitleSettingsView: View {
                         }
                         Slider(value: $settings.delaySeconds, in: -5...5, step: 0.1)
                     }
+                    #endif
                 }
             }
             .navigationTitle("Subtitle Settings")

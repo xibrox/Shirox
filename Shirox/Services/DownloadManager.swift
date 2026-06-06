@@ -153,10 +153,10 @@ final class DownloadManager: NSObject, ObservableObject {
 
     private func observeAppLifecycle() {
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.handleEnterBackground()
+            MainActor.assumeIsolated { self?.handleEnterBackground() }
         }
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.handleEnterForeground()
+            MainActor.assumeIsolated { self?.handleEnterForeground() }
         }
     }
 
@@ -598,7 +598,7 @@ final class DownloadManager: NSObject, ObservableObject {
 }
 
 extension DownloadManager: URLSessionDownloadDelegate {
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         Task { @MainActor in
             if let idx = items.firstIndex(where: { $0.taskIdentifier == downloadTask.taskIdentifier }) {
                 if totalBytesExpectedToWrite > 0 {
@@ -610,7 +610,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
     }
     
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+    nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let uuidString = downloadTask.taskDescription,
               let id = UUID(uuidString: uuidString) else {
             let taskIdentifier = downloadTask.taskIdentifier
@@ -644,7 +644,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let error else { return }
         let nsError = error as NSError
         guard nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled else { return }
@@ -656,8 +656,8 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
     }
 
-    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        DispatchQueue.main.async {
+    nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        Task { @MainActor in
             self.backgroundCompletionHandler?()
             self.backgroundCompletionHandler = nil
         }

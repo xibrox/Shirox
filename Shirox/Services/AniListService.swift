@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 // MARK: - Response wrappers with error handling
 
@@ -31,7 +32,7 @@ private struct MediaData: Decodable {
 // MARK: - Service
 
 final class AniListService {
-    static let shared = AniListService()
+    nonisolated(unsafe) static let shared = AniListService()
 
     private let endpoint = URL(string: "https://graphql.anilist.co")!
     private let session: URLSession
@@ -338,7 +339,7 @@ enum AniListError: LocalizedError {
 
 /// Manages persistent mappings between standard module titles and AniList IDs.
 final class AniListMappingManager {
-    static let shared = AniListMappingManager()
+    nonisolated(unsafe) static let shared = AniListMappingManager()
     
     private let userDefaults = UserDefaults.standard
     private let storageKey = "com.shirox.anilist_mappings"

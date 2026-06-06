@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - ContinueWatchingSection
 
@@ -37,41 +38,19 @@ struct ContinueWatchingSection: View {
                 .padding(.horizontal, 16)
             }
         }
-        .background(
-            Group {
-                NavigationLink(
-                    destination: detailDestination,
-                    isActive: Binding(
-                        get: { selectedForDetail != nil },
-                        set: { if !$0 { selectedForDetail = nil } }
-                    )
-                ) { EmptyView() }
-                NavigationLink(
-                    destination: aniListDestination,
-                    isActive: Binding(
-                        get: { selectedForAniList != nil },
-                        set: { if !$0 { selectedForAniList = nil } }
-                    )
-                ) { EmptyView() }
+        .navigationDestinationCompat(item: $selectedForDetail) { item in
+            if let href = item.detailHref, let mid = item.moduleId {
+                DetailView(
+                    item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href),
+                    moduleId: mid,
+                    aniListID: item.aniListID
+                )
             }
-        )
-    }
-
-    @ViewBuilder
-    private var detailDestination: some View {
-        if let item = selectedForDetail, let href = item.detailHref, let mid = item.moduleId {
-            DetailView(
-                item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href),
-                moduleId: mid,
-                aniListID: item.aniListID
-            )
         }
-    }
-
-    @ViewBuilder
-    private var aniListDestination: some View {
-        if let item = selectedForAniList, let aid = item.aniListID {
-            AniListDetailView(mediaId: aid, preloadedMedia: nil)
+        .navigationDestinationCompat(item: $selectedForAniList) { item in
+            if let aid = item.aniListID {
+                AniListDetailView(mediaId: aid, preloadedMedia: nil)
+            }
         }
     }
 
@@ -241,7 +220,7 @@ struct ContinueWatchingSection: View {
 
     @ViewBuilder
     private func contextMenuItems(for item: ContinueWatchingItem) -> some View {
-        if let href = item.detailHref, let mid = item.moduleId {
+        if let _ = item.detailHref, let mid = item.moduleId {
             Button {
                 if let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
                     ModuleManager.shared.selectModule(module)
@@ -407,7 +386,7 @@ struct ContinueWatchingCardDisplay: View {
 /// per URL, not re-firing on every SwiftUI update cycle.
 private struct CardThumbnail: View {
     let urlString: String
-    #if os(iOS)
+    #if os(iOS) || os(tvOS)
     @State private var platformImage: UIImage?
     private static let cache = NSCache<NSString, UIImage>()
     #else
@@ -418,7 +397,7 @@ private struct CardThumbnail: View {
     var body: some View {
         Group {
             if let platformImage {
-                #if os(iOS)
+                #if os(iOS) || os(tvOS)
                 Image(uiImage: platformImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -438,7 +417,7 @@ private struct CardThumbnail: View {
                 return
             }
             guard let (data, _) = try? await URLSession.shared.data(from: url) else { return }
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
             guard let loaded = UIImage(data: data) else { return }
             #else
             guard let loaded = NSImage(data: data) else { return }

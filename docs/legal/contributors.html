@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Contributors</title>
+  <style>
+    :root {
+      --group: #ffffff;
+      --text: #1c1c1e;
+      --secondary: #636366;
+      --separator: rgba(60, 60, 67, 0.18);
+      --link: #007aff;
+      --avatar-bg: #e5e5ea;
+      --avatar-border: rgba(0, 0, 0, 0.12);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --group: #1c1c1e;
+        --text: #f2f2f7;
+        --secondary: #aeaeb2;
+        --separator: rgba(84, 84, 88, 0.65);
+        --link: #0a84ff;
+        --avatar-bg: #2c2c2e;
+        --avatar-border: rgba(255, 255, 255, 0.12);
+      }
+    }
+
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+
+    body {
+      margin: 0;
+      background: "transparent";
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 18px 16px 34px;
+    }
+
+    .intro {
+      margin: 0 0 18px;
+      color: var(--secondary);
+      font-size: 0.95rem;
+    }
+
+    .section-label {
+      margin: 0 2px 6px;
+      color: var(--secondary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .group {
+      overflow: hidden;
+      border-radius: 16px;
+      background: var(--group);
+      margin-bottom: 28px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 64px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--separator);
+      color: inherit;
+      text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .row:last-child { border-bottom: 0; }
+
+    .row:active { background: rgba(0, 0, 0, 0.06); }
+
+    @media (prefers-color-scheme: dark) {
+      .row:active { background: rgba(255, 255, 255, 0.08); }
+    }
+
+    .avatar-wrap {
+      flex: 0 0 auto;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--avatar-bg);
+      border: 1px solid var(--avatar-border);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    .avatar-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .avatar-wrap .icon {
+      width: 26px;
+      height: 26px;
+      fill: rgba(0, 0, 0, 0.65);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .avatar-wrap .icon { fill: rgba(255, 255, 255, 0.65); }
+    }
+
+    .info { flex: 1; min-width: 0; }
+
+    h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 2px 0 0;
+      color: var(--secondary);
+      font-size: 0.88rem;
+    }
+
+    .chevron {
+      flex: 0 0 auto;
+      width: 7px;
+      height: 12px;
+      opacity: 0.3;
+    }
+
+    .stamp {
+      margin: 4px 2px 0;
+      color: var(--secondary);
+      font-size: 0.86rem;
+    }
+
+    @keyframes av-spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes av-bounce {
+      0%, 100% { transform: translateY(0); }
+      30%       { transform: translateY(-10px); }
+      55%       { transform: translateY(-5px); }
+      75%       { transform: translateY(-8px); }
+    }
+    @keyframes av-shrink-zoom {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(0.55); }
+      70%  { transform: scale(1.18); }
+      100% { transform: scale(1); }
+    }
+    @keyframes av-wobble {
+      0%,100% { transform: rotate(0deg); }
+      20%     { transform: rotate(-14deg); }
+      40%     { transform: rotate(12deg); }
+      60%     { transform: rotate(-8deg); }
+      80%     { transform: rotate(6deg); }
+    }
+    @keyframes av-shake {
+      0%,100% { transform: translateX(0); }
+      15%     { transform: translateX(-6px); }
+      30%     { transform: translateX(6px); }
+      45%     { transform: translateX(-5px); }
+      60%     { transform: translateX(5px); }
+      75%     { transform: translateX(-3px); }
+      90%     { transform: translateX(3px); }
+    }
+    @keyframes av-flip {
+      0%   { transform: perspective(200px) rotateY(0deg); }
+      50%  { transform: perspective(200px) rotateY(180deg); }
+      100% { transform: perspective(200px) rotateY(360deg); }
+    }
+    @keyframes av-rubber {
+      0%,100% { transform: scale(1, 1); }
+      25%     { transform: scale(1.3, 0.75); }
+      50%     { transform: scale(0.8, 1.25); }
+      75%     { transform: scale(1.15, 0.9); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="intro">People and community links connected to Shirox.</p>
+
+    <p class="section-label">App Developers</p>
+    <div class="group" role="list">
+      <a class="row" href="https://github.com/xibrox" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/xibrox.png" alt="xibrox">
+        </div>
+        <div class="info">
+          <h2>xibrox</h2>
+          <p>Owner & Developer</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+
+      <a class="row" href="https://github.com/undeaDD" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/undeaDD.png" alt="undeaDD">
+        </div>
+        <div class="info">
+          <h2>undeaDD</h2>
+          <p>App Developer</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <p class="section-label">Module Developers</p>
+    <div class="group" role="list">
+      <a class="row" href="https://github.com/50n50" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/50n50.png" alt="50n50">
+        </div>
+        <div class="info">
+          <h2>50n50 <span style="font-weight:400;color:var(--secondary);">· paul</span></h2>
+          <p>Module Developer</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+
+      <a class="row" href="https://github.com/JMcrafter26" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/JMcrafter26.png" alt="JMcrafter26">
+        </div>
+        <div class="info">
+          <h2>JMcrafter26 <span style="font-weight:400;color:var(--secondary);">· Cufiy</span></h2>
+          <p>Module Developer</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+
+      <a class="row" href="https://github.com/emp0ry" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/emp0ry.png" alt="emp0ry">
+        </div>
+        <div class="info">
+          <h2>emp0ry</h2>
+          <p>Module Developer</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <p class="section-label">Inspirations</p>
+    <div class="group" role="list">
+      <a class="row" href="https://github.com/cranci1" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <img src="https://github.com/cranci1.png" alt="cranci1">
+        </div>
+        <div class="info">
+          <h2>cranci1</h2>
+          <p>Sora &amp; Luna</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <p class="section-label">Community</p>
+    <div class="group" role="list">
+      <a class="row" href="https://github.com/xibrox/Shirox/graphs/contributors" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="GitHub">
+            <title>GitHub</title>
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+        </div>
+        <div class="info">
+          <h2>GitHub</h2>
+          <p>View all contributors</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+
+      <a class="row" href="https://discord.com/invite/b9tZSuJj73" target="_blank" rel="noopener" role="listitem">
+        <div class="avatar-wrap">
+          <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="Discord">
+            <title>Discord</title>
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.084.112 18.11.128 18.132a19.859 19.859 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.1.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+          </svg>
+        </div>
+        <div class="info">
+          <h2>Discord</h2>
+          <p>Join the community server</p>
+        </div>
+        <svg class="chevron" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+
+    <p class="stamp">Last updated: May 30, 2026</p>
+  </main>
+
+  <script>
+    const animations = [
+      { name: 'av-spin',       duration: 700,  easing: 'ease-in-out' },
+      { name: 'av-bounce',     duration: 800,  easing: 'ease-out'    },
+      { name: 'av-shrink-zoom',duration: 600,  easing: 'ease-in-out' },
+      { name: 'av-wobble',     duration: 700,  easing: 'ease-in-out' },
+      { name: 'av-shake',      duration: 550,  easing: 'ease-in-out' },
+      { name: 'av-flip',       duration: 750,  easing: 'ease-in-out' },
+      { name: 'av-rubber',     duration: 650,  easing: 'ease-in-out' },
+    ];
+
+    function rand(min, max) { return min + Math.random() * (max - min); }
+
+    function scheduleNext() {
+      const delay = rand(5000, 14000);
+      setTimeout(playOne, delay);
+    }
+
+    function playOne() {
+      const wraps = Array.from(document.querySelectorAll('.avatar-wrap'));
+      const target = wraps[Math.floor(Math.random() * wraps.length)];
+      const anim   = animations[Math.floor(Math.random() * animations.length)];
+      const img    = target.querySelector('img, svg');
+      if (!img) { scheduleNext(); return; }
+
+      img.style.animation = `${anim.name} ${anim.duration}ms ${anim.easing} 1 forwards`;
+      setTimeout(() => {
+        img.style.animation = '';
+        scheduleNext();
+      }, anim.duration + 100);
+    }
+
+    setTimeout(playOne, rand(4000, 9000));
+  </script>
+</body>
+</html>
