@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DetailView: View {
     let item: SearchItem
+    var offlineSnapshot: DownloadedMediaSnapshot? = nil
     var resumeEpisodeNumber: Int?
     var resumeWatchedSeconds: Double?
     var moduleId: String?
@@ -94,13 +95,30 @@ struct DetailView: View {
             DetailView(item: item)
         }
         .onAppear {
+            #if os(iOS)
+            if let snap = offlineSnapshot {
+                vm.loadOffline(snapshot: snap)
+                // Soft-online: if internet IS available and the user is logged in, fetch the
+                // current library entry so the AniList edit pencil reflects real progress.
+                // Failure is silent — viewing/playing never depends on this.
+                if let aid = snap.aniListID, AniListAuthManager.shared.isLoggedIn {
+                    Task {
+                        if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                            existingEntry = AniListProvider.shared.mapEntry(raw)
+                        }
+                    }
+                }
+                return
+            }
+            #endif
+
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             vm.aniListID = aniListID
 
             if vm.aniListID == nil {
                 vm.aniListID = AniListMappingManager.shared.getMapping(title: item.title)
             }
-            
+
             if let aid = aniListID, AniListAuthManager.shared.isLoggedIn {
                 Task {
                     if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
@@ -192,7 +210,10 @@ struct DetailView: View {
             StreamPickerView(vm: vm)
         }
         #if os(iOS)
-        .adaptiveSheet(isPresented: $vm.showDownloadStreamPicker) {
+        .adaptiveSheet(isPresented: Binding(
+            get: { offlineSnapshot == nil && vm.showDownloadStreamPicker },
+            set: { vm.showDownloadStreamPicker = $0 }
+        )) {
             DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
                 vm.downloadWithSelectedStream(stream)
             }
@@ -284,7 +305,10 @@ struct DetailView: View {
             }
         }
         #if os(iOS)
-        .adaptiveSheet(isPresented: $showBatchDownloadPicker) {
+        .adaptiveSheet(isPresented: Binding(
+            get: { offlineSnapshot == nil && showBatchDownloadPicker },
+            set: { showBatchDownloadPicker = $0 }
+        )) {
             if let detail = vm.detail {
                 BatchDownloadStreamPickerView(
                     mediaTitle: item.title,
@@ -406,15 +430,17 @@ struct DetailView: View {
                 circleIconButton(icon: selectedTab == 0 ? "person.3.fill" : "list.bullet", isActive: selectedTab == 1, size: 16)
             }
             .buttonStyle(.plain)
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    isSelectionMode.toggle()
-                    if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+            if offlineSnapshot == nil {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isSelectionMode.toggle()
+                        if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+                    }
+                } label: {
+                    circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
                 }
-            } label: {
-                circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
     #endif
@@ -437,7 +463,13 @@ struct DetailView: View {
         let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
         
         Button {
-            if let item {
+            if let snap = offlineSnapshot {
+                let completed = DownloadManager.shared.items
+                    .filter { $0.mediaTitle == snap.mediaTitle && $0.moduleId == snap.moduleId && $0.state == .completed }
+                    .sorted { $0.episodeNumber < $1.episodeNumber }
+                let target = completed.first(where: { $0.episodeNumber == nextEp }) ?? completed.first
+                if let target { playDownloaded(target) }
+            } else if let item {
                 resumeWatching(item: item)
             } else if let first = detail.episodes.first(where: { Int($0.number) == nextEp }) ?? detail.episodes.first {
                 vm.loadStreams(for: first)
@@ -604,7 +636,7 @@ struct DetailView: View {
             let aniListLoggedIn = AniListAuthManager.shared.isLoggedIn
             let malLoggedIn = malAuth.isLoggedIn
             let hasAniListEdit = aniListLoggedIn && vm.aniListID != nil
-            let hasMALEdit = malLoggedIn && malID != nil
+            let hasMALEdit = malLoggedIn && malID != nil && offlineSnapshot == nil
             let hasAnyEdit = hasAniListEdit || hasMALEdit
             let bothAvail = hasAniListEdit && hasMALEdit
 
@@ -653,12 +685,14 @@ struct DetailView: View {
                             } label: { Label("Edit on MyAnimeList", systemImage: "pencil") }
                         }
                     }
-                    Button { showMatchingSearch = true } label: {
-                        Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
+                    if offlineSnapshot == nil {
+                        Button { showMatchingSearch = true } label: {
+                            Label("Change AniList Match", systemImage: "arrow.triangle.2.circlepath")
+                        }
                     }
                 } label: { libraryEditButtonLabel }
                 .disabled(isLoadingEntry)
-            } else {
+            } else if offlineSnapshot == nil {
                 Button { showMatchingSearch = true } label: {
                     if isLoadingEntry {
                         ProgressView().scaleEffect(0.8)
@@ -1055,8 +1089,17 @@ struct DetailView: View {
         return seasons.count > 1 ? seasons : [episodes]
     }
 
-    @ViewBuilder
     private func episodesSection(detail: MediaDetail) -> some View {
+        #if os(iOS)
+        if let snap = offlineSnapshot {
+            return AnyView(offlineEpisodesSection(detail: detail, snapshot: snap))
+        }
+        #endif
+        return AnyView(onlineEpisodesSection(detail: detail))
+    }
+
+    @ViewBuilder
+    private func onlineEpisodesSection(detail: MediaDetail) -> some View {
         let seasons = detectSeasons(detail.episodes)
         let isMultiSeason = seasons.count > 1
         let visibleEpisodes = isMultiSeason ? seasons[min(selectedSeason, seasons.count - 1)] : detail.episodes
@@ -1376,6 +1419,161 @@ struct DetailView: View {
             Text("This will clear all watched history and progress for \(detail.title).")
         }
     }
+
+    #if os(iOS)
+    @ViewBuilder
+    private func offlineEpisodesSection(detail: MediaDetail, snapshot: DownloadedMediaSnapshot) -> some View {
+        let dm = DownloadManager.shared
+        let store = DownloadedMediaSnapshotStore.shared
+
+        let completed = dm.items
+            .filter { $0.mediaTitle == snapshot.mediaTitle && $0.moduleId == snapshot.moduleId && $0.state == .completed }
+            .sorted { $0.episodeNumber < $1.episodeNumber }
+        let sorted = isReversed ? completed.reversed() : completed
+
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                HStack(spacing: 8) {
+                    Text("Downloaded Episodes").font(.title3.weight(.bold))
+                    Text("\(completed.count)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(platformBackground)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Color.primary, in: Capsule())
+                }
+                Spacer()
+
+                Button { isReversed.toggle() } label: {
+                    Image(systemName: isReversed ? "arrow.down" : "arrow.up")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 36, height: 36)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 4)
+
+                if continueWatching.hasProgress(
+                    aniListID: snapshot.aniListID,
+                    moduleId: snapshot.moduleId,
+                    mediaTitle: snapshot.mediaTitle
+                ) {
+                    Button { showResetConfirmation = true } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            if completed.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "folder.badge.minus").font(.system(size: 48)).foregroundStyle(.secondary)
+                    Text("No downloaded episodes left").font(.headline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity).padding(.top, 40)
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(sorted, id: \.id) { downloadItem in
+                        let epNum = downloadItem.episodeNumber
+                        let epSnap = snapshot.episodes[epNum]
+                        let thumbnailURLString: String? = epSnap?.thumbnailFile.map {
+                            store.localFileURL(in: snapshot, relative: $0).absoluteString
+                        }
+                        let displayTitle = epSnap?.title ?? downloadItem.episodeTitle
+                        let progressValue: Double? = offlineProgress(for: epNum, snapshot: snapshot)
+
+                        ZStack(alignment: .trailing) {
+                            ThumbnailEpisodeRow(
+                                number: epNum,
+                                thumbnail: thumbnailURLString,
+                                title: displayTitle,
+                                progress: progressValue,
+                                onTap: { playDownloaded(downloadItem) },
+                                onResetProgress: {
+                                    ContinueWatchingManager.shared.resetEpisodeProgress(
+                                        aniListID: snapshot.aniListID,
+                                        moduleId: snapshot.moduleId,
+                                        mediaTitle: snapshot.mediaTitle,
+                                        episodeNumber: epNum
+                                    )
+                                }
+                            )
+                            Button {
+                                DownloadManager.shared.remove(downloadItem)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 32, height: 32)
+                                    .background(.ultraThinMaterial, in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.trailing, 14)
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                DownloadManager.shared.remove(downloadItem)
+                            } label: {
+                                Label("Delete Download", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    /// Computes the watched-progress fraction for an episode using ContinueWatchingManager.
+    private func offlineProgress(for episodeNumber: Int, snapshot: DownloadedMediaSnapshot) -> Double? {
+        if continueWatching.isWatched(
+            aniListID: snapshot.aniListID,
+            moduleId: snapshot.moduleId,
+            mediaTitle: snapshot.mediaTitle,
+            episodeNumber: episodeNumber
+        ) {
+            return 1.0
+        }
+        guard let cw = continueWatching.items.first(where: {
+            ($0.aniListID != nil && $0.aniListID == snapshot.aniListID && $0.episodeNumber == episodeNumber) ||
+            ($0.mediaTitle == snapshot.mediaTitle && $0.moduleId == snapshot.moduleId && $0.episodeNumber == episodeNumber)
+        }), cw.totalSeconds > 0 else { return nil }
+        return min(cw.watchedSeconds / cw.totalSeconds, 1.0)
+    }
+
+    /// Plays a downloaded item by resolving its local file via DownloadManager.getStream(...).
+    private func playDownloaded(_ item: DownloadItem) {
+        Task {
+            guard let stream = await DownloadManager.shared.getStream(for: item) else { return }
+            let context = PlayerContext(
+                mediaTitle: item.mediaTitle,
+                episodeNumber: item.episodeNumber,
+                episodeTitle: item.episodeTitle,
+                imageUrl: item.imageUrl,
+                aniListID: item.aniListID,
+                malID: item.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
+                moduleId: item.moduleId,
+                totalEpisodes: nil,
+                availableEpisodes: nil,
+                isAiring: nil,
+                resumeFrom: nil,
+                detailHref: item.detailHref,
+                streamTitle: item.streamTitle,
+                workingDetailHref: item.detailHref,
+                thumbnailUrl: nil
+            )
+            PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+        }
+    }
+    #endif
 }
 
 // MARK: - Module Episode Row Container

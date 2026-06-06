@@ -224,9 +224,20 @@ final class DownloadManager: NSObject, ObservableObject {
         
         items.append(item)
         persist()
-        
+
         ToastManager.shared.show(message: "Download added: \(context.mediaTitle) - \(context.episodeNumber)", type: .info)
-        
+
+        let enrichItem = item
+        let enrichImageUrl = context.imageUrl
+        let enrichAniListID = context.aniListID
+        Task {
+            await DownloadedMediaSnapshotStore.shared.enrich(
+                item: enrichItem,
+                imageUrl: enrichImageUrl,
+                aniListID: enrichAniListID
+            )
+        }
+
         processQueue()
     }
 
@@ -318,6 +329,10 @@ final class DownloadManager: NSObject, ObservableObject {
         }
         items.removeAll { $0.id == item.id }
         persist()
+        DownloadedMediaSnapshotStore.shared.removeIfOrphaned(
+            mediaTitle: item.mediaTitle,
+            moduleId: item.moduleId
+        )
         ToastManager.shared.show(message: "Download removed: \(item.mediaTitle) - \(item.episodeNumber)", type: .info)
         processQueue()
     }

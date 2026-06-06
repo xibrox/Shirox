@@ -83,6 +83,77 @@ final class DetailViewModel: ObservableObject {
         }
     }
 
+    #if os(iOS)
+    /// Offline mode: hydrate from a persisted snapshot. No network calls are issued.
+    /// Episodes are emitted as `EpisodeLink` with empty href (offline mode never resolves them).
+    func loadOffline(snapshot: DownloadedMediaSnapshot) {
+        let poster: String
+        if let file = snapshot.posterFile {
+            poster = DownloadedMediaSnapshotStore.shared
+                .localFileURL(in: snapshot, relative: file)
+                .absoluteString
+        } else {
+            poster = ""
+        }
+
+        let episodeLinks: [EpisodeLink] = snapshot.episodes
+            .values
+            .sorted(by: { $0.number < $1.number })
+            .map { EpisodeLink(number: Double($0.number), href: "") }
+
+        self.detail = MediaDetail(
+            title: snapshot.mediaTitle,
+            image: poster,
+            description: snapshot.synopsis ?? "",
+            aliases: "",
+            airdate: snapshot.seasonYear.map { String($0) } ?? "",
+            episodes: episodeLinks
+        )
+
+        let bannerURLString: String? = snapshot.bannerFile.map {
+            DownloadedMediaSnapshotStore.shared.localFileURL(in: snapshot, relative: $0).absoluteString
+        }
+        self.aniListMedia = Media(
+            id: snapshot.aniListID ?? 0,
+            idMal: nil,
+            provider: .anilist,
+            title: MediaTitle(romaji: snapshot.mediaTitle, english: snapshot.mediaTitle, native: nil),
+            coverImage: MediaCoverImage(large: poster, extraLarge: poster),
+            bannerImage: bannerURLString,
+            description: snapshot.synopsis,
+            episodes: snapshot.episodes.keys.max(),
+            status: snapshot.statusDisplay.flatMap(Self.aniListStatusRaw),
+            averageScore: snapshot.averageScore,
+            genres: snapshot.genres,
+            season: nil,
+            seasonYear: snapshot.seasonYear,
+            nextAiringEpisode: nil,
+            relations: nil,
+            type: nil,
+            format: snapshot.format
+        )
+
+        self.aniListID = snapshot.aniListID
+        self.detailHref = nil
+        self.isLoadingDetail = false
+        self.isLoadingEpisodes = false
+        self.isLoadingAniListMedia = false
+    }
+
+    /// `Media.statusDisplay` is computed from raw status codes (e.g. "RELEASING" → "Airing").
+    /// We stored the display string, so reverse-map for round-trip consistency.
+    private static func aniListStatusRaw(from display: String) -> String? {
+        switch display {
+        case "Airing": return "RELEASING"
+        case "Finished": return "FINISHED"
+        case "Upcoming": return "NOT_YET_RELEASED"
+        case "Cancelled": return "CANCELLED"
+        case "Hiatus": return "HIATUS"
+        default: return display
+        }
+    }
+    #endif
+
     private func fetchAniListMetadata(id: Int) {
         Task {
             isLoadingAniListMedia = true
