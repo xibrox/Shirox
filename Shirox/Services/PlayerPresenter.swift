@@ -17,6 +17,11 @@ import UIKit
 @preconcurrency import GoogleCast
 #endif
 
+/// Time to wait after sheet `onDismiss` fires before calling `presentPlayer` — the callback fires
+/// when the sheet is committed to dismiss, not when the animation completes, so
+/// `findTopViewController` would otherwise still see the sheet's VC in the hierarchy.
+let streamSelectionDelay: TimeInterval = 0.35
+
 @MainActor
 final class PlayerPresenter: ObservableObject {
     static let shared = PlayerPresenter()

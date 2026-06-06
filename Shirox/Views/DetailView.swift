@@ -184,7 +184,7 @@ struct DetailView: View {
             if let stream = vm.pendingStream {
                 vm.pendingStream = nil
                 let s = stream
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { vm.selectStream(s, onSequelAdvanced: { nav in if case .searchItem(let item) = nav { sequelSearchItem = item } }) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + streamSelectionDelay) { vm.selectStream(s, onSequelAdvanced: { nav in if case .searchItem(let item) = nav { sequelSearchItem = item } }) }
             } else {
                 vm.cancelStreamLoading()
             }
