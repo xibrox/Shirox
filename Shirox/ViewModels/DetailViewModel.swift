@@ -29,6 +29,11 @@ final class DetailViewModel: ObservableObject {
     @Published var aniListID: Int?
     @Published var isMatchingAniList = false
 
+    /// Set by loadOffline. Tells load() to treat snapshot data as authoritative for
+    /// text fields (synopsis/aliases/airdate) and to only accept the fetched episode
+    /// list when it is plausibly real.
+    private(set) var hydratedFromSnapshot = false
+
     /// Stream selected by user in the picker — presented after the sheet fully dismisses.
     var pendingStream: StreamResult?
 
@@ -70,35 +75,34 @@ final class DetailViewModel: ObservableObject {
                     title: item.title,
                     image: item.image
                 )
-                // Preserve already-rendered snapshot fields when the fetch returned
-                // empty / "N/A" stubs (offline or module returned defaults).
-                if let existing = detail {
-                    if d.episodes.isEmpty { d.episodes = existing.episodes }
-                    let preservedDescription = (d.description.isEmpty || d.description == "N/A")
-                        ? existing.description : d.description
-                    let preservedAliases = (d.aliases.isEmpty || d.aliases == "N/A")
-                        ? existing.aliases : d.aliases
-                    let preservedAirdate = (d.airdate.isEmpty || d.airdate == "N/A")
-                        ? existing.airdate : d.airdate
+                // Snapshot is authoritative for text fields: AniList synopsis/year are
+                // higher-quality than the module's, and an offline JS module that swallows
+                // its own network errors often returns the error string as `description`.
+                // We never let that overwrite a hydrated snapshot.
+                if hydratedFromSnapshot, let existing = detail {
                     d = MediaDetail(
-                        title: d.title,
-                        image: d.image,
-                        description: preservedDescription,
-                        aliases: preservedAliases,
-                        airdate: preservedAirdate,
-                        episodes: d.episodes
+                        title: existing.title,
+                        image: existing.image,
+                        description: existing.description,
+                        aliases: existing.aliases,
+                        airdate: existing.airdate,
+                        episodes: existing.episodes
                     )
+                } else if let existing = detail, d.episodes.isEmpty {
+                    d.episodes = existing.episodes
                 }
                 detail = d
                 isLoadingDetail = false
 
                 isLoadingEpisodes = true
                 let fetched = try await JSEngine.shared.fetchEpisodes(url: item.href)
-                // Only overwrite snapshot's episodes if the fetched list is plausibly real
-                // — non-empty and every entry has a usable href. JS modules that swallow
-                // their own network errors tend to return [] or [{href: ""}] which the
-                // existing snapshot would otherwise survive.
-                let looksValid = !fetched.isEmpty && fetched.allSatisfy { !$0.href.isEmpty }
+                // Only overwrite the existing episode list when the fetched one looks
+                // strictly real. Modules that swallow their own network errors often
+                // return [] or [{href: "stub"}] which parses to episode-0 entries —
+                // the snapshot's actual download list survives that.
+                let looksValid = !fetched.isEmpty
+                    && fetched.allSatisfy { !$0.href.isEmpty }
+                    && (!hydratedFromSnapshot || fetched.allSatisfy { $0.number > 0 })
                 if looksValid {
                     d.episodes = fetched
                     detail = d
@@ -170,6 +174,7 @@ final class DetailViewModel: ObservableObject {
         self.isLoadingDetail = false
         self.isLoadingEpisodes = false
         self.isLoadingAniListMedia = false
+        self.hydratedFromSnapshot = true
     }
 
     /// `Media.statusDisplay` is computed from raw status codes (e.g. "RELEASING" → "Airing").
