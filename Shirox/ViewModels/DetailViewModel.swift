@@ -70,20 +70,45 @@ final class DetailViewModel: ObservableObject {
                     title: item.title,
                     image: item.image
                 )
-                // When opened from an offline snapshot, fetchDetails returns before
-                // fetchEpisodes — preserve the already-shown episodes so the list
-                // doesn't flash empty during the gap.
-                if let existing = detail, d.episodes.isEmpty {
-                    d.episodes = existing.episodes
+                // Preserve already-rendered snapshot fields when the fetch returned
+                // empty / "N/A" stubs (offline or module returned defaults).
+                if let existing = detail {
+                    if d.episodes.isEmpty { d.episodes = existing.episodes }
+                    let preservedDescription = (d.description.isEmpty || d.description == "N/A")
+                        ? existing.description : d.description
+                    let preservedAliases = (d.aliases.isEmpty || d.aliases == "N/A")
+                        ? existing.aliases : d.aliases
+                    let preservedAirdate = (d.airdate.isEmpty || d.airdate == "N/A")
+                        ? existing.airdate : d.airdate
+                    d = MediaDetail(
+                        title: d.title,
+                        image: d.image,
+                        description: preservedDescription,
+                        aliases: preservedAliases,
+                        airdate: preservedAirdate,
+                        episodes: d.episodes
+                    )
                 }
                 detail = d
                 isLoadingDetail = false
 
                 isLoadingEpisodes = true
-                d.episodes = try await JSEngine.shared.fetchEpisodes(url: item.href)
-                detail = d
+                let fetched = try await JSEngine.shared.fetchEpisodes(url: item.href)
+                // Only overwrite snapshot's episodes if the fetched list is plausibly real
+                // — non-empty and every entry has a usable href. JS modules that swallow
+                // their own network errors tend to return [] or [{href: ""}] which the
+                // existing snapshot would otherwise survive.
+                let looksValid = !fetched.isEmpty && fetched.allSatisfy { !$0.href.isEmpty }
+                if looksValid {
+                    d.episodes = fetched
+                    detail = d
+                }
             } catch {
-                errorMessage = error.localizedDescription
+                // If we already rendered something (e.g. from an offline snapshot),
+                // silently keep that view instead of replacing it with an error screen.
+                if detail == nil {
+                    errorMessage = error.localizedDescription
+                }
             }
             isLoadingDetail = false
             isLoadingEpisodes = false
