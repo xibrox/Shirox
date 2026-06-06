@@ -162,13 +162,20 @@ final class JSEngine: ObservableObject {
                     }
                     var responseText = String(data: data, encoding: .utf8) ?? ""
 
-                    // CF reactive retry: solve challenge, then retry via URLSession using all
-                    // bypass cookies + the WKWebView's UA so CF sees the same session identity.
+                    // CF reactive retry: bypass the final redirect destination, then retry directly
+                    // against that URL — avoids cross-domain Cookie stripping on URLSession redirects.
                     if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
-                        try? await CloudflareBypassManager.shared.triggerBypass(for: url)
-                        if let host = url.host,
-                           let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: host) {
-                            var retryRequest = request
+                        let cfResponseURL = httpResponse.url ?? url
+                        try? await CloudflareBypassManager.shared.triggerBypass(for: cfResponseURL)
+                        if let bypassHost = cfResponseURL.host,
+                           let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: bypassHost) {
+                            var retryRequest = URLRequest(url: cfResponseURL)
+                            retryRequest.httpMethod = request.httpMethod
+                            retryRequest.httpBody = request.httpBody
+                            request.allHTTPHeaderFields?.forEach { key, val in
+                                guard key.lowercased() != "cookie" else { return }
+                                retryRequest.setValue(val, forHTTPHeaderField: key)
+                            }
                             retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
                             if !info.userAgent.isEmpty {
                                 retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
@@ -388,15 +395,16 @@ final class JSEngine: ObservableObject {
     }
 
     static func isTurnstileResponse(status: Int, body: String) -> Bool {
-        guard status == 403 || status == 503 else { return false }
         let lower = body.lowercased()
         guard lower.contains("cloudflare") else { return false }
-        return lower.contains("cf-turnstile") ||
+        let hasChallenge = lower.contains("cf-turnstile") ||
                lower.contains("challenges.cloudflare.com") ||
                lower.contains("__cf_chl_") ||
                lower.contains("jschl") ||
                lower.contains("challenge-platform") ||
                lower.contains("cf-spinner")
+        guard hasChallenge else { return false }
+        return status == 403 || status == 503 || (status == 200 && lower.contains("just a moment"))
     }
 
     static func jsStringLiteral(_ string: String) -> String {

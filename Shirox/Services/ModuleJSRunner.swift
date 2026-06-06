@@ -223,12 +223,12 @@ final class ModuleJSRunner {
 
             Task {
                 do {
-                    // CF cookie injection
+                    // CF cookie injection — use full cookie header (matches JSEngine behaviour)
                     if let host = url.host,
-                       let cfCookie = CloudflareBypassManager.shared.cookie(for: host) {
+                       let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
                         let existing = request.value(forHTTPHeaderField: "Cookie") ?? ""
                         request.setValue(
-                            existing.isEmpty ? "cf_clearance=\(cfCookie)" : "\(existing); cf_clearance=\(cfCookie)",
+                            existing.isEmpty ? cfHeader : "\(existing); \(cfHeader)",
                             forHTTPHeaderField: "Cookie"
                         )
                     }
@@ -240,17 +240,23 @@ final class ModuleJSRunner {
                     }
                     var responseText = String(data: data, encoding: .utf8) ?? ""
 
-                    // CF reactive retry
+                    // CF reactive retry: bypass the final redirect destination, retry directly against it
                     if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
-                        try? await CloudflareBypassManager.shared.triggerBypass(for: url)
-                        if let host = url.host,
-                           let cfCookie = CloudflareBypassManager.shared.cookie(for: host) {
-                            var retryRequest = request
-                            let existing = retryRequest.value(forHTTPHeaderField: "Cookie") ?? ""
-                            retryRequest.setValue(
-                                existing.isEmpty ? "cf_clearance=\(cfCookie)" : "\(existing); cf_clearance=\(cfCookie)",
-                                forHTTPHeaderField: "Cookie"
-                            )
+                        let cfResponseURL = httpResponse.url ?? url
+                        try? await CloudflareBypassManager.shared.triggerBypass(for: cfResponseURL)
+                        if let bypassHost = cfResponseURL.host,
+                           let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: bypassHost) {
+                            var retryRequest = URLRequest(url: cfResponseURL)
+                            retryRequest.httpMethod = request.httpMethod
+                            retryRequest.httpBody = request.httpBody
+                            request.allHTTPHeaderFields?.forEach { key, val in
+                                guard key.lowercased() != "cookie" else { return }
+                                retryRequest.setValue(val, forHTTPHeaderField: key)
+                            }
+                            retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
+                            if !info.userAgent.isEmpty {
+                                retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
+                            }
                             let (retryData, retryResponse) = try await self.session.data(for: retryRequest)
                             if let retryHTTP = retryResponse as? HTTPURLResponse {
                                 data = retryData

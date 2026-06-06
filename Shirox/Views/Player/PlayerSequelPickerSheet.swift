@@ -13,13 +13,9 @@ struct PlayerSequelPickerSheet: View {
                     dismiss()
                 } label: {
                     HStack(spacing: 12) {
-                        AsyncImage(url: URL(string: item.image)) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            Color.secondary.opacity(0.3)
-                        }
-                        .frame(width: 40, height: 56)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        CachedAsyncImage(urlString: item.image)
+                            .frame(width: 40, height: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
 
                         Text(item.title)
                             .foregroundStyle(.primary)

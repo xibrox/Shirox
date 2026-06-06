@@ -8,26 +8,8 @@ struct AnimeCardView: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(
                 ZStack {
-                    AsyncImage(url: URL(string: item.image)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().scaledToFill()
-                        case .failure:
-                            Rectangle()
-                                .fill(Color.secondary.opacity(0.2))
-                                .overlay(
-                                    Image(systemName: "photo")
-                                        .font(.largeTitle)
-                                        .foregroundStyle(.tertiary)
-                                )
-                        default:
-                            Rectangle()
-                                .fill(Color.secondary.opacity(0.15))
-                                .overlay(ProgressView())
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
+                    CachedAsyncImage(urlString: item.image)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     LinearGradient(
                         colors: [.clear, .black.opacity(0.8)],

@@ -757,19 +757,10 @@ struct DetailView: View {
                 let imageH = 420 + stretch + scrollDown * 0.5
                 let imageY = scrollDown * 0.5 - stretch
 
-                AsyncImage(url: URL(string: item.image)) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Rectangle().fill(Color.secondary.opacity(0.2))
-                    default:
-                        Rectangle().fill(Color.secondary.opacity(0.15))
-                    }
-                }
-                .frame(width: proxy.size.width, height: imageH)
-                .clipped()
-                .offset(y: imageY)
+                CachedAsyncImage(urlString: item.image)
+                    .frame(width: proxy.size.width, height: imageH)
+                    .clipped()
+                    .offset(y: imageY)
             }
             .frame(height: 420)
             .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
@@ -786,21 +777,11 @@ struct DetailView: View {
             .frame(height: 420)
 
             HStack(alignment: .bottom, spacing: 14) {
-                AsyncImage(url: URL(string: item.image)) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Rectangle().fill(Color.secondary.opacity(0.3))
-                    default:
-                        Rectangle().fill(Color.secondary.opacity(0.15))
-                            .overlay(ProgressView())
-                    }
-                }
-                .frame(width: 110, height: 165)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
+                CachedAsyncImage(urlString: item.image)
+                    .frame(width: 110, height: 165)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(item.title)

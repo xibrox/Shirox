@@ -38,6 +38,22 @@ struct CachedAsyncImage: View {
         return URLSession(configuration: cfg)
     }()
 
+    private static let defaultUserAgent =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+    /// Build an image-fetch request with browser-like headers. Many anime CDNs
+    /// hotlink-protect with a Referer requirement and reject the default
+    /// URLSession UA — sending these by default is harmless for hosts that don't.
+    private static func makeImageRequest(for url: URL) -> URLRequest {
+        var req = URLRequest(url: url)
+        req.setValue(defaultUserAgent, forHTTPHeaderField: "User-Agent")
+        if let scheme = url.scheme, let host = url.host {
+            req.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
+        }
+        req.setValue("image/avif,image/webp,image/png,image/jpeg,*/*", forHTTPHeaderField: "Accept")
+        return req
+    }
+
     private static func diskKey(for urlString: String) -> URL {
         // Safe filename from URL string
         let safe = urlString.data(using: .utf8).map { Data($0).base64EncodedString()
@@ -150,8 +166,88 @@ struct CachedAsyncImage: View {
 
             platformImage = nil
 
-            guard let (data, _) = try? await Self.session.data(from: url),
-                  let loaded = PlatformImage(data: data) else {
+            var imageRequest = Self.makeImageRequest(for: url)
+            // If this host was CF-bypassed, use the WebView's UA + cookies so the
+            // cf_clearance binding (UA + IP + cookie) matches.
+            if let host = url.host,
+               let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: host) {
+                imageRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
+                if !info.userAgent.isEmpty {
+                    imageRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
+                }
+            } else if let host = url.host,
+                      let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
+                imageRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+            }
+
+            guard let (data, response) = try? await Self.session.data(for: imageRequest) else {
+                Logger.shared.log("[Image] network error for \(url.host ?? urlString)", type: "Error")
+                loadFailed = true
+                return
+            }
+
+            let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 200
+            let finalURL = (response as? HTTPURLResponse)?.url ?? url
+            let isImageContentType = ((response as? HTTPURLResponse)?
+                .value(forHTTPHeaderField: "Content-Type") ?? "")
+                .lowercased().hasPrefix("image/")
+            let responseText = isImageContentType ? "" : (String(data: data, encoding: .utf8) ?? "")
+
+            // If CF blocked the image CDN (may be a different domain than the API),
+            // trigger bypass for that specific domain and retry.
+            if JSEngine.isTurnstileResponse(status: httpStatus, body: responseText) {
+                Logger.shared.log("[Image] CF challenge detected status=\(httpStatus) host=\(finalURL.host ?? "?")", type: "Debug")
+                let cfTarget = finalURL
+                let cfHostStr = cfTarget.host ?? ""
+
+                // If another bypass is already in progress, wait for it to finish
+                // before triggering a new one — avoids spawning multiple WebViews.
+                // This is safe because both this task and CloudflareBypassManager
+                // are @MainActor (cooperative scheduling, no data race).
+                if CloudflareBypassManager.shared.activeBypassWebView != nil {
+                    for _ in 0..<70 {
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        guard CloudflareBypassManager.shared.activeBypassWebView != nil else { break }
+                    }
+                }
+
+                // Trigger bypass for this image's host if still needed
+                if CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) == nil {
+                    try? await CloudflareBypassManager.shared.triggerBypass(for: cfTarget)
+                }
+
+                var retryRequest = Self.makeImageRequest(for: cfTarget)
+                // cf_clearance is bound to the UA that solved the challenge —
+                // use the bypass WebView's actual UA + full cookie header, not our default.
+                if let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: cfHostStr) {
+                    retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
+                    if !info.userAgent.isEmpty {
+                        retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
+                    }
+                } else if let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) {
+                    retryRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+                }
+                guard let (retryData, retryResponse) = try? await Self.session.data(for: retryRequest) else {
+                    Logger.shared.log("[Image] CF retry network error host=\(cfHostStr)", type: "Error")
+                    loadFailed = true
+                    return
+                }
+                guard let loaded = PlatformImage(data: retryData) else {
+                    let st = (retryResponse as? HTTPURLResponse)?.statusCode ?? -1
+                    let snippet = (String(data: retryData, encoding: .utf8) ?? "").prefix(120)
+                    Logger.shared.log("[Image] CF retry decode failed host=\(cfHostStr) status=\(st) body=\(snippet)", type: "Error")
+                    loadFailed = true
+                    return
+                }
+                Self.memCache.setObject(loaded, forKey: urlString as NSString)
+                Self.saveToDisk(urlString: urlString, data: retryData)
+                platformImage = loaded
+                return
+            }
+
+            guard let loaded = PlatformImage(data: data) else {
+                let snippet = responseText.prefix(160).replacingOccurrences(of: "\n", with: " ")
+                Logger.shared.log("[Image] decode failed status=\(httpStatus) host=\(url.host ?? "?") len=\(data.count) body=\(snippet)", type: "Error")
                 loadFailed = true
                 return
             }
