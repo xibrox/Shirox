@@ -1,6 +1,7 @@
 #if os(iOS)
 import Foundation
 import Combine
+import CryptoKit
 
 @MainActor
 final class DownloadedMediaSnapshotStore: ObservableObject {
@@ -117,6 +118,8 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
             statusDisplay: nil,
             format: nil,
             seasonYear: nil,
+            airdate: nil,
+            aliases: nil,
             episodes: [:],
             updatedAt: Date()
         )
@@ -146,15 +149,48 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
             }
         }
 
+        // Module-provided airdate + aliases (different surface than AniList — some shows
+        // get a nice "Aired: Oct 5, 2007 to Mar 28, 2008" / "Duration: 24m" here). Skip
+        // if we already captured them.
+        if (snap.airdate == nil || snap.aliases == nil), let href = item.detailHref, !href.isEmpty {
+            if let detail = try? await JSEngine.shared.fetchDetails(
+                url: href,
+                title: item.mediaTitle,
+                image: item.imageUrl
+            ) {
+                if snap.airdate == nil, detail.airdate != "N/A", !detail.airdate.isEmpty {
+                    snap.airdate = detail.airdate
+                }
+                if snap.aliases == nil, detail.aliases != "N/A", !detail.aliases.isEmpty {
+                    snap.aliases = detail.aliases
+                }
+            }
+        }
+
         // Per-episode TVDB thumbnail + title for the episode being downloaded.
         let epNum = item.episodeNumber
         if let aid = aniListID {
             let eps = await TVDBMappingService.shared.getEpisodes(for: aid)
+            // TVDB often returns the same fallback URL (typically the show's poster)
+            // for episodes that don't actually have unique per-episode art. We only
+            // accept a thumbnail URL when this episode is the FIRST one to use it —
+            // otherwise the row gets a placeholder instead of a duplicate.
+            let firstEpisodeForThumbnail: [String: Int] = eps.reduce(into: [:]) { acc, ep in
+                guard let t = ep.thumbnail, !t.isEmpty else { return }
+                if let existing = acc[t] {
+                    acc[t] = min(existing, ep.episode)
+                } else {
+                    acc[t] = ep.episode
+                }
+            }
+
             if let match = eps.first(where: { $0.episode == epNum }) {
                 let relative = "thumbnails/ep_\(epNum).jpg"
                 var existing = snap.episodes[epNum] ?? EpisodeSnapshot(number: epNum, title: nil, thumbnailFile: nil)
                 if existing.title == nil { existing.title = match.title }
-                if existing.thumbnailFile == nil, let thumb = match.thumbnail, !thumb.isEmpty,
+                let isFirstOccurrence = match.thumbnail.flatMap { firstEpisodeForThumbnail[$0] == epNum } ?? false
+                if existing.thumbnailFile == nil,
+                   let thumb = match.thumbnail, !thumb.isEmpty, isFirstOccurrence,
                    await downloadImage(from: thumb, into: snap.mediaKey, relativeName: relative) {
                     existing.thumbnailFile = relative
                 }
@@ -198,6 +234,8 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
             statusDisplay: nil,
             format: nil,
             seasonYear: nil,
+            airdate: nil,
+            aliases: nil,
             episodes: episodes,
             updatedAt: Date()
         )
@@ -216,24 +254,149 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
         )
         if FileManager.default.fileExists(atPath: dest.path) { return true }
 
-        var req = URLRequest(url: url, timeoutInterval: 15)
+        // Fast path: if the same URL is already in CachedAsyncImage's disk cache
+        // (e.g. the user navigated to the show online before downloading), reuse
+        // those bytes — that cache is in iOS Caches and can be purged at any time,
+        // so we promote it into the persistent Snapshots folder.
+        if let cached = CachedAsyncImage.cachedImageData(for: urlString), !cached.isEmpty {
+            do {
+                try cached.write(to: dest, options: .atomic)
+                Logger.shared.log("[Snapshot] Promoted cached image \(relativeName) (\(cached.count) bytes)", type: "Download")
+                return true
+            } catch {
+                Logger.shared.log("[Snapshot] Promote failed for \(relativeName): \(error.localizedDescription)", type: "Error")
+            }
+        }
+
+        guard let data = await fetchImageData(for: url) else { return false }
+        do {
+            try data.write(to: dest, options: .atomic)
+            Logger.shared.log("[Snapshot] Downloaded \(relativeName) (\(data.count) bytes)", type: "Download")
+            return true
+        } catch {
+            Logger.shared.log("[Snapshot] Disk write failed for \(relativeName): \(error.localizedDescription)", type: "Error")
+            return false
+        }
+    }
+
+    /// Browser-like fetch with Cloudflare bypass cookie support, mirroring the
+    /// behavior of CachedAsyncImage. Many anime CDNs (the source's `cdn.*.co` poster
+    /// hosts in particular) are CF-protected — without this, snapshot image
+    /// downloads silently fail and the offline view has nothing to fall back to.
+    private func fetchImageData(for url: URL) async -> Data? {
+        var req = URLRequest(url: url, timeoutInterval: 20)
         req.setValue(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             forHTTPHeaderField: "User-Agent"
         )
+        req.setValue("image/avif,image/webp,image/png,image/jpeg,*/*", forHTTPHeaderField: "Accept")
         if let scheme = url.scheme, let host = url.host {
             req.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
         }
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
-              let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode),
-              !data.isEmpty
-        else { return false }
-        do {
-            try data.write(to: dest, options: .atomic)
-            return true
-        } catch {
-            return false
+        if let host = url.host {
+            if let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: host) {
+                req.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
+                if !info.userAgent.isEmpty {
+                    req.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
+                }
+            } else if let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
+                req.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+            }
+        }
+
+        guard let (data, response) = try? await URLSession.shared.data(for: req) else {
+            Logger.shared.log("[Snapshot] Image fetch network error host=\(url.host ?? "?")", type: "Error")
+            return nil
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard (200..<300).contains(status), !data.isEmpty else {
+            Logger.shared.log("[Snapshot] Image fetch HTTP \(status) host=\(url.host ?? "?") size=\(data.count)", type: "Error")
+            return nil
+        }
+        return data
+    }
+
+    // MARK: - Private helpers (used by enrichMedia / enrichEpisode)
+
+    /// Constructs an empty snapshot scaffold for a media we haven't seen before.
+    /// All asset fields are nil; the enrichment stages fill them in.
+    private func newSnapshot(item: DownloadItem) -> DownloadedMediaSnapshot {
+        let key = DownloadedMediaSnapshot.computeKey(
+            mediaTitle: item.mediaTitle, moduleId: item.moduleId)
+        return DownloadedMediaSnapshot(
+            mediaKey: key,
+            mediaTitle: item.mediaTitle,
+            moduleId: item.moduleId,
+            aniListID: item.aniListID,
+            posterFile: nil,
+            bannerFile: nil,
+            synopsis: nil,
+            genres: nil,
+            averageScore: nil,
+            statusDisplay: nil,
+            format: nil,
+            seasonYear: nil,
+            airdate: nil,
+            aliases: nil,
+            episodes: [:],
+            updatedAt: Date()
+        )
+    }
+
+    /// `nil`, `.module`, and `.anilist` are upgradeable to higher-priority sources.
+    /// `.tvdb` is the top of the chain and is never re-attempted.
+    private func canUpgrade(_ src: AssetSource?) -> Bool { src != .tvdb }
+
+    /// sha1 hex digest used for content-hash dedup of episode thumbnails.
+    /// Same primitive as `DownloadedMediaSnapshot.computeKey` to keep the dependency
+    /// surface small.
+    private func sha1Hex(_ data: Data) -> String {
+        Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Convenience wrapper over `fetchImageData(for: URL)` that accepts a string.
+    /// Returns nil for invalid URLs or any fetch failure (same failure mode as today).
+    private func fetchImageData(urlString: String) async -> Data? {
+        guard let url = URL(string: urlString) else { return nil }
+        return await fetchImageData(for: url)
+    }
+
+    /// Fetches AniList detail if we have an aniListID, snapshot is missing synopsis
+    /// (a cheap "do we need this" proxy), and the call succeeds. Returns the mapped
+    /// `Media` so callers can read `coverImage`, `bannerImage`, and other fields.
+    private func fetchAniListIfNeeded(snap: DownloadedMediaSnapshot) async -> Media? {
+        guard let aid = snap.aniListID, snap.synopsis == nil else { return nil }
+        guard let raw = try? await AniListService.shared.detail(id: aid) else { return nil }
+        return AniListProvider.shared.mapMedia(raw)
+    }
+
+    /// Pulls AniList metadata fields onto the snapshot. Fields already populated
+    /// are not overwritten (so an enrichMedia retry can't blank them out).
+    private func apply(aniList: Media?, to snap: inout DownloadedMediaSnapshot) {
+        guard let media = aniList else { return }
+        if snap.synopsis == nil       { snap.synopsis = media.plainDescription }
+        if snap.genres == nil         { snap.genres = media.genres }
+        if snap.averageScore == nil   { snap.averageScore = media.averageScore }
+        if snap.statusDisplay == nil  { snap.statusDisplay = media.statusDisplay }
+        if snap.format == nil         { snap.format = media.format }
+        if snap.seasonYear == nil     { snap.seasonYear = media.seasonYear }
+    }
+
+    /// Captures airdate + aliases from the module's `JSEngine.fetchDetails` if both
+    /// aren't already set. Some shows give a useful "Aired: Oct 5, 2007 to Mar 28, 2008"
+    /// string here that AniList does not.
+    private func applyModuleDetailIfNeeded(item: DownloadItem, snap: inout DownloadedMediaSnapshot) async {
+        guard snap.airdate == nil || snap.aliases == nil,
+              let href = item.detailHref, !href.isEmpty
+        else { return }
+        guard let detail = try? await JSEngine.shared.fetchDetails(
+            url: href, title: item.mediaTitle, image: item.imageUrl)
+        else { return }
+        if snap.airdate == nil, detail.airdate != "N/A", !detail.airdate.isEmpty {
+            snap.airdate = detail.airdate
+        }
+        if snap.aliases == nil, detail.aliases != "N/A", !detail.aliases.isEmpty {
+            snap.aliases = detail.aliases
         }
     }
 }
