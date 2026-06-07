@@ -76,6 +76,14 @@ struct CachedAsyncImage: View {
         try? data.write(to: path, options: .atomic)
     }
 
+    /// Read the raw bytes that disk-cache holds for `urlString`, if any.
+    /// Lets other subsystems (e.g. the snapshot store) reuse already-downloaded images
+    /// instead of re-fetching from the network.
+    static func cachedImageData(for urlString: String) -> Data? {
+        let path = diskKey(for: urlString)
+        return try? Data(contentsOf: path)
+    }
+
     static var diskCacheBytes: Int {
         let dir = diskCacheDir
         let keys: [URLResourceKey] = [.fileSizeKey]
@@ -152,6 +160,22 @@ struct CachedAsyncImage: View {
                 return
             }
 
+            // Local file fast path: read bytes directly. The URLSession pipeline below
+            // does technically support file:// URLs, but it also runs the CF-bypass
+            // logic and writes a duplicate copy into the disk-cache folder under a
+            // base64-encoded key — neither of which makes sense for an image already
+            // sitting on local disk. Reading directly also makes it obvious in logs
+            // whether a snapshot file is the source of a render.
+            if url.isFileURL {
+                if let loaded = PlatformImage(contentsOfFile: url.path) {
+                    Self.memCache.setObject(loaded, forKey: urlString as NSString)
+                    platformImage = loaded
+                } else {
+                    loadFailed = true
+                }
+                return
+            }
+
             if let cached = Self.memCache.object(forKey: urlString as NSString) {
                 platformImage = cached
                 return
@@ -180,8 +204,17 @@ struct CachedAsyncImage: View {
                 imageRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
             }
 
-            guard let (data, response) = try? await Self.session.data(for: imageRequest) else {
-                Logger.shared.log("[Image] network error for \(url.host ?? urlString)", type: "Error")
+            let data: Data
+            let response: URLResponse
+            do {
+                (data, response) = try await Self.session.data(for: imageRequest)
+            } catch {
+                // Silent for true offline failures — that's expected when the device
+                // has no network. Everything else (DNS failure on a single host,
+                // server errors, etc.) still surfaces so we can debug it.
+                if !ProviderManager.isOfflineError(error) {
+                    Logger.shared.log("[Image] network error for \(url.host ?? urlString): \(error.localizedDescription)", type: "Error")
+                }
                 loadFailed = true
                 return
             }
