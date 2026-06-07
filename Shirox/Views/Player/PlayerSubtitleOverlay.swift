@@ -82,9 +82,10 @@ struct PlayerSubtitleOverlay: View {
                     // slider value.
                     .offset(y: showControls ? -min(CGFloat(settings.bottomPadding), controlsRiseOffset) : 0)
                     .animation(.easeInOut(duration: 0.2), value: showControls)
-                    .transition(.opacity)
+                    // No enter/exit animation between cues — cues snap in and out so
+                    // text never lags behind audio.
+                    .transition(.identity)
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: activeCue?.id)
     }
 }

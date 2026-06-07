@@ -387,13 +387,13 @@
 		7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
-		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		AA01000000000000000002AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
 		AA01000000000000000003AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
 		AA01000000000000000004AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
 		AA02000000000000000002AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
 		AA02000000000000000003AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
 		AA02000000000000000004AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
+		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -526,13 +526,13 @@
 		4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiroxApp.swift; sourceTree = "<group>"; };
 		4C8891C8EC305651E62AC138 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshot.swift; sourceTree = "<group>"; };
+		AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshotStore.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		CF6B7E2E4A3D9F1B8C0E5A33 /* Shirox.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shirox.xcconfig; sourceTree = "<group>"; };
 		CF6B7E2E4A3D9F1B8C0E5A44 /* Shirox.local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shirox.local.xcconfig; sourceTree = "<group>"; };
 		CF6B7E2E4A3D9F1B8C0E5A55 /* Shirox.local.xcconfig.template */ = {isa = PBXFileReference; lastKnownFileType = text; path = Shirox.local.xcconfig.template; sourceTree = "<group>"; };
 		E8D91E43B99205901655CDF0 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshot.swift; sourceTree = "<group>"; };
-		AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshotStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1499,13 +1499,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CURRENT_PROJECT_VERSION = 77;
+				CURRENT_PROJECT_VERSION = 78;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.80;
+				MARKETING_VERSION = 0.0.81;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1523,7 +1523,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 77;
+				CURRENT_PROJECT_VERSION = 78;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1531,7 +1531,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.0.80;
+				MARKETING_VERSION = 0.0.81;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;
@@ -1546,13 +1546,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CURRENT_PROJECT_VERSION = 77;
+				CURRENT_PROJECT_VERSION = 78;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.80;
+				MARKETING_VERSION = 0.0.81;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1631,7 +1631,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 77;
+				CURRENT_PROJECT_VERSION = 78;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1639,7 +1639,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.0.80;
+				MARKETING_VERSION = 0.0.81;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;

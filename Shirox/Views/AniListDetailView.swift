@@ -18,6 +18,7 @@ struct AniListDetailView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var auth = AniListAuthManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject private var malAuth = MALAuthManager.shared
     @State private var showResetConfirmation = false
     @State private var autoPlayOnLoad = false
@@ -1185,13 +1186,17 @@ struct AniListDetailView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 60)
         } else {
-            let columns = [
-                GridItem(.flexible(), spacing: 16),
-                GridItem(.flexible(), spacing: 16)
-            ]
-            
+            let columnCount: Int = {
+                #if os(iOS)
+                return horizontalSizeClass == .regular ? 4 : 2
+                #else
+                return 4
+                #endif
+            }()
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+
             VStack(alignment: .leading, spacing: 16) {
-                LazyVGrid(columns: columns, spacing: 20) {
+                LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(animeRelations) { edge in
                         NavigationLink {
                             AniListDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)

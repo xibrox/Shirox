@@ -57,6 +57,10 @@ final class ProviderManager: ObservableObject {
             if fallbackActive { fallbackActive = false }
             return result
         } catch {
+            // Skip the verbose fallback log when the device just isn't online — there's
+            // no provider that's going to succeed in that state, and the caller already
+            // handles the throw via try?.
+            if Self.isOfflineError(error) { throw error }
             let eligible = isFallbackEligible(error)
             Logger.shared.log("ProviderManager fallback check — error: \(error), eligible: \(eligible), fallback: \(fallback?.providerType.rawValue ?? "nil")", type: "Provider")
             guard eligible, let fallback else { throw error }
@@ -67,6 +71,20 @@ final class ProviderManager: ObservableObject {
                 self?.fallbackActive = false
             }
             return try await operation(fallback)
+        }
+    }
+
+    static func isOfflineError(_ error: Error) -> Bool {
+        guard let urlError = error as? URLError else { return false }
+        switch urlError.code {
+        case .notConnectedToInternet,
+             .networkConnectionLost,
+             .cannotConnectToHost,
+             .dnsLookupFailed,
+             .timedOut:
+            return true
+        default:
+            return false
         }
     }
 

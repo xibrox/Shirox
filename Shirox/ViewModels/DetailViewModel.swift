@@ -141,8 +141,8 @@ final class DetailViewModel: ObservableObject {
             title: snapshot.mediaTitle,
             image: poster,
             description: snapshot.synopsis ?? "",
-            aliases: "",
-            airdate: snapshot.seasonYear.map { String($0) } ?? "",
+            aliases: snapshot.aliases ?? "",
+            airdate: snapshot.airdate ?? (snapshot.seasonYear.map { String($0) } ?? ""),
             episodes: episodeLinks
         )
 

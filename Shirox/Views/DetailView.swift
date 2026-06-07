@@ -10,6 +10,7 @@ struct DetailView: View {
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var malID: Int? = nil
     @State private var existingMALEntry: LibraryEntry? = nil
     @State private var isSynopsisExpanded = false
@@ -952,13 +953,17 @@ struct DetailView: View {
             MediaRelationEdge(relationType: edge.relationType, node: edge.node)
         }
         if let relations = mappedRelations, !relations.isEmpty {
-            let columns = [
-                GridItem(.flexible(), spacing: 16),
-                GridItem(.flexible(), spacing: 16)
-            ]
-            
+            let columnCount: Int = {
+                #if os(iOS)
+                return horizontalSizeClass == .regular ? 4 : 2
+                #else
+                return 4
+                #endif
+            }()
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+
             VStack(alignment: .leading, spacing: 20) {
-                LazyVGrid(columns: columns, spacing: 20) {
+                LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(relations) { edge in
                         NavigationLink {
                             AniListDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)
@@ -1288,11 +1293,13 @@ struct DetailView: View {
                     
                     let selectableEpisodes = currentRangeEpisodes.filter { ep in
                         let epNum = Int(ep.number)
-                        let state = DownloadManager.shared.items.first { 
-                            $0.episodeHref == ep.href || 
+                        let state = DownloadManager.shared.items.first {
+                            $0.episodeHref == ep.href ||
                             ($0.mediaTitle == detail.title && $0.episodeNumber == epNum && $0.moduleId == ModuleManager.shared.activeModule?.id)
                         }?.state
-                        return state != .completed && state != .downloading && state != .pending
+                        // In-progress items can't be batched into anything useful; skip them.
+                        // Completed items are selectable so they can be batch-deleted.
+                        return state != .downloading && state != .pending
                     }
                     
                     let allSelected = !selectableEpisodes.isEmpty && selectableEpisodes.allSatisfy { selectedEpisodeNumbers.contains(Int($0.number)) }
@@ -1313,18 +1320,44 @@ struct DetailView: View {
                     
                     Spacer()
                     
-                    if !selectedEpisodeNumbers.isEmpty {
-                        Button {
-                            showBatchDownloadPicker = true
-                        } label: {
-                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(platformBackground)
+                    let downloadedItems = DownloadManager.shared.items.filter { item in
+                        selectedEpisodeNumbers.contains(item.episodeNumber)
+                            && item.mediaTitle == detail.title
+                            && item.moduleId == ModuleManager.shared.activeModule?.id
+                            && item.state == .completed
+                    }
+                    let downloadCount = selectedEpisodeNumbers.count - downloadedItems.count
+                    let deleteCount = downloadedItems.count
+
+                    HStack(spacing: 8) {
+                        if deleteCount > 0 {
+                            Button(role: .destructive) {
+                                for it in downloadedItems {
+                                    DownloadManager.shared.remove(it)
+                                    selectedEpisodeNumbers.remove(it.episodeNumber)
+                                }
+                            } label: {
+                                Label("Delete \(deleteCount)", systemImage: "trash.fill")
+                                    .font(.subheadline.weight(.bold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                            .controlSize(.small)
+                            .clipShape(Capsule())
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.primary)
-                        .controlSize(.small)
-                        .clipShape(Capsule())
+                        if downloadCount > 0 {
+                            Button {
+                                showBatchDownloadPicker = true
+                            } label: {
+                                Label("Download \(downloadCount)", systemImage: "arrow.down.circle.fill")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(platformBackground)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.primary)
+                            .controlSize(.small)
+                            .clipShape(Capsule())
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -1379,14 +1412,17 @@ struct DetailView: View {
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
                             onTap: sel ? {
-                                // Prevent selecting if already downloaded or in progress
-                                let state = DownloadManager.shared.items.first { 
-                                    $0.episodeHref == episode.href || 
+                                // Block selecting an in-progress download — nothing useful
+                                // to do with it from the batch bar. Completed downloads
+                                // can be selected for batch delete; non-downloaded for
+                                // batch download.
+                                let state = DownloadManager.shared.items.first {
+                                    $0.episodeHref == episode.href ||
                                     ($0.mediaTitle == detail.title && $0.episodeNumber == epNum && $0.moduleId == ModuleManager.shared.activeModule?.id)
                                 }?.state
-                                
-                                if state == .completed || state == .downloading || state == .pending {
-                                    return 
+
+                                if state == .downloading || state == .pending {
+                                    return
                                 }
 
                                 if selectedEpisodeNumbers.contains(epNum) {
@@ -1486,6 +1522,48 @@ struct DetailView: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
 
+            // Selection bar — visible only when selection mode is on. Lets the user batch-
+            // delete downloaded episodes.
+            if isSelectionMode && !sorted.isEmpty {
+                let allSelected = sorted.allSatisfy { selectedEpisodeNumbers.contains($0.episodeNumber) }
+                HStack(spacing: 8) {
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        if allSelected {
+                            sorted.forEach { selectedEpisodeNumbers.remove($0.episodeNumber) }
+                        } else {
+                            sorted.forEach { selectedEpisodeNumbers.insert($0.episodeNumber) }
+                        }
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.1), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+
+                    Spacer()
+
+                    let selectedItems = sorted.filter { selectedEpisodeNumbers.contains($0.episodeNumber) }
+                    if !selectedItems.isEmpty {
+                        Button(role: .destructive) {
+                            for it in selectedItems {
+                                DownloadManager.shared.remove(it)
+                                selectedEpisodeNumbers.remove(it.episodeNumber)
+                            }
+                        } label: {
+                            Label("Delete \(selectedItems.count)", systemImage: "trash.fill")
+                                .font(.subheadline.weight(.bold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .controlSize(.small)
+                        .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+            }
+
             if completed.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "folder.badge.minus").font(.system(size: 48)).foregroundStyle(.secondary)
@@ -1502,42 +1580,39 @@ struct DetailView: View {
                         }
                         let displayTitle = epSnap?.title ?? downloadItem.episodeTitle
                         let progressValue: Double? = offlineProgress(for: epNum, snapshot: snapshot)
+                        let isSel = selectedEpisodeNumbers.contains(epNum)
 
-                        ZStack(alignment: .trailing) {
-                            ThumbnailEpisodeRow(
-                                number: epNum,
-                                thumbnail: thumbnailURLString,
-                                title: displayTitle,
-                                progress: progressValue,
-                                onTap: { playDownloaded(downloadItem) },
-                                onResetProgress: {
-                                    ContinueWatchingManager.shared.resetEpisodeProgress(
-                                        aniListID: snapshot.aniListID,
-                                        moduleId: snapshot.moduleId,
-                                        mediaTitle: snapshot.mediaTitle,
-                                        episodeNumber: epNum
-                                    )
+                        ThumbnailEpisodeRow(
+                            number: epNum,
+                            thumbnail: thumbnailURLString,
+                            title: displayTitle,
+                            progress: progressValue,
+                            onTap: {
+                                if isSelectionMode {
+                                    if selectedEpisodeNumbers.contains(epNum) {
+                                        selectedEpisodeNumbers.remove(epNum)
+                                    } else {
+                                        selectedEpisodeNumbers.insert(epNum)
+                                    }
+                                } else {
+                                    playDownloaded(downloadItem)
                                 }
-                            )
-                            Button {
+                            },
+                            onResetProgress: {
+                                ContinueWatchingManager.shared.resetEpisodeProgress(
+                                    aniListID: snapshot.aniListID,
+                                    moduleId: snapshot.moduleId,
+                                    mediaTitle: snapshot.mediaTitle,
+                                    episodeNumber: epNum
+                                )
+                            },
+                            onDeleteDownload: {
                                 DownloadManager.shared.remove(downloadItem)
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(.primary)
-                                    .frame(width: 32, height: 32)
-                                    .background(.ultraThinMaterial, in: Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.trailing, 14)
-                        }
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                DownloadManager.shared.remove(downloadItem)
-                            } label: {
-                                Label("Delete Download", systemImage: "trash")
-                            }
-                        }
+                            },
+                            isSelectionMode: isSelectionMode,
+                            isSelected: isSel,
+                            downloadState: .completed
+                        )
                     }
                 }
                 .padding(.horizontal, 16)
@@ -1566,6 +1641,23 @@ struct DetailView: View {
     private func playDownloaded(_ item: DownloadItem) {
         Task {
             guard let stream = await DownloadManager.shared.getStream(for: item) else { return }
+
+            // Look up saved progress for this exact episode so the player resumes
+            // where the user left off instead of restarting from 0 every time.
+            let saved = ContinueWatchingManager.shared.items.first {
+                $0.episodeNumber == item.episodeNumber
+                    && (
+                        ($0.aniListID != nil && $0.aniListID == item.aniListID)
+                        || ($0.mediaTitle == item.mediaTitle && $0.moduleId == item.moduleId)
+                    )
+            }
+            // Don't auto-resume if the user has already finished the episode —
+            // tapping a completed row should restart it.
+            let resumeSeconds: Double? = {
+                guard let s = saved, s.totalSeconds > 0 else { return nil }
+                return (s.watchedSeconds / s.totalSeconds) < 0.95 ? s.watchedSeconds : nil
+            }()
+
             let context = PlayerContext(
                 mediaTitle: item.mediaTitle,
                 episodeNumber: item.episodeNumber,
@@ -1577,7 +1669,7 @@ struct DetailView: View {
                 totalEpisodes: nil,
                 availableEpisodes: nil,
                 isAiring: nil,
-                resumeFrom: nil,
+                resumeFrom: resumeSeconds,
                 detailHref: item.detailHref,
                 streamTitle: item.streamTitle,
                 workingDetailHref: item.detailHref,
@@ -1612,7 +1704,6 @@ private struct ModuleEpisodeRowContainer: View {
     #endif
 
     @State private var aniMapEpisode: AniMapEpisode?
-    @State private var fallbackThumbnail: String?
     @State private var pendingDowngrade: RemoteDowngrade? = nil
 
     private var moduleId: String? { ModuleManager.shared.activeModule?.id }
@@ -1645,6 +1736,19 @@ private struct ModuleEpisodeRowContainer: View {
         #endif
     }
 
+    private var deleteDownloadAction: (() -> Void)? {
+        #if os(iOS)
+        guard let downloaded = downloadManager.items.first(where: {
+            ($0.episodeHref == episode.href ||
+             ($0.mediaTitle == mediaTitle && $0.episodeNumber == epNum && $0.moduleId == moduleId))
+            && $0.state == .completed
+        }) else { return nil }
+        return { DownloadManager.shared.remove(downloaded) }
+        #else
+        return nil
+        #endif
+    }
+
     private var progress: Double? {
         if continueWatching.isWatched(aniListID: aniListID, moduleId: moduleId,
                                       mediaTitle: mediaTitle, episodeNumber: epNum) {
@@ -1662,12 +1766,34 @@ private struct ModuleEpisodeRowContainer: View {
         return min(item.watchedSeconds / item.totalSeconds, 1.0)
     }
 
+    /// Prefer the snapshot's downloaded thumbnail when present (matches the offline view),
+    /// then live TVDB per-episode art, and otherwise nil so the row falls back to a
+    /// gray-with-episode-number placeholder. The snapshot path already filters out
+    /// duplicate TVDB fallback URLs (enrich uses first-occurrence-wins), so for
+    /// downloaded series the online and offline views match.
+    private var preferredThumbnail: String? {
+        #if os(iOS)
+        let store = DownloadedMediaSnapshotStore.shared
+        if let snap = store.snapshot(mediaTitle: mediaTitle, moduleId: moduleId) {
+            // A snapshot exists → this is a downloaded series. Surface only the
+            // snapshot file. Don't fall back to a live TVDB URL: when offline,
+            // every row would queue a guaranteed-failing fetch and spam the log
+            // / waste CPU. The gray placeholder is the right end state.
+            if let relPath = snap.episodes[epNum]?.thumbnailFile {
+                return store.localFileURL(in: snap, relative: relPath).absoluteString
+            }
+            return nil
+        }
+        #endif
+        return aniMapEpisode?.thumbnail
+    }
+
     var body: some View {
         Group {
             if aniListID != nil {
                 ThumbnailEpisodeRow(
                     number: epNum,
-                    thumbnail: aniMapEpisode?.thumbnail ?? fallbackThumbnail,
+                    thumbnail: preferredThumbnail,
                     title: aniMapEpisode?.title,
                     progress: progress,
                     onTap: onTap,
@@ -1690,6 +1816,7 @@ private struct ModuleEpisodeRowContainer: View {
                             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
                     },
                     onDownload: onDownload,
+                    onDeleteDownload: deleteDownloadAction,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
                     isSelected: isSelected,
@@ -1743,13 +1870,15 @@ private struct ModuleEpisodeRowContainer: View {
             ].compactMap { $0 }
             Text(parts.joined(separator: "\n"))
         }
-        .task(id: aniListID) {
-            guard let aid = aniListID else { return }
-            aniMapEpisode = await TVDBMappingService.shared.getEpisode(for: aid, episodeNumber: epNum)
-            if aniMapEpisode?.thumbnail == nil {
-                let artwork = await TVDBMappingService.shared.getArtwork(for: aid)
-                fallbackThumbnail = artwork.fanart ?? artwork.poster
+        // ID must include epNum — every row of the same show shares aniListID, so
+        // without it LazyVStack-recycled rows keep the previous episode's
+        // aniMapEpisode state and render the wrong thumbnail/title.
+        .task(id: "\(aniListID ?? 0)-\(epNum)") {
+            guard let aid = aniListID else {
+                aniMapEpisode = nil
+                return
             }
+            aniMapEpisode = await TVDBMappingService.shared.getEpisode(for: aid, episodeNumber: epNum)
         }
     }
 }

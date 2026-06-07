@@ -10,6 +10,7 @@ struct ThumbnailEpisodeRow: View {
     var onMarkUnwatched: (() -> Void)? = nil
     var onResetProgress: (() -> Void)? = nil
     var onDownload: (() -> Void)? = nil
+    var onDeleteDownload: (() -> Void)? = nil
     var onTryOtherStream: (() -> Void)? = nil
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
@@ -100,27 +101,30 @@ struct ThumbnailEpisodeRow: View {
 
                 Spacer()
 
-                if !isSelectionMode {
-                    HStack(spacing: 8) {
-                        if let state = downloadState {
-                            Group {
-                                switch state {
-                                case .completed:
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                case .downloading:
-                                    ProgressView().controlSize(.small)
-                                case .pending:
-                                    Image(systemName: "hourglass")
-                                        .foregroundStyle(.secondary)
-                                case .failed:
-                                    Image(systemName: "exclamationmark.circle.fill")
-                                        .foregroundStyle(.red)
-                                }
+                HStack(spacing: 8) {
+                    // Download-state indicator. Shown in selection mode too so the user
+                    // can tell at a glance which selected rows are about to be deleted
+                    // (downloaded) vs queued for download (not yet downloaded).
+                    if let state = downloadState {
+                        Group {
+                            switch state {
+                            case .completed:
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .foregroundStyle(.blue)
+                            case .downloading:
+                                ProgressView().controlSize(.small)
+                            case .pending:
+                                Image(systemName: "hourglass")
+                                    .foregroundStyle(.secondary)
+                            case .failed:
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundStyle(.red)
                             }
-                            .font(.system(size: 16))
                         }
+                        .font(.system(size: 16))
+                    }
 
+                    if !isSelectionMode {
                         Image(systemName: "play.fill")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.primary)
@@ -155,7 +159,7 @@ struct ThumbnailEpisodeRow: View {
             in: RoundedRectangle(cornerRadius: 14)
         )
         .contentShape(RoundedRectangle(cornerRadius: 14))
-        .opacity(isSelectionMode && (downloadState == .completed || downloadState == .downloading || downloadState == .pending) ? 0.5 : 1.0)
+        .opacity(isSelectionMode && (downloadState == .downloading || downloadState == .pending) ? 0.5 : 1.0)
         .onTapGesture { onTap() }
         .contextMenu {
             if !isSelectionMode {
@@ -186,6 +190,12 @@ struct ThumbnailEpisodeRow: View {
                         Label("Download Episode", systemImage: "arrow.down.circle")
                     }
                     .disabled(downloadState == .completed || downloadState == .downloading || downloadState == .pending)
+                }
+                if let onDeleteDownload {
+                    Divider()
+                    Button(role: .destructive) { onDeleteDownload() } label: {
+                        Label("Delete Download", systemImage: "trash")
+                    }
                 }
             }
         }

@@ -22,14 +22,21 @@ struct DownloadItem: Identifiable, Codable {
     let detailHref: String?
     let episodeHref: String
     let streamTitle: String?
-    let streamURL: URL
-    let headers: [String: String]
-    
+    /// nil while the batch-download pipeline is still extracting the stream URL for this
+    /// item. processQueue() ignores items where this is nil; a separate task is responsible
+    /// for filling it in and then re-triggering the queue.
+    var streamURL: URL?
+    var headers: [String: String]
+
+    // Subtitles
+    var subtitleURL: URL?
+    var subtitleHeaders: [String: String]?
+
     // Status
     var state: DownloadState
     var progress: Double
     var error: String?
-    
+
     // File Info
     var fileName: String? // Points to the .mp4 or .m3u8 file
     var relativeSubtitlePath: String?

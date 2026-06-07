@@ -194,7 +194,7 @@ final class DownloadManager: NSObject, ObservableObject {
     
     // MARK: - Public API
     
-    func download(stream: StreamResult, episodeHref: String, context: DownloadContext) {
+    func download(stream: StreamResult, episodeHref: String, context: DownloadContext, enrichSnapshot: Bool = true) {
         // Prevent duplicates
         if let existing = items.first(where: { $0.episodeNumber == context.episodeNumber && $0.episodeHref == episodeHref && $0.streamTitle == context.streamTitle }) {
             let status = existing.state == .completed ? "already downloaded" : "already in queue"
@@ -217,28 +217,101 @@ final class DownloadManager: NSObject, ObservableObject {
             streamTitle: context.streamTitle,
             streamURL: stream.url,
             headers: stream.headers,
+            subtitleURL: stream.subtitleURL,
+            subtitleHeaders: stream.subtitleHeaders.isEmpty ? nil : stream.subtitleHeaders,
             state: .pending,
             progress: 0,
             createdAt: Date()
         )
-        
+
         items.append(item)
         persist()
 
         ToastManager.shared.show(message: "Download added: \(context.mediaTitle) - \(context.episodeNumber)", type: .info)
 
-        let enrichItem = item
-        let enrichImageUrl = context.imageUrl
-        let enrichAniListID = context.aniListID
-        Task {
-            await DownloadedMediaSnapshotStore.shared.enrich(
-                item: enrichItem,
-                imageUrl: enrichImageUrl,
-                aniListID: enrichAniListID
-            )
+        if enrichSnapshot {
+            let enrichItem = item
+            let enrichImageUrl = context.imageUrl
+            let enrichAniListID = context.aniListID
+            Task {
+                await DownloadedMediaSnapshotStore.shared.enrich(
+                    item: enrichItem,
+                    imageUrl: enrichImageUrl,
+                    aniListID: enrichAniListID
+                )
+            }
+        }
+
+        // Fetch the subtitle file in the background. Small, fast — usually finishes long
+        // before the video does so the local copy is ready for offline playback.
+        if let subURL = item.subtitleURL {
+            let captureID = item.id
+            // Subtitles often live on a different CDN than the video but share the
+            // stream's auth context (Referer = embedded player origin). If the JS module
+            // didn't set explicit subtitle headers, reuse the video stream's headers —
+            // those carry the right Referer + User-Agent for the source.
+            let effectiveHeaders = (item.subtitleHeaders?.isEmpty == false)
+                ? (item.subtitleHeaders ?? [:])
+                : item.headers
+            Task {
+                await self.downloadSubtitleFile(itemID: captureID, url: subURL, headers: effectiveHeaders)
+            }
+        } else {
+            Logger.shared.log("[Subtitles] Stream had no subtitle URL — episode will play without subs offline", type: "Download")
         }
 
         processQueue()
+    }
+
+    /// Downloads a subtitle file to disk and stores its relative path on the item.
+    /// Silent on failure — the video still plays without subtitles.
+    private func downloadSubtitleFile(itemID: UUID, url: URL, headers: [String: String]) async {
+        Logger.shared.log("[Subtitles] Downloading subtitle from \(url.absoluteString)", type: "Download")
+
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        // Browser-like default headers — many subtitle hosts reject the default
+        // URLSession UA and require a Referer matching the origin.
+        req.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            forHTTPHeaderField: "User-Agent"
+        )
+        if let scheme = url.scheme, let host = url.host {
+            req.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
+        }
+        // Reuse Cloudflare bypass cookies if the subtitle host happens to be CF-protected.
+        if let host = url.host,
+           let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
+            req.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+        }
+        // Caller-provided headers (from the stream) override defaults.
+        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+
+        guard let (data, response) = try? await URLSession.shared.data(for: req) else {
+            Logger.shared.log("[Subtitles] Network error fetching subtitle host=\(url.host ?? "?")", type: "Error")
+            return
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard (200..<300).contains(status), !data.isEmpty else {
+            Logger.shared.log("[Subtitles] HTTP \(status) for subtitle host=\(url.host ?? "?") size=\(data.count)", type: "Error")
+            return
+        }
+
+        let rawExt = url.pathExtension.lowercased()
+        let ext = ["vtt", "srt", "ass", "ssa"].contains(rawExt) ? rawExt : "vtt"
+        let fileName = "\(itemID.uuidString).\(ext)"
+        let dest = downloadDir.appendingPathComponent(fileName)
+
+        do {
+            try data.write(to: dest, options: .atomic)
+            await MainActor.run {
+                guard let idx = self.items.firstIndex(where: { $0.id == itemID }) else { return }
+                self.items[idx].relativeSubtitlePath = fileName
+                self.persist()
+                Logger.shared.log("[Subtitles] Saved subtitle to \(fileName) (\(data.count) bytes)", type: "Download")
+            }
+        } catch {
+            Logger.shared.log("[Subtitles] Disk write failed: \(error.localizedDescription)", type: "Error")
+        }
     }
 
     func batchDownload(
@@ -249,54 +322,164 @@ final class DownloadManager: NSObject, ObservableObject {
         detailHref: String?,
         episodes: [EpisodeLink],
         episodeNumbers: [Int],
-        streamTitle: String
+        streamTitle: String,
+        preFetchedFirstEpisode: (episodeHref: String, streams: [StreamResult])? = nil
     ) {
-        ToastManager.shared.show(message: "Starting batch download for \(episodeNumbers.count) episodes...", type: .info)
-        
-        Task {
-            let runner = ModuleJSRunner()
-            if let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
-                try? await runner.load(module: module)
-            }
-            
-            for epNum in episodeNumbers {
-                guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { continue }
-                
-                // Check duplicate before even fetching streams to be faster
-                if items.contains(where: { $0.episodeNumber == epNum && $0.episodeHref == episode.href && $0.streamTitle == streamTitle }) {
-                    continue
-                }
+        // Pre-enqueue every selected episode as a placeholder DownloadItem with no stream
+        // URL yet. They show up in the Downloads tab immediately as "Waiting…", and a
+        // background task fills in the stream URL one at a time (animepahe and similar
+        // CF-protected hosts throttle parallel extractStreamUrl calls hard).
+        var queuedIDs: [(href: String, id: UUID, reuseable: [StreamResult]?)] = []
+        for epNum in episodeNumbers {
+            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { continue }
+            if items.contains(where: {
+                $0.episodeNumber == epNum && $0.episodeHref == episode.href && $0.streamTitle == streamTitle
+            }) { continue }
 
-                do {
-                    let fetchedStreams = try await runner.fetchStreams(episodeUrl: episode.href)
-                    guard !fetchedStreams.isEmpty else {
-                        ToastManager.shared.show(message: "No streams found for Ep \(epNum)", type: .warning)
-                        continue
+            let reuseable = preFetchedFirstEpisode.flatMap {
+                $0.episodeHref == episode.href ? $0.streams : nil
+            }
+            let id = UUID()
+            let placeholder = DownloadItem(
+                id: id,
+                mediaTitle: mediaTitle,
+                episodeNumber: epNum,
+                episodeTitle: nil,
+                imageUrl: imageUrl,
+                aniListID: aniListID,
+                moduleId: moduleId,
+                detailHref: detailHref,
+                episodeHref: episode.href,
+                streamTitle: streamTitle,
+                streamURL: nil,
+                headers: [:],
+                state: .pending,
+                progress: 0,
+                createdAt: Date()
+            )
+            items.append(placeholder)
+            queuedIDs.append((episode.href, id, reuseable))
+        }
+        persist()
+
+        guard !queuedIDs.isEmpty else { return }
+        ToastManager.shared.show(message: "Queued \(queuedIDs.count) episode\(queuedIDs.count == 1 ? "" : "s")", type: .info)
+
+        // Only stream hosts behind Cloudflare apply the 13–14s cooldown on
+        // back-to-back extractStreamUrl calls. For non-CF modules (no cached
+        // bypass cookie for the source host) we extract in parallel and let
+        // maxConcurrentDownloads govern speed via the usual processQueue path.
+        let firstHost = URL(string: queuedIDs[0].href)?.host ?? ""
+        let needsPacing = !firstHost.isEmpty
+            && CloudflareBypassManager.shared.fullCookieHeader(for: firstHost) != nil
+
+        Task {
+            if needsPacing {
+                for (idx, queued) in queuedIDs.enumerated() {
+                    if idx > 0 {
+                        try? await Task.sleep(nanoseconds: 14_000_000_000)
                     }
-                    
-                    let stream = fetchedStreams.first(where: { $0.title == streamTitle }) ?? fetchedStreams[0]
-                    
-                    let ctx = DownloadContext(
-                        mediaTitle: mediaTitle,
-                        episodeNumber: epNum,
-                        episodeTitle: nil,
-                        imageUrl: imageUrl,
-                        aniListID: aniListID,
-                        moduleId: moduleId,
-                        detailHref: detailHref,
-                        episodeHref: episode.href,
-                        streamTitle: stream.title,
-                        totalEpisodes: episodes.count
-                    )
-                    
-                    await MainActor.run {
-                        self.download(stream: stream, episodeHref: episode.href, context: ctx)
-                    }
-                } catch {
-                    ToastManager.shared.show(message: "Failed to fetch Ep \(epNum): \(error.localizedDescription)", type: .error)
+                    await self.runBatchExtraction(queued: queued, streamTitle: streamTitle)
                 }
+            } else {
+                await withTaskGroup(of: Void.self) { group in
+                    for queued in queuedIDs {
+                        group.addTask {
+                            await self.runBatchExtraction(queued: queued, streamTitle: streamTitle)
+                        }
+                    }
+                }
+            }
+
+            // Enrich the snapshot once per item, sequentially — each call writes that
+            // episode's TVDB title + thumbnail. We can't parallelize because enrich()
+            // mutates the same in-memory snapshot and persists it; concurrent writes
+            // would race. AniList + TVDB responses are cached in their services so
+            // sequential calls are cheap after the first one.
+            for queued in queuedIDs {
+                guard let item = self.items.first(where: { $0.id == queued.id }) else { continue }
+                await DownloadedMediaSnapshotStore.shared.enrich(
+                    item: item,
+                    imageUrl: imageUrl,
+                    aniListID: aniListID
+                )
             }
         }
+    }
+
+    /// Extracts the stream URL for one batch-queued placeholder and either fills it in
+    /// (so processQueue picks it up) or marks it failed.
+    private func runBatchExtraction(
+        queued: (href: String, id: UUID, reuseable: [StreamResult]?),
+        streamTitle: String
+    ) async {
+        let fetchedStreams: [StreamResult]
+        if let reuseable = queued.reuseable {
+            fetchedStreams = reuseable
+        } else {
+            fetchedStreams = await Self.fetchStreamsWithRetry(episodeUrl: queued.href, epNum: 0)
+        }
+
+        guard !fetchedStreams.isEmpty else {
+            await MainActor.run { self.markPendingItemFailed(id: queued.id, reason: "No streams found") }
+            return
+        }
+
+        let stream = fetchedStreams.first(where: { $0.title == streamTitle }) ?? fetchedStreams[0]
+        await MainActor.run { self.fillPendingItemStream(id: queued.id, stream: stream) }
+    }
+
+    /// Fills in the stream URL + headers for a placeholder item created by batchDownload
+    /// and lets processQueue pick it up.
+    private func fillPendingItemStream(id: UUID, stream: StreamResult) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].streamURL = stream.url
+        items[idx].headers = stream.headers
+        items[idx].subtitleURL = stream.subtitleURL
+        items[idx].subtitleHeaders = stream.subtitleHeaders.isEmpty ? nil : stream.subtitleHeaders
+        items[idx].error = nil
+        persist()
+
+        if let subURL = stream.subtitleURL {
+            let captureID = id
+            // See note in download(): if subtitleHeaders weren't provided, reuse the
+            // video stream's headers — same source, same Referer/UA expectations.
+            let effectiveHeaders: [String: String] = (items[idx].subtitleHeaders?.isEmpty == false)
+                ? (items[idx].subtitleHeaders ?? [:])
+                : items[idx].headers
+            Task {
+                await self.downloadSubtitleFile(itemID: captureID, url: subURL, headers: effectiveHeaders)
+            }
+        } else {
+            Logger.shared.log("[Subtitles] Batch stream had no subtitle URL for ep \(items[idx].episodeNumber)", type: "Download")
+        }
+
+        processQueue()
+    }
+
+    /// Marks a placeholder item as .failed when its stream-extraction never succeeds.
+    private func markPendingItemFailed(id: UUID, reason: String) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].state = .failed
+        items[idx].error = reason
+        persist()
+        ToastManager.shared.show(
+            message: "Failed to fetch Ep \(items[idx].episodeNumber): \(reason)",
+            type: .warning
+        )
+    }
+
+    /// Calls `JSEngine.shared.fetchStreams` with one long-backoff retry on empty.
+    /// Empty results from CF-protected stream hosts are the typical rate-limit signature.
+    /// Single retry tuned long enough (16s) to clear animepahe-style cooldowns when the
+    /// initial 14s base spacing wasn't quite enough (e.g. the picker's recent fetch
+    /// already burned part of our budget for the first episode).
+    private static func fetchStreamsWithRetry(episodeUrl: String, epNum: Int) async -> [StreamResult] {
+        if let result = try? await JSEngine.shared.fetchStreams(episodeUrl: episodeUrl), !result.isEmpty {
+            return result
+        }
+        try? await Task.sleep(nanoseconds: 16_000_000_000) // 16s cooldown
+        return (try? await JSEngine.shared.fetchStreams(episodeUrl: episodeUrl)) ?? []
     }
 
     func retry(_ item: DownloadItem) {
@@ -310,7 +493,26 @@ final class DownloadManager: NSObject, ObservableObject {
         items[idx].error = nil
         items[idx].retryCount = 0
         persist()
-        processQueue()
+
+        // If this is a batch-queued item whose stream-extraction failed, re-run
+        // the single-episode extraction in the background instead of going to
+        // processQueue (which would no-op since streamURL is still nil).
+        if items[idx].streamURL == nil {
+            let id = item.id
+            let href = item.episodeHref
+            let preferredTitle = item.streamTitle
+            Task {
+                let fetched = await Self.fetchStreamsWithRetry(episodeUrl: href, epNum: 0)
+                guard !fetched.isEmpty else {
+                    await MainActor.run { self.markPendingItemFailed(id: id, reason: "No streams found") }
+                    return
+                }
+                let stream = fetched.first(where: { $0.title == preferredTitle }) ?? fetched[0]
+                await MainActor.run { self.fillPendingItemStream(id: id, stream: stream) }
+            }
+        } else {
+            processQueue()
+        }
     }
 
     func remove(_ item: DownloadItem) {
@@ -326,6 +528,9 @@ final class DownloadManager: NSObject, ObservableObject {
             } else {
                 try? FileManager.default.removeItem(at: path)
             }
+        }
+        if let subPath = item.relativeSubtitlePath {
+            try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(subPath))
         }
         items.removeAll { $0.id == item.id }
         persist()
@@ -360,11 +565,15 @@ final class DownloadManager: NSObject, ObservableObject {
             playURL = fileURL
             Logger.shared.log("[Downloads] Playing direct MP4: \(playURL)", type: "Download")
         }
+        let localSubtitle: String? = item.relativeSubtitlePath.flatMap { relPath in
+            let url = downloadDir.appendingPathComponent(relPath)
+            return FileManager.default.fileExists(atPath: url.path) ? url.absoluteString : nil
+        }
         return StreamResult(
             title: item.episodeTitle ?? "Episode \(item.episodeNumber)",
             url: playURL,
             headers: [:],
-            subtitle: nil
+            subtitle: localSubtitle
         )
     }
 
@@ -416,21 +625,24 @@ final class DownloadManager: NSObject, ObservableObject {
     private func processQueue() {
         let activeCount = items.filter { $0.state == .downloading }.count
         let availableSlots = maxConcurrentDownloads - activeCount
-        
+
         guard availableSlots > 0 else { return }
-        
-        let pendingItems = items.filter { $0.state == .pending }
+
+        // Only pick items whose stream URL has been resolved. Items pre-queued by
+        // batchDownload sit in .pending with streamURL == nil until the sequential
+        // stream-extraction task fills them in.
+        let pendingItems = items.filter { $0.state == .pending && $0.streamURL != nil }
         for i in 0..<min(pendingItems.count, availableSlots) {
             let item = pendingItems[i]
             startDownload(item)
         }
     }
-    
+
     private func startDownload(_ item: DownloadItem) {
         // Mark downloading immediately so processQueue() doesn't re-fire while probing.
         updateState(item.id, .downloading)
         let id = item.id
-        let url = item.streamURL
+        guard let url = item.streamURL else { return }
         let headers = item.headers
         Task {
             let isHLS = await Self.detectIsHLS(url: url, headers: headers)
@@ -463,12 +675,13 @@ final class DownloadManager: NSObject, ObservableObject {
     
     private func startHLS(_ item: DownloadItem) {
         let id = item.id
+        guard let streamURL = item.streamURL else { return }
         updateState(id, .downloading)
         let task = Task {
             do {
                 let manifestPath = try await hlsDownloader.download(
                     id: id,
-                    url: item.streamURL,
+                    url: streamURL,
                     headers: item.headers,
                     downloadDir: downloadDir,
                     onProgress: { [weak self] p in
@@ -483,9 +696,10 @@ final class DownloadManager: NSObject, ObservableObject {
         }
         hlsTasks[id] = task
     }
-    
+
     private func startMP4(_ item: DownloadItem) {
-        var req = URLRequest(url: item.streamURL)
+        guard let streamURL = item.streamURL else { return }
+        var req = URLRequest(url: streamURL)
         item.headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
         
         let task = urlSession.downloadTask(with: req)
@@ -594,6 +808,16 @@ final class DownloadManager: NSObject, ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "shirox_downloads_v3"),
            let decoded = try? JSONDecoder().decode([DownloadItem].self, from: data) {
             items = decoded.map { item in
+                // Stranded batch-queued items (state=.pending, streamURL=nil) from a
+                // previous session never got their stream extracted. Mark them failed
+                // so the user can retry — auto-resuming on app launch would surprise
+                // people with network activity.
+                if item.state == .pending && item.streamURL == nil {
+                    var reset = item
+                    reset.state = .failed
+                    reset.error = "Stream extraction was interrupted"
+                    return reset
+                }
                 guard item.state == .completed, let fileName = item.fileName else { return item }
                 let fileURL = downloadDir.appendingPathComponent(fileName)
                 let checkPath = (fileName.hasSuffix(".m3u8"))
