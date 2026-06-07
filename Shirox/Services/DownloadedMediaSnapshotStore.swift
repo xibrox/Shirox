@@ -207,6 +207,83 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
         persist(snap)
     }
 
+    // MARK: - Stage 1: Per-media enrichment (poster + banner + AniList metadata + module detail)
+
+    /// Idempotent. Fetches the per-media artwork and metadata for a snapshot.
+    /// Coalesced by `inFlightEnrich` keyed by `mediaKey`, so concurrent batch-download
+    /// items don't double-fetch AniList for the same show.
+    ///
+    /// Poster and banner both walk the priority chain TVDB → AniList → module.
+    /// Successfully downloaded source is recorded in `posterSource` / `bannerSource`
+    /// so a later run can upgrade a low-priority pick (e.g. .module) to a better one
+    /// once the network is back.
+    func enrichMedia(mediaKey: String, item: DownloadItem, moduleImageUrl: String) async {
+        guard !inFlightEnrich.contains(mediaKey) else { return }
+        inFlightEnrich.insert(mediaKey)
+        defer { inFlightEnrich.remove(mediaKey) }
+
+        var snap = snapshots[mediaKey] ?? newSnapshot(item: item)
+
+        let aniListMedia = await fetchAniListIfNeeded(snap: snap)
+        let tvdbArt: (poster: String?, fanart: String?) = await {
+            guard let aid = snap.aniListID else { return (nil, nil) }
+            return await TVDBMappingService.shared.getArtwork(for: aid)
+        }()
+
+        // Poster: TVDB → AniList → module. Stop at first success.
+        if snap.posterFile == nil || canUpgrade(snap.posterSource) {
+            let candidates: [(AssetSource, String?)] = [
+                (.tvdb,    tvdbArt.poster),
+                (.anilist, aniListMedia?.coverImage.extraLarge ?? aniListMedia?.coverImage.large),
+                (.module,  moduleImageUrl)
+            ]
+            for (source, url) in candidates {
+                guard let u = url, !u.isEmpty else { continue }
+                if await downloadImage(from: u, into: mediaKey, relativeName: "poster.jpg") {
+                    snap.posterFile = "poster.jpg"
+                    snap.posterSource = source
+                    break
+                }
+            }
+        }
+
+        // Banner: same chain. Module URL is last-resort so the hero always has
+        // *something* offline, even for shows with no banner art anywhere.
+        if snap.bannerFile == nil || canUpgrade(snap.bannerSource) {
+            let candidates: [(AssetSource, String?)] = [
+                (.tvdb,    tvdbArt.fanart),
+                (.anilist, aniListMedia?.bannerImage),
+                (.module,  moduleImageUrl)
+            ]
+            for (source, url) in candidates {
+                guard let u = url, !u.isEmpty else { continue }
+                if await downloadImage(from: u, into: mediaKey, relativeName: "banner.jpg") {
+                    snap.bannerFile = "banner.jpg"
+                    snap.bannerSource = source
+                    break
+                }
+            }
+        }
+
+        apply(aniList: aniListMedia, to: &snap)
+        await applyModuleDetailIfNeeded(item: item, snap: &snap)
+
+        // Graduate the snapshot when we successfully reached AniList — i.e. we had
+        // network to walk the priority chain. If aniListID is nil there's nothing
+        // to graduate toward anyway, so graduate immediately.
+        //
+        // What this guarantees: a snapshot saved while offline (aniListMedia == nil
+        // despite aniListID != nil) stays at v0 and is retried on the next online
+        // open. A snapshot saved online graduates even if TVDB/AniList genuinely
+        // had no banner art — we did what we could, no infinite retry.
+        if aniListMedia != nil || snap.aniListID == nil {
+            snap.schemaVersion = DownloadedMediaSnapshot.currentSchemaVersion
+        }
+
+        snap.updatedAt = Date()
+        persist(snap)
+    }
+
     /// Synchronous backfill for pre-upgrade downloads (no network). Constructs a minimal
     /// snapshot from `DownloadItem` fields alone. Persisted so the next visit skips this path.
     func backfill(mediaTitle: String, moduleId: String?, items: [DownloadItem]) -> DownloadedMediaSnapshot {
