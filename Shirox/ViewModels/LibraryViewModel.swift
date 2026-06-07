@@ -1,6 +1,10 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    static let remoteLibraryProgressDidPush = Notification.Name("remoteLibraryProgressDidPush")
+}
+
 @MainActor
 final class LibraryViewModel: ObservableObject {
     @Published var entries: [LibraryEntry] = []
@@ -26,6 +30,15 @@ final class LibraryViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 Task { await self.refresh() }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .remoteLibraryProgressDidPush)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.lastFetchedAt = nil
+                    self?.cacheValid = false
+                }
             }
             .store(in: &cancellables)
     }

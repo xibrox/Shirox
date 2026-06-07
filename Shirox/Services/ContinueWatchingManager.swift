@@ -225,7 +225,10 @@ import Combine
             persist()
             
         } catch {
-            Logger.shared.log("[CW] Sync failed: \(error.localizedDescription)", type: "Error")
+            // No internet → expected silent failure; anything else is worth logging.
+            if !ProviderManager.isOfflineError(error) {
+                Logger.shared.log("[CW] Sync failed: \(error.localizedDescription)", type: "Error")
+            }
         }
     }
 
@@ -252,7 +255,9 @@ import Combine
             }
             persist()
         } catch {
-            Logger.shared.log("[CW] MAL sync failed: \(error.localizedDescription)", type: "Error")
+            if !ProviderManager.isOfflineError(error) {
+                Logger.shared.log("[CW] MAL sync failed: \(error.localizedDescription)", type: "Error")
+            }
         }
     }
 
@@ -767,6 +772,12 @@ import Combine
                         mediaId: mid, status: targetStatus, progress: ep, score: 0)
                 }
             }
+        }
+
+        let aniListWillWrite = aniListEnabled && AniListAuthManager.shared.isLoggedIn
+        let malWillWrite     = malEnabled     && MALAuthManager.shared.isLoggedIn
+        if aniListWillWrite || malWillWrite {
+            NotificationCenter.default.post(name: .remoteLibraryProgressDidPush, object: nil)
         }
     }
 
