@@ -284,6 +284,78 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
         persist(snap)
     }
 
+    // MARK: - Stage 2: Per-episode enrichment (TVDB title + thumbnail with content-hash dedup)
+
+    /// Idempotent. Fetches the TVDB title and thumbnail for one episode of one media.
+    /// **Not** coalesced — every batched episode runs its own enrichEpisode call.
+    /// Bytes-level dedup avoids writing duplicate files when TVDB serves the same
+    /// fallback image under different URLs across episodes.
+    func enrichEpisode(mediaKey: String, episodeNumber: Int, item: DownloadItem) async {
+        guard var snap = snapshots[mediaKey] else { return }
+        let epNum = episodeNumber
+
+        var ep = snap.episodes[epNum] ?? EpisodeSnapshot(
+            number: epNum,
+            title: item.episodeTitle,
+            thumbnailFile: nil,
+            thumbnailContentHash: nil
+        )
+
+        // Skip the network roundtrip entirely if we already have a thumbnail file
+        // saved for this episode and a title.
+        if ep.thumbnailFile != nil && ep.title != nil {
+            snap.episodes[epNum] = ep
+            snap.updatedAt = Date()
+            persist(snap)
+            return
+        }
+
+        if let aid = snap.aniListID {
+            let eps = await TVDBMappingService.shared.getEpisodes(for: aid)
+            if let match = eps.first(where: { $0.episode == epNum }) {
+                if ep.title == nil { ep.title = match.title }
+
+                if ep.thumbnailFile == nil,
+                   let thumbURL = match.thumbnail, !thumbURL.isEmpty,
+                   let data = await fetchImageData(urlString: thumbURL) {
+                    let hash = sha1Hex(data)
+
+                    // Content-hash dedup: if any other episode in this snapshot
+                    // already saved bytes with the same hash, point this episode at
+                    // that existing file instead of writing a duplicate.
+                    if let existingPath = snap.episodes.values
+                        .first(where: { $0.thumbnailContentHash == hash })?
+                        .thumbnailFile
+                    {
+                        ep.thumbnailFile = existingPath
+                        ep.thumbnailContentHash = hash
+                        Logger.shared.log(
+                            "[Snapshot] Ep \(epNum) thumbnail deduped to \(existingPath) (hash \(hash.prefix(8)))",
+                            type: "Download")
+                    } else {
+                        let relative = "thumbnails/ep_\(epNum).jpg"
+                        let dest = folderURL(for: mediaKey).appendingPathComponent(relative)
+                        try? FileManager.default.createDirectory(
+                            at: dest.deletingLastPathComponent(),
+                            withIntermediateDirectories: true)
+                        if (try? data.write(to: dest, options: .atomic)) != nil {
+                            ep.thumbnailFile = relative
+                            ep.thumbnailContentHash = hash
+                            Logger.shared.log(
+                                "[Snapshot] Ep \(epNum) thumbnail saved \(relative) (\(data.count) bytes)",
+                                type: "Download")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Always upsert (even with no TVDB match) so the offline view sees the episode.
+        snap.episodes[epNum] = ep
+        snap.updatedAt = Date()
+        persist(snap)
+    }
+
     /// Synchronous backfill for pre-upgrade downloads (no network). Constructs a minimal
     /// snapshot from `DownloadItem` fields alone. Persisted so the next visit skips this path.
     func backfill(mediaTitle: String, moduleId: String?, items: [DownloadItem]) -> DownloadedMediaSnapshot {
