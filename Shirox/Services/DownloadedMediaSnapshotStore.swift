@@ -253,6 +253,51 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
         persist(snap)
     }
 
+    // MARK: - Stage 3: Auto-upgrade stale snapshots
+
+    /// Re-runs the per-media and per-episode stages for a snapshot whose
+    /// `schemaVersion` is below `currentSchemaVersion`. Called fire-and-forget
+    /// from DownloadsView when navigating into a downloaded series.
+    ///
+    /// Both stages are idempotent: fields already at the best-available source
+    /// are skipped, fields that previously failed (network blip, .module fallback)
+    /// are retried. If the network is down now, every `try?`-wrapped call returns
+    /// nil and the snapshot stays at v0 — we try again on the next open.
+    func reenrichIfStale(mediaKey: String) async {
+        guard let snap = snapshots[mediaKey],
+              snap.schemaVersion < DownloadedMediaSnapshot.currentSchemaVersion
+        else { return }
+
+        // Find a representative DownloadItem for this media. All completed items
+        // for the same media share mediaTitle/moduleId/aniListID, so any one will do
+        // as the source of (imageUrl, detailHref) for enrichMedia.
+        guard let representative = DownloadManager.shared.items.first(where: {
+            $0.mediaTitle == snap.mediaTitle && $0.moduleId == snap.moduleId
+        }) else { return }
+
+        await enrichMedia(
+            mediaKey: mediaKey,
+            item: representative,
+            moduleImageUrl: representative.imageUrl)
+
+        // Re-run per-episode for every episode the snapshot knows about. We iterate
+        // the snapshot's keys (not DownloadManager.items) because the snapshot is
+        // the source of truth for which episodes belong to this media offline.
+        let epNums = snap.episodes.keys.sorted()
+        for n in epNums {
+            // Find the matching DownloadItem to source episodeTitle from. If none
+            // exists (degenerate case), pass `representative` with the right
+            // episode number — enrichEpisode reads episodeTitle off `item` only as
+            // a fallback when TVDB has no title.
+            let perItem = DownloadManager.shared.items.first(where: {
+                $0.mediaTitle == snap.mediaTitle &&
+                $0.moduleId == snap.moduleId &&
+                $0.episodeNumber == n
+            }) ?? representative
+            await enrichEpisode(mediaKey: mediaKey, episodeNumber: n, item: perItem)
+        }
+    }
+
     /// Synchronous backfill for pre-upgrade downloads (no network). Constructs a minimal
     /// snapshot from `DownloadItem` fields alone. Persisted so the next visit skips this path.
     func backfill(mediaTitle: String, moduleId: String?, items: [DownloadItem]) -> DownloadedMediaSnapshot {
