@@ -112,6 +112,16 @@ struct DownloadsView: View {
                                             moduleId: moduleGroup.id,
                                             aniListID: snap.aniListID
                                         )
+                                        .task {
+                                            // One-shot auto-upgrade for snapshots written by the
+                                            // pre-v2 enrichment pipeline. Fire-and-forget — the
+                                            // view renders whatever's on disk now and re-renders
+                                            // when the upgrade persists.
+                                            if snap.schemaVersion < DownloadedMediaSnapshot.currentSchemaVersion {
+                                                await DownloadedMediaSnapshotStore.shared
+                                                    .reenrichIfStale(mediaKey: snap.mediaKey)
+                                            }
+                                        }
                                     } label: {
                                         MediaGroupRow(
                                             mediaTitle: mediaGroup.mediaTitle,
