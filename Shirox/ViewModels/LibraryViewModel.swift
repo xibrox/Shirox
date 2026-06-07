@@ -1,6 +1,10 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    static let remoteLibraryProgressDidPush = Notification.Name("remoteLibraryProgressDidPush")
+}
+
 @MainActor
 final class LibraryViewModel: ObservableObject {
     @Published var entries: [LibraryEntry] = []
@@ -14,6 +18,8 @@ final class LibraryViewModel: ObservableObject {
 
     private var allEntries: [LibraryEntry] = []
     private var cacheValid = false
+    private var lastFetchedAt: Date?
+    private let minAutoRefreshInterval: TimeInterval = 30
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -24,6 +30,15 @@ final class LibraryViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 Task { await self.refresh() }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .remoteLibraryProgressDidPush)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.lastFetchedAt = nil
+                    self?.cacheValid = false
+                }
             }
             .store(in: &cancellables)
     }
@@ -84,24 +99,37 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    func autoRefreshIfNeeded() async {
+        if let last = lastFetchedAt, Date().timeIntervalSince(last) < minAutoRefreshInterval {
+            return
+        }
+        let silent = !allEntries.isEmpty
+        cacheValid = false
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.fetch(silent: silent) }
+            group.addTask { await ContinueWatchingManager.shared.syncWithAniList() }
+        }
+    }
+
     // MARK: - Private
 
-    private func fetch() async {
+    private func fetch(silent: Bool = false) async {
         if cacheValid { applyFilter(); return }
-        if allEntries.isEmpty { isLoading = true }
-        error = nil
+        if allEntries.isEmpty && !silent { isLoading = true }
+        if !silent { error = nil }
         do {
             let result = try await ProviderManager.shared.call { try await $0.fetchLibrary() }
             allEntries = result
             cacheValid = true
+            lastFetchedAt = Date()
             var seen = Set<String>()
             customListNames = result.compactMap { $0.customListName }.filter { seen.insert($0).inserted }.sorted()
             UserDefaults.standard.set(customListNames, forKey: "libraryCustomListNames")
             applyFilter()
         } catch {
-            self.error = error.localizedDescription
+            if !silent { self.error = error.localizedDescription }
         }
-        isLoading = false
+        if !silent { isLoading = false }
     }
 
     private func applyFilter() {

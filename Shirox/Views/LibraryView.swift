@@ -444,7 +444,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .task { await vm.load() }
+        .task { await vm.autoRefreshIfNeeded() }
         #if os(iOS)
         .onAppear {
             presentationWindow = UIApplication.shared.connectedScenes

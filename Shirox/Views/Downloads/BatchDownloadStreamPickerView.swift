@@ -6,12 +6,14 @@ import SwiftUI
 struct BatchDownloadStreamPickerView: View {
     let mediaTitle: String
     let imageUrl: String
+    var aniListID: Int? = nil
     let moduleId: String?
     let episodes: [EpisodeLink]  // full EpisodeLink list so we can match by number
     let episodeNumbers: [Int]    // the selected subset to download
     let onDismiss: () -> Void
 
     @State private var streams: [StreamResult] = []
+    @State private var firstEpisodeHref: String? = nil
     @State private var isLoading = true
     @State private var error: String? = nil
 
@@ -90,6 +92,7 @@ struct BatchDownloadStreamPickerView: View {
         do {
             let result = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
             streams = result.sorted { $0.title < $1.title }
+            firstEpisodeHref = episode.href
             isLoading = false
         } catch {
             self.error = error.localizedDescription
@@ -98,15 +101,21 @@ struct BatchDownloadStreamPickerView: View {
     }
 
     private func startBatchDownload(streamTitle: String) {
+        // Pass through the already-fetched first-episode streams so the batch loop
+        // doesn't have to call extractStreamUrl again for it (one less call against
+        // the stream host's rate limiter).
+        let prefetched: (episodeHref: String, streams: [StreamResult])? = firstEpisodeHref
+            .map { (episodeHref: $0, streams: streams) }
         DownloadManager.shared.batchDownload(
             mediaTitle: mediaTitle,
             imageUrl: imageUrl,
-            aniListID: nil,
+            aniListID: aniListID,
             moduleId: moduleId,
             detailHref: nil,
             episodes: episodes,
             episodeNumbers: episodeNumbers,
-            streamTitle: streamTitle
+            streamTitle: streamTitle,
+            preFetchedFirstEpisode: prefetched
         )
     }
 }

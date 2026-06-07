@@ -47,12 +47,15 @@ import Combine
             markWatched(item)
             let nextEp = item.episodeNumber + 1
             Logger.shared.log("[CW] save threshold crossed: ep=\(item.episodeNumber) isAiring=\(String(describing: item.isAiring)) totalEps=\(String(describing: item.totalEpisodes)) availableEps=\(String(describing: item.availableEpisodes)) title=\(item.mediaTitle)", type: "Debug")
-            // Only block "Up Next" when the show is explicitly finished with a confirmed episode
-            // count. For airing/unknown shows, always create the placeholder — stale placeholders
-            // are cleaned up by notifyNewEpisodesAvailable when the detail view reloads.
+            // Block "Up Next" if we've confirmed there's no next episode to load.
+            // Priority: AniList confirmed total → module available count → assume more exist.
+            // availableEpisodes covers ongoing shows at their current last episode and
+            // completed shows that lack AniList isAiring/totalEpisodes metadata.
             let isLastEpisode: Bool
             if item.isAiring == false, let cap = item.totalEpisodes {
                 isLastEpisode = item.episodeNumber >= cap
+            } else if let avail = item.availableEpisodes {
+                isLastEpisode = item.episodeNumber >= avail
             } else {
                 isLastEpisode = false
             }
@@ -225,7 +228,10 @@ import Combine
             persist()
             
         } catch {
-            Logger.shared.log("[CW] Sync failed: \(error.localizedDescription)", type: "Error")
+            // No internet → expected silent failure; anything else is worth logging.
+            if !ProviderManager.isOfflineError(error) {
+                Logger.shared.log("[CW] Sync failed: \(error.localizedDescription)", type: "Error")
+            }
         }
     }
 
@@ -252,7 +258,9 @@ import Combine
             }
             persist()
         } catch {
-            Logger.shared.log("[CW] MAL sync failed: \(error.localizedDescription)", type: "Error")
+            if !ProviderManager.isOfflineError(error) {
+                Logger.shared.log("[CW] MAL sync failed: \(error.localizedDescription)", type: "Error")
+            }
         }
     }
 
@@ -767,6 +775,12 @@ import Combine
                         mediaId: mid, status: targetStatus, progress: ep, score: 0)
                 }
             }
+        }
+
+        let aniListWillWrite = aniListEnabled && AniListAuthManager.shared.isLoggedIn
+        let malWillWrite     = malEnabled     && MALAuthManager.shared.isLoggedIn
+        if aniListWillWrite || malWillWrite {
+            NotificationCenter.default.post(name: .remoteLibraryProgressDidPush, object: nil)
         }
     }
 

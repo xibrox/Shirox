@@ -29,6 +29,11 @@ final class DetailViewModel: ObservableObject {
     @Published var aniListID: Int?
     @Published var isMatchingAniList = false
 
+    /// Set by loadOffline. Tells load() to treat snapshot data as authoritative for
+    /// text fields (synopsis/aliases/airdate) and to only accept the fetched episode
+    /// list when it is plausibly real.
+    private(set) var hydratedFromSnapshot = false
+
     /// Stream selected by user in the picker — presented after the sheet fully dismisses.
     var pendingStream: StreamResult?
 
@@ -40,16 +45,17 @@ final class DetailViewModel: ObservableObject {
     private var streamsTask: Task<Void, Never>?
 
     func load(item: SearchItem) {
-        guard detail == nil && !isMatchingAniList else { return }
+        guard !isMatchingAniList else { return }
+        guard !item.href.isEmpty else { return }
         detailHref = item.href
-        
+
         // Check if we have a saved mapping first
         if aniListID == nil {
             if let savedID = AniListMappingManager.shared.getMapping(title: item.title) {
                 aniListID = savedID
             }
         }
-        
+
         // If still no ID, try auto-matching
         if aniListID == nil {
             Task {
@@ -69,19 +75,121 @@ final class DetailViewModel: ObservableObject {
                     title: item.title,
                     image: item.image
                 )
+                // Snapshot is authoritative for text fields: AniList synopsis/year are
+                // higher-quality than the module's, and an offline JS module that swallows
+                // its own network errors often returns the error string as `description`.
+                // We never let that overwrite a hydrated snapshot.
+                if hydratedFromSnapshot, let existing = detail {
+                    d = MediaDetail(
+                        title: existing.title,
+                        image: existing.image,
+                        description: existing.description,
+                        aliases: existing.aliases,
+                        airdate: existing.airdate,
+                        episodes: existing.episodes
+                    )
+                } else if let existing = detail, d.episodes.isEmpty {
+                    d.episodes = existing.episodes
+                }
                 detail = d
                 isLoadingDetail = false
 
                 isLoadingEpisodes = true
-                d.episodes = try await JSEngine.shared.fetchEpisodes(url: item.href)
-                detail = d
+                let fetched = try await JSEngine.shared.fetchEpisodes(url: item.href)
+                // Only overwrite the existing episode list when the fetched one looks
+                // strictly real. Modules that swallow their own network errors often
+                // return [] or [{href: "stub"}] which parses to episode-0 entries —
+                // the snapshot's actual download list survives that.
+                let looksValid = !fetched.isEmpty
+                    && fetched.allSatisfy { !$0.href.isEmpty }
+                    && (!hydratedFromSnapshot || fetched.allSatisfy { $0.number > 0 })
+                if looksValid {
+                    d.episodes = fetched
+                    detail = d
+                }
             } catch {
-                errorMessage = error.localizedDescription
+                // If we already rendered something (e.g. from an offline snapshot),
+                // silently keep that view instead of replacing it with an error screen.
+                if detail == nil {
+                    errorMessage = error.localizedDescription
+                }
             }
             isLoadingDetail = false
             isLoadingEpisodes = false
         }
     }
+
+    #if os(iOS)
+    /// Offline mode: hydrate from a persisted snapshot. No network calls are issued.
+    /// Episodes are emitted as `EpisodeLink` with empty href (offline mode never resolves them).
+    func loadOffline(snapshot: DownloadedMediaSnapshot) {
+        let poster: String
+        if let file = snapshot.posterFile {
+            poster = DownloadedMediaSnapshotStore.shared
+                .localFileURL(in: snapshot, relative: file)
+                .absoluteString
+        } else {
+            poster = ""
+        }
+
+        let episodeLinks: [EpisodeLink] = snapshot.episodes
+            .values
+            .sorted(by: { $0.number < $1.number })
+            .map { EpisodeLink(number: Double($0.number), href: "") }
+
+        self.detail = MediaDetail(
+            title: snapshot.mediaTitle,
+            image: poster,
+            description: snapshot.synopsis ?? "",
+            aliases: snapshot.aliases ?? "",
+            airdate: snapshot.airdate ?? (snapshot.seasonYear.map { String($0) } ?? ""),
+            episodes: episodeLinks
+        )
+
+        let bannerURLString: String? = snapshot.bannerFile.map {
+            DownloadedMediaSnapshotStore.shared.localFileURL(in: snapshot, relative: $0).absoluteString
+        }
+        self.aniListMedia = Media(
+            id: snapshot.aniListID ?? 0,
+            idMal: nil,
+            provider: .anilist,
+            title: MediaTitle(romaji: snapshot.mediaTitle, english: snapshot.mediaTitle, native: nil),
+            coverImage: MediaCoverImage(large: poster, extraLarge: poster),
+            bannerImage: bannerURLString,
+            description: snapshot.synopsis,
+            episodes: snapshot.episodes.keys.max(),
+            status: snapshot.statusDisplay.flatMap(Self.aniListStatusRaw),
+            averageScore: snapshot.averageScore,
+            genres: snapshot.genres,
+            season: nil,
+            seasonYear: snapshot.seasonYear,
+            nextAiringEpisode: nil,
+            relations: nil,
+            type: nil,
+            format: snapshot.format
+        )
+
+        self.aniListID = snapshot.aniListID
+        self.detailHref = nil
+        self.isLoadingDetail = false
+        self.isLoadingEpisodes = false
+        self.isLoadingAniListMedia = false
+        self.hydratedFromSnapshot = true
+    }
+
+    /// `Media.statusDisplay` is computed from raw status codes (e.g. "RELEASING" → "Airing").
+    /// We stored the display string, so reverse-map for round-trip consistency.
+    private static func aniListStatusRaw(from display: String) -> String? {
+        switch display {
+        case "Airing": return "RELEASING"
+        case "Finished": return "FINISHED"
+        case "Upcoming": return "NOT_YET_RELEASED"
+        case "Cancelled": return "CANCELLED"
+        case "Hiatus": return "HIATUS"
+        default: return display
+        }
+    }
+    #endif
 
     private func fetchAniListMetadata(id: Int) {
         Task {
@@ -216,7 +324,7 @@ final class DetailViewModel: ObservableObject {
             episodeNumber: Int(episode.number),
             episodeTitle: pendingEpisodeTitle,
             imageUrl: detail.image,
-            aniListID: nil,
+            aniListID: aniListID,
             moduleId: ModuleManager.shared.activeModule?.id,
             detailHref: detailHref,
             episodeHref: episode.href,
