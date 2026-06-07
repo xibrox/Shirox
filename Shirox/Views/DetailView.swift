@@ -778,6 +778,19 @@ struct DetailView: View {
         }
     }
 
+    /// Stretchy hero background URL. Offline mode prefers the snapshot's banner file
+    /// when available so the hero shows a true banner image instead of repeating
+    /// the floating poster.
+    private var heroBannerURL: String {
+        #if os(iOS)
+        if let snap = offlineSnapshot, let banner = snap.bannerFile {
+            return DownloadedMediaSnapshotStore.shared
+                .localFileURL(in: snap, relative: banner).absoluteString
+        }
+        #endif
+        return item.image
+    }
+
     // MARK: - Hero (unchanged, but poster overlay uses neutral strokes)
     private var heroSection: some View {
         ZStack(alignment: .bottom) {
@@ -788,7 +801,7 @@ struct DetailView: View {
                 let imageH = 420 + stretch + scrollDown * 0.5
                 let imageY = scrollDown * 0.5 - stretch
 
-                CachedAsyncImage(urlString: item.image)
+                CachedAsyncImage(urlString: heroBannerURL)
                     .frame(width: proxy.size.width, height: imageH)
                     .clipped()
                     .offset(y: imageY)
