@@ -94,117 +94,14 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
 
     // MARK: - Enrichment (download-time only)
 
-    /// Download-time entry point. Creates or updates the snapshot for this item's media,
-    /// fetching AniList metadata once per media and TVDB thumbnail for this specific episode.
-    /// All network calls are silent on failure — partial snapshots are valid.
+    /// Public download-time entry point. Delegates to the two stages.
+    /// API kept stable so DownloadManager call sites don't need to change.
     func enrich(item: DownloadItem, imageUrl: String, aniListID: Int?) async {
-        let key = DownloadedMediaSnapshot.computeKey(mediaTitle: item.mediaTitle, moduleId: item.moduleId)
-
-        // Coalesce concurrent batch downloads — only one enrichment per mediaKey at a time.
-        if inFlightEnrich.contains(key) { return }
-        inFlightEnrich.insert(key)
-        defer { inFlightEnrich.remove(key) }
-
-        var snap = snapshots[key] ?? DownloadedMediaSnapshot(
-            mediaKey: key,
-            mediaTitle: item.mediaTitle,
-            moduleId: item.moduleId,
-            aniListID: aniListID,
-            posterFile: nil,
-            bannerFile: nil,
-            synopsis: nil,
-            genres: nil,
-            averageScore: nil,
-            statusDisplay: nil,
-            format: nil,
-            seasonYear: nil,
-            airdate: nil,
-            aliases: nil,
-            episodes: [:],
-            updatedAt: Date()
-        )
-
-        // Poster: only download if we don't have it yet.
-        if snap.posterFile == nil, !imageUrl.isEmpty {
-            if await downloadImage(from: imageUrl, into: snap.mediaKey, relativeName: "poster.jpg") {
-                snap.posterFile = "poster.jpg"
-            }
-        }
-
-        // AniList metadata + banner: fetch once per media (skip if synopsis already populated).
-        if let aid = aniListID, snap.synopsis == nil {
-            if let raw = try? await AniListService.shared.detail(id: aid) {
-                let media = AniListProvider.shared.mapMedia(raw)
-                snap.synopsis = media.plainDescription
-                snap.genres = media.genres
-                snap.averageScore = media.averageScore
-                snap.statusDisplay = media.statusDisplay
-                snap.format = media.format
-                snap.seasonYear = media.seasonYear
-
-                if let banner = media.bannerImage, !banner.isEmpty,
-                   await downloadImage(from: banner, into: snap.mediaKey, relativeName: "banner.jpg") {
-                    snap.bannerFile = "banner.jpg"
-                }
-            }
-        }
-
-        // Module-provided airdate + aliases (different surface than AniList — some shows
-        // get a nice "Aired: Oct 5, 2007 to Mar 28, 2008" / "Duration: 24m" here). Skip
-        // if we already captured them.
-        if (snap.airdate == nil || snap.aliases == nil), let href = item.detailHref, !href.isEmpty {
-            if let detail = try? await JSEngine.shared.fetchDetails(
-                url: href,
-                title: item.mediaTitle,
-                image: item.imageUrl
-            ) {
-                if snap.airdate == nil, detail.airdate != "N/A", !detail.airdate.isEmpty {
-                    snap.airdate = detail.airdate
-                }
-                if snap.aliases == nil, detail.aliases != "N/A", !detail.aliases.isEmpty {
-                    snap.aliases = detail.aliases
-                }
-            }
-        }
-
-        // Per-episode TVDB thumbnail + title for the episode being downloaded.
-        let epNum = item.episodeNumber
-        if let aid = aniListID {
-            let eps = await TVDBMappingService.shared.getEpisodes(for: aid)
-            // TVDB often returns the same fallback URL (typically the show's poster)
-            // for episodes that don't actually have unique per-episode art. We only
-            // accept a thumbnail URL when this episode is the FIRST one to use it —
-            // otherwise the row gets a placeholder instead of a duplicate.
-            let firstEpisodeForThumbnail: [String: Int] = eps.reduce(into: [:]) { acc, ep in
-                guard let t = ep.thumbnail, !t.isEmpty else { return }
-                if let existing = acc[t] {
-                    acc[t] = min(existing, ep.episode)
-                } else {
-                    acc[t] = ep.episode
-                }
-            }
-
-            if let match = eps.first(where: { $0.episode == epNum }) {
-                let relative = "thumbnails/ep_\(epNum).jpg"
-                var existing = snap.episodes[epNum] ?? EpisodeSnapshot(number: epNum, title: nil, thumbnailFile: nil)
-                if existing.title == nil { existing.title = match.title }
-                let isFirstOccurrence = match.thumbnail.flatMap { firstEpisodeForThumbnail[$0] == epNum } ?? false
-                if existing.thumbnailFile == nil,
-                   let thumb = match.thumbnail, !thumb.isEmpty, isFirstOccurrence,
-                   await downloadImage(from: thumb, into: snap.mediaKey, relativeName: relative) {
-                    existing.thumbnailFile = relative
-                }
-                snap.episodes[epNum] = existing
-            }
-        }
-
-        // Always upsert this episode (even with no TVDB match) so the offline view sees it.
-        if snap.episodes[epNum] == nil {
-            snap.episodes[epNum] = EpisodeSnapshot(number: epNum, title: item.episodeTitle, thumbnailFile: nil)
-        }
-
-        snap.updatedAt = Date()
-        persist(snap)
+        _ = aniListID  // unused — DownloadItem already carries aniListID
+        let key = DownloadedMediaSnapshot.computeKey(
+            mediaTitle: item.mediaTitle, moduleId: item.moduleId)
+        await enrichMedia(mediaKey: key, item: item, moduleImageUrl: imageUrl)
+        await enrichEpisode(mediaKey: key, episodeNumber: item.episodeNumber, item: item)
     }
 
     // MARK: - Stage 1: Per-media enrichment (poster + banner + AniList metadata + module detail)
