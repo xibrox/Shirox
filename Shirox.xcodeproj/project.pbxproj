@@ -218,6 +218,7 @@
 		1279E5322FCA397700C9BA56 /* EpisodeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */; };
 		1279E5332FCA397700C9BA56 /* CastOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B22FCA397700C9BA56 /* CastOverlayView.swift */; };
 		1279E5342FCA397700C9BA56 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DC2FCA397700C9BA56 /* DetailView.swift */; };
+		34FEC549807840C99DE4F688 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		1279E5352FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */; };
 		1279E5362FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */; };
 		1279E5372FCA397700C9BA56 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DE2FCA397700C9BA56 /* HomeView.swift */; };
@@ -340,6 +341,7 @@
 		1279E5AB2FCA397700C9BA56 /* EpisodeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */; };
 		1279E5AC2FCA397700C9BA56 /* CastOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B22FCA397700C9BA56 /* CastOverlayView.swift */; };
 		1279E5AD2FCA397700C9BA56 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DC2FCA397700C9BA56 /* DetailView.swift */; };
+		17C26798164E438581BFC7F4 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		1279E5AE2FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */; };
 		1279E5AF2FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */; };
 		1279E5B02FCA397700C9BA56 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DE2FCA397700C9BA56 /* HomeView.swift */; };
@@ -515,6 +517,7 @@
 		1279E4DA2FCA397700C9BA56 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		1279E4DB2FCA397700C9BA56 /* ContinueWatchingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingCard.swift; sourceTree = "<group>"; };
 		1279E4DC2FCA397700C9BA56 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
+		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
 		1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeRowView.swift; sourceTree = "<group>"; };
 		1279E4DE2FCA397700C9BA56 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		1279E4DF2FCA397700C9BA56 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -767,6 +770,7 @@
 				1279E4DA2FCA397700C9BA56 /* BrowseView.swift */,
 				1279E4DB2FCA397700C9BA56 /* ContinueWatchingCard.swift */,
 				1279E4DC2FCA397700C9BA56 /* DetailView.swift */,
+				46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */,
 				1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */,
 				1279E4DE2FCA397700C9BA56 /* HomeView.swift */,
 				1279E4DF2FCA397700C9BA56 /* LibraryView.swift */,
@@ -1179,6 +1183,7 @@
 				1279E5322FCA397700C9BA56 /* EpisodeRowView.swift in Sources */,
 				1279E5332FCA397700C9BA56 /* CastOverlayView.swift in Sources */,
 				1279E5342FCA397700C9BA56 /* DetailView.swift in Sources */,
+				34FEC549807840C99DE4F688 /* RatingPromptView.swift in Sources */,
 				1279E5352FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */,
 				1279E5362FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */,
 				1279E5372FCA397700C9BA56 /* HomeView.swift in Sources */,
@@ -1312,6 +1317,7 @@
 				1279E5AB2FCA397700C9BA56 /* EpisodeRowView.swift in Sources */,
 				1279E5AC2FCA397700C9BA56 /* CastOverlayView.swift in Sources */,
 				1279E5AD2FCA397700C9BA56 /* DetailView.swift in Sources */,
+				17C26798164E438581BFC7F4 /* RatingPromptView.swift in Sources */,
 				1279E5AE2FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */,
 				1279E5AF2FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */,
 				1279E5B02FCA397700C9BA56 /* HomeView.swift in Sources */,
