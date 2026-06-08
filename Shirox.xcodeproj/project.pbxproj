@@ -114,6 +114,7 @@
 		121D9BA92FCA563E000FF9B4 /* AniListDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4D82FCA397700C9BA56 /* AniListDetailView.swift */; };
 		121D9BAA2FCA563E000FF9B4 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DE2FCA397700C9BA56 /* HomeView.swift */; };
 		121D9BAB2FCA563E000FF9B4 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */; };
+		8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		121D9BAC2FCA563E000FF9B4 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DC2FCA397700C9BA56 /* DetailView.swift */; };
 		121D9BAD2FCA563E000FF9B4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E42FCA397700C9BA56 /* SettingsView.swift */; };
 		121D9BAE2FCA563E000FF9B4 /* ViewTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E62FCA397700C9BA56 /* ViewTracker.swift */; };
@@ -198,6 +199,7 @@
 		1279E5202FCA397700C9BA56 /* AniListLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47C2FCA397700C9BA56 /* AniListLibraryService.swift */; };
 		1279E5212FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */; };
 		1279E5222FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */; };
+		17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		1279E5232FCA397700C9BA56 /* DownloadRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */; };
 		1279E5242FCA397700C9BA56 /* AniListNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4672FCA397700C9BA56 /* AniListNotification.swift */; };
 		1279E5252FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
@@ -319,6 +321,7 @@
 		1279E5992FCA397700C9BA56 /* AniListLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47C2FCA397700C9BA56 /* AniListLibraryService.swift */; };
 		1279E59A2FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */; };
 		1279E59B2FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */; };
+		6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		1279E59C2FCA397700C9BA56 /* DownloadRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */; };
 		1279E59D2FCA397700C9BA56 /* AniListNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4672FCA397700C9BA56 /* AniListNotification.swift */; };
 		1279E59E2FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
@@ -496,6 +499,7 @@
 		1279E4C92FCA397700C9BA56 /* ProfileStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsView.swift; sourceTree = "<group>"; };
 		1279E4CA2FCA397700C9BA56 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
+		21201D48C8E94395977F4564 /* ScoreInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreInputView.swift; sourceTree = "<group>"; };
 		1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassSheetView.swift; sourceTree = "<group>"; };
 		1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SystemBackground.swift"; sourceTree = "<group>"; };
 		1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentUnavailableView.swift; sourceTree = "<group>"; };
@@ -735,6 +739,7 @@
 			children = (
 				1251C4582FCAE1AA002AD0B2 /* LegalWebView.swift */,
 				1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */,
+				21201D48C8E94395977F4564 /* ScoreInputView.swift */,
 				1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */,
 				1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */,
 				1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */,
@@ -1055,6 +1060,7 @@
 				121D9BA92FCA563E000FF9B4 /* AniListDetailView.swift in Sources */,
 				121D9BAA2FCA563E000FF9B4 /* HomeView.swift in Sources */,
 				121D9BAB2FCA563E000FF9B4 /* CachedAsyncImage.swift in Sources */,
+				8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */,
 				121D9BAC2FCA563E000FF9B4 /* DetailView.swift in Sources */,
 				121D9BAD2FCA563E000FF9B4 /* SettingsView.swift in Sources */,
 				121D9BAE2FCA563E000FF9B4 /* ViewTracker.swift in Sources */,
@@ -1154,6 +1160,7 @@
 				1279E5202FCA397700C9BA56 /* AniListLibraryService.swift in Sources */,
 				1279E5212FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */,
 				1279E5222FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
+				17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */,
 				1279E5232FCA397700C9BA56 /* DownloadRowView.swift in Sources */,
 				1279E5242FCA397700C9BA56 /* AniListNotification.swift in Sources */,
 				1279E5252FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */,
@@ -1286,6 +1293,7 @@
 				1279E5992FCA397700C9BA56 /* AniListLibraryService.swift in Sources */,
 				1279E59A2FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */,
 				1279E59B2FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
+				6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */,
 				1279E59C2FCA397700C9BA56 /* DownloadRowView.swift in Sources */,
 				1279E59D2FCA397700C9BA56 /* AniListNotification.swift in Sources */,
 				1279E59E2FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */,
