@@ -38,6 +38,7 @@ struct PlayerView: View {
     let currentStreamInitial: StreamResult
     let customDismiss: (() -> Void)?
     let onWatchNext: WatchNextLoader?
+    let onFinished: ((PlayerContext) -> Void)?
     let onStreamExpired: StreamRefetchLoader?
     let onSequelNeeded: SequelLoader?
     let onSequelAdvanced: ((SequelNavigation) -> Void)?
@@ -67,6 +68,7 @@ struct PlayerView: View {
     // AniList tracking
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @State private var didTrackEpisode = false
+    @State private var completedLastEpisode = false
 
     // Multi-stream / Next episode state
     @State private var currentStream: StreamResult
@@ -131,7 +133,7 @@ struct PlayerView: View {
     @State private var pipTrigger = 0
     #endif
 
-    init(stream: StreamResult, streams: [StreamResult] = [], customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
+    init(stream: StreamResult, streams: [StreamResult] = [], customDismiss: (() -> Void)? = nil, context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil) {
         self.currentStreamInitial = stream
         self._currentStream = State(initialValue: stream)
         self._currentContext = State(initialValue: context)
@@ -140,6 +142,7 @@ struct PlayerView: View {
         self._availableStreams = State(initialValue: streams.isEmpty ? [stream] : streams)
         self.customDismiss = customDismiss
         self.onWatchNext = onWatchNext
+        self.onFinished = onFinished
         self.onStreamExpired = onStreamExpired
         self.onSequelNeeded = onSequelNeeded
         self.onSequelAdvanced = onSequelAdvanced
@@ -766,6 +769,13 @@ struct PlayerView: View {
 
     // MARK: - Tracking
 
+    private var isLastEpisodeNow: Bool {
+        guard let ctx = currentContext else { return false }
+        if let total = ctx.totalEpisodes { return ctx.episodeNumber >= total }
+        if let avail = ctx.availableEpisodes { return ctx.episodeNumber >= avail }
+        return false
+    }
+
     private func trackAniListProgress() {
         guard let ctx = currentContext else { return }
         let context = MarkContext(
@@ -781,6 +791,7 @@ struct PlayerView: View {
         Task {
             await ContinueWatchingManager.shared.pushRemoteProgress(ep: ctx.episodeNumber, context: context)
         }
+        if isLastEpisodeNow { completedLastEpisode = true }
     }
 
     // MARK: - Player Actions
@@ -832,6 +843,9 @@ struct PlayerView: View {
     }
 
     private func handleDismiss() {
+        if completedLastEpisode, let ctx = currentContext {
+            onFinished?(ctx)
+        }
         if let customDismiss { customDismiss() } else { dismiss() }
     }
 
@@ -1132,7 +1146,8 @@ struct PlayerView: View {
                        let seg = segments.segment(for: type) {
                         skippedSegments.insert(type)
                         activeSkipSegment = nil
-                        p?.seek(to: CMTime(seconds: seg.endMs / 1000, preferredTimescale: 600))
+                        p?.seek(to: CMTime(seconds: seg.endMs / 1000, preferredTimescale: 600),
+                                toleranceBefore: .zero, toleranceAfter: .zero)
                     } else {
                         activeSkipSegment = newActive
                     }
@@ -1536,6 +1551,7 @@ struct PlayerView: View {
 
     private func swapStream(_ next: StreamResult, episodeNumber: Int, allStreams: [StreamResult] = []) {
         didTrackEpisode = false
+        completedLastEpisode = false
         // onWatchNext confirmed ep `episodeNumber` exists. If availableEpisodes is stale
         // (set lower), bump it so saveProgress() correctly sees ep N as non-last.
         let preSwapAvailableEpisodes = currentContext?.availableEpisodes
