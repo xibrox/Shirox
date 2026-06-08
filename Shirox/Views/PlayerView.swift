@@ -269,6 +269,9 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
+            if completedLastEpisode, let ctx = currentContext {
+                onFinished?(ctx)
+            }
             hideTask?.cancel()
             autoAdvanceTask?.cancel()
             autoAdvanceTask = nil
@@ -843,9 +846,6 @@ struct PlayerView: View {
     }
 
     private func handleDismiss() {
-        if completedLastEpisode, let ctx = currentContext {
-            onFinished?(ctx)
-        }
         if let customDismiss { customDismiss() } else { dismiss() }
     }
 
