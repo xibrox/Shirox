@@ -33,6 +33,7 @@ struct DetailView: View {
     @State private var selectedTab = 0
     @State private var showMatchingSearch = false
     @State private var sequelSearchItem: SearchItem? = nil
+    @State private var pendingRatingContext: PlayerContext? = nil
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -289,6 +290,46 @@ struct DetailView: View {
                 #else
                 .frame(minWidth: 480, minHeight: 360)
                 #endif
+            }
+        }
+        .sheet(isPresented: .init(
+            get: { pendingRatingContext != nil },
+            set: { if !$0 { pendingRatingContext = nil } }
+        )) {
+            if let ctx = pendingRatingContext {
+                RatingPromptView(
+                    title: ctx.mediaTitle,
+                    imageUrl: ctx.imageUrl,
+                    scoreFormat: AniListAuthManager.shared.scoreFormat,
+                    onSave: { score in
+                        Task {
+                            if let aid = ctx.aniListID, let entry = existingEntry {
+                                try? await AniListLibraryService.shared.updateEntry(
+                                    mediaId: aid, status: entry.status, progress: entry.progress, score: score
+                                )
+                                existingEntry = LibraryEntry(
+                                    id: entry.id, media: entry.media, status: entry.status,
+                                    progress: entry.progress, score: score,
+                                    updatedAt: entry.updatedAt, customListName: entry.customListName,
+                                    timesRewatched: entry.timesRewatched
+                                )
+                            }
+                            if let mid = ctx.malID, let entry = existingMALEntry {
+                                try? await MALProvider.shared.updateEntry(
+                                    mediaId: mid, status: entry.status, progress: entry.progress, score: score
+                                )
+                                existingMALEntry = LibraryEntry(
+                                    id: entry.id, media: entry.media, status: entry.status,
+                                    progress: entry.progress, score: score,
+                                    updatedAt: entry.updatedAt, customListName: entry.customListName,
+                                    timesRewatched: entry.timesRewatched
+                                )
+                            }
+                            pendingRatingContext = nil
+                        }
+                    },
+                    onSkip: { pendingRatingContext = nil }
+                )
             }
         }
         #if os(iOS)
@@ -619,7 +660,18 @@ struct DetailView: View {
 
         let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
 
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
+        PlayerPresenter.shared.presentPlayer(
+            stream: stream,
+            streams: storedStreams,
+            context: context,
+            onWatchNext: onWatchNext,
+            onStreamExpired: onExpired,
+            onFinished: { [self] ctx in
+                let alreadyRated = (existingEntry?.score ?? 0) > 0 || (existingMALEntry?.score ?? 0) > 0
+                guard !alreadyRated, ctx.aniListID != nil || ctx.malID != nil else { return }
+                pendingRatingContext = ctx
+            }
+        )
     }
     #else
 
@@ -1675,7 +1727,15 @@ struct DetailView: View {
                 workingDetailHref: item.detailHref,
                 thumbnailUrl: nil
             )
-            PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
+            PlayerPresenter.shared.presentPlayer(
+                stream: stream,
+                context: context,
+                onFinished: { [self] ctx in
+                    let alreadyRated = (existingEntry?.score ?? 0) > 0 || (existingMALEntry?.score ?? 0) > 0
+                    guard !alreadyRated, ctx.aniListID != nil || ctx.malID != nil else { return }
+                    pendingRatingContext = ctx
+                }
+            )
         }
     }
     #endif
