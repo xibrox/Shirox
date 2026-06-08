@@ -341,7 +341,7 @@ final class DetailViewModel: ObservableObject {
         #endif
     }
 
-    func selectStream(_ stream: StreamResult, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
+    func selectStream(_ stream: StreamResult, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil) {
         selectedStream = stream
 
         // For module shows, availableEpisodes == totalEpisodes (the fetched episode list).
@@ -407,9 +407,9 @@ final class DetailViewModel: ObservableObject {
         }()
 
         #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
         #elseif os(macOS)
-        MacPlayerWindowManager.shared.open(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
+        MacPlayerWindowManager.shared.open(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
         #endif
     }
 }

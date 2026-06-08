@@ -193,7 +193,13 @@ struct DetailView: View {
             if let stream = vm.pendingStream {
                 vm.pendingStream = nil
                 let s = stream
-                DispatchQueue.main.asyncAfter(deadline: .now() + streamSelectionDelay) { vm.selectStream(s, onSequelAdvanced: { nav in if case .searchItem(let item) = nav { sequelSearchItem = item } }) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + streamSelectionDelay) {
+                    vm.selectStream(s, onSequelAdvanced: { nav in if case .searchItem(let item) = nav { sequelSearchItem = item } }, onFinished: { ctx in
+                        let alreadyRated = (existingEntry?.score ?? 0) > 0 || (existingMALEntry?.score ?? 0) > 0
+                        guard !alreadyRated, ctx.aniListID != nil || ctx.malID != nil else { return }
+                        pendingRatingContext = ctx
+                    })
+                }
             } else {
                 vm.cancelStreamLoading()
             }
