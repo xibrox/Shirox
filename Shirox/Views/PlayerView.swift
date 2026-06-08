@@ -1733,7 +1733,7 @@ final class MacPlayerWindowManager {
 
     private init() {}
 
-    func open(stream: StreamResult, streams: [StreamResult], context: PlayerContext, onWatchNext: WatchNextLoader?, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
+    func open(stream: StreamResult, streams: [StreamResult], context: PlayerContext, onWatchNext: WatchNextLoader?, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil) {
         playerWindow?.close()
 
         let window = NSWindow(
@@ -1756,7 +1756,8 @@ final class MacPlayerWindowManager {
             context: context,
             onWatchNext: onWatchNext,
             onSequelNeeded: onSequelNeeded,
-            onSequelAdvanced: onSequelAdvanced
+            onSequelAdvanced: onSequelAdvanced,
+            onFinished: onFinished
         )
 
         window.contentView = NSHostingView(rootView: playerView)

@@ -43,7 +43,7 @@ final class PlayerPresenter: ObservableObject {
 
     #if !os(iOS)
 
-    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, from sourceView: Any? = nil) {
+    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil, from sourceView: Any? = nil) {
         // TODO: implement this function for tv and macos
     }
 
@@ -69,7 +69,7 @@ final class PlayerPresenter: ObservableObject {
         return root
     }
 
-    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, from sourceView: UIView? = nil) {
+    func presentPlayer(stream: StreamResult, streams: [StreamResult] = [], context: PlayerContext? = nil, onWatchNext: WatchNextLoader? = nil, onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil, from sourceView: UIView? = nil) {
         guard let topVC = Self.findTopViewController() else { return }
         self.sourceView = sourceView
 
@@ -81,7 +81,8 @@ final class PlayerPresenter: ObservableObject {
             onWatchNext: onWatchNext,
             onStreamExpired: onStreamExpired,
             onSequelNeeded: onSequelNeeded,
-            onSequelAdvanced: onSequelAdvanced
+            onSequelAdvanced: onSequelAdvanced,
+            onFinished: onFinished
         )
         .tint(.primary)
         .ignoresSafeArea()
