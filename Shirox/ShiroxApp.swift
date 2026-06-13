@@ -203,6 +203,9 @@ private struct MacSidebarView: View {
 private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var cfManager = CloudflareBypassManager.shared
+    #if os(iOS)
+    @ObservedObject private var playerPresenter = PlayerPresenter.shared
+    #endif
     @State private var selectedTab = 0
     #if targetEnvironment(macCatalyst) || os(macOS)
     @State private var sidebarTab: SidebarTab = .home
@@ -299,6 +302,26 @@ private struct RootTabView: View {
             #endif
         }
         #if os(iOS)
+        .sheet(isPresented: Binding(
+            get: { playerPresenter.pendingRatingContext != nil },
+            set: { if !$0 { playerPresenter.pendingRatingContext = nil } }
+        )) {
+            if let ctx = playerPresenter.pendingRatingContext {
+                RatingPromptView(
+                    title: ctx.mediaTitle,
+                    imageUrl: ctx.imageUrl,
+                    scoreFormat: AniListAuthManager.shared.scoreFormat,
+                    onSave: { score in
+                        PlayerPresenter.shared.submitRating(score, for: ctx)
+                        playerPresenter.pendingRatingContext = nil
+                    },
+                    onSkip: {
+                        playerPresenter.pendingRatingContext = nil
+                    }
+                )
+                .adaptivePresentationDetents([.medium, .large])
+            }
+        }
 
         .overlay(alignment: .bottom) {
             ToastView()

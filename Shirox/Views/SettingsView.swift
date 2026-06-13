@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
     @AppStorage("dualSync") private var dualSync = false
+    @AppStorage("rateOnFinish") private var rateOnFinish = true
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
@@ -147,6 +148,8 @@ struct SettingsView: View {
                                 .tint(.secondary)
                         }
                         Toggle("Never reduce progress", isOn: $skipReWatchTracking)
+                            .tint(.secondary)
+                        Toggle("Prompt to rate after finishing", isOn: $rateOnFinish)
                             .tint(.secondary)
                         Text("Automatically update your watch progress as you watch.")
                             .font(.caption)

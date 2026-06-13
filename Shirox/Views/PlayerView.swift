@@ -34,6 +34,10 @@ struct CircularButtonStyle: ButtonStyle {
 
 // MARK: - Player View
 
+private final class CompletionBox {
+    var context: PlayerContext?
+}
+
 struct PlayerView: View {
     let currentStreamInitial: StreamResult
     let customDismiss: (() -> Void)?
@@ -68,7 +72,7 @@ struct PlayerView: View {
     // AniList tracking
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @State private var didTrackEpisode = false
-    @State private var completedLastEpisode = false
+    @State private var completionBox = CompletionBox()
 
     // Multi-stream / Next episode state
     @State private var currentStream: StreamResult
@@ -269,8 +273,12 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
-            if completedLastEpisode, let ctx = currentContext {
-                onFinished?(ctx)
+            Logger.shared.log("[Rating] PlayerView.onDisappear: completionBox.context=\(completionBox.context != nil ? "set" : "nil")", type: "Debug")
+            if let ctx = completionBox.context {
+                Logger.shared.log("[Rating] PlayerView.onDisappear: requesting rating prompt for ep=\(ctx.episodeNumber)", type: "Debug")
+                #if os(iOS)
+                PlayerPresenter.shared.presentRatingPromptIfNeeded(context: ctx)
+                #endif
             }
             hideTask?.cancel()
             autoAdvanceTask?.cancel()
@@ -780,7 +788,10 @@ struct PlayerView: View {
     }
 
     private func trackAniListProgress() {
-        guard let ctx = currentContext else { return }
+        guard let ctx = currentContext else {
+            Logger.shared.log("[Rating] trackAniListProgress: currentContext nil — bail", type: "Debug")
+            return
+        }
         let context = MarkContext(
             aniListID: ctx.aniListID,
             malID: ctx.malID,
@@ -794,7 +805,13 @@ struct PlayerView: View {
         Task {
             await ContinueWatchingManager.shared.pushRemoteProgress(ep: ctx.episodeNumber, context: context)
         }
-        if isLastEpisodeNow { completedLastEpisode = true }
+        let last = isLastEpisodeNow
+        let totalStr = ctx.totalEpisodes.map(String.init) ?? "nil"
+        let availStr = ctx.availableEpisodes.map(String.init) ?? "nil"
+        let aniIDStr = ctx.aniListID.map(String.init) ?? "nil"
+        let malIDStr = ctx.malID.map(String.init) ?? "nil"
+        Logger.shared.log("[Rating] trackAniListProgress: ep=\(ctx.episodeNumber) total=\(totalStr) avail=\(availStr) aniListID=\(aniIDStr) malID=\(malIDStr) isLastEpisodeNow=\(last) onFinished=\(onFinished != nil)", type: "Debug")
+        if last { completionBox.context = currentContext }
     }
 
     // MARK: - Player Actions
@@ -1551,7 +1568,7 @@ struct PlayerView: View {
 
     private func swapStream(_ next: StreamResult, episodeNumber: Int, allStreams: [StreamResult] = []) {
         didTrackEpisode = false
-        completedLastEpisode = false
+        completionBox.context = nil
         // onWatchNext confirmed ep `episodeNumber` exists. If availableEpisodes is stale
         // (set lower), bump it so saveProgress() correctly sees ep N as non-last.
         let preSwapAvailableEpisodes = currentContext?.availableEpisodes

@@ -114,7 +114,6 @@
 		121D9BA92FCA563E000FF9B4 /* AniListDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4D82FCA397700C9BA56 /* AniListDetailView.swift */; };
 		121D9BAA2FCA563E000FF9B4 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DE2FCA397700C9BA56 /* HomeView.swift */; };
 		121D9BAB2FCA563E000FF9B4 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */; };
-		8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		121D9BAC2FCA563E000FF9B4 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DC2FCA397700C9BA56 /* DetailView.swift */; };
 		121D9BAD2FCA563E000FF9B4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E42FCA397700C9BA56 /* SettingsView.swift */; };
 		121D9BAE2FCA563E000FF9B4 /* ViewTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E62FCA397700C9BA56 /* ViewTracker.swift */; };
@@ -199,7 +198,6 @@
 		1279E5202FCA397700C9BA56 /* AniListLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47C2FCA397700C9BA56 /* AniListLibraryService.swift */; };
 		1279E5212FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */; };
 		1279E5222FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */; };
-		17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		1279E5232FCA397700C9BA56 /* DownloadRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */; };
 		1279E5242FCA397700C9BA56 /* AniListNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4672FCA397700C9BA56 /* AniListNotification.swift */; };
 		1279E5252FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
@@ -218,7 +216,6 @@
 		1279E5322FCA397700C9BA56 /* EpisodeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */; };
 		1279E5332FCA397700C9BA56 /* CastOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B22FCA397700C9BA56 /* CastOverlayView.swift */; };
 		1279E5342FCA397700C9BA56 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DC2FCA397700C9BA56 /* DetailView.swift */; };
-		34FEC549807840C99DE4F688 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		1279E5352FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */; };
 		1279E5362FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */; };
 		1279E5372FCA397700C9BA56 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DE2FCA397700C9BA56 /* HomeView.swift */; };
@@ -322,7 +319,6 @@
 		1279E5992FCA397700C9BA56 /* AniListLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47C2FCA397700C9BA56 /* AniListLibraryService.swift */; };
 		1279E59A2FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */; };
 		1279E59B2FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */; };
-		6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		1279E59C2FCA397700C9BA56 /* DownloadRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AB2FCA397700C9BA56 /* DownloadRowView.swift */; };
 		1279E59D2FCA397700C9BA56 /* AniListNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4672FCA397700C9BA56 /* AniListNotification.swift */; };
 		1279E59E2FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
@@ -341,7 +337,6 @@
 		1279E5AB2FCA397700C9BA56 /* EpisodeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */; };
 		1279E5AC2FCA397700C9BA56 /* CastOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B22FCA397700C9BA56 /* CastOverlayView.swift */; };
 		1279E5AD2FCA397700C9BA56 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DC2FCA397700C9BA56 /* DetailView.swift */; };
-		17C26798164E438581BFC7F4 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		1279E5AE2FCA397700C9BA56 /* ContentUnavailableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */; };
 		1279E5AF2FCA397700C9BA56 /* VTTSubtitlesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */; };
 		1279E5B02FCA397700C9BA56 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4DE2FCA397700C9BA56 /* HomeView.swift */; };
@@ -386,10 +381,15 @@
 		1279E5D72FCA397700C9BA56 /* PresentationDetent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4D32FCA397700C9BA56 /* PresentationDetent.swift */; };
 		1279E5D82FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4A92FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift */; };
 		1279E5D92FCA397700C9BA56 /* ActivityDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4C22FCA397700C9BA56 /* ActivityDetailView.swift */; };
+		17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
+		17C26798164E438581BFC7F4 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
+		34FEC549807840C99DE4F688 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
 		42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
+		6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
+		8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA01000000000000000002AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
@@ -501,7 +501,6 @@
 		1279E4C92FCA397700C9BA56 /* ProfileStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStatsView.swift; sourceTree = "<group>"; };
 		1279E4CA2FCA397700C9BA56 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		1279E4CC2FCA397700C9BA56 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
-		21201D48C8E94395977F4564 /* ScoreInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreInputView.swift; sourceTree = "<group>"; };
 		1279E4CD2FCA397700C9BA56 /* CloudflareBypassSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareBypassSheetView.swift; sourceTree = "<group>"; };
 		1279E4CE2FCA397700C9BA56 /* Color+SystemBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+SystemBackground.swift"; sourceTree = "<group>"; };
 		1279E4CF2FCA397700C9BA56 /* ContentUnavailableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentUnavailableView.swift; sourceTree = "<group>"; };
@@ -517,7 +516,6 @@
 		1279E4DA2FCA397700C9BA56 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		1279E4DB2FCA397700C9BA56 /* ContinueWatchingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinueWatchingCard.swift; sourceTree = "<group>"; };
 		1279E4DC2FCA397700C9BA56 /* DetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailView.swift; sourceTree = "<group>"; };
-		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
 		1279E4DD2FCA397700C9BA56 /* EpisodeRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeRowView.swift; sourceTree = "<group>"; };
 		1279E4DE2FCA397700C9BA56 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		1279E4DF2FCA397700C9BA56 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -529,7 +527,9 @@
 		1279E4E52FCA397700C9BA56 /* StreamPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamPickerView.swift; sourceTree = "<group>"; };
 		1279E4E62FCA397700C9BA56 /* ViewTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewTracker.swift; sourceTree = "<group>"; };
 		1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		21201D48C8E94395977F4564 /* ScoreInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreInputView.swift; sourceTree = "<group>"; };
 		41894B1527B61C1E6E98EFA5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
 		4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiroxApp.swift; sourceTree = "<group>"; };
 		4C8891C8EC305651E62AC138 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -1513,13 +1513,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CURRENT_PROJECT_VERSION = 78;
+				CURRENT_PROJECT_VERSION = 79;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.81;
+				MARKETING_VERSION = 0.0.82;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1537,7 +1537,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 78;
+				CURRENT_PROJECT_VERSION = 79;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1545,7 +1545,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.0.81;
+				MARKETING_VERSION = 0.0.82;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;
@@ -1560,13 +1560,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CURRENT_PROJECT_VERSION = 78;
+				CURRENT_PROJECT_VERSION = 79;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.81;
+				MARKETING_VERSION = 0.0.82;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1645,7 +1645,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 78;
+				CURRENT_PROJECT_VERSION = 79;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1653,7 +1653,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.0.81;
+				MARKETING_VERSION = 0.0.82;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;

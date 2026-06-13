@@ -25,10 +25,15 @@ let streamSelectionDelay: TimeInterval = 0.35
 @MainActor
 final class PlayerPresenter: ObservableObject {
     static let shared = PlayerPresenter()
-    
+
     #if os(iOS)
     @Published var orientationLock = UIInterfaceOrientationMask.portrait
     #endif
+
+    /// Set by `presentRatingPromptIfNeeded` after the user finishes the last episode.
+    /// Observed by `RootTabView` which presents the rating sheet via SwiftUI — using
+    /// native `.sheet()` so dark mode and detent backgrounds match other sheets.
+    @Published var pendingRatingContext: PlayerContext?
 
     #if os(iOS)
     private weak var playerVC: UIViewController?
@@ -147,6 +152,56 @@ final class PlayerPresenter: ObservableObject {
         playerVC.dismiss(animated: false) { [weak self] in
             self?.playerVC = nil
             self?.sourceView = nil
+        }
+    }
+
+    // MARK: - Rating prompt
+
+    /// Called from PlayerView.onDisappear when the user finished the last episode.
+    /// Centralized here so every player launch path (DetailView, ContinueWatching, AniListDetail)
+    /// gets the rating prompt without each call site needing to pass an `onFinished` closure.
+    func presentRatingPromptIfNeeded(context: PlayerContext) {
+        let enabled = UserDefaults.standard.object(forKey: "rateOnFinish") as? Bool ?? true
+        Logger.shared.log("[Rating] presentRatingPromptIfNeeded: enabled=\(enabled) aniListID=\(context.aniListID.map(String.init) ?? "nil") malID=\(context.malID.map(String.init) ?? "nil")", type: "Debug")
+        guard enabled else { return }
+        guard context.aniListID != nil || context.malID != nil else {
+            Logger.shared.log("[Rating] presentRatingPromptIfNeeded: no IDs — bail", type: "Debug")
+            return
+        }
+        Task { @MainActor in
+            var aniScore: Double = 0
+            var malScore: Double = 0
+            if let aid = context.aniListID, AniListAuthManager.shared.isLoggedIn {
+                if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                    aniScore = raw.score
+                }
+            }
+            if let mid = context.malID, MALAuthManager.shared.isLoggedIn {
+                if let entry = try? await MALProvider.shared.fetchEntry(mediaId: mid) {
+                    malScore = entry.score
+                }
+            }
+            Logger.shared.log("[Rating] presentRatingPromptIfNeeded: aniScore=\(aniScore) malScore=\(malScore)", type: "Debug")
+            guard aniScore == 0 && malScore == 0 else {
+                Logger.shared.log("[Rating] presentRatingPromptIfNeeded: already rated — skip", type: "Debug")
+                return
+            }
+            Logger.shared.log("[Rating] presentRatingPromptIfNeeded: setting pendingRatingContext", type: "Debug")
+            self.pendingRatingContext = context
+        }
+    }
+
+    /// Called by the SwiftUI sheet's onSave to push the score to AniList/MAL.
+    func submitRating(_ score: Double, for context: PlayerContext) {
+        Task { @MainActor in
+            if let aid = context.aniListID, AniListAuthManager.shared.isLoggedIn,
+               let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: raw.status, progress: raw.progress, score: score)
+            }
+            if let mid = context.malID, MALAuthManager.shared.isLoggedIn,
+               let entry = try? await MALProvider.shared.fetchEntry(mediaId: mid) {
+                try? await MALProvider.shared.updateEntry(mediaId: mid, status: entry.status, progress: entry.progress, score: score)
+            }
         }
     }
 
