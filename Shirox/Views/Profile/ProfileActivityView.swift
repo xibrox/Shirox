@@ -27,6 +27,9 @@ struct ProfileActivityView: View {
     @State private var targetUsername: String?
     @State private var targetMediaId: Int?
 
+    // MAL history has no cover art in the feed payload; fetch posters lazily per row.
+    @State private var malPosters: [Int: String] = [:]
+
     private func likeCount(for item: UserActivity) -> Int {
         likeOverrides[item.id]?.count ?? item.likeCount
     }
@@ -240,7 +243,8 @@ struct ProfileActivityView: View {
                         targetMediaId = media?.id
                     } label: {
                         HStack(alignment: .top, spacing: 10) {
-                            if let img = media?.coverImage?.large {
+                            let poster = media?.coverImage?.large ?? media.flatMap { malPosters[$0.id] }
+                            if let img = poster {
                                 CachedAsyncImage(urlString: img)
                                     .frame(width: 48, height: 66)
                                     .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -300,6 +304,14 @@ struct ProfileActivityView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.secondary.opacity(0.08))
         )
+        .task(id: item.id) {
+            // Lazily fetch the MAL poster for this row (history feed carries no art).
+            guard isMAL, case .list(_, _, let media) = item.kind,
+                  let m = media, m.coverImage?.large == nil, malPosters[m.id] == nil else { return }
+            if let url = try? await MALDiscoveryService.shared.posterURL(malId: m.id) {
+                malPosters[m.id] = url
+            }
+        }
         .contextMenu {
             if !isMAL && item.user?.id == anilistAuth.userId {
                 Button(role: .destructive) {

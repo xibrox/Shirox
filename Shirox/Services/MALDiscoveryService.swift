@@ -152,6 +152,13 @@ final class MALDiscoveryService {
         try await fetchSingle("anime/\(malId)/full")
     }
 
+    /// Lightweight poster lookup by MAL id. The Jikan history feed carries no cover
+    /// art, so the activity list fetches posters per row on demand.
+    func posterURL(malId: Int) async throws -> String? {
+        let anime = try await fetchSingle("anime/\(malId)")
+        return anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url
+    }
+
     struct JikanEpisode: Decodable {
         let mal_id: Int
         let title: String?
