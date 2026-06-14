@@ -200,7 +200,11 @@ final class PlayerPresenter: ObservableObject {
             }
             if let mid = context.malID, MALAuthManager.shared.isLoggedIn,
                let entry = try? await MALProvider.shared.fetchEntry(mediaId: mid) {
-                try? await MALProvider.shared.updateEntry(mediaId: mid, status: entry.status, progress: entry.progress, score: score)
+                do {
+                    try await MALProvider.shared.updateEntry(mediaId: mid, status: entry.status, progress: entry.progress, score: score)
+                } catch {
+                    Logger.shared.log("[Rating] MAL score update failed: \(error)", type: "Error")
+                }
             }
         }
     }

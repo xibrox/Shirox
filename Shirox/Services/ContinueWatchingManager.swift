@@ -457,8 +457,12 @@ import Combine
                     let malID = capturedContext.malID
                         ?? capturedContext.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) }
                     if let mid = malID, capturedMalLoggedIn {
-                        try? await MALProvider.shared.updateEntry(
-                            mediaId: mid, status: remoteStatus, progress: capturedProposed, score: 0)
+                        do {
+                            try await MALProvider.shared.updateEntry(
+                                mediaId: mid, status: remoteStatus, progress: capturedProposed, score: 0)
+                        } catch {
+                            Logger.shared.log("[Tracking] MAL unmark update failed: \(error)", type: "Error")
+                        }
                     }
                 },
                 localOnly: {
@@ -711,7 +715,11 @@ import Combine
             }
             if let aid = resolvedAniListID {
                 if let current = try? await AniListProvider.shared.fetchEntry(mediaId: aid) {
-                    if current.status == .completed {
+                    if current.status == .completed && skipRewatch {
+                        // "Never reduce progress" is on: leave the completed entry untouched
+                        // instead of resetting it to a lower ep via rewatch tracking.
+                        Logger.shared.log("[Tracking] AniList skip rewatch (never reduce progress): ep \(ep) on completed entry", type: "Info")
+                    } else if current.status == .completed {
                         if context.totalEpisodes == 1 {
                             let newRepeat = (current.timesRewatched ?? 0) + 1
                             Logger.shared.log("[Tracking] AniList rewatch (single-ep): repeat → \(newRepeat)", type: "Info")
@@ -747,17 +755,29 @@ import Combine
             }
             if let mid = resolvedMALID {
                 if let current = try? await MALProvider.shared.fetchEntry(mediaId: mid) {
-                    if current.status == .completed {
+                    if current.status == .completed && skipRewatch {
+                        // "Never reduce progress" is on: leave the completed entry untouched
+                        // instead of resetting num_watched_episodes to a lower ep via rewatch tracking.
+                        Logger.shared.log("[Tracking] MAL skip rewatch (never reduce progress): ep \(ep) on completed entry", type: "Info")
+                    } else if current.status == .completed {
                         if context.totalEpisodes == 1 {
                             let newRepeat = (current.timesRewatched ?? 0) + 1
                             Logger.shared.log("[Tracking] MAL rewatch (single-ep): num_times_rewatched → \(newRepeat)", type: "Info")
-                            try? await MALLibraryService.shared.updateEntry(
-                                malId: mid, status: .completed, progress: ep, score: 0,
-                                numTimesRewatched: newRepeat)
+                            do {
+                                try await MALLibraryService.shared.updateEntry(
+                                    malId: mid, status: .completed, progress: ep, score: 0,
+                                    numTimesRewatched: newRepeat)
+                            } catch {
+                                Logger.shared.log("[Tracking] MAL single-ep rewatch update failed: \(error)", type: "Error")
+                            }
                         } else {
                             Logger.shared.log("[Tracking] MAL rewatch: setting rewatching at ep \(ep)", type: "Info")
-                            try? await MALLibraryService.shared.updateEntry(
-                                malId: mid, status: .repeating, progress: ep, score: 0)
+                            do {
+                                try await MALLibraryService.shared.updateEntry(
+                                    malId: mid, status: .repeating, progress: ep, score: 0)
+                            } catch {
+                                Logger.shared.log("[Tracking] MAL rewatch update failed: \(error)", type: "Error")
+                            }
                         }
                     } else if skipRewatch && ep <= current.progress {
                         Logger.shared.log("[Tracking] MAL skip: ep \(ep) <= tracked \(current.progress)", type: "Info")
@@ -771,8 +791,13 @@ import Combine
                         }
                     }
                 } else {
-                    try? await MALProvider.shared.updateEntry(
-                        mediaId: mid, status: targetStatus, progress: ep, score: 0)
+                    do {
+                        try await MALProvider.shared.updateEntry(
+                            mediaId: mid, status: targetStatus, progress: ep, score: 0)
+                        Logger.shared.log("[Tracking] MAL progress updated (new entry): ep \(ep), malId \(mid)", type: "Info")
+                    } catch {
+                        Logger.shared.log("[Tracking] MAL new-entry update failed: \(error)", type: "Error")
+                    }
                 }
             }
         }
