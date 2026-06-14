@@ -133,8 +133,11 @@ final class MALSocialService {
         components.queryItems = [URLQueryItem(name: "page", value: "\(page)")]
         let (data, _) = try await session.data(from: components.url!)
         let friends = try JSONDecoder().decode(JikanFriendsPage.self, from: data)
-        return friends.data.map { f in
-            UserProfile(id: 0, provider: .mal, name: f.user.username,
+        // Jikan friends carry no MAL user id; synthesize a unique, page-stable id so
+        // SwiftUI's ForEach identity does not collide (which rendered the same friend
+        // repeatedly when every id was 0).
+        return friends.data.enumerated().map { index, f in
+            UserProfile(id: page * 1000 + index, provider: .mal, name: f.user.username,
                         avatarURL: f.user.images?.jpg?.image_url,
                         bannerImage: nil, isFollowing: nil, statistics: nil)
         }
