@@ -218,9 +218,12 @@ struct CachedAsyncImage: View {
                 (data, response) = try await Self.session.data(for: imageRequest)
             } catch {
                 // Silent for true offline failures — that's expected when the device
-                // has no network. Everything else (DNS failure on a single host,
-                // server errors, etc.) still surfaces so we can debug it.
-                if !ProviderManager.isOfflineError(error) {
+                // has no network. Also silent for cancellations, which happen routinely
+                // when a cell scrolls offscreen before its image finishes loading.
+                // Everything else (DNS failure on a single host, server errors, etc.)
+                // still surfaces so we can debug it.
+                let isCancelled = (error as? URLError)?.code == .cancelled || error is CancellationError
+                if !ProviderManager.isOfflineError(error) && !isCancelled {
                     Logger.shared.log("[Image] network error for \(url.host ?? urlString): \(error.localizedDescription)", type: "Error")
                 }
                 loadFailed = true
