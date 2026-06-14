@@ -191,6 +191,7 @@ final class MALAuthManager: NSObject, ObservableObject {
         keychainWrite(key: accessTokenKey, value: tokens.access_token)
         keychainWrite(key: refreshTokenKey, value: tokens.refresh_token)
         storeTokenExpiry(expiresIn: tokens.expires_in)
+        Logger.shared.log("[MAL] access token refreshed (expires in \(tokens.expires_in)s)", type: "Info")
     }
 
     func fetchCurrentUser() async {
@@ -246,7 +247,10 @@ final class MALAuthManager: NSObject, ObservableObject {
             try await refreshAccessToken()
         } catch {
             if case MALAuthError.refreshFailed(let status) = error, status == 400 || status == 401 {
+                Logger.shared.log("[MAL] token refresh rejected (status \(status)) — signing out", type: "Error")
                 logout()
+            } else {
+                Logger.shared.log("[MAL] token refresh failed: \(error)", type: "Error")
             }
             throw error
         }
