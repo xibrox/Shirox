@@ -17,9 +17,8 @@ final class MALSocialService {
         var components = URLComponents(url: malBase.appendingPathComponent("users/@me"),
                                        resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "fields", value: "anime_statistics,picture")]
-        let request = try await MALAuthManager.shared.authorizedRequest(url: components.url!)
-        let (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+        let (data, response) = try await MALAuthManager.shared.send(url: components.url!)
+        if response.statusCode == 401 {
             throw ProviderError.unauthenticated
         }
 

@@ -3,11 +3,6 @@ import Foundation
 final class MALLibraryService {
     nonisolated(unsafe) static let shared = MALLibraryService()
     private let base = URL(string: "https://api.myanimelist.net/v2")!
-    private let session: URLSession = {
-        let cfg = URLSessionConfiguration.default
-        cfg.timeoutIntervalForRequest = 15
-        return URLSession(configuration: cfg)
-    }()
     private init() {}
 
     // MARK: - Internal models
@@ -67,8 +62,7 @@ final class MALLibraryService {
         var allEntries: [MALListEntry] = []
         var nextURL: URL? = makeLibraryURL()
         while let url = nextURL {
-            let request = try await MALAuthManager.shared.authorizedRequest(url: url)
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await MALAuthManager.shared.send(url: url)
             try validateResponse(response)
             let page = try JSONDecoder().decode(MALListPage.self, from: data)
             allEntries.append(contentsOf: page.data)
@@ -94,9 +88,8 @@ final class MALLibraryService {
         var components = URLComponents(url: base.appendingPathComponent("anime/\(malId)"),
                                        resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "fields", value: "my_list_status{status,score,num_episodes_watched,num_times_rewatched,updated_at},num_episodes,status,mean,genres,synopsis,start_season,media_type,main_picture")]
-        let request = try await MALAuthManager.shared.authorizedRequest(url: components.url!)
-        let (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode == 404 { return nil }
+        let (data, response) = try await MALAuthManager.shared.send(url: components.url!)
+        if response.statusCode == 404 { return nil }
         try validateResponse(response)
 
         struct NodeWithStatus: Decodable {
@@ -119,21 +112,20 @@ final class MALLibraryService {
 
     func updateEntry(malId: Int, status: MediaListStatus, progress: Int, score: Double, numTimesRewatched: Int? = nil) async throws {
         let url = base.appendingPathComponent("anime/\(malId)/my_list_status")
-        var request = try await MALAuthManager.shared.authorizedRequest(url: url, method: "PATCH")
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let malStatus = mapStatusToMAL(status)
         let scoreInt = Int(score)
-        var body = "status=\(malStatus)&num_watched_episodes=\(progress)&score=\(scoreInt)"
-        if let numTimesRewatched { body += "&num_times_rewatched=\(numTimesRewatched)" }
-        request.httpBody = body.data(using: .utf8)
-        let (_, response) = try await session.data(for: request)
+        var bodyString = "status=\(malStatus)&num_watched_episodes=\(progress)&score=\(scoreInt)"
+        if let numTimesRewatched { bodyString += "&num_times_rewatched=\(numTimesRewatched)" }
+        let (_, response) = try await MALAuthManager.shared.send(
+            url: url, method: "PATCH",
+            body: bodyString.data(using: .utf8),
+            contentType: "application/x-www-form-urlencoded")
         try validateResponse(response)
     }
 
     func deleteEntry(malId: Int) async throws {
         let url = base.appendingPathComponent("anime/\(malId)/my_list_status")
-        let request = try await MALAuthManager.shared.authorizedRequest(url: url, method: "DELETE")
-        let (_, response) = try await session.data(for: request)
+        let (_, response) = try await MALAuthManager.shared.send(url: url, method: "DELETE")
         try validateResponse(response)
     }
 
