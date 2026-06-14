@@ -1,12 +1,34 @@
 import SwiftUI
 
+enum ProfileTab: CaseIterable {
+    case activity, favourites, stats, social
+
+    var title: String {
+        switch self {
+        case .activity:   return "Activity"
+        case .favourites: return "Favourites"
+        case .stats:      return "Stats"
+        case .social:     return "Social"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .activity:   return "bubble.left.and.bubble.right"
+        case .favourites: return "heart"
+        case .stats:      return "chart.bar"
+        case .social:     return "person.2"
+        }
+    }
+}
+
 struct ProfileView: View {
     let userId: Int
     let username: String
     let avatarURL: String?
 
     @StateObject private var vm = ProfileViewModel()
-    @State private var selectedTab = 0
+    @State private var selectedTab: ProfileTab = .activity
     @State private var showLogoutConfirm = false
     @Environment(\.dismiss) private var dismiss
 
@@ -26,6 +48,14 @@ struct ProfileView: View {
             : userId == anilistAuth.userId
     }
 
+    /// Tabs available for the active provider. MAL has no favourites data source,
+    /// so that tab is omitted under MAL.
+    private var availableTabs: [ProfileTab] {
+        activeProviderType == .mal
+            ? ProfileTab.allCases.filter { $0 != .favourites }
+            : ProfileTab.allCases
+    }
+
     private var scrollableHeader: AnyView {
         AnyView(
             VStack(spacing: 0) {
@@ -42,14 +72,15 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if selectedTab == 0 {
+                switch selectedTab {
+                case .activity:
                     ProfileActivityView(vm: vm, userId: userId, topContent: scrollableHeader)
-                } else if selectedTab == 1 {
+                case .favourites:
                     ScrollView {
                         scrollableHeader
                         ProfileFavouritesView(favourites: vm.user?.favourites)
                     }
-                } else if selectedTab == 2 {
+                case .stats:
                     ScrollView {
                         scrollableHeader
                         ProfileStatsView(
@@ -57,7 +88,7 @@ struct ProfileView: View {
                             scoreFormat: activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
                         )
                     }
-                } else if selectedTab == 3 {
+                case .social:
                     ProfileSocialView(vm: vm, userId: userId, topContent: scrollableHeader)
                 }
             }
@@ -83,6 +114,9 @@ struct ProfileView: View {
             if !isOwnProfile {
                 await vm.loadActivity(userId: userId, feed: .mine)
             }
+        }
+        .onChangeOf(activeProviderType) { _ in
+            if !availableTabs.contains(selectedTab) { selectedTab = .activity }
         }
         #if !os(iOS)
         .frame(minWidth: 480, minHeight: 360)
@@ -199,18 +233,18 @@ struct ProfileView: View {
 
     private var tabBar: some View {
         HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.offset) { idx, tab in
+            ForEach(availableTabs, id: \.self) { tab in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { selectedTab = idx }
+                    withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
                 } label: {
                     VStack(spacing: 6) {
                         HStack(spacing: 5) {
                             Image(systemName: tab.icon).font(.caption)
                             Text(tab.title).font(.caption.weight(.semibold))
                         }
-                        .foregroundStyle(selectedTab == idx ? Color.primary : .secondary)
+                        .foregroundStyle(selectedTab == tab ? Color.primary : .secondary)
                         Rectangle()
-                            .fill(selectedTab == idx ? Color.primary : Color.clear)
+                            .fill(selectedTab == tab ? Color.primary : Color.clear)
                             .frame(height: 2)
                     }
                     .frame(maxWidth: .infinity)
@@ -220,12 +254,4 @@ struct ProfileView: View {
         }
     }
 
-    private var tabs: [(title: String, icon: String)] {
-        [
-            ("Activity", "bubble.left.and.bubble.right"),
-            ("Favourites", "heart"),
-            ("Stats", "chart.bar"),
-            ("Social", "person.2")
-        ]
-    }
 }
