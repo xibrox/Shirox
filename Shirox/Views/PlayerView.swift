@@ -106,6 +106,12 @@ struct PlayerView: View {
     @State private var audioGroup: AVMediaSelectionGroup? = nil
     @State private var bufferProgress: Double = 0
 
+    // Stall recovery watchdog
+    @State private var stallWatchdogTask: Task<Void, Never>? = nil
+    @State private var stallRecoveryAttempts = 0
+    @State private var isRecoveringStall = false
+    @State private var showStallRetry = false
+
     // TVDB episode title
     @State private var tvdbEpisodeTitle: String? = nil
 
@@ -192,11 +198,15 @@ struct PlayerView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-                if isBuffering && videoReady {
+                if isBuffering && videoReady && !showStallRetry {
                     ProgressView()
                         .tint(.white)
                         .scaleEffect(1.5)
                         .allowsHitTesting(false)
+                }
+
+                if showStallRetry {
+                    stallRetryOverlay
                 }
 
                 #if os(iOS)
@@ -283,6 +293,7 @@ struct PlayerView: View {
             hideTask?.cancel()
             autoAdvanceTask?.cancel()
             autoAdvanceTask = nil
+            cancelStallWatchdog(resetAttempts: true)
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
             rateObserver?.invalidate()
             player?.pause()
@@ -764,6 +775,33 @@ struct PlayerView: View {
     }
 
     @ViewBuilder
+    private var stallRetryOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.6).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 44, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.85))
+                Text("Playback stalled")
+                    .font(.headline).foregroundStyle(.white)
+                Text("Couldn't keep buffering this stream.")
+                    .font(.subheadline).foregroundStyle(.white.opacity(0.65))
+                    .multilineTextAlignment(.center)
+                Button(action: manualStallRetry) {
+                    Text("Retry")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 28).padding(.vertical, 10)
+                        .background(Color.white, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(32)
+        }
+        .transition(.opacity)
+    }
+
+    @ViewBuilder
     private var loadingViewPlaceholder: some View {
         VStack(spacing: 20) {
             Image(systemName: "play.circle")
@@ -1034,7 +1072,7 @@ struct PlayerView: View {
             asset = AVURLAsset(url: currentStream.url)
         }
         let item = AVPlayerItem(asset: asset)
-        item.preferredForwardBufferDuration = 60 // Eagerly buffer up to 60 seconds ahead
+        item.preferredForwardBufferDuration = 0 // Automatic: let AVPlayer size the buffer adaptively (YouTube-style ABR). A fixed value fights stall-minimization and prolongs stalls on flaky CDNs.
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = true // Continue buffering when paused
         
         // Fix: Local files and fast streams might already be ready or need a status observer
@@ -1094,6 +1132,20 @@ struct PlayerView: View {
                     videoReady = true
                 }
                 #endif
+                switch status {
+                case .waitingToPlayAtSpecifiedRate:
+                    // A stall: AVPlayer is waiting on the network. It never escalates to
+                    // .failed, so without a watchdog it can wait forever. Arm recovery.
+                    startStallWatchdog()
+                case .playing:
+                    // Playback resumed — clear any in-flight watchdog and reset the budget
+                    // so each independent stall gets a fresh escalation.
+                    cancelStallWatchdog(resetAttempts: true)
+                case .paused:
+                    cancelStallWatchdog(resetAttempts: false)
+                @unknown default:
+                    break
+                }
             }
         }
 
@@ -1383,10 +1435,134 @@ struct PlayerView: View {
         } catch { isRefetchingStream = false }
     }
 
+    // MARK: - Stall Recovery
+    //
+    // AVPlayer enters .waitingToPlayAtSpecifiedRate when the network wedges (a bad
+    // segment, a dropped CDN connection). It never escalates to .failed, so the
+    // .failed-only refetch path never fires and the spinner spins forever — the user
+    // has to back out and restart. This watchdog detects the stall and escalates:
+    //   1. nudge the pipeline (re-issues the wedged requests)
+    //   2. refetch a fresh stream URL, preserving position
+    //   3. surface a manual retry button
+
+    private func startStallWatchdog() {
+        // Ignore user-initiated transitions that legitimately produce a wait state.
+        guard !isScrubbing, !isLoadingNextEpisode, !isRefetchingStream, !isRecoveringStall else { return }
+        guard stallWatchdogTask == nil else { return } // already armed
+        let stalledAt = currentTime
+        stallWatchdogTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            guard !Task.isCancelled else { return }
+            stallWatchdogTask = nil
+            // Still stalled at the same position?
+            guard player?.timeControlStatus == .waitingToPlayAtSpecifiedRate,
+                  abs(currentTime - stalledAt) < 0.5 else { return }
+            await attemptStallRecovery()
+        }
+    }
+
+    private func cancelStallWatchdog(resetAttempts: Bool) {
+        stallWatchdogTask?.cancel()
+        stallWatchdogTask = nil
+        if resetAttempts {
+            stallRecoveryAttempts = 0
+            if showStallRetry { showStallRetry = false }
+        }
+    }
+
+    @MainActor
+    private func attemptStallRecovery() async {
+        guard !isRecoveringStall else { return }
+        stallRecoveryAttempts += 1
+        let attempt = stallRecoveryAttempts
+        Logger.shared.log("[StallRecovery] Stall detected at \(currentTime)s — attempt \(attempt)", type: "Player")
+
+        if attempt == 1 {
+            // Step 1: nudge. A zero-distance seek + playImmediately re-issues the
+            // segment requests that wedged, clearing most transient CDN stalls.
+            nudgePlayer()
+            startStallWatchdog() // re-arm to escalate if the nudge didn't take
+        } else if attempt <= 3, onStreamExpired != nil {
+            // Step 2: URL is likely dead — re-run the extractor, preserving position.
+            await recoverByRefetch()
+        } else {
+            // Step 3: give up auto-recovery; let the user retry manually.
+            Logger.shared.log("[StallRecovery] Exhausted automatic recovery — showing retry UI", type: "Player")
+            isBuffering = false
+            showStallRetry = true
+        }
+    }
+
+    private func nudgePlayer() {
+        guard let player else { return }
+        let t = currentTime
+        Logger.shared.log("[StallRecovery] Nudging player at \(t)s", type: "Player")
+        player.seek(to: CMTime(seconds: t, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+            DispatchQueue.main.async {
+                if isPlaying { player.playImmediately(atRate: Float(playbackSpeed)) }
+            }
+        }
+    }
+
+    @MainActor
+    private func recoverByRefetch() async {
+        guard !isRecoveringStall else { return }
+        isRecoveringStall = true
+        defer { isRecoveringStall = false }
+        let resumeAt = currentTime
+        Logger.shared.log("[StallRecovery] Refetching stream, will resume at \(resumeAt)s", type: "Player")
+        await refetchStream() // swaps in a fresh item, resets currentTime to 0
+        // Wait for the fresh item to become ready, then restore position.
+        for _ in 0..<40 {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            if Task.isCancelled { return }
+            if let item = player?.currentItem, item.status == .readyToPlay {
+                await player?.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                if isPlaying { player?.playImmediately(atRate: Float(playbackSpeed)) }
+                currentTime = resumeAt
+                Logger.shared.log("[StallRecovery] Resumed at \(resumeAt)s after refetch", type: "Player")
+                return
+            }
+        }
+        Logger.shared.log("[StallRecovery] Refetched item never became ready", type: "Error")
+    }
+
+    private func manualStallRetry() {
+        Logger.shared.log("[StallRecovery] Manual retry tapped", type: "Player")
+        showStallRetry = false
+        stallRecoveryAttempts = 0
+        Task { @MainActor in
+            if onStreamExpired != nil {
+                await recoverByRefetch()
+            } else {
+                nudgePlayer()
+            }
+        }
+    }
+
     private func loadAndAdvance() async {
         Logger.shared.log("[PlayerView] loadAndAdvance() called", type: "Debug")
 
         guard let epNum = currentContext?.episodeNumber else { return }
+
+        #if os(iOS)
+        // Prefer a downloaded copy of the next episode. Downloads are keyed by integer
+        // episode number, so we look for epNum + 1 directly — this keeps auto-advance
+        // working offline and stops it from streaming an episode the user already has.
+        if let ctx = currentContext,
+           let download = DownloadManager.shared.completedDownload(
+               mediaTitle: ctx.mediaTitle,
+               episodeNumber: epNum + 1,
+               aniListID: ctx.aniListID,
+               moduleId: ctx.moduleId,
+               streamTitle: ctx.streamTitle),
+           let localStream = await DownloadManager.shared.getStream(for: download) {
+            guard !Task.isCancelled else { return }
+            Logger.shared.log("[PlayerView] Next episode \(epNum + 1) is downloaded — playing local copy", type: "Debug")
+            swapStream(localStream, episodeNumber: epNum + 1)
+            return
+        }
+        #endif
 
         guard let loader = onWatchNext else {
             if onSequelNeeded != nil { await loadSequel() }
@@ -1533,7 +1709,7 @@ struct PlayerView: View {
         if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }
         else { asset = AVURLAsset(url: next.url) }
         let newItem = AVPlayerItem(asset: asset)
-        newItem.preferredForwardBufferDuration = 60
+        newItem.preferredForwardBufferDuration = 0
         newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         setupPlaybackEndObserver(for: newItem)
         player?.replaceCurrentItem(with: newItem)
@@ -1588,7 +1764,7 @@ struct PlayerView: View {
         if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }
         else { asset = AVURLAsset(url: next.url) }
         let newItem = AVPlayerItem(asset: asset)
-        newItem.preferredForwardBufferDuration = 60
+        newItem.preferredForwardBufferDuration = 0
         newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         setupPlaybackEndObserver(for: newItem)
         player?.replaceCurrentItem(with: newItem)

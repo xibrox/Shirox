@@ -15,6 +15,7 @@ final class DetailViewModel: ObservableObject {
     @Published var streamOptions: [StreamResult] = []
     @Published var selectedEpisode: EpisodeLink?
     @Published var showStreamPicker = false
+    @Published var needsCloudflareVerification = false
 
     // Download stream picker state
     @Published var pendingStreams: [StreamResult] = []
@@ -228,6 +229,8 @@ final class DetailViewModel: ObservableObject {
     func loadStreams(for episode: EpisodeLink) {
         selectedEpisode = episode
         streamOptions = []
+        needsCloudflareVerification = false
+        CloudflareBypassManager.shared.pendingVerificationURL = nil
         showStreamPicker = true
         isLoadingStreams = true
 
@@ -253,7 +256,23 @@ final class DetailViewModel: ObservableObject {
                     errorMessage = error.localizedDescription
                 }
             }
+            // A CF wall during the fetch leaves no streams but a flagged host — offer
+            // a user-initiated "Verify Cloudflare" button instead of "No Streams Found".
+            needsCloudflareVerification = streamOptions.isEmpty
+                && CloudflareBypassManager.shared.pendingVerificationURL != nil
             isLoadingStreams = false
+        }
+    }
+
+    /// Runs the user-initiated Cloudflare challenge for the flagged host, then reloads
+    /// streams (the cached cookie lets the fetch's inline retry succeed).
+    func verifyCloudflare() {
+        guard let url = CloudflareBypassManager.shared.pendingVerificationURL,
+              let episode = selectedEpisode else { return }
+        Task {
+            try? await CloudflareBypassManager.shared.triggerBypass(for: url)
+            needsCloudflareVerification = false
+            loadStreams(for: episode)
         }
     }
 

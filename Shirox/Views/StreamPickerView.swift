@@ -14,6 +14,8 @@ struct StreamPickerView: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if vm.needsCloudflareVerification {
+                    CloudflareVerifyView { vm.verifyCloudflare() }
                 } else if vm.streamOptions.isEmpty {
                     ContentUnavailableView(
                         "No Streams Found",
@@ -71,5 +73,51 @@ struct StreamPickerView: View {
 
     private var episodeTitle: String {
         vm.selectedEpisode.map { "Episode \($0.displayNumber)" } ?? "Select Stream"
+    }
+}
+
+// MARK: - Shared Cloudflare verification UI
+
+/// Full-screen "Verify Cloudflare" prompt shown when a fetch hit a Turnstile wall.
+/// `onVerify` should run the (user-initiated) challenge and retry.
+struct CloudflareVerifyView: View {
+    let onVerify: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "shield.lefthalf.filled")
+                .font(.system(size: 44))
+                .foregroundStyle(.secondary)
+            VStack(spacing: 4) {
+                Text("Verification Required")
+                    .font(.headline)
+                Text("This source is protected by Cloudflare. Verify to load streams.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            Button(action: onVerify) {
+                Label("Verify Cloudflare", systemImage: "checkmark.shield")
+                    .font(.headline)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Compact inline "Verify Cloudflare" button for module-picker rows.
+struct CloudflareVerifyInlineButton: View {
+    let onVerify: () -> Void
+
+    var body: some View {
+        Button(action: onVerify) {
+            Label("Verify Cloudflare", systemImage: "checkmark.shield")
+                .font(.caption.weight(.semibold))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(.orange)
     }
 }

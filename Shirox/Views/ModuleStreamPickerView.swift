@@ -100,6 +100,13 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     @Published var readyStreams: [StreamResult]?
     @Published var selectedEpisodeHref: String?  // Track the href for Next Episode
     @Published var availableCount: Int?        // Track total episodes in this module result
+    @Published var cloudflareURL: URL?         // Set when *this* module's runner hit a Turnstile wall
+
+    /// Captures whether this row's runner hit Cloudflare, then transitions to a settled state.
+    private func settle(_ newState: State) {
+        cloudflareURL = runner?.lastTurnstileURL
+        state = newState
+    }
 
     let module: ModuleDefinition
     let mediaId: Int?
@@ -201,7 +208,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
                 selectedEpisodeHref = savedHref
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
                 if streams.isEmpty {
-                    state = .error("No streams found for episode \(targetEpisodeNumber)")
+                    settle(.error("No streams found for episode \(targetEpisodeNumber)"))
                 } else {
                     readyStreams = streams
                 }
@@ -242,13 +249,13 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             }
 
             if results.isEmpty {
-                state = .notFound
+                settle(.notFound)
             } else {
-                state = .searchResults(results)
+                settle(.searchResults(results))
             }
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 
@@ -271,16 +278,16 @@ private final class ModuleStreamRowViewModel: ObservableObject {
                 selectedEpisodeHref = item.href
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
                 if streams.isEmpty {
-                    state = .error("No streams found for episode \(targetEpisodeNumber)")
+                    settle(.error("No streams found for episode \(targetEpisodeNumber)"))
                 } else {
                     readyStreams = streams
                 }
             } else {
-                state = .selectingEpisode(episodes)
+                settle(.selectingEpisode(episodes))
             }
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 
@@ -318,7 +325,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
         do {
             let streams = try await r.fetchStreams(episodeUrl: episode.href)
             if streams.isEmpty {
-                state = .error("No streams found")
+                settle(.error("No streams found"))
             } else {
                 readyStreams = streams
                 // Use the current search result href if available (from manual episode selection)
@@ -328,7 +335,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             }
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 
@@ -339,6 +346,17 @@ private final class ModuleStreamRowViewModel: ObservableObject {
         readyStreams = nil
         runner = nil
         currentSearchResultHref = nil
+        cloudflareURL = nil
+    }
+
+    /// Runs the user-initiated Cloudflare challenge for this module, then re-runs the search.
+    func verifyAndRetry() {
+        guard let url = cloudflareURL else { return }
+        Task {
+            try? await CloudflareBypassManager.shared.triggerBypass(for: url)
+            reset()
+            startFind()
+        }
     }
 }
 
@@ -525,6 +543,7 @@ private struct ModuleStreamRow: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.primary)
                 }
+                verifyBanner
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
@@ -543,6 +562,7 @@ private struct ModuleStreamRow: View {
         case .selectingEpisode(let episodes):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
+                verifyBanner
                 Text("Episode not auto-matched — pick manually:")
                     .font(.caption).foregroundStyle(.secondary)
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -562,15 +582,30 @@ private struct ModuleStreamRow: View {
         case .notFound:
             VStack(alignment: .leading, spacing: 6) {
                 titleField
-                Text("No results found")
-                    .font(.caption).foregroundStyle(.secondary)
+                if rowVm.cloudflareURL != nil {
+                    Text("Blocked by Cloudflare").font(.caption).foregroundStyle(.secondary)
+                    verifyBanner
+                } else {
+                    Text("No results found")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
 
         case .error(let msg):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
                 Text(msg).font(.caption).foregroundStyle(.primary)
+                verifyBanner
             }
+        }
+    }
+
+    /// Inline "Verify Cloudflare" button shown whenever a Turnstile wall was hit while
+    /// loading this module (data fetch or a blocked poster image).
+    @ViewBuilder
+    private var verifyBanner: some View {
+        if rowVm.cloudflareURL != nil {
+            CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
         }
     }
 

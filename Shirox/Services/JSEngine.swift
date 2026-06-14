@@ -153,6 +153,11 @@ final class JSEngine: ObservableObject {
                             existing.isEmpty ? bypassHeader : "\(existing); \(bypassHeader)",
                             forHTTPHeaderField: "Cookie"
                         )
+                        // cf_clearance is UA-bound — replay the UA that solved the challenge,
+                        // otherwise CF rejects the cookie and evicts the cache via flagPendingVerification.
+                        if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: host) {
+                            request.setValue(ua, forHTTPHeaderField: "User-Agent")
+                        }
                     }
 
                     var (data, response) = try await self.session.data(for: request)
@@ -166,28 +171,25 @@ final class JSEngine: ObservableObject {
                     // against that URL — avoids cross-domain Cookie stripping on URLSession redirects.
                     if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
                         let cfResponseURL = httpResponse.url ?? url
-                        try? await CloudflareBypassManager.shared.triggerBypass(for: cfResponseURL)
-                        if let bypassHost = cfResponseURL.host,
-                           let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: bypassHost) {
-                            var retryRequest = URLRequest(url: cfResponseURL)
-                            retryRequest.httpMethod = request.httpMethod
-                            retryRequest.httpBody = request.httpBody
-                            request.allHTTPHeaderFields?.forEach { key, val in
-                                guard key.lowercased() != "cookie" else { return }
-                                retryRequest.setValue(val, forHTTPHeaderField: key)
-                            }
-                            retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
-                            if !info.userAgent.isEmpty {
-                                retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
-                            }
-                            Logger.shared.log("[CFBypass] URLSession retry cookie=\(info.cookieHeader.prefix(60))", type: "Debug")
-                            let (retryData, retryResponse) = try await self.session.data(for: retryRequest)
-                            if let retryHTTP = retryResponse as? HTTPURLResponse {
-                                Logger.shared.log("[CFBypass] URLSession retry status=\(retryHTTP.statusCode)", type: "Debug")
-                                data = retryData
-                                httpResponse = retryHTTP
-                                responseText = String(data: retryData, encoding: .utf8) ?? ""
-                            }
+                        // We have a solved session if either the live bypass WebView is still
+                        // around, or a persisted cookie survived a relaunch. Retry the FINAL URL
+                        // directly with that cookie+UA — URLSession strips cookies on cross-domain
+                        // redirects, which is what walled the first request in the first place.
+                        let recovered = await CloudflareBypassManager.shared.retryWithSolvedSession(
+                            for: cfResponseURL,
+                            method: request.httpMethod ?? "GET",
+                            body: request.httpBody,
+                            extraHeaders: request.allHTTPHeaderFields ?? [:],
+                            session: self.session
+                        )
+                        if let recovered {
+                            data = recovered.data
+                            httpResponse = recovered.response
+                            responseText = String(data: recovered.data, encoding: .utf8) ?? ""
+                        } else {
+                            // No usable session, or the session itself is now walled — defer to a
+                            // user-initiated "Verify Cloudflare" action instead of silently failing.
+                            await CloudflareBypassManager.shared.flagPendingVerification(for: cfResponseURL)
                         }
                     }
 

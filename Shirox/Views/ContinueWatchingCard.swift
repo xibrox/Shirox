@@ -214,6 +214,29 @@ struct ContinueWatchingSection: View {
         let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
 
         #if os(iOS)
+        // Downloaded episodes saved a local URL: a file:// (MP4) or a 127.0.0.1 proxy URL
+        // (HLS). The HLS proxy only works while DownloadManager's server is running, which
+        // this path never starts — so replaying the stored URL fails and the onStreamExpired
+        // fallback silently re-extracts the ONLINE stream. Re-resolve through getStream() to
+        // get a fresh, server-backed local stream and drop the online fallback entirely.
+        let isLocal = url.isFileURL || url.host == "127.0.0.1" || url.host == "localhost"
+        if isLocal, let download = DownloadManager.shared.completedDownload(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            streamTitle: item.streamTitle
+        ) {
+            Task {
+                guard let localStream = await DownloadManager.shared.getStream(for: download) else {
+                    ToastManager.shared.show(message: "Downloaded file is missing — re-download to play offline", type: .error)
+                    return
+                }
+                PlayerPresenter.shared.presentPlayer(stream: localStream, context: context, onWatchNext: onWatchNext)
+            }
+            return
+        }
+
         PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired)
         #endif
     }

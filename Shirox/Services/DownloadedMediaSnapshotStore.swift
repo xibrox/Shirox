@@ -165,15 +165,18 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
         apply(aniList: aniListMedia, to: &snap)
         await applyModuleDetailIfNeeded(item: item, snap: &snap)
 
-        // Graduate the snapshot when we successfully reached AniList — i.e. we had
-        // network to walk the priority chain. If aniListID is nil there's nothing
-        // to graduate toward anyway, so graduate immediately.
+        // Graduate the snapshot once it has been processed by the current pipeline with
+        // network available. "Had network" is inferred from reaching AniList this run
+        // (aniListMedia != nil) OR already holding AniList metadata from a prior online
+        // run (synopsis != nil). The synopsis clause matters for re-enrichment after a
+        // schema bump: fetchAniListIfNeeded skips the network when synopsis is already
+        // set, so without it a re-enriched snapshot would never graduate and would
+        // re-run on every Downloads open. If aniListID is nil there's nothing to
+        // graduate toward, so graduate immediately.
         //
-        // What this guarantees: a snapshot saved while offline (aniListMedia == nil
-        // despite aniListID != nil) stays at v0 and is retried on the next online
-        // open. A snapshot saved online graduates even if TVDB/AniList genuinely
-        // had no banner art — we did what we could, no infinite retry.
-        if aniListMedia != nil || snap.aniListID == nil {
+        // A snapshot saved while truly offline has aniListID != nil but no synopsis, so
+        // it stays below currentSchemaVersion and is retried on the next online open.
+        if aniListMedia != nil || snap.aniListID == nil || snap.synopsis != nil {
             snap.schemaVersion = DownloadedMediaSnapshot.currentSchemaVersion
         }
 
@@ -208,8 +211,14 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
         }
 
         if let aid = snap.aniListID {
-            let eps = await TVDBMappingService.shared.getEpisodes(for: aid)
-            if let match = eps.first(where: { $0.episode == epNum }) {
+            // Use the full episode-number waterfall (handles absolute vs. per-cour
+            // numbering and the `absolute` field) — NOT a naive `$0.episode == epNum`
+            // match. A split-cour "Part 2" whose source numbers episodes absolutely
+            // (e.g. 14–20) while AniList numbers them per-cour (1–7) otherwise finds no
+            // match here and silently saves no title or thumbnail, leaving the offline
+            // Downloads view with blank rows even though the online view (which uses
+            // this same waterfall) showed them fine.
+            if let match = await TVDBMappingService.shared.getEpisode(for: aid, episodeNumber: epNum) {
                 if ep.title == nil { ep.title = match.title }
 
                 if ep.thumbnailFile == nil,
@@ -392,6 +401,9 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
                 }
             } else if let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
                 req.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+                if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: host) {
+                    req.setValue(ua, forHTTPHeaderField: "User-Agent")
+                }
             }
         }
 

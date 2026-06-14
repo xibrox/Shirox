@@ -1259,6 +1259,8 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
     private func extractCFClearanceCookie() {
         #if !os(tvOS)
         guard let webView = webView, let host = webView.url?.host else { return }
+        // cf_clearance is UA-bound — capture the UA this webView solved under so reuse replays it.
+        let solvedUA = webView.customUserAgent ?? ""
         let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
         cookieStore.getAllCookies { cookies in
             guard let cf = cookies.first(where: {
@@ -1272,7 +1274,7 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
             }
             let fullHeader = hostCookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
             Task { @MainActor in
-                CloudflareBypassManager.shared.store(cookie: cf.value, cookieHeader: fullHeader, for: host)
+                CloudflareBypassManager.shared.store(cookie: cf.value, cookieHeader: fullHeader, userAgent: solvedUA, for: host)
             }
         }
         #endif

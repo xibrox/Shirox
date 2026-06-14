@@ -27,6 +27,11 @@ struct DetailView: View {
     @State private var isSelectionMode = false
     @State private var selectedEpisodeNumbers: Set<Int> = []
     @State private var showBatchDownloadPicker = false
+    // Observe the snapshot store so the offline view re-renders when reenrichIfStale
+    // finishes — `offlineSnapshot` is a value captured at navigation time and never
+    // updates on its own, which is why re-enriched thumbnails only appeared after an
+    // app relaunch.
+    @ObservedObject private var snapshotStore = DownloadedMediaSnapshotStore.shared
     #endif
     @State private var selectedRangeIndex = 0
     @State private var isReversed = false
@@ -1117,8 +1122,11 @@ struct DetailView: View {
         #if os(iOS)
         // Use the downloaded-only path only when we have a snapshot AND the episode list
         // contains nothing usable for online streaming (all hrefs empty = snapshot fallback).
-        if let snap = offlineSnapshot,
+        if let captured = offlineSnapshot,
            detail.episodes.allSatisfy({ $0.href.isEmpty }) {
+            // Read the freshest copy from the store so re-enriched titles/thumbnails
+            // render live (the captured value is stale once reenrichIfStale runs).
+            let snap = snapshotStore.snapshot(mediaKey: captured.mediaKey) ?? captured
             return AnyView(offlineEpisodesSection(detail: detail, snapshot: snap))
         }
         #endif
@@ -1425,10 +1433,13 @@ struct DetailView: View {
                                 // to do with it from the batch bar. Completed downloads
                                 // can be selected for batch delete; non-downloaded for
                                 // batch download.
-                                let state = DownloadManager.shared.items.first {
-                                    $0.episodeHref == episode.href ||
-                                    ($0.mediaTitle == detail.title && $0.episodeNumber == epNum && $0.moduleId == ModuleManager.shared.activeModule?.id)
-                                }?.state
+                                let state = DownloadManager.shared.downloadItem(
+                                    forEpisodeHref: episode.href,
+                                    aniListID: vm.aniListID ?? aniListID,
+                                    moduleId: ModuleManager.shared.activeModule?.id,
+                                    mediaTitle: detail.title,
+                                    episodeNumber: epNum
+                                )?.state
 
                                 if state == .downloading || state == .pending {
                                     return
@@ -1740,10 +1751,10 @@ private struct ModuleEpisodeRowContainer: View {
 
     private var downloadState: DownloadState? {
         #if os(iOS)
-            downloadManager.items.first {
-                $0.episodeHref == episode.href ||
-                ($0.mediaTitle == mediaTitle && $0.episodeNumber == epNum && $0.moduleId == moduleId)
-            }?.state
+            downloadManager.downloadItem(
+                forEpisodeHref: episode.href, aniListID: aniListID,
+                moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum
+            )?.state
         #else
             return nil
         #endif
@@ -1751,11 +1762,10 @@ private struct ModuleEpisodeRowContainer: View {
 
     private var deleteDownloadAction: (() -> Void)? {
         #if os(iOS)
-        guard let downloaded = downloadManager.items.first(where: {
-            ($0.episodeHref == episode.href ||
-             ($0.mediaTitle == mediaTitle && $0.episodeNumber == epNum && $0.moduleId == moduleId))
-            && $0.state == .completed
-        }) else { return nil }
+        guard let downloaded = downloadManager.downloadItem(
+            forEpisodeHref: episode.href, aniListID: aniListID,
+            moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum
+        ), downloaded.state == .completed else { return nil }
         return { DownloadManager.shared.remove(downloaded) }
         #else
         return nil
@@ -1787,18 +1797,35 @@ private struct ModuleEpisodeRowContainer: View {
     private var preferredThumbnail: String? {
         #if os(iOS)
         let store = DownloadedMediaSnapshotStore.shared
-        if let snap = store.snapshot(mediaTitle: mediaTitle, moduleId: moduleId) {
-            // A snapshot exists → this is a downloaded series. Surface only the
-            // snapshot file. Don't fall back to a live TVDB URL: when offline,
-            // every row would queue a guaranteed-failing fetch and spam the log
-            // / waste CPU. The gray placeholder is the right end state.
-            if let relPath = snap.episodes[epNum]?.thumbnailFile {
-                return store.localFileURL(in: snap, relative: relPath).absoluteString
-            }
-            return nil
+        // Prefer the snapshot's downloaded file when this specific episode has one
+        // (keeps the row working offline for downloaded episodes). For episodes the
+        // snapshot doesn't cover — i.e. everything not yet downloaded once a snapshot
+        // exists for the series — fall through to the live Anira thumbnail rather than
+        // returning nil, so browsing a partially-downloaded series online still shows
+        // art for the rest. When offline, aniMapEpisode is itself nil, so this still
+        // ends at the gray placeholder without queueing failing fetches.
+        if let snap = store.snapshot(mediaTitle: mediaTitle, moduleId: moduleId),
+           let relPath = snap.episodes[epNum]?.thumbnailFile {
+            return store.localFileURL(in: snap, relative: relPath).absoluteString
         }
         #endif
         return aniMapEpisode?.thumbnail
+    }
+
+    /// Episode title for the row. Prefer the live Anira/TVDB title, but fall back to the
+    /// title persisted in the download snapshot so a downloaded episode keeps its title
+    /// even when the live fetch is slow, rate-limited, cancelled, or unavailable (offline).
+    /// Mirrors `preferredThumbnail` so a downloaded episode's metadata is always served
+    /// from disk when the network can't supply it.
+    private var preferredTitle: String? {
+        if let live = aniMapEpisode?.title, !live.isEmpty { return live }
+        #if os(iOS)
+        if let snap = DownloadedMediaSnapshotStore.shared.snapshot(mediaTitle: mediaTitle, moduleId: moduleId),
+           let t = snap.episodes[epNum]?.title, !t.isEmpty {
+            return t
+        }
+        #endif
+        return nil
     }
 
     var body: some View {
@@ -1807,7 +1834,7 @@ private struct ModuleEpisodeRowContainer: View {
                 ThumbnailEpisodeRow(
                     number: epNum,
                     thumbnail: preferredThumbnail,
-                    title: aniMapEpisode?.title,
+                    title: preferredTitle,
                     progress: progress,
                     onTap: onTap,
                     onMarkWatched: {
@@ -1859,6 +1886,7 @@ private struct ModuleEpisodeRowContainer: View {
                             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
                     },
                     onDownload: onDownload,
+                    onDeleteDownload: deleteDownloadAction,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
                     isSelected: isSelected,

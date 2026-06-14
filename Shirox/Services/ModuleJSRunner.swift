@@ -16,6 +16,11 @@ final class ModuleJSRunner {
 
     private var context: JSContext?
 
+    /// Set when a request made by *this* runner hit a Turnstile wall with no cached cookie.
+    /// Host-scoped to this module, so the picker only offers verification for the module
+    /// that's actually Cloudflare-protected (not every visible module).
+    var lastTurnstileURL: URL?
+
     // Ephemeral config gives each runner its own isolated cookie store so bypass
     // cookies from search persist through to fetchEpisodes without bleeding into
     // other runners or being wiped by HTTPCookieStorage.shared clears.
@@ -83,7 +88,7 @@ final class ModuleJSRunner {
               let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             throw JSEngineError.parseError("Could not parse episodes")
         }
-        return array.compactMap { item in
+        let links = array.compactMap { item -> EpisodeLink? in
             guard let href = item["href"] as? String else { return nil }
             let number: Double
             if let n = item["number"] as? Double { number = n }
@@ -91,6 +96,13 @@ final class ModuleJSRunner {
             else { number = 0 }
             return EpisodeLink(number: number, href: href)
         }
+        // Logged so episode-number mismatches (the usual cause of "only ep 1 downloads"
+        // on split-cour shows) are visible in Settings → App Logs.
+        Logger.shared.log(
+            "[Episodes] \(url) → \(links.count) eps numbers=[\(links.prefix(60).map { $0.number.truncatingRemainder(dividingBy: 1) == 0 ? String(Int($0.number)) : String($0.number) }.joined(separator: ","))]",
+            type: "Download"
+        )
+        return links
     }
 
     // MARK: - Streams
@@ -231,6 +243,10 @@ final class ModuleJSRunner {
                             existing.isEmpty ? cfHeader : "\(existing); \(cfHeader)",
                             forHTTPHeaderField: "Cookie"
                         )
+                        // cf_clearance is UA-bound — replay the solving UA so CF accepts the cookie.
+                        if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: host) {
+                            request.setValue(ua, forHTTPHeaderField: "User-Agent")
+                        }
                     }
 
                     var (data, response) = try await self.session.data(for: request)
@@ -243,26 +259,24 @@ final class ModuleJSRunner {
                     // CF reactive retry: bypass the final redirect destination, retry directly against it
                     if JSEngine.isTurnstileResponse(status: httpResponse.statusCode, body: responseText) {
                         let cfResponseURL = httpResponse.url ?? url
-                        try? await CloudflareBypassManager.shared.triggerBypass(for: cfResponseURL)
-                        if let bypassHost = cfResponseURL.host,
-                           let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: bypassHost) {
-                            var retryRequest = URLRequest(url: cfResponseURL)
-                            retryRequest.httpMethod = request.httpMethod
-                            retryRequest.httpBody = request.httpBody
-                            request.allHTTPHeaderFields?.forEach { key, val in
-                                guard key.lowercased() != "cookie" else { return }
-                                retryRequest.setValue(val, forHTTPHeaderField: key)
-                            }
-                            retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
-                            if !info.userAgent.isEmpty {
-                                retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
-                            }
-                            let (retryData, retryResponse) = try await self.session.data(for: retryRequest)
-                            if let retryHTTP = retryResponse as? HTTPURLResponse {
-                                data = retryData
-                                httpResponse = retryHTTP
-                                responseText = String(data: retryData, encoding: .utf8) ?? ""
-                            }
+                        // Retry the final URL directly with our solved session (live WebView cookies
+                        // or a persisted cookie+UA after relaunch) — only fall back to prompting the
+                        // user if we have no session or it's itself walled. Avoids re-popping the
+                        // bypass sheet on every request once a host has been solved.
+                        let recovered = await CloudflareBypassManager.shared.retryWithSolvedSession(
+                            for: cfResponseURL,
+                            method: request.httpMethod ?? "GET",
+                            body: request.httpBody,
+                            extraHeaders: request.allHTTPHeaderFields ?? [:],
+                            session: self.session
+                        )
+                        if let recovered {
+                            data = recovered.data
+                            httpResponse = recovered.response
+                            responseText = String(data: recovered.data, encoding: .utf8) ?? ""
+                        } else {
+                            self.lastTurnstileURL = cfResponseURL
+                            await CloudflareBypassManager.shared.flagPendingVerification(for: cfResponseURL)
                         }
                     }
 

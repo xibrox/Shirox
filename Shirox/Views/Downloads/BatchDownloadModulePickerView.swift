@@ -128,6 +128,12 @@ private final class BatchDownloadModuleRowViewModel: ObservableObject {
     @Published var searchTitle: String
     @Published var readyStreams: [StreamResult]?
     @Published var readySearchItem: SearchItem?
+    @Published var cloudflareURL: URL?
+
+    private func settle(_ newState: State) {
+        cloudflareURL = runner?.lastTurnstileURL
+        state = newState
+    }
 
     let module: ModuleDefinition
     let mediaId: Int?
@@ -154,11 +160,20 @@ private final class BatchDownloadModuleRowViewModel: ObservableObject {
         currentTask = Task { await find() }
     }
 
+    func verifyAndRetry() {
+        guard let url = cloudflareURL else { return }
+        Task {
+            try? await CloudflareBypassManager.shared.triggerBypass(for: url)
+            reset()
+            startFind()
+        }
+    }
+
     func startFetchStreamsForPicker(from item: SearchItem) {
         currentTask = Task { await fetchStreamsForPicker(from: item) }
     }
 
-    func reset() { currentTask?.cancel(); currentTask = nil; state = .idle; readyStreams = nil; readySearchItem = nil; runner = nil }
+    func reset() { currentTask?.cancel(); currentTask = nil; state = .idle; readyStreams = nil; readySearchItem = nil; runner = nil; cloudflareURL = nil }
 
     private func find() async {
         let keyword = searchTitle.trimmingCharacters(in: .whitespaces)
@@ -168,10 +183,10 @@ private final class BatchDownloadModuleRowViewModel: ObservableObject {
         do {
             try await r.load(module: module)
             let results = try await r.search(keyword: keyword)
-            state = results.isEmpty ? .notFound : .searchResults(results)
+            settle(results.isEmpty ? .notFound : .searchResults(results))
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 
@@ -182,19 +197,19 @@ private final class BatchDownloadModuleRowViewModel: ObservableObject {
             let allEpisodes = try await r.fetchEpisodes(url: item.href)
             guard let firstEpNum = episodeNumbers.first,
                   let matched = allEpisodes.first(where: { $0.number == Double(firstEpNum) }) else {
-                state = .error("Could not find episode \(episodeNumbers.first ?? 0)")
+                settle(.error("Could not find episode \(episodeNumbers.first ?? 0)"))
                 return
             }
             let streams = try await r.fetchStreams(episodeUrl: matched.href)
             if streams.isEmpty {
-                state = .error("No streams found")
+                settle(.error("No streams found"))
             } else {
                 readyStreams = streams
                 readySearchItem = item
             }
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 }
@@ -309,6 +324,7 @@ private struct BatchDownloadModuleRow: View {
                     Button("Show All") { showAllResults = true }
                         .font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
                 }
+                verifyBanner
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
@@ -335,13 +351,26 @@ private struct BatchDownloadModuleRow: View {
         case .notFound:
             VStack(alignment: .leading, spacing: 6) {
                 titleField
-                Text("No results found").font(.caption).foregroundStyle(.secondary)
+                if rowVm.cloudflareURL != nil {
+                    Text("Blocked by Cloudflare").font(.caption).foregroundStyle(.secondary)
+                    verifyBanner
+                } else {
+                    Text("No results found").font(.caption).foregroundStyle(.secondary)
+                }
             }
         case .error(let msg):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
                 Text(msg).font(.caption).foregroundStyle(.primary)
+                verifyBanner
             }
+        }
+    }
+
+    @ViewBuilder
+    private var verifyBanner: some View {
+        if rowVm.cloudflareURL != nil {
+            CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
         }
     }
 

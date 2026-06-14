@@ -16,6 +16,7 @@ struct BatchDownloadStreamPickerView: View {
     @State private var firstEpisodeHref: String? = nil
     @State private var isLoading = true
     @State private var error: String? = nil
+    @State private var cloudflareURL: URL? = nil
 
     var body: some View {
         NavigationStack {
@@ -28,6 +29,8 @@ struct BatchDownloadStreamPickerView: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if cloudflareURL != nil {
+                    CloudflareVerifyView { Task { await verifyCloudflare() } }
                 } else if let error {
                     ContentUnavailableView(
                         "Failed to Load",
@@ -83,6 +86,10 @@ struct BatchDownloadStreamPickerView: View {
     }
 
     private func loadStreams() async {
+        isLoading = true
+        error = nil
+        cloudflareURL = nil
+        CloudflareBypassManager.shared.pendingVerificationURL = nil
         guard let firstEpNum = episodeNumbers.first,
               let episode = episodes.first(where: { Int($0.number) == firstEpNum }) else {
             error = "Could not find episode"
@@ -93,11 +100,22 @@ struct BatchDownloadStreamPickerView: View {
             let result = try await JSEngine.shared.fetchStreams(episodeUrl: episode.href)
             streams = result.sorted { $0.title < $1.title }
             firstEpisodeHref = episode.href
+            if streams.isEmpty {
+                cloudflareURL = CloudflareBypassManager.shared.pendingVerificationURL
+            }
             isLoading = false
         } catch {
             self.error = error.localizedDescription
             isLoading = false
         }
+    }
+
+    /// Runs the user-initiated Cloudflare challenge, then reloads streams.
+    private func verifyCloudflare() async {
+        guard let url = cloudflareURL else { return }
+        isLoading = true
+        try? await CloudflareBypassManager.shared.triggerBypass(for: url)
+        await loadStreams()
     }
 
     private func startBatchDownload(streamTitle: String) {

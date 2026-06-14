@@ -203,6 +203,7 @@ private struct DownloadModuleRow: View {
                     Button("Show All") { showAllResults = true }
                         .font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
                 }
+                verifyBanner
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
@@ -218,6 +219,7 @@ private struct DownloadModuleRow: View {
         case .selectingEpisode(let episodes):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
+                verifyBanner
                 Text("Episode not auto-matched — pick manually:").font(.caption).foregroundStyle(.secondary)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -231,13 +233,26 @@ private struct DownloadModuleRow: View {
         case .notFound:
             VStack(alignment: .leading, spacing: 6) {
                 titleField
-                Text("No results found").font(.caption).foregroundStyle(.secondary)
+                if rowVm.cloudflareURL != nil {
+                    Text("Blocked by Cloudflare").font(.caption).foregroundStyle(.secondary)
+                    verifyBanner
+                } else {
+                    Text("No results found").font(.caption).foregroundStyle(.secondary)
+                }
             }
         case .error(let msg):
             VStack(alignment: .leading, spacing: 6) {
                 titleField
                 Text(msg).font(.caption).foregroundStyle(.primary)
+                verifyBanner
             }
+        }
+    }
+
+    @ViewBuilder
+    private var verifyBanner: some View {
+        if rowVm.cloudflareURL != nil {
+            CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
         }
     }
 
@@ -266,6 +281,12 @@ private final class DownloadModuleRowViewModel: ObservableObject {
     @Published var searchTitle: String
     @Published var readyStreams: [StreamResult]?
     @Published var selectedEpisodeHref: String?
+    @Published var cloudflareURL: URL?
+
+    private func settle(_ newState: State) {
+        cloudflareURL = runner?.lastTurnstileURL
+        state = newState
+    }
 
     let module: ModuleDefinition
     let mediaId: Int?
@@ -300,7 +321,16 @@ private final class DownloadModuleRowViewModel: ObservableObject {
     }
     func startSelectEpisode(_ episode: EpisodeLink) { currentTask = Task { await selectEpisode(episode) } }
 
-    func reset() { currentTask?.cancel(); currentTask = nil; state = .idle; readyStreams = nil; runner = nil; currentSearchResultHref = nil }
+    func reset() { currentTask?.cancel(); currentTask = nil; state = .idle; readyStreams = nil; runner = nil; currentSearchResultHref = nil; cloudflareURL = nil }
+
+    func verifyAndRetry() {
+        guard let url = cloudflareURL else { return }
+        Task {
+            try? await CloudflareBypassManager.shared.triggerBypass(for: url)
+            reset()
+            startFind()
+        }
+    }
 
     private func persistAlias() {
         ModuleSearchAliasManager.shared.setAlias(mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id, alias: searchTitle)
@@ -316,13 +346,13 @@ private final class DownloadModuleRowViewModel: ObservableObject {
             let results = try await r.search(keyword: keyword)
             
             if results.isEmpty {
-                state = .notFound
+                settle(.notFound)
             } else {
-                state = .searchResults(results)
+                settle(.searchResults(results))
             }
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 
@@ -334,14 +364,14 @@ private final class DownloadModuleRowViewModel: ObservableObject {
             if let matched = episodes.first(where: { $0.number == Double(targetEpisodeNumber) }) {
                 state = .loadingStreams; selectedEpisodeHref = item.href
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
-                state = streams.isEmpty ? .error("No streams found for episode \(targetEpisodeNumber)") : .idle
-                if !streams.isEmpty { readyStreams = streams }
+                if streams.isEmpty { settle(.error("No streams found for episode \(targetEpisodeNumber)")) }
+                else { state = .idle; readyStreams = streams }
             } else {
-                state = .selectingEpisode(episodes)
+                settle(.selectingEpisode(episodes))
             }
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 
@@ -350,11 +380,11 @@ private final class DownloadModuleRowViewModel: ObservableObject {
         state = .loadingStreams
         do {
             let streams = try await r.fetchStreams(episodeUrl: episode.href)
-            if streams.isEmpty { state = .error("No streams found") }
+            if streams.isEmpty { settle(.error("No streams found")) }
             else { readyStreams = streams; if let href = currentSearchResultHref { selectedEpisodeHref = href } }
         } catch {
             if (error as? CancellationError) != nil { return }
-            state = .error(error.localizedDescription)
+            settle(.error(error.localizedDescription))
         }
     }
 }

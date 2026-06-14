@@ -8,6 +8,7 @@ struct EpisodeRowView: View {
     var onMarkUnwatched: (() -> Void)? = nil
     var onResetProgress: (() -> Void)? = nil
     var onDownload: (() -> Void)? = nil
+    var onDeleteDownload: (() -> Void)? = nil
     var onTryOtherStream: (() -> Void)? = nil
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
@@ -156,6 +157,12 @@ struct EpisodeRowView: View {
                         Label("Download Episode", systemImage: "arrow.down.circle")
                     }
                     .disabled(downloadState == .completed || downloadState == .downloading || downloadState == .pending)
+                }
+                if let onDeleteDownload {
+                    Divider()
+                    Button(role: .destructive) { onDeleteDownload() } label: {
+                        Label("Delete Download", systemImage: "trash")
+                    }
                 }
             }
         }

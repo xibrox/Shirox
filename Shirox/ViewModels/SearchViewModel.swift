@@ -36,7 +36,28 @@ final class SearchViewModel: ObservableObject {
         searchTask = Task {
             do {
                 if usingModule {
-                    let res = try await JSEngine.shared.search(keyword: q)
+                    CloudflareBypassManager.shared.pendingVerificationURL = nil
+                    var res: [SearchItem]
+                    do {
+                        res = try await JSEngine.shared.search(keyword: q)
+                    } catch {
+                        // Modules often swallow a CF wall as a JSON parse error and rethrow.
+                        // If a Turnstile host was flagged, fall through to verify; else surface it.
+                        guard CloudflareBypassManager.shared.pendingVerificationURL != nil else { throw error }
+                        res = []
+                    }
+                    // The user explicitly searched, so a Cloudflare wall here is solved inline
+                    // (auto-verify + retry once) rather than deferred to a button. Verify whenever
+                    // a wall was flagged — modules often swallow the CF page and return a bogus
+                    // result, so we can't rely on the result being empty.
+                    if !Task.isCancelled,
+                       let cfURL = CloudflareBypassManager.shared.pendingVerificationURL {
+                        try? await CloudflareBypassManager.shared.triggerBypass(for: cfURL)
+                        if !Task.isCancelled {
+                            CloudflareBypassManager.shared.pendingVerificationURL = nil
+                            res = try await JSEngine.shared.search(keyword: q)
+                        }
+                    }
                     if !Task.isCancelled {
                         var seen = Set<String>()
                         moduleResults = res.filter { seen.insert($0.href).inserted }

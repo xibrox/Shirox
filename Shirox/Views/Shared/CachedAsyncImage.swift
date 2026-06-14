@@ -17,6 +17,7 @@ struct CachedAsyncImage: View {
     var base64String: String? = nil
     @State private var platformImage: PlatformImage?
     @State private var loadFailed = false
+    @State private var reloadToken = 0
 
     private static let memCache: NSCache<NSString, PlatformImage> = {
         let c = NSCache<NSString, PlatformImage>()
@@ -145,7 +146,11 @@ struct CachedAsyncImage: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ClearImageCache"))) { _ in
             platformImage = nil
         }
-        .task(id: urlString + (base64String ?? "")) {
+        .onReceive(NotificationCenter.default.publisher(for: .cloudflareBypassSolved)) { _ in
+            // A challenge was just solved — retry images that are showing a placeholder.
+            if platformImage == nil { reloadToken += 1 }
+        }
+        .task(id: urlString + (base64String ?? "") + "#\(reloadToken)") {
             loadFailed = false
 
             if let base64 = base64String, !base64.isEmpty,
@@ -202,6 +207,9 @@ struct CachedAsyncImage: View {
             } else if let host = url.host,
                       let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
                 imageRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+                if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: host) {
+                    imageRequest.setValue(ua, forHTTPHeaderField: "User-Agent")
+                }
             }
 
             let data: Data
@@ -226,25 +234,13 @@ struct CachedAsyncImage: View {
                 .lowercased().hasPrefix("image/")
             let responseText = isImageContentType ? "" : (String(data: data, encoding: .utf8) ?? "")
 
-            // If CF blocked the image CDN (may be a different domain than the API),
-            // trigger bypass for that specific domain and retry.
+            // If CF blocked the image CDN, solve the challenge for that host (deduped across a
+            // grid of posters so only one sheet appears) then retry with the fresh cookie.
             if JSEngine.isTurnstileResponse(status: httpStatus, body: responseText) {
                 Logger.shared.log("[Image] CF challenge detected status=\(httpStatus) host=\(finalURL.host ?? "?")", type: "Debug")
                 let cfTarget = finalURL
                 let cfHostStr = cfTarget.host ?? ""
 
-                // If another bypass is already in progress, wait for it to finish
-                // before triggering a new one — avoids spawning multiple WebViews.
-                // This is safe because both this task and CloudflareBypassManager
-                // are @MainActor (cooperative scheduling, no data race).
-                if CloudflareBypassManager.shared.activeBypassWebView != nil {
-                    for _ in 0..<70 {
-                        try? await Task.sleep(nanoseconds: 500_000_000)
-                        guard CloudflareBypassManager.shared.activeBypassWebView != nil else { break }
-                    }
-                }
-
-                // Trigger bypass for this image's host if still needed
                 if CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) == nil {
                     try? await CloudflareBypassManager.shared.triggerBypass(for: cfTarget)
                 }
@@ -259,6 +255,9 @@ struct CachedAsyncImage: View {
                     }
                 } else if let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) {
                     retryRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+                    if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: cfHostStr) {
+                        retryRequest.setValue(ua, forHTTPHeaderField: "User-Agent")
+                    }
                 }
                 guard let (retryData, retryResponse) = try? await Self.session.data(for: retryRequest) else {
                     Logger.shared.log("[Image] CF retry network error host=\(cfHostStr)", type: "Error")

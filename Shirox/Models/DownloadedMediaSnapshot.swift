@@ -11,7 +11,9 @@ struct DownloadedMediaSnapshot: Codable {
     /// Bump when changes to the enrichment pipeline require existing snapshots
     /// to be re-run. `schemaVersion < currentSchemaVersion` triggers
     /// `reenrichIfStale` from `DownloadsView`.
-    static let currentSchemaVersion = 2
+    // v3: enrichEpisode switched to the offset-aware getEpisode waterfall, so split-cour
+    // shows that previously saved blank episode titles/thumbnails get re-enriched.
+    static let currentSchemaVersion = 3
 
     /// Implicit `0` for snapshots written by code that didn't have this field.
     /// `0` is the "needs upgrade" signal.

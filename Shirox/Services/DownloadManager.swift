@@ -282,6 +282,9 @@ final class DownloadManager: NSObject, ObservableObject {
         if let host = url.host,
            let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
             req.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+            if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: host) {
+                req.setValue(ua, forHTTPHeaderField: "User-Agent")
+            }
         }
         // Caller-provided headers (from the stream) override defaults.
         headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
@@ -329,9 +332,21 @@ final class DownloadManager: NSObject, ObservableObject {
         // URL yet. They show up in the Downloads tab immediately as "Waiting…", and a
         // background task fills in the stream URL one at a time (animepahe and similar
         // CF-protected hosts throttle parallel extractStreamUrl calls hard).
+        // Evidence for diagnosing numbering mismatches (e.g. split-cour shows where the
+        // source numbers episodes absolutely but AniList numbers them per-cour). Shows up
+        // in Settings → App Logs so the actual source numbering is visible.
+        Logger.shared.log(
+            "[BatchDownload] requested=\(episodeNumbers.sorted()) source returned \(episodes.count) eps numbers=[\(episodes.map { $0.number.truncatingRemainder(dividingBy: 1) == 0 ? String(Int($0.number)) : String($0.number) }.joined(separator: ","))]",
+            type: "Download"
+        )
+
         var queuedIDs: [(href: String, id: UUID, reuseable: [StreamResult]?)] = []
+        var unmatched: [Int] = []
         for epNum in episodeNumbers {
-            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { continue }
+            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else {
+                unmatched.append(epNum)
+                continue
+            }
             if items.contains(where: {
                 $0.episodeNumber == epNum && $0.episodeHref == episode.href && $0.streamTitle == streamTitle
             }) { continue }
@@ -361,6 +376,17 @@ final class DownloadManager: NSObject, ObservableObject {
             queuedIDs.append((episode.href, id, reuseable))
         }
         persist()
+
+        // Surface episodes the source couldn't match instead of dropping them silently —
+        // this is what made batch downloads look like they "only grabbed episode 1".
+        if !unmatched.isEmpty {
+            let list = unmatched.sorted().map(String.init).joined(separator: ", ")
+            ToastManager.shared.show(
+                message: "Couldn't match episode\(unmatched.count == 1 ? "" : "s") \(list) on this source — its numbering may differ",
+                type: .warning,
+                duration: 5
+            )
+        }
 
         guard !queuedIDs.isEmpty else { return }
         ToastManager.shared.show(message: "Queued \(queuedIDs.count) episode\(queuedIDs.count == 1 ? "" : "s")", type: .info)
@@ -581,6 +607,38 @@ final class DownloadManager: NSObject, ObservableObject {
         let matchStreamTitle = streamTitle == nil
         return items.first { item in
             item.episodeHref == episodeHref && (matchStreamTitle || item.streamTitle == streamTitle)
+        }
+    }
+
+    /// Finds a completed download backing a Continue Watching entry, so resume can replay
+    /// the local file via getStream() instead of a stale proxy URL. Continue Watching items
+    /// don't carry episodeHref, so we match the same way saveProgress correlates them:
+    /// episode number + (AniList ID, or module + title). streamTitle is a soft preference —
+    /// we fall back to ignoring it so a quality-label mismatch doesn't miss the local copy.
+    func completedDownload(mediaTitle: String, episodeNumber: Int, aniListID: Int?, moduleId: String?, streamTitle: String?) -> DownloadItem? {
+        func matches(_ item: DownloadItem) -> Bool {
+            guard item.state == .completed, item.episodeNumber == episodeNumber else { return false }
+            if let aniListID, item.aniListID == aniListID { return true }
+            return item.mediaTitle == mediaTitle && item.moduleId == moduleId
+        }
+        if let streamTitle {
+            if let exact = items.first(where: { matches($0) && $0.streamTitle == streamTitle }) { return exact }
+        }
+        return items.first(where: matches)
+    }
+
+    /// Finds the download backing an episode row across every way an item can be identified.
+    /// A download started from the AniList detail view stores the AniList display title and
+    /// the detail-page href (not the per-episode href), so a module detail view — which knows
+    /// the source title and the real episode href — can't match it by href or title. Fall back
+    /// to AniList ID + episode number (same correlation completedDownload uses) so the
+    /// downloaded indicator shows everywhere, not just the Downloads tab.
+    func downloadItem(forEpisodeHref episodeHref: String?, aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int) -> DownloadItem? {
+        items.first { item in
+            if let episodeHref, !episodeHref.isEmpty, item.episodeHref == episodeHref { return true }
+            guard item.episodeNumber == episodeNumber else { return false }
+            if let aniListID, item.aniListID == aniListID { return true }
+            return item.mediaTitle == mediaTitle && item.moduleId == moduleId
         }
     }
 

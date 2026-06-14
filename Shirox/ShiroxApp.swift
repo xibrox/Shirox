@@ -328,14 +328,13 @@ private struct RootTabView: View {
                 .allowsHitTesting(false)
         }
 
-        .overlay {
-            if cfManager.activeBypassWebView != nil {
-                CloudflareBypassSheetView()
-                    .ignoresSafeArea()
-                    .transition(.move(edge: .bottom))
+        .onChange(of: cfManager.activeBypassWebView != nil) { presented in
+            if presented {
+                CloudflareBypassWindowController.shared.show()
+            } else {
+                CloudflareBypassWindowController.shared.hide()
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: cfManager.activeBypassWebView == nil)
         #endif
         #if targetEnvironment(macCatalyst)
         .onAppear {
