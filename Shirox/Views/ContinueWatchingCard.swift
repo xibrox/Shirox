@@ -383,21 +383,30 @@ struct ContinueWatchingCardDisplay: View {
                 .lineLimit(1)
         }
         .task(id: item.id) {
-            guard let aid = item.aniListID else { return }
-            // 1. Use cached episode thumbnail immediately if available
-            if let cached = TVDBMappingService.shared.getCachedEpisode(for: aid, episodeNumber: item.episodeNumber)?.thumbnail {
-                episodeThumbnail = cached
-                return
+            if let aid = item.aniListID {
+                // 1. Use cached episode thumbnail immediately if available
+                if let cached = TVDBMappingService.shared.getCachedEpisode(for: aid, episodeNumber: item.episodeNumber)?.thumbnail {
+                    episodeThumbnail = cached
+                    return
+                }
+                // 2. Fetch from animap episodes endpoint
+                let episodes = await TVDBMappingService.shared.getEpisodes(for: aid)
+                if let thumb = episodes.first(where: { $0.episode == item.episodeNumber })?.thumbnail {
+                    episodeThumbnail = thumb
+                    return
+                }
+                // 3. Fall back to TVDB series banner/fanart
+                let artwork = await TVDBMappingService.shared.getArtwork(for: aid)
+                episodeThumbnail = artwork.fanart ?? artwork.poster
+            } else if let mid = item.malID {
+                let episodes = await TVDBMappingService.shared.getEpisodes(for: mid, provider: .mal)
+                if let thumb = episodes.first(where: { $0.episode == item.episodeNumber })?.thumbnail {
+                    episodeThumbnail = thumb
+                    return
+                }
+                let artwork = await TVDBMappingService.shared.getArtwork(for: mid, provider: .mal)
+                episodeThumbnail = artwork.fanart ?? artwork.poster
             }
-            // 2. Fetch from animap episodes endpoint
-            let episodes = await TVDBMappingService.shared.getEpisodes(for: aid)
-            if let thumb = episodes.first(where: { $0.episode == item.episodeNumber })?.thumbnail {
-                episodeThumbnail = thumb
-                return
-            }
-            // 3. Fall back to TVDB series banner/fanart
-            let artwork = await TVDBMappingService.shared.getArtwork(for: aid)
-            episodeThumbnail = artwork.fanart ?? artwork.poster
         }
     }
 }

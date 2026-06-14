@@ -601,6 +601,7 @@ import Combine
             id: UUID(), mediaTitle: srcMediaTitle, episodeNumber: episodeNumber,
             episodeTitle: nil, imageUrl: srcImageUrl, streamUrl: "",
             headers: nil, subtitle: nil, streamTitle: nil, aniListID: srcAniListID,
+            malID: source?.malID,
             moduleId: srcModuleId, detailHref: srcDetailHref,
             watchedSeconds: 0, totalSeconds: 0, totalEpisodes: srcTotalEps,
             availableEpisodes: srcAvailable,

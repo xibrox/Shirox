@@ -28,6 +28,7 @@ struct ContinueWatchingItem: Identifiable, Codable, Hashable {
     let streamTitle: String?  // the selected stream's title (e.g., "SUB", "DUB", "pahe")
     var allStreams: [StoredStream]?
     let aniListID: Int?
+    let malID: Int?
     let moduleId: String?
     let detailHref: String?
     var watchedSeconds: Double
