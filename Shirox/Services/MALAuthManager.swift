@@ -3,6 +3,11 @@ import AuthenticationServices
 import Security
 import Combine
 
+enum MALAuthError: Error {
+    /// The refresh-token grant failed (e.g. invalid_grant). Caller should sign out.
+    case refreshFailed(status: Int)
+}
+
 @MainActor
 final class MALAuthManager: NSObject, ObservableObject {
     static let shared = MALAuthManager()
@@ -19,9 +24,17 @@ final class MALAuthManager: NSObject, ObservableObject {
     private let accessTokenKey = "mal_access_token"
     private let refreshTokenKey = "mal_refresh_token"
     private let profileKey = "mal_user_profile"
+    private let tokenExpiryKey = "mal_token_expiry"
     private var codeVerifier: String?
     private var authSession: ASWebAuthenticationSession?
     nonisolated(unsafe) var presentationAnchorWindow: ASPresentationAnchor?
+
+    private let session: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 15
+        return URLSession(configuration: cfg)
+    }()
+    private var refreshTask: Task<Void, Error>?
 
     private struct CachedProfile: Codable {
         let id: Int; let name: String; let avatarURL: String?
@@ -68,6 +81,19 @@ final class MALAuthManager: NSObject, ObservableObject {
     private func keychainDelete(key: String) {
         let q: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrAccount: key]
         SecItemDelete(q as CFDictionary)
+    }
+
+    // MARK: - Token expiry
+
+    /// Absolute expiry of the current access token, if known.
+    private var tokenExpiry: Date? {
+        let t = UserDefaults.standard.double(forKey: tokenExpiryKey)
+        return t > 0 ? Date(timeIntervalSince1970: t) : nil
+    }
+
+    private func storeTokenExpiry(expiresIn: Int) {
+        let date = Date().addingTimeInterval(TimeInterval(expiresIn))
+        UserDefaults.standard.set(date.timeIntervalSince1970, forKey: tokenExpiryKey)
     }
 
     // MARK: - PKCE
@@ -140,10 +166,11 @@ final class MALAuthManager: NSObject, ObservableObject {
         ]
         request.httpBody = bodyParts.joined(separator: "&").data(using: .utf8)
         let (data, _) = try await URLSession.shared.data(for: request)
-        struct TokenResponse: Decodable { let access_token: String; let refresh_token: String }
+        struct TokenResponse: Decodable { let access_token: String; let refresh_token: String; let expires_in: Int }
         let tokens = try JSONDecoder().decode(TokenResponse.self, from: data)
         keychainWrite(key: accessTokenKey, value: tokens.access_token)
         keychainWrite(key: refreshTokenKey, value: tokens.refresh_token)
+        storeTokenExpiry(expiresIn: tokens.expires_in)
         isLoggedIn = true
     }
 
@@ -155,11 +182,15 @@ final class MALAuthManager: NSObject, ObservableObject {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = "client_id=\(clientId)&grant_type=refresh_token&refresh_token=\(refresh)"
         request.httpBody = body.data(using: .utf8)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        struct TokenResponse: Decodable { let access_token: String; let refresh_token: String }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw MALAuthError.refreshFailed(status: http.statusCode)
+        }
+        struct TokenResponse: Decodable { let access_token: String; let refresh_token: String; let expires_in: Int }
         let tokens = try JSONDecoder().decode(TokenResponse.self, from: data)
         keychainWrite(key: accessTokenKey, value: tokens.access_token)
         keychainWrite(key: refreshTokenKey, value: tokens.refresh_token)
+        storeTokenExpiry(expiresIn: tokens.expires_in)
     }
 
     func fetchCurrentUser() async {
@@ -181,6 +212,7 @@ final class MALAuthManager: NSObject, ObservableObject {
         keychainDelete(key: accessTokenKey)
         keychainDelete(key: refreshTokenKey)
         UserDefaults.standard.removeObject(forKey: profileKey)
+        UserDefaults.standard.removeObject(forKey: tokenExpiryKey)
         isLoggedIn = false
         username = nil
         avatarURL = nil
@@ -193,6 +225,62 @@ final class MALAuthManager: NSObject, ObservableObject {
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return request
+    }
+
+    /// Refresh the access token if it is expired/near-expiry, or unconditionally when `force`.
+    /// Concurrent callers share a single in-flight refresh.
+    private func refreshIfNeeded(force: Bool) async throws {
+        if !force, let expiry = tokenExpiry, expiry.timeIntervalSinceNow > 60 { return }
+        if let task = refreshTask {
+            try await task.value
+            return
+        }
+        let task = Task<Void, Error> { try await self.performRefresh() }
+        refreshTask = task
+        defer { refreshTask = nil }
+        try await task.value
+    }
+
+    private func performRefresh() async throws {
+        do {
+            try await refreshAccessToken()
+        } catch {
+            if case MALAuthError.refreshFailed(let status) = error, status == 400 || status == 401 {
+                logout()
+            }
+            throw error
+        }
+    }
+
+    /// Send an authenticated request to the official MAL API, refreshing the token
+    /// proactively and (once) reactively on a 401. Returns the decoded HTTP response.
+    func send(url: URL,
+              method: String = "GET",
+              body: Data? = nil,
+              contentType: String? = nil) async throws -> (Data, HTTPURLResponse) {
+        try await refreshIfNeeded(force: false)
+
+        func attempt() async throws -> (Data, HTTPURLResponse) {
+            var request = try await authorizedRequest(url: url, method: method)
+            if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+            if let body { request.httpBody = body }
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw ProviderError.networkError(URLError(.badServerResponse))
+            }
+            return (data, http)
+        }
+
+        var (data, http) = try await attempt()
+        if http.statusCode == 401 {
+            try await refreshIfNeeded(force: true)
+            (data, http) = try await attempt()
+            if http.statusCode == 401 {
+                logout()
+                throw ProviderError.unauthenticated
+            }
+        }
+        return (data, http)
     }
 }
 
