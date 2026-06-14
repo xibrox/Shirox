@@ -34,7 +34,6 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
-                            ProviderSwitcher()
                             if !vm.trending.isEmpty {
                                 FeaturedCarousel(items: vm.trending)
                             }
@@ -73,6 +72,11 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackgroundHidden()
             #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    ProviderMenuButton()
+                }
+            }
         }
         .task { await vm.load() }
         .onAppear {

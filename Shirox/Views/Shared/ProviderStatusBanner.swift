@@ -21,37 +21,79 @@ struct ProviderStatusBanner: View {
     }
 }
 
-/// Segmented control that switches the global primary provider.
-/// Shown only when BOTH AniList and MyAnimeList are signed in — with a single
-/// provider there is nothing to switch, so it renders nothing.
+/// Whether both providers are signed in (so there is something to switch).
+@MainActor
+private var bothProvidersSignedIn: Bool {
+    AniListAuthManager.shared.isLoggedIn && MALAuthManager.shared.isLoggedIn
+}
+
+/// Capsule-pill switcher for the global primary provider (used in the Library).
+/// Shown only when BOTH AniList and MyAnimeList are signed in.
 struct ProviderSwitcher: View {
     @ObservedObject private var manager = ProviderManager.shared
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
 
-    private var bothSignedIn: Bool {
-        anilistAuth.isLoggedIn && malAuth.isLoggedIn
-    }
-
-    private var selection: Binding<ProviderType> {
-        Binding(
-            get: { manager.primary?.providerType ?? .anilist },
-            set: { manager.selectProvider($0) }
-        )
-    }
-
     var body: some View {
-        if bothSignedIn {
-            // Iterate a STABLE order (allCases) so the segments don't reorder when
-            // selectProvider moves the chosen provider to the front of orderedProviders.
-            Picker("Provider", selection: selection) {
+        if bothProvidersSignedIn {
+            HStack(spacing: 8) {
+                // Stable order so the pills don't reorder when selectProvider moves
+                // the chosen provider to the front of orderedProviders.
                 ForEach(ProviderType.allCases, id: \.self) { type in
-                    Text(type.displayName).tag(type)
+                    let selected = manager.primary?.providerType == type
+                    Button {
+                        manager.selectProvider(type)
+                    } label: {
+                        Text(type.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .background(
+                                Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
+                            )
+                            .overlay(
+                                Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
+                            )
+                            .foregroundStyle(selected ? Color.primary : .secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
+                Spacer()
             }
-            .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+        }
+    }
+}
+
+/// Toolbar menu button that switches the global primary provider (used on Home).
+/// Shows the active provider; tap to pick the other. Hidden unless both are signed in.
+struct ProviderMenuButton: View {
+    @ObservedObject private var manager = ProviderManager.shared
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+
+    var body: some View {
+        if bothProvidersSignedIn {
+            Menu {
+                ForEach(ProviderType.allCases, id: \.self) { type in
+                    Button {
+                        manager.selectProvider(type)
+                    } label: {
+                        if manager.primary?.providerType == type {
+                            Label(type.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(type.displayName)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(manager.primary?.providerType.displayName ?? "")
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "chevron.down").font(.caption2)
+                }
+                .foregroundStyle(.primary)
+            }
         }
     }
 }
