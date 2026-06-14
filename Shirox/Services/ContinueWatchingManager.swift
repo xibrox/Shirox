@@ -695,21 +695,40 @@ import Combine
 
     /// Pushes episode progress to AniList and MAL, replicating the player's full tracking logic.
     /// Handles .completed (rewatch), .repeating, and .current status correctly for both services.
-    func pushRemoteProgress(ep: Int, context: MarkContext) async {
+    func pushRemoteProgress(ep rawEp: Int, context: MarkContext) async {
         let aniListEnabled = Self.trackingPref("aniListTrackingEnabled", default: true)
         let malEnabled     = Self.trackingPref("malTrackingEnabled", default: true)
         let skipRewatch    = Self.trackingPref("skipReWatchTracking", default: true)
 
-        let isCompleted = context.totalEpisodes != nil && context.totalEpisodes == ep
+        // Remap a module's global (absolute) episode number to the correct season entry
+        // and season-relative number. Falls back to the raw values when unresolved.
+        var ep = rawEp
+        var aniListID = context.aniListID
+        var malID = context.malID
+        var totalEpisodes = context.totalEpisodes
+        if let mapping = await SeasonChainMapper.shared.resolve(
+            globalEpisode: rawEp, anchorAniListID: context.aniListID, anchorMALID: context.malID) {
+            ep = mapping.relativeEpisode
+            aniListID = mapping.aniListID ?? aniListID
+            malID = mapping.malID ?? malID
+            totalEpisodes = mapping.seasonEpisodeCount ?? totalEpisodes
+        } else if let anchorAniList = context.aniListID,
+                  let off = TVDBMappingService.shared.cachedEpOffset(for: anchorAniList, provider: .anilist),
+                  off > 0, rawEp - off > 0 {
+            // Fallback tier 1: anchor is itself a later cour within one tvdb_season.
+            ep = rawEp - off
+        }
+
+        let isCompleted = totalEpisodes != nil && totalEpisodes == ep
         let targetStatus: MediaListStatus = isCompleted ? .completed : .current
 
         // --- AniList ---
         if aniListEnabled, AniListAuthManager.shared.isLoggedIn {
             let resolvedAniListID: Int?
-            if let aid = context.aniListID {
+            if let aid = aniListID {
                 resolvedAniListID = aid
-            } else if let malID = context.malID {
-                resolvedAniListID = await IDMappingService.shared.anilistId(forMALId: malID)
+            } else if let mid = malID {
+                resolvedAniListID = await IDMappingService.shared.anilistId(forMALId: mid)
             } else {
                 resolvedAniListID = nil
             }
@@ -720,7 +739,7 @@ import Combine
                         // instead of resetting it to a lower ep via rewatch tracking.
                         Logger.shared.log("[Tracking] AniList skip rewatch (never reduce progress): ep \(ep) on completed entry", type: "Info")
                     } else if current.status == .completed {
-                        if context.totalEpisodes == 1 {
+                        if totalEpisodes == 1 {
                             let newRepeat = (current.timesRewatched ?? 0) + 1
                             Logger.shared.log("[Tracking] AniList rewatch (single-ep): repeat → \(newRepeat)", type: "Info")
                             try? await AniListLibraryService.shared.updateEntry(
@@ -746,9 +765,9 @@ import Combine
         // --- MAL ---
         if malEnabled, MALAuthManager.shared.isLoggedIn {
             let resolvedMALID: Int?
-            if let malID = context.malID {
-                resolvedMALID = malID
-            } else if let aid = context.aniListID {
+            if let mid = malID {
+                resolvedMALID = mid
+            } else if let aid = aniListID {
                 resolvedMALID = await IDMappingService.shared.malId(forAnilistId: aid)
             } else {
                 resolvedMALID = nil
@@ -760,7 +779,7 @@ import Combine
                         // instead of resetting num_watched_episodes to a lower ep via rewatch tracking.
                         Logger.shared.log("[Tracking] MAL skip rewatch (never reduce progress): ep \(ep) on completed entry", type: "Info")
                     } else if current.status == .completed {
-                        if context.totalEpisodes == 1 {
+                        if totalEpisodes == 1 {
                             let newRepeat = (current.timesRewatched ?? 0) + 1
                             Logger.shared.log("[Tracking] MAL rewatch (single-ep): num_times_rewatched → \(newRepeat)", type: "Info")
                             do {

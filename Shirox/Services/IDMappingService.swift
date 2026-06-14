@@ -3,11 +3,15 @@ import Foundation
 final class IDMappingService: @unchecked Sendable {
     static let shared = IDMappingService()
     private let cacheKey = "id_mappings_cache"
-    private let prefetchedKey = "id_mappings_prefetched"
+    private let prefetchedKey = "id_mappings_prefetched_v2"
     private let mediaCacheKey = "id_media_mappings_cache"
     private let mediaPrefetchedKey = "id_media_mappings_prefetched_v1"
+    private let tvdbGroupsCacheKey = "id_tvdb_groups_cache"
     private var cache: [String: Int] = [:]
     private var mediaCache: [Int: MediaMapping] = [:]
+    private var anilistToTvdb: [Int: Int] = [:]
+    private var malToTvdb: [Int: Int] = [:]
+    private var tvdbGroups: [Int: [SiblingSeason]] = [:]
 
     struct MediaMapping: Codable {
         let imdbId: String?
@@ -22,6 +26,16 @@ final class IDMappingService: @unchecked Sendable {
            let decoded = try? JSONDecoder().decode([Int: MediaMapping].self, from: data) {
             mediaCache = decoded
         }
+        if let data = UserDefaults.standard.data(forKey: tvdbGroupsCacheKey),
+           let decoded = try? JSONDecoder().decode([Int: [SiblingSeason]].self, from: data) {
+            tvdbGroups = decoded
+            for (tvdb, sibs) in decoded {
+                for s in sibs {
+                    if let a = s.aniListID { anilistToTvdb[a] = tvdb }
+                    if let m = s.malID { malToTvdb[m] = tvdb }
+                }
+            }
+        }
     }
 
     private struct AniraMapping: Decodable {
@@ -31,6 +45,9 @@ final class IDMappingService: @unchecked Sendable {
         let tmdb_show_id: Int?
         let tmdb_movie_id: Int?
         let media_type: String?
+        let tvdb_id: Int?
+        let tvdb_season: Int?
+        let tvdb_epoffset: Int?
     }
 
     private typealias AniraBulkMapping = AniraMapping
@@ -57,6 +74,34 @@ final class IDMappingService: @unchecked Sendable {
                 }
                 self.cache = newCache
                 UserDefaults.standard.set(newCache, forKey: self.cacheKey)
+
+                // Build tvdb sibling groups (used by SeasonChainMapper to remap continuous
+                // module episode numbers onto the correct AniList/MAL season entry).
+                var newGroups: [Int: [SiblingSeason]] = [:]
+                for m in mappings {
+                    guard let tvdb = m.tvdb_id, let season = m.tvdb_season else { continue }
+                    // Only TV entries participate in continuous episode numbering.
+                    if let mt = m.media_type, mt.uppercased() != "TV" { continue }
+                    let sib = SiblingSeason(
+                        aniListID: m.anilist_id, malID: m.mal_id,
+                        tvdbSeason: season, tvdbEpoffset: m.tvdb_epoffset ?? 0,
+                        episodeCount: nil)
+                    newGroups[tvdb, default: []].append(sib)
+                }
+                self.tvdbGroups = newGroups
+                self.anilistToTvdb = [:]
+                self.malToTvdb = [:]
+                for (tvdb, sibs) in newGroups {
+                    for s in sibs {
+                        if let a = s.aniListID { self.anilistToTvdb[a] = tvdb }
+                        if let mid = s.malID { self.malToTvdb[mid] = tvdb }
+                    }
+                }
+                if let encoded = try? JSONEncoder().encode(newGroups) {
+                    UserDefaults.standard.set(encoded, forKey: self.tvdbGroupsCacheKey)
+                }
+                Logger.shared.log("[Tracking] tvdb groups built: \(newGroups.count) shows", type: "Debug")
+
                 UserDefaults.standard.set(true, forKey: self.prefetchedKey)
             }
 
@@ -90,6 +135,13 @@ final class IDMappingService: @unchecked Sendable {
     func cachedMalId(forAnilistId anilistId: Int) -> Int? {
         cache["anilist-\(anilistId)"]
     }
+
+    func tvdbId(forAnilistId anilistId: Int) -> Int? { anilistToTvdb[anilistId] }
+    func tvdbId(forMALId malId: Int) -> Int? { malToTvdb[malId] }
+
+    /// Sibling seasons/cours sharing a tvdb_id. episodeCount is always nil here
+    /// (the bulk feed has no counts); the caller fills counts in where needed.
+    func siblings(forTvdbId tvdbId: Int) -> [SiblingSeason] { tvdbGroups[tvdbId] ?? [] }
 
     func anilistId(forMALId malId: Int) async -> Int? {
         let key = "mal-\(malId)"
@@ -151,9 +203,13 @@ final class IDMappingService: @unchecked Sendable {
     func clearCache() {
         cache = [:]
         mediaCache = [:]
+        tvdbGroups = [:]
+        anilistToTvdb = [:]
+        malToTvdb = [:]
         UserDefaults.standard.removeObject(forKey: cacheKey)
         UserDefaults.standard.removeObject(forKey: prefetchedKey)
         UserDefaults.standard.removeObject(forKey: mediaCacheKey)
         UserDefaults.standard.removeObject(forKey: mediaPrefetchedKey)
+        UserDefaults.standard.removeObject(forKey: tvdbGroupsCacheKey)
     }
 }

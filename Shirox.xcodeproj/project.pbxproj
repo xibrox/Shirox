@@ -50,6 +50,8 @@
 		121D9B692FCA5612000FF9B4 /* AniListAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47B2FCA397700C9BA56 /* AniListAuthManager.swift */; };
 		121D9B6A2FCA5612000FF9B4 /* AniListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47D2FCA397700C9BA56 /* AniListProvider.swift */; };
 		121D9B6B2FCA5612000FF9B4 /* SkipTimestampsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */; };
+		5EA50C4A17000000000000C1 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
+		5EA50C4A17000000000000B1 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		121D9B6C2FCA5612000FF9B4 /* ModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4952FCA397700C9BA56 /* ModuleManager.swift */; };
 		121D9B6D2FCA5612000FF9B4 /* ProviderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4992FCA397700C9BA56 /* ProviderManager.swift */; };
 		121D9B6E2FCA5612000FF9B4 /* AniListService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47E2FCA397700C9BA56 /* AniListService.swift */; };
@@ -224,6 +226,8 @@
 		1279E53A2FCA397700C9BA56 /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4742FCA397700C9BA56 /* StreamResult.swift */; };
 		1279E53B2FCA397700C9BA56 /* HLSQualityParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4882FCA397700C9BA56 /* HLSQualityParser.swift */; };
 		1279E53C2FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */; };
+		5EA50C4A17000000000000C2 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
+		5EA50C4A17000000000000B2 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		1279E53D2FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B52FCA397700C9BA56 /* PlayerDoubleTapSeek.swift */; };
 		1279E53E2FCA397700C9BA56 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4972FCA397700C9BA56 /* NetworkFetch.swift */; };
 		1279E53F2FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B42FCA397700C9BA56 /* PlayerCenterControls.swift */; };
@@ -345,6 +349,8 @@
 		1279E5B32FCA397700C9BA56 /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4742FCA397700C9BA56 /* StreamResult.swift */; };
 		1279E5B42FCA397700C9BA56 /* HLSQualityParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4882FCA397700C9BA56 /* HLSQualityParser.swift */; };
 		1279E5B52FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */; };
+		5EA50C4A17000000000000C3 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
+		5EA50C4A17000000000000B3 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		1279E5B62FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B52FCA397700C9BA56 /* PlayerDoubleTapSeek.swift */; };
 		1279E5B72FCA397700C9BA56 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4972FCA397700C9BA56 /* NetworkFetch.swift */; };
 		1279E5B82FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B42FCA397700C9BA56 /* PlayerCenterControls.swift */; };
@@ -458,6 +464,8 @@
 		1279E4992FCA397700C9BA56 /* ProviderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderManager.swift; sourceTree = "<group>"; };
 		1279E49A2FCA397700C9BA56 /* SequelResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SequelResolver.swift; sourceTree = "<group>"; };
 		1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipTimestampsService.swift; sourceTree = "<group>"; };
+		5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMapper.swift; sourceTree = "<group>"; };
+		5EA50C4A17000000000000F1 /* SeasonChainMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMath.swift; sourceTree = "<group>"; };
 		1279E49C2FCA397700C9BA56 /* SubtitleSettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleSettingsManager.swift; sourceTree = "<group>"; };
 		1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VTTSubtitlesLoader.swift; sourceTree = "<group>"; };
 		1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchHistoryService.swift; sourceTree = "<group>"; };
@@ -656,6 +664,8 @@
 				1279E4992FCA397700C9BA56 /* ProviderManager.swift */,
 				1279E49A2FCA397700C9BA56 /* SequelResolver.swift */,
 				1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */,
+				5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */,
+				5EA50C4A17000000000000F1 /* SeasonChainMath.swift */,
 				1279E49C2FCA397700C9BA56 /* SubtitleSettingsManager.swift */,
 				1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */,
 				1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */,
@@ -996,6 +1006,8 @@
 				121D9B692FCA5612000FF9B4 /* AniListAuthManager.swift in Sources */,
 				121D9B6A2FCA5612000FF9B4 /* AniListProvider.swift in Sources */,
 				121D9B6B2FCA5612000FF9B4 /* SkipTimestampsService.swift in Sources */,
+				5EA50C4A17000000000000C1 /* SeasonChainMapper.swift in Sources */,
+				5EA50C4A17000000000000B1 /* SeasonChainMath.swift in Sources */,
 				121D9B6C2FCA5612000FF9B4 /* ModuleManager.swift in Sources */,
 				121D9B6D2FCA5612000FF9B4 /* ProviderManager.swift in Sources */,
 				121D9B6E2FCA5612000FF9B4 /* AniListService.swift in Sources */,
@@ -1193,6 +1205,8 @@
 				1279E53A2FCA397700C9BA56 /* StreamResult.swift in Sources */,
 				1279E53B2FCA397700C9BA56 /* HLSQualityParser.swift in Sources */,
 				1279E53C2FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */,
+				5EA50C4A17000000000000C2 /* SeasonChainMapper.swift in Sources */,
+				5EA50C4A17000000000000B2 /* SeasonChainMath.swift in Sources */,
 				1279E53D2FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */,
 				1279E53E2FCA397700C9BA56 /* NetworkFetch.swift in Sources */,
 				1279E53F2FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */,
@@ -1327,6 +1341,8 @@
 				1279E5B32FCA397700C9BA56 /* StreamResult.swift in Sources */,
 				1279E5B42FCA397700C9BA56 /* HLSQualityParser.swift in Sources */,
 				1279E5B52FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */,
+				5EA50C4A17000000000000C3 /* SeasonChainMapper.swift in Sources */,
+				5EA50C4A17000000000000B3 /* SeasonChainMath.swift in Sources */,
 				1279E5B62FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */,
 				1279E5B72FCA397700C9BA56 /* NetworkFetch.swift in Sources */,
 				1279E5B82FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */,
