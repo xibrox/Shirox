@@ -887,6 +887,7 @@ struct PlayerView: View {
                              subtitle: $0.subtitle, subtitleHeaders: $0.subtitleHeaders.isEmpty ? nil : $0.subtitleHeaders)
             } : nil,
             aniListID: context.aniListID,
+            malID: context.malID,
             moduleId: context.moduleId,
             detailHref: context.detailHref,
             watchedSeconds: currentTime,
@@ -1246,21 +1247,32 @@ struct PlayerView: View {
     }
 
     private func loadTVDBTitle() {
-        guard let aniListID = currentContext?.aniListID,
-              let ep = currentContext?.episodeNumber else { return }
-        tvdbEpisodeTitle = TVDBMappingService.shared.getCachedEpisode(for: aniListID, episodeNumber: ep)?.title
+        guard let ep = currentContext?.episodeNumber else { return }
+        let aniListID = currentContext?.aniListID
+        let malID = currentContext?.malID
+        if let aniListID {
+            tvdbEpisodeTitle = TVDBMappingService.shared.getCachedEpisode(for: aniListID, episodeNumber: ep)?.title
+        }
         guard tvdbEpisodeTitle == nil else { return }
+        guard aniListID != nil || malID != nil else { return }
         Task {
-            // Try Anira per-episode first for accurate title
-            let aniraEp = await TVDBMappingService.shared.fetchAniraEpisode(id: aniListID, episodeNumber: ep)
-            if let title = aniraEp?.title, !title.isEmpty {
-                await MainActor.run { tvdbEpisodeTitle = title }
-                return
-            }
-            // Fall back to TVDB / bulk episode list
-            let eps = await TVDBMappingService.shared.getEpisodes(for: aniListID)
-            await MainActor.run {
-                tvdbEpisodeTitle = eps.first(where: { $0.episode == ep })?.title
+            if let aniListID {
+                // Try Anira per-episode first for accurate title
+                let aniraEp = await TVDBMappingService.shared.fetchAniraEpisode(id: aniListID, episodeNumber: ep)
+                if let title = aniraEp?.title, !title.isEmpty {
+                    await MainActor.run { tvdbEpisodeTitle = title }
+                    return
+                }
+                // Fall back to TVDB / bulk episode list
+                let eps = await TVDBMappingService.shared.getEpisodes(for: aniListID)
+                await MainActor.run {
+                    tvdbEpisodeTitle = eps.first(where: { $0.episode == ep })?.title
+                }
+            } else if let malID {
+                let eps = await TVDBMappingService.shared.getEpisodes(for: malID, provider: .mal)
+                await MainActor.run {
+                    tvdbEpisodeTitle = eps.first(where: { $0.episode == ep })?.title
+                }
             }
         }
     }
