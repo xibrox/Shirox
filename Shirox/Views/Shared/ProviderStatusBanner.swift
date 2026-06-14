@@ -77,6 +77,32 @@ struct ProviderMenuButton: View {
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
 
+    /// A concrete, preloaded provider icon for use inside a Menu. Native menu items
+    /// don't render remote async images, but they do render a ready `Image`, so we
+    /// pull the bytes the disk cache already holds (warmed by `iconWarmer`).
+    private func cachedIcon(_ type: ProviderType) -> Image? {
+        guard let data = CachedAsyncImage.cachedImageData(for: type.iconURL) else { return nil }
+        #if os(macOS)
+        guard let img = NSImage(data: data) else { return nil }
+        return Image(nsImage: img)
+        #else
+        guard let img = UIImage(data: data) else { return nil }
+        return Image(uiImage: img)
+        #endif
+    }
+
+    /// Off-screen loaders that ensure BOTH provider icons land in the disk cache,
+    /// so `cachedIcon` can show them in the menu even before Library/Settings are opened.
+    private var iconWarmer: some View {
+        ZStack {
+            ForEach(ProviderType.allCases, id: \.self) { type in
+                CachedAsyncImage(urlString: type.iconURL).frame(width: 1, height: 1)
+            }
+        }
+        .opacity(0.01)
+        .allowsHitTesting(false)
+    }
+
     var body: some View {
         if bothProvidersSignedIn {
             Menu {
@@ -84,8 +110,8 @@ struct ProviderMenuButton: View {
                     Button {
                         manager.selectProvider(type)
                     } label: {
-                        if manager.primary?.providerType == type {
-                            Label(type.displayName, systemImage: "checkmark")
+                        if let icon = cachedIcon(type) {
+                            Label { Text(type.displayName) } icon: { icon }
                         } else {
                             Text(type.displayName)
                         }
@@ -102,6 +128,7 @@ struct ProviderMenuButton: View {
                 }
                 .foregroundStyle(.primary)
             }
+            .background(iconWarmer)
         }
     }
 }
