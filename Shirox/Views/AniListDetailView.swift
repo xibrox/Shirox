@@ -27,6 +27,8 @@ struct AniListDetailView: View {
     @State private var existingEntry: LibraryEntry? = nil
     @State private var existingMALEntry: LibraryEntry? = nil
     @State private var showMALEdit = false
+    @State private var showAniListEdit = false
+    @State private var existingAniListCrossEntry: LibraryEntry? = nil
     @State private var isLoadingEntry = false
     #if os(iOS)
     @State private var pendingDownloadEpisodeNumber: DownloadEpisodeItem? = nil
@@ -63,6 +65,18 @@ struct AniListDetailView: View {
     private var malMediaId: Int? {
         guard let media = vm.media, media.provider == .anilist else { return nil }
         return media.idMal
+    }
+
+    /// The AniList id for a MAL-provider media (from the reverse mapping cache).
+    private var anilistMediaId: Int? {
+        guard let media = vm.media, media.provider == .mal else { return nil }
+        return IDMappingService.shared.cachedAnilistId(forMALId: media.id)
+    }
+
+    /// True when viewing a MAL item while AniList is signed in and its AniList id
+    /// is known — enables the reverse "Edit on AniList" cross-add.
+    private var isReverseDualAvailable: Bool {
+        vm.media?.provider == .mal && auth.isLoggedIn && anilistMediaId != nil
     }
 
     private var isDualAvailable: Bool {
@@ -110,7 +124,37 @@ struct AniListDetailView: View {
 
     #if os(iOS)
     @ViewBuilder private var editToolbarButton: some View {
-        if isDualAvailable && !dualSync {
+        if isReverseDualAvailable {
+            Menu {
+                Button {
+                    Task {
+                        isLoadingEntry = true
+                        existingEntry = try? await activeProvider.fetchEntry(mediaId: mediaId)
+                        isLoadingEntry = false
+                        showLibraryEdit = true
+                    }
+                } label: { Label("Edit on MyAnimeList", systemImage: "pencil") }
+                Button {
+                    Task {
+                        isLoadingEntry = true
+                        if let aniId = anilistMediaId {
+                            existingAniListCrossEntry = try? await AniListProvider.shared.fetchEntry(mediaId: aniId)
+                        }
+                        isLoadingEntry = false
+                        showAniListEdit = true
+                    }
+                } label: { Label("Edit on AniList", systemImage: "pencil") }
+            } label: {
+                if isLoadingEntry {
+                    ProgressView().scaleEffect(0.8)
+                } else {
+                    Image(systemName: "pencil.circle")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .disabled(isLoadingEntry)
+        } else if isDualAvailable && !dualSync {
             Menu {
                 Button {
                     Task {
@@ -197,6 +241,12 @@ struct AniListDetailView: View {
             }
             if malAuth.isLoggedIn, let idMal = vm.media?.idMal, vm.media?.provider == .anilist {
                 existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: idMal)
+            }
+            if auth.isLoggedIn, vm.media?.provider == .mal, let malId = vm.media?.id {
+                _ = await IDMappingService.shared.anilistId(forMALId: malId)
+                if let aniId = anilistMediaId {
+                    existingAniListCrossEntry = try? await AniListProvider.shared.fetchEntry(mediaId: aniId)
+                }
             }
 
             if let media = vm.media {
@@ -361,6 +411,41 @@ struct AniListDetailView: View {
                     onDelete: existingMALEntry != nil ? {
                         existingMALEntry = nil
                         Task { try? await MALProvider.shared.deleteEntry(entryId: idMal) }
+                    } : nil
+                )
+                #if os(iOS)
+                .adaptivePresentationDetents([.medium, .large])
+                #else
+                .frame(minWidth: 480, minHeight: 360)
+                #endif
+            }
+        }
+        .adaptiveSheet(isPresented: $showAniListEdit) {
+            if let media = vm.media, let aniId = anilistMediaId {
+                let aniMedia = Media(
+                    id: aniId, idMal: media.id, provider: .anilist,
+                    title: media.title, coverImage: media.coverImage,
+                    bannerImage: nil, description: nil, episodes: media.episodes,
+                    status: nil, averageScore: nil, genres: nil,
+                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                    relations: nil, type: nil, format: nil
+                )
+                LibraryEntryEditSheet(
+                    entry: existingAniListCrossEntry,
+                    media: aniMedia,
+                    onSave: { status, progress, score in
+                        if var updated = existingAniListCrossEntry {
+                            updated.status = status
+                            updated.progress = progress
+                            updated.score = score
+                            existingAniListCrossEntry = updated
+                        }
+                        Task { try? await AniListProvider.shared.updateEntry(mediaId: aniId, status: status, progress: progress, score: score) }
+                    },
+                    onDelete: existingAniListCrossEntry != nil ? {
+                        let entryId = existingAniListCrossEntry!.id
+                        existingAniListCrossEntry = nil
+                        Task { try? await AniListProvider.shared.deleteEntry(entryId: entryId) }
                     } : nil
                 )
                 #if os(iOS)
