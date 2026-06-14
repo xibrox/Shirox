@@ -15,7 +15,6 @@ struct LibraryView: View {
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
     @State private var showProfile = false
-    @State private var showMALLogoutConfirm = false
     @State private var showNotifications = false
     @StateObject private var profileVM = ProfileViewModel()
     @State private var searchText = ""
@@ -225,6 +224,7 @@ struct LibraryView: View {
 
     private var libraryContent: some View {
         VStack(spacing: 0) {
+            ProviderSwitcher()
             // Combined row: Status on left, Genres on right
             HStack {
                 // Status & Custom List Menu
@@ -421,11 +421,7 @@ struct LibraryView: View {
                         }
 
                         Button {
-                            if activeProviderType == .mal {
-                                showMALLogoutConfirm = true
-                            } else {
-                                showProfile = true
-                            }
+                            showProfile = true
                         } label: {
                             HStack(spacing: 6) {
                                 if let url = activeAvatarURL {
@@ -585,13 +581,11 @@ struct LibraryView: View {
             }
         }
         .adaptiveSheet(isPresented: $showProfile) {
-            if let uid = anilistAuth.userId, let username = anilistAuth.username {
+            if activeProviderType == .mal, let uid = malAuth.userId {
+                ProfileView(userId: uid, username: malAuth.username ?? "Profile", avatarURL: malAuth.avatarURL)
+            } else if let uid = anilistAuth.userId, let username = anilistAuth.username {
                 ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL)
             }
-        }
-        .confirmationDialog("Log out of MyAnimeList?", isPresented: $showMALLogoutConfirm, titleVisibility: .visible) {
-            Button("Log Out", role: .destructive) { malAuth.logout() }
-            Button("Cancel", role: .cancel) { }
         }
         .adaptiveSheet(isPresented: $showNotifications) {
             NotificationsView(vm: profileVM)
