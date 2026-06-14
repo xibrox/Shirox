@@ -427,13 +427,42 @@ import Combine
             return .applied
         }
 
+        // Remap the global (module-absolute) episode onto the correct season entry, so the
+        // downgrade comparison and the remote write both target the right AniList/MAL entry
+        // with season-relative numbers. Single-season shows resolve to nil → behavior unchanged.
+        let mapping = await SeasonChainMapper.shared.resolve(
+            globalEpisode: ep, anchorAniListID: context.aniListID, anchorMALID: context.malID)
+        let targetAniListID = mapping?.aniListID ?? context.aniListID
+        let targetMALID = mapping?.malID
+            ?? context.malID
+            ?? context.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) }
+        let relativeEp = mapping?.relativeEpisode ?? ep
+
         // Check downgrade BEFORE touching local state — if confirmation is needed,
         // defer the unmark into the closures so Cancel leaves the episode intact.
-        let proposedProgress = ep - 1
+        let proposedProgress = relativeEp - 1
         let aniListLoggedIn = AniListAuthManager.shared.isLoggedIn
         let malLoggedIn = MALAuthManager.shared.isLoggedIn
-        let aniFrom = context.currentAniListProgress
-        let malFrom = context.currentMALProgress
+
+        // Current remote progress of the TARGET entry. When we remapped to a different entry
+        // than the anchor, the context's cached progress is for the wrong entry — fetch fresh.
+        let aniFrom: Int?
+        if aniListLoggedIn, let aid = targetAniListID {
+            if mapping != nil, aid != context.aniListID {
+                aniFrom = (try? await AniListProvider.shared.fetchEntry(mediaId: aid))?.progress
+            } else {
+                aniFrom = context.currentAniListProgress
+            }
+        } else {
+            aniFrom = nil
+        }
+        let malFrom: Int?
+        if malLoggedIn, mapping != nil, let mid = targetMALID {
+            malFrom = (try? await MALProvider.shared.fetchEntry(mediaId: mid))?.progress
+        } else {
+            malFrom = malLoggedIn ? context.currentMALProgress : nil
+        }
+
         let aniNeedsDowngrade = aniListLoggedIn && (aniFrom.map { $0 > proposedProgress } ?? false)
         let malNeedsDowngrade = malLoggedIn && (malFrom.map { $0 > proposedProgress } ?? false)
 
@@ -442,6 +471,8 @@ import Combine
             let capturedProposed = proposedProgress
             let capturedAniListLoggedIn = aniListLoggedIn
             let capturedMalLoggedIn = malLoggedIn
+            let capturedAniListID = targetAniListID
+            let capturedMALID = targetMALID
 
             return .needsConfirmation(RemoteDowngrade(
                 newProgress: capturedProposed,
@@ -450,13 +481,11 @@ import Combine
                 confirm: {
                     self.applyLocalUnmark(ep: ep, context: capturedContext)
                     let remoteStatus: MediaListStatus = capturedProposed == 0 ? .planning : .current
-                    if let aid = capturedContext.aniListID, capturedAniListLoggedIn {
+                    if let aid = capturedAniListID, capturedAniListLoggedIn {
                         try? await AniListLibraryService.shared.updateEntry(
                             mediaId: aid, status: remoteStatus, progress: capturedProposed, score: 0)
                     }
-                    let malID = capturedContext.malID
-                        ?? capturedContext.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) }
-                    if let mid = malID, capturedMalLoggedIn {
+                    if let mid = capturedMALID, capturedMalLoggedIn {
                         do {
                             try await MALProvider.shared.updateEntry(
                                 mediaId: mid, status: remoteStatus, progress: capturedProposed, score: 0)
