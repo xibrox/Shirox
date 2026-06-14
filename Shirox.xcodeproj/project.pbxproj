@@ -50,8 +50,6 @@
 		121D9B692FCA5612000FF9B4 /* AniListAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47B2FCA397700C9BA56 /* AniListAuthManager.swift */; };
 		121D9B6A2FCA5612000FF9B4 /* AniListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47D2FCA397700C9BA56 /* AniListProvider.swift */; };
 		121D9B6B2FCA5612000FF9B4 /* SkipTimestampsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */; };
-		5EA50C4A17000000000000C1 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
-		5EA50C4A17000000000000B1 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		121D9B6C2FCA5612000FF9B4 /* ModuleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4952FCA397700C9BA56 /* ModuleManager.swift */; };
 		121D9B6D2FCA5612000FF9B4 /* ProviderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4992FCA397700C9BA56 /* ProviderManager.swift */; };
 		121D9B6E2FCA5612000FF9B4 /* AniListService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47E2FCA397700C9BA56 /* AniListService.swift */; };
@@ -226,8 +224,6 @@
 		1279E53A2FCA397700C9BA56 /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4742FCA397700C9BA56 /* StreamResult.swift */; };
 		1279E53B2FCA397700C9BA56 /* HLSQualityParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4882FCA397700C9BA56 /* HLSQualityParser.swift */; };
 		1279E53C2FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */; };
-		5EA50C4A17000000000000C2 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
-		5EA50C4A17000000000000B2 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		1279E53D2FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B52FCA397700C9BA56 /* PlayerDoubleTapSeek.swift */; };
 		1279E53E2FCA397700C9BA56 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4972FCA397700C9BA56 /* NetworkFetch.swift */; };
 		1279E53F2FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B42FCA397700C9BA56 /* PlayerCenterControls.swift */; };
@@ -349,8 +345,6 @@
 		1279E5B32FCA397700C9BA56 /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4742FCA397700C9BA56 /* StreamResult.swift */; };
 		1279E5B42FCA397700C9BA56 /* HLSQualityParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4882FCA397700C9BA56 /* HLSQualityParser.swift */; };
 		1279E5B52FCA397700C9BA56 /* SkipTimestampsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */; };
-		5EA50C4A17000000000000C3 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
-		5EA50C4A17000000000000B3 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		1279E5B62FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B52FCA397700C9BA56 /* PlayerDoubleTapSeek.swift */; };
 		1279E5B72FCA397700C9BA56 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4972FCA397700C9BA56 /* NetworkFetch.swift */; };
 		1279E5B82FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B42FCA397700C9BA56 /* PlayerCenterControls.swift */; };
@@ -393,6 +387,12 @@
 		34FEC549807840C99DE4F688 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
 		42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
+		5EA50C4A17000000000000B1 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
+		5EA50C4A17000000000000B2 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
+		5EA50C4A17000000000000B3 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
+		5EA50C4A17000000000000C1 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
+		5EA50C4A17000000000000C2 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
+		5EA50C4A17000000000000C3 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
 		6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
 		8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
@@ -464,8 +464,6 @@
 		1279E4992FCA397700C9BA56 /* ProviderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderManager.swift; sourceTree = "<group>"; };
 		1279E49A2FCA397700C9BA56 /* SequelResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SequelResolver.swift; sourceTree = "<group>"; };
 		1279E49B2FCA397700C9BA56 /* SkipTimestampsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipTimestampsService.swift; sourceTree = "<group>"; };
-		5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMapper.swift; sourceTree = "<group>"; };
-		5EA50C4A17000000000000F1 /* SeasonChainMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMath.swift; sourceTree = "<group>"; };
 		1279E49C2FCA397700C9BA56 /* SubtitleSettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleSettingsManager.swift; sourceTree = "<group>"; };
 		1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VTTSubtitlesLoader.swift; sourceTree = "<group>"; };
 		1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchHistoryService.swift; sourceTree = "<group>"; };
@@ -540,6 +538,8 @@
 		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
 		4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiroxApp.swift; sourceTree = "<group>"; };
 		4C8891C8EC305651E62AC138 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5EA50C4A17000000000000F1 /* SeasonChainMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMath.swift; sourceTree = "<group>"; };
+		5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMapper.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshot.swift; sourceTree = "<group>"; };
 		AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshotStore.swift; sourceTree = "<group>"; };
@@ -1529,13 +1529,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 81;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.83;
+				MARKETING_VERSION = 0.0.84;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1553,7 +1553,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 81;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1561,7 +1561,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.0.83;
+				MARKETING_VERSION = 0.0.84;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;
@@ -1576,13 +1576,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 81;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.83;
+				MARKETING_VERSION = 0.0.84;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1661,7 +1661,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 81;
 				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1669,7 +1669,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.0.83;
+				MARKETING_VERSION = 0.0.84;
 				PRODUCT_NAME = Shirox;
 				SDKROOT = macosx;
 				SUPPORTS_MACCATALYST = NO;
