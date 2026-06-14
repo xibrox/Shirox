@@ -11,7 +11,9 @@ struct ProfileStatsView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     statBox(title: "Total Anime", value: "\(stats.count)", icon: "play.tv")
                     statBox(title: "Episodes", value: "\(stats.episodesWatched)", icon: "play.circle")
-                    statBox(title: "Time Watched", value: formatMinutes(stats.minutesWatched), icon: "clock")
+                    if stats.minutesWatched > 0 {
+                        statBox(title: "Time Watched", value: formatMinutes(stats.minutesWatched), icon: "clock")
+                    }
                     if stats.meanScore > 0 {
                         statBox(title: "Mean Score", value: scoreFormat.displayString(for: stats.meanScore), icon: "star")
                     }
@@ -19,10 +21,15 @@ struct ProfileStatsView: View {
                 .padding(.horizontal)
                 .padding(.top, 10)
 
-                if #available(iOS 16, *) {
-                    chartsSection(stats: stats)
-                } else {
-                    statsListFallback(stats: stats)
+                // Distribution charts need breakdown data (statuses/genres/scores),
+                // which some providers (e.g. MAL's official API) do not supply.
+                let hasBreakdowns = stats.statuses != nil || stats.genres != nil || stats.scores != nil
+                if hasBreakdowns {
+                    if #available(iOS 16, *) {
+                        chartsSection(stats: stats)
+                    } else {
+                        statsListFallback(stats: stats)
+                    }
                 }
             }
         } else {

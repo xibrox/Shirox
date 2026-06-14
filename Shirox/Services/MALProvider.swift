@@ -79,8 +79,10 @@ final class MALProvider: MediaProvider {
     }
 
     func fetchProfile(userId: Int) async throws -> UserProfile {
-        guard let username = MALAuthManager.shared.username else { throw ProviderError.unauthenticated }
-        return try await MALSocialService.shared.fetchProfile(username: username)
+        // MAL only exposes the signed-in user's profile. The official API
+        // (users/@me) returns real anime statistics; the Jikan users/{name}
+        // endpoint does not, so use the official one for the profile/stats.
+        return try await MALSocialService.shared.fetchCurrentUserProfile()
     }
 
     // MARK: - Social
