@@ -894,6 +894,15 @@ private struct ProvidersSettingsSection: View {
                                 .foregroundStyle(Color.accentColor)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(.primary.opacity(0.1), in: Capsule())
+                        } else if isSignedIn(provider.providerType) {
+                            Button("Make Primary") {
+                                manager.selectProvider(provider.providerType)
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.accentColor.opacity(0.1), in: Capsule())
+                            .buttonStyle(.plain)
                         }
                         #if os(iOS)
                         providerAuthButton(for: provider.providerType)
@@ -945,6 +954,13 @@ private struct ProvidersSettingsSection: View {
         .buttonStyle(.plain)
     }
     #endif
+
+    private func isSignedIn(_ type: ProviderType) -> Bool {
+        switch type {
+        case .anilist: return aniListAuth.isLoggedIn
+        case .mal:     return malAuth.isLoggedIn
+        }
+    }
 
     private func providerStatus(_ provider: any MediaProvider) -> String {
         switch provider.providerType {
