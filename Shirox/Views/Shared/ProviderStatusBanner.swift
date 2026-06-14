@@ -44,16 +44,21 @@ struct ProviderSwitcher: View {
                     Button {
                         manager.selectProvider(type)
                     } label: {
-                        Text(type.displayName)
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14).padding(.vertical, 7)
-                            .background(
-                                Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
-                            )
-                            .overlay(
-                                Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
-                            )
-                            .foregroundStyle(selected ? Color.primary : .secondary)
+                        HStack(spacing: 6) {
+                            CachedAsyncImage(urlString: type.iconURL)
+                                .frame(width: 16, height: 16)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            Text(type.displayName)
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(
+                            Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
+                        )
+                        .overlay(
+                            Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
+                        )
+                        .foregroundStyle(selected ? Color.primary : .secondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -87,7 +92,10 @@ struct ProviderMenuButton: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    CachedAsyncImage(urlString: (manager.primary?.providerType ?? .anilist).iconURL)
+                        .frame(width: 20, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
                     Text(manager.primary?.providerType.displayName ?? "")
                         .font(.subheadline.weight(.semibold))
                     Image(systemName: "chevron.down").font(.caption2)

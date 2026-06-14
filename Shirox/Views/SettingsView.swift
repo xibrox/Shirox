@@ -879,6 +879,9 @@ private struct ProvidersSettingsSection: View {
                     Image(systemName: "line.3.horizontal")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
+                    CachedAsyncImage(urlString: provider.providerType.iconURL)
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(provider.providerType.displayName)
                             .font(.headline)
