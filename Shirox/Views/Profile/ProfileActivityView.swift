@@ -200,24 +200,29 @@ struct ProfileActivityView: View {
     @ViewBuilder
     private func activityCard(_ item: UserActivity) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Header row
+            // Header row — MAL "activity" is the user's own watch history with no
+            // associated poster, so show only the timestamp (no "Unknown" user).
             HStack(spacing: 10) {
-                if let url = item.user?.avatar?.large {
-                    CachedAsyncImage(urlString: url)
-                        .frame(width: 36, height: 36).clipShape(Circle())
-                        .onTapGesture {
-                            targetUsername = item.user?.name
-                            targetUserId = item.user?.id
-                        }
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.user?.name ?? "Unknown")
-                        .font(.subheadline.weight(.semibold))
-                        .onTapGesture {
-                            targetUsername = item.user?.name
-                            targetUserId = item.user?.id
-                        }
+                if isMAL {
                     Text(item.createdAt.toTimeAgo()).font(.caption2).foregroundStyle(.secondary)
+                } else {
+                    if let url = item.user?.avatar?.large {
+                        CachedAsyncImage(urlString: url)
+                            .frame(width: 36, height: 36).clipShape(Circle())
+                            .onTapGesture {
+                                targetUsername = item.user?.name
+                                targetUserId = item.user?.id
+                            }
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.user?.name ?? "Unknown")
+                            .font(.subheadline.weight(.semibold))
+                            .onTapGesture {
+                                targetUsername = item.user?.name
+                                targetUserId = item.user?.id
+                            }
+                        Text(item.createdAt.toTimeAgo()).font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
             }
@@ -255,37 +260,39 @@ struct ProfileActivityView: View {
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture { selectedActivity = item }
+            .onTapGesture { if !isMAL { selectedActivity = item } }
 
-            // Action row
-            HStack(spacing: 16) {
-                // Like button
-                Button {
-                    Task { await toggleLike(item) }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: isLiked(for: item) ? "heart.fill" : "heart")
-                            .foregroundStyle(isLiked(for: item) ? .pink : .secondary)
-                        Text("\(likeCount(for: item))")
-                            .foregroundStyle(isLiked(for: item) ? .pink : .secondary)
+            // Action row — likes/replies are AniList-only; MAL history has none.
+            if !isMAL {
+                HStack(spacing: 16) {
+                    // Like button
+                    Button {
+                        Task { await toggleLike(item) }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: isLiked(for: item) ? "heart.fill" : "heart")
+                                .foregroundStyle(isLiked(for: item) ? .pink : .secondary)
+                            Text("\(likeCount(for: item))")
+                                .foregroundStyle(isLiked(for: item) ? .pink : .secondary)
+                        }
+                        .font(.caption)
                     }
-                    .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .disabled(togglingIds.contains(item.id))
+                    .buttonStyle(.plain)
+                    .disabled(togglingIds.contains(item.id))
 
-                // Comments
-                Button { selectedActivity = item } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bubble.left")
-                        Text("\(replyCount(for: item))")
+                    // Comments
+                    Button { selectedActivity = item } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bubble.left")
+                            Text("\(replyCount(for: item))")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+                    .buttonStyle(.plain)
 
-                Spacer()
+                    Spacer()
+                }
             }
         }
         .padding(12)
