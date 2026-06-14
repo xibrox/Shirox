@@ -43,6 +43,13 @@ final class AniListDetailViewModel: ObservableObject {
         error = nil
         do {
             media = try await ProviderManager.shared.call { try await $0.detail(id: id) }
+            // MAL/Jikan has no banner art; reuse the already-cached TVDB fanart.
+            if media?.provider == .mal, media?.bannerImage == nil {
+                let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: .mal)
+                if let fanart = artwork.fanart {
+                    media?.bannerImage = fanart
+                }
+            }
         } catch {
             self.error = error.localizedDescription
         }

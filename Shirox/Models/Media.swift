@@ -25,7 +25,7 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
     let provider: ProviderType
     let title: MediaTitle
     let coverImage: MediaCoverImage
-    let bannerImage: String?
+    var bannerImage: String?
     let description: String?
     let episodes: Int?
     let status: String?
