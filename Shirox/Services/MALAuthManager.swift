@@ -262,6 +262,7 @@ final class MALAuthManager: NSObject, ObservableObject {
               method: String = "GET",
               body: Data? = nil,
               contentType: String? = nil) async throws -> (Data, HTTPURLResponse) {
+        Logger.shared.log("[MAL] authenticated \(method) \(url.path)", type: "Debug")
         try await refreshIfNeeded(force: false)
 
         func attempt() async throws -> (Data, HTTPURLResponse) {
