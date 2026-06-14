@@ -585,6 +585,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             aniMapResults = try JSONDecoder().decode([AniMapEpisode].self, from: data)
         } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
             return []
+        } catch is DecodingError {
+            // anira returns a non-array body ("Not Found"/error object) for titles it
+            // has no mapping for. Expected — fall through to the TVDB/legacy fallbacks.
+            Logger.shared.log("AniMap media episodes: no anira mapping for \(aniListId)", type: "Debug")
         } catch {
             Logger.shared.log("AniMap Media EP Error: \(error)", type: "Error")
         }
@@ -634,6 +638,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             return results
         } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
             return []
+        } catch is DecodingError {
+            // Legacy mapping endpoint also returns a non-JSON body when it has no data
+            // for this title. Expected — return the empty list below.
+            Logger.shared.log("AniMap mapping episodes: no legacy mapping for \(aniListId)", type: "Debug")
         } catch {
             Logger.shared.log("AniMap Mapping EP Error: \(error)", type: "Error")
         }
@@ -758,6 +766,10 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             }
         } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
             return []
+        } catch is DecodingError {
+            // anira returns a non-array body for MAL ids it has no mapping for.
+            // Expected — fall through to the TVDB fallback below.
+            Logger.shared.log("Anira MAL episodes: no mapping for malId \(id)", type: "Debug")
         } catch {
             Logger.shared.log("Anira MAL episodes error: \(error)", type: "Error")
         }
