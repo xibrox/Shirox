@@ -88,10 +88,13 @@ final class MALSocialService {
     // MARK: - History as activity (Jikan)
 
     func fetchHistory(username: String, page: Int) async throws -> [UserActivity] {
-        struct JikanHistoryMedia: Decodable { let mal_id: Int; let title: String? }
+        // Jikan history entries are { entry: { mal_id, name }, increment, date }.
+        // Note the fields are `name` and `increment` — NOT `title`/`episodes_seen`;
+        // decoding the wrong keys yields nil, which renders every row as "Unknown".
+        struct JikanHistoryMedia: Decodable { let mal_id: Int; let name: String? }
         struct JikanHistoryEntry: Decodable {
             let entry: JikanHistoryMedia
-            let episodes_seen: Int?; let date: String?
+            let increment: Int?; let date: String?
         }
         struct JikanHistoryPage: Decodable { let data: [JikanHistoryEntry] }
 
@@ -104,12 +107,12 @@ final class MALSocialService {
         return result.data.enumerated().map { index, entry in
             let media = ActivityMedia(
                 id: entry.entry.mal_id,
-                title: AniListTitle(romaji: entry.entry.title, english: nil, native: nil),
+                title: AniListTitle(romaji: entry.entry.name, english: nil, native: nil),
                 coverImage: nil
             )
             return UserActivity(
                 id: entry.entry.mal_id * 1000 + index,
-                kind: .list(status: "watched", progress: entry.episodes_seen.map { "\($0)" }, media: media),
+                kind: .list(status: "watched", progress: entry.increment.map { "\($0)" }, media: media),
                 createdAt: parseDate(entry.date),
                 user: nil,
                 likeCount: 0,
