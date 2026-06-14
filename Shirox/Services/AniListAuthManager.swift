@@ -127,6 +127,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
     }
 
     func logout() {
+        Logger.shared.log("[AniList] logout() — token cleared", type: "Info")
         deleteToken()
         isLoggedIn = false
         username = nil
@@ -159,10 +160,25 @@ final class AniListAuthManager: NSObject, ObservableObject {
         let body: [String: Any] = ["query": query]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        guard let (data, response) = try? await URLSession.shared.data(for: request) else { return }
-        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
-            logout()
+        guard let (data, response) = try? await URLSession.shared.data(for: request) else {
+            // Network error (no response) — transient, keep the session.
+            Logger.shared.log("[AniList] fetchViewer network error — keeping session", type: "Network")
             return
+        }
+        if let http = response as? HTTPURLResponse {
+            switch http.statusCode {
+            case 200:
+                break
+            case 401:
+                // Genuine auth failure — token rejected.
+                Logger.shared.log("[AniList] fetchViewer 401 — logging out", type: "Error")
+                logout()
+                return
+            default:
+                // 429 / 5xx / anything else — transient. Do NOT clear the token.
+                Logger.shared.log("[AniList] fetchViewer HTTP \(http.statusCode) — keeping session", type: "Network")
+                return
+            }
         }
 
         struct ViewerResponse: Decodable {
@@ -195,8 +211,10 @@ final class AniListAuthManager: NSObject, ObservableObject {
                 UserDefaults.standard.set(format.rawValue, forKey: "anilist_score_format")
             }
         } else {
-            // Token is present but invalid — clear it
-            logout()
+            // HTTP 200 but the body didn't decode into a Viewer (e.g. a GraphQL error
+            // envelope or a Cloudflare/HTML interstitial). This is NOT proof the token is
+            // invalid — only a real 401 is. Keep the session and try again next launch.
+            Logger.shared.log("[AniList] fetchViewer: 200 but no Viewer in response — keeping session", type: "Network")
         }
     }
 }

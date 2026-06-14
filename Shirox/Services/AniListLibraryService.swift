@@ -204,10 +204,30 @@ final class AniListLibraryService {
         let body: [String: Any] = ["query": query, "variables": variables]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
-            await AniListAuthManager.shared.logout()
-            throw AniListError.httpError(401)
+        if let http = response as? HTTPURLResponse {
+            switch http.statusCode {
+            case 200:
+                return data
+            case 401:
+                // Genuine auth failure — the token is no longer accepted.
+                Logger.shared.log("[AniList] 401 on \(operationName(in: query)) — logging out", type: "Error")
+                await AniListAuthManager.shared.logout()
+                throw AniListError.httpError(401)
+            case 429:
+                // Rate limited — transient, do NOT clear the token.
+                Logger.shared.log("[AniList] 429 rate limited on \(operationName(in: query)) — keeping session", type: "Network")
+                throw AniListError.rateLimited
+            default:
+                // 5xx / other transient errors — do NOT clear the token.
+                Logger.shared.log("[AniList] HTTP \(http.statusCode) on \(operationName(in: query)) — keeping session", type: "Network")
+                throw AniListError.httpError(http.statusCode)
+            }
         }
         return data
+    }
+
+    /// Best-effort label for logs ("query"/"mutation") without dumping the whole GraphQL doc.
+    private func operationName(in query: String) -> String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("mutation") ? "mutation" : "query"
     }
 }
