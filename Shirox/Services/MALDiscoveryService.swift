@@ -189,34 +189,50 @@ final class MALDiscoveryService {
             nextAiringEpisode: nil,
             relations: {
                 guard let jikanRelations = a.relations else { return nil }
-                let edges: [MediaRelationEdge] = jikanRelations
-                    .filter { $0.relation == "Sequel" }
-                    .flatMap { $0.entry }
-                    .filter { $0.type == "anime" }
-                    .map { entry in
-                        MediaRelationEdge(
-                            relationType: "SEQUEL",
-                            node: Media(
-                                id: entry.mal_id,
-                                idMal: entry.mal_id,
-                                provider: .mal,
-                                title: MediaTitle(romaji: entry.name, english: nil, native: nil),
-                                coverImage: MediaCoverImage(large: nil, extraLarge: nil),
-                                bannerImage: nil,
-                                description: nil,
-                                episodes: nil,
-                                status: nil,
-                                averageScore: nil,
-                                genres: nil,
-                                season: nil,
-                                seasonYear: nil,
-                                nextAiringEpisode: nil,
-                                relations: nil,
-                                type: "TV",
-                                format: nil
-                            )
-                        )
+                // Map the meaningful Jikan relation labels to the app's relationType
+                // strings. Sequel handling is preserved so next-episode chaining works.
+                func relationType(for label: String) -> String? {
+                    switch label {
+                    case "Sequel":              return "SEQUEL"
+                    case "Prequel":             return "PREQUEL"
+                    case "Side story":          return "SIDE_STORY"
+                    case "Parent story":        return "PARENT"
+                    case "Alternative version",
+                         "Alternative setting": return "ALTERNATIVE"
+                    default:                    return nil
                     }
+                }
+                let edges: [MediaRelationEdge] = jikanRelations
+                    .compactMap { rel -> [MediaRelationEdge]? in
+                        guard let type = relationType(for: rel.relation) else { return nil }
+                        return rel.entry
+                            .filter { $0.type == "anime" }
+                            .map { entry in
+                                MediaRelationEdge(
+                                    relationType: type,
+                                    node: Media(
+                                        id: entry.mal_id,
+                                        idMal: entry.mal_id,
+                                        provider: .mal,
+                                        title: MediaTitle(romaji: entry.name, english: nil, native: nil),
+                                        coverImage: MediaCoverImage(large: nil, extraLarge: nil),
+                                        bannerImage: nil,
+                                        description: nil,
+                                        episodes: nil,
+                                        status: nil,
+                                        averageScore: nil,
+                                        genres: nil,
+                                        season: nil,
+                                        seasonYear: nil,
+                                        nextAiringEpisode: nil,
+                                        relations: nil,
+                                        type: "TV",
+                                        format: nil
+                                    )
+                                )
+                            }
+                    }
+                    .flatMap { $0 }
                 return edges.isEmpty ? nil : MediaRelations(edges: edges)
             }(),
             type: a.type,
