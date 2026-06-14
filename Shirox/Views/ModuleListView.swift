@@ -11,8 +11,7 @@ struct ModuleListView: View {
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
-        NavigationStack {
-            List {
+        List {
                 Section {
                     addModuleCard
                 }
@@ -112,14 +111,6 @@ struct ModuleListView: View {
                 }
                 #endif
             }
-        }
-        #if os(iOS)
-        .background(Color(.systemBackground))
-        #elseif os(tvOS)
-        // TODO: add back background color
-        #else
-        .background(Color(.windowBackgroundColor))
-        #endif
         .onChangeOf(moduleURL) { _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
