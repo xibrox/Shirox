@@ -34,6 +34,7 @@ struct HomeView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
+                            ProviderSwitcher()
                             if !vm.trending.isEmpty {
                                 FeaturedCarousel(items: vm.trending)
                             }
