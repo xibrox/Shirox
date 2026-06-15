@@ -357,6 +357,16 @@ final class CastManager: NSObject, ObservableObject {
         isConnected = session != nil
         currentDeviceName = session?.device.friendlyName
 
+        // Keep the app alive in the background so CastProxyServer keeps serving
+        // segments after the screen locks; iOS otherwise suspends us ~30s in.
+        #if os(iOS)
+        if isConnected {
+            BackgroundKeepAlive.shared.acquire("cast")
+        } else {
+            BackgroundKeepAlive.shared.release("cast")
+        }
+        #endif
+
         if let remoteMediaClient = session?.remoteMediaClient {
             remoteMediaClient.add(self)
             updateMediaStatus(remoteMediaClient.mediaStatus)

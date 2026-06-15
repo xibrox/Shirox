@@ -61,6 +61,7 @@ struct PlayerView: View {
     @State private var autoAdvanceTask: Task<Void, Never>? = nil
     @State private var timeObserver: Any? = nil
     @State private var rateObserver: NSKeyValueObservation? = nil
+    @State private var externalPlaybackObserver: NSKeyValueObservation? = nil
     @State private var loadingOpacity = 0.8
     @State private var didSeekToResume = false
     @State private var skipSegments: SkipSegments?
@@ -296,6 +297,10 @@ struct PlayerView: View {
             cancelStallWatchdog(resetAttempts: true)
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
             rateObserver?.invalidate()
+            externalPlaybackObserver?.invalidate()
+            #if os(iOS)
+            BackgroundKeepAlive.shared.release("airplay")
+            #endif
             player?.pause()
             saveProgress()
             tearDownNowPlaying()
@@ -1058,6 +1063,7 @@ struct PlayerView: View {
     private func setupPlayer() {
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
         rateObserver?.invalidate(); rateObserver = nil
+        externalPlaybackObserver?.invalidate(); externalPlaybackObserver = nil
         audioGroup = nil
         #if os(iOS)
         videoReady = false
@@ -1122,6 +1128,22 @@ struct PlayerView: View {
             let qualities = await HLSQualityParser.parse(url: qualityURL, headers: qualityHeaders)
             await MainActor.run { hlsQualities = qualities }
         }
+
+        #if os(iOS)
+        // AirPlay video is fed by this local AVPlayer, but with external playback the
+        // audio renders on the receiver so the app no longer counts as "playing audio"
+        // and gets suspended on screen lock. Hold the keep-alive while AirPlay is active.
+        externalPlaybackObserver = p.observe(\.isExternalPlaybackActive, options: [.new, .initial]) { player, _ in
+            let active = player.isExternalPlaybackActive
+            DispatchQueue.main.async {
+                if active {
+                    BackgroundKeepAlive.shared.acquire("airplay")
+                } else {
+                    BackgroundKeepAlive.shared.release("airplay")
+                }
+            }
+        }
+        #endif
 
         rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
             DispatchQueue.main.async {
