@@ -61,7 +61,7 @@ struct PlayerView: View {
     @State private var autoAdvanceTask: Task<Void, Never>? = nil
     @State private var timeObserver: Any? = nil
     @State private var rateObserver: NSKeyValueObservation? = nil
-    @State private var externalPlaybackObserver: NSKeyValueObservation? = nil
+    @State private var lastSavedSeconds: Double = 0
     @State private var loadingOpacity = 0.8
     @State private var didSeekToResume = false
     @State private var skipSegments: SkipSegments?
@@ -297,10 +297,6 @@ struct PlayerView: View {
             cancelStallWatchdog(resetAttempts: true)
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
             rateObserver?.invalidate()
-            externalPlaybackObserver?.invalidate()
-            #if os(iOS)
-            BackgroundKeepAlive.shared.release("airplay")
-            #endif
             player?.pause()
             saveProgress()
             tearDownNowPlaying()
@@ -328,19 +324,41 @@ struct PlayerView: View {
                 castCurrentMedia()
                 player?.pause()
                 isPlaying = false
+            } else {
+                // Cast ended by any path — the app's dismiss button, the system Cast
+                // UI, or a dropped connection. Resume the local player from where the
+                // TV left off. `currentTime` still holds the TV's last position: the
+                // position observer above is gated on `isConnected`, so the SDK's
+                // reset-to-zero on disconnect can't clobber it.
+                #if os(iOS)
+                CastProxyServer.shared.stop()
+                #endif
+                if let player {
+                    player.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600))
+                    player.rate = Float(playbackSpeed)
+                    isPlaying = true
+                    scheduleHide()
+                }
             }
         }
         .onChangeOf(castManager.isPlaying) { playing in
             if castManager.isConnected { isPlaying = playing }
         }
         .onChangeOf(castManager.currentPosition) { pos in
-            if castManager.isConnected && !isScrubbing { currentTime = pos }
+            if castManager.isConnected && !isScrubbing {
+                currentTime = pos
+                saveProgressIfDue()
+            }
         }
         .onChangeOf(castManager.duration) { dur in
             if castManager.isConnected && dur > 0 { duration = dur }
         }
         #if os(iOS)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            // Persist the live position the moment the user leaves the app — this is
+            // the last reliable signal before a swipe-away kill (which never calls
+            // onDisappear or applicationWillTerminate). Covers local and cast.
+            saveProgress()
             if isSpeedBoosted {
                 isSpeedBoosted = false
                 player?.rate = isPlaying ? Float(playbackSpeed) : 0
@@ -348,6 +366,13 @@ struct PlayerView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             guard let player else { return }
+            // While casting, `isPlaying` mirrors the Chromecast's state and the local
+            // player must stay silent — never resume it on foreground or you get audio
+            // from both the device and the TV.
+            if castManager.isConnected {
+                player.pause()
+                return
+            }
             player.seek(
                 to: CMTime(seconds: currentTime, preferredTimescale: 600),
                 toleranceBefore: .zero,
@@ -678,7 +703,7 @@ struct PlayerView: View {
                 isVideoScrubbing = false
                 isScrubbing = false
                 endScrubbing()
-                if scrubWasPlaying {
+                if scrubWasPlaying && !castManager.isConnected {
                     player?.rate = Float(playbackSpeed)
                     isPlaying = true
                 }
@@ -859,6 +884,15 @@ struct PlayerView: View {
 
     // MARK: - Player Actions
 
+    /// Periodic backstop: persists progress at most once every 10s of playback so a
+    /// hard crash or swipe-away loses at most ~10s. Works for both local and cast,
+    /// since `currentTime` mirrors the active source's position.
+    private func saveProgressIfDue() {
+        guard duration > 0, abs(currentTime - lastSavedSeconds) >= 10 else { return }
+        lastSavedSeconds = currentTime
+        saveProgress()
+    }
+
     private func saveProgress() {
         guard let context = currentContext, duration > 0 else { return }
         let urlString = currentStream.url.absoluteString
@@ -911,17 +945,10 @@ struct PlayerView: View {
     }
 
     private func exitCastMode() {
-        let resumeAt = castManager.currentPosition
+        // Just end the session; the `castManager.isConnected` observer handles
+        // stopping the proxy and resuming the local player at the TV's position,
+        // so every disconnect path goes through the same code.
         castManager.disconnect()
-        #if os(iOS)
-        CastProxyServer.shared.stop()
-        #endif
-        guard let player else { return }
-        player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600))
-        player.rate = Float(playbackSpeed)
-        isPlaying = true
-        currentTime = resumeAt
-        scheduleHide()
     }
 
     private func castCurrentMedia() {
@@ -1063,7 +1090,6 @@ struct PlayerView: View {
     private func setupPlayer() {
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
         rateObserver?.invalidate(); rateObserver = nil
-        externalPlaybackObserver?.invalidate(); externalPlaybackObserver = nil
         audioGroup = nil
         #if os(iOS)
         videoReady = false
@@ -1129,22 +1155,6 @@ struct PlayerView: View {
             await MainActor.run { hlsQualities = qualities }
         }
 
-        #if os(iOS)
-        // AirPlay video is fed by this local AVPlayer, but with external playback the
-        // audio renders on the receiver so the app no longer counts as "playing audio"
-        // and gets suspended on screen lock. Hold the keep-alive while AirPlay is active.
-        externalPlaybackObserver = p.observe(\.isExternalPlaybackActive, options: [.new, .initial]) { player, _ in
-            let active = player.isExternalPlaybackActive
-            DispatchQueue.main.async {
-                if active {
-                    BackgroundKeepAlive.shared.acquire("airplay")
-                } else {
-                    BackgroundKeepAlive.shared.release("airplay")
-                }
-            }
-        }
-        #endif
-
         rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
             DispatchQueue.main.async {
                 let status = player.timeControlStatus
@@ -1206,6 +1216,7 @@ struct PlayerView: View {
                     .max() ?? 0
                 bufferProgress = min(maxLoaded / duration, 1)
             }
+            saveProgressIfDue()
             if duration > 0 {
                 let progress = currentTime / duration
                 if progress >= watchedPercentage / 100.0 && !didTrackEpisode {

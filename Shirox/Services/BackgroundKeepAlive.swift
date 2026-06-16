@@ -2,20 +2,22 @@
 import Foundation
 import AVFoundation
 
-/// Keeps the app process alive in the background while casting or AirPlaying.
+/// Keeps the app process alive in the background while casting to Chromecast.
 ///
 /// Auth-required Chromecast streams are served by ``CastProxyServer`` — a local
-/// HTTP listener the Chromecast fetches every segment from — and AirPlay video is
-/// fed by the local `AVPlayer`. Both die when iOS suspends the app ~30s after the
-/// screen locks. The `audio` UIBackgroundMode only exempts the app from suspension
-/// while audio is *actually rendering*: a paused player (Chromecast) or AirPlay
-/// external playback (audio rendered on the receiver) does not qualify, so the app
-/// gets suspended and playback on the device stops.
+/// HTTP listener the Chromecast fetches every segment from. During a cast the local
+/// `AVPlayer` is paused, so the app is producing no audio and iOS suspends it ~30s
+/// after the screen locks; the proxy then stops answering and playback on the TV
+/// stalls. The `audio` UIBackgroundMode only exempts the app from suspension while
+/// audio is *actually rendering*, which a paused player doesn't satisfy.
 ///
-/// This plays an inaudible looping track for as long as a cast/AirPlay session is
-/// active, satisfying the background-audio exemption so the proxy keeps serving and
-/// the player keeps feeding the receiver. Uses reason-counting so the Chromecast and
-/// AirPlay sources can independently start/stop it.
+/// This plays an inaudible (volume 0) looping track for as long as a cast session is
+/// active, satisfying the background-audio exemption so the proxy keeps serving.
+///
+/// AirPlay does *not* use this: there the local `AVPlayer` is itself playing and
+/// feeding the receiver, so it holds the app alive on its own. Adding a competing
+/// audio player there disrupts external-playback routing. Reason-counting is kept so
+/// other future sources can share the keep-alive without clobbering each other.
 @MainActor
 final class BackgroundKeepAlive {
     static let shared = BackgroundKeepAlive()
