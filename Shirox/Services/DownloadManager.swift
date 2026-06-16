@@ -167,11 +167,21 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     private func handleEnterBackground() {
+        isBackgrounded = true
         guard !hlsTasks.isEmpty else { return }
-        // Request extra background time so in-flight HLS downloads can finish or at least
-        // make progress. iOS typically grants ~30 seconds.
+
+        // Preferred path: hold the silent-audio keep-alive (the mechanism casting uses) so the
+        // process stays alive and the in-process HLS downloads keep running in the background —
+        // including overnight while the app is left open. acquire() returns false only if it
+        // couldn't start the silent audio.
+        if backgroundDownloadsEnabled, BackgroundKeepAlive.shared.acquire(Self.keepAliveReason) {
+            return
+        }
+
+        // Fallback (toggle off, or audio couldn't start): make sure we aren't half-holding the
+        // keep-alive, then request the usual ~30s and pause HLS cleanly so it resumes on return.
+        BackgroundKeepAlive.shared.release(Self.keepAliveReason)
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "HLSDownload") { [weak self] in
-            // Time is nearly up — pause downloads cleanly so they resume on return.
             self?.pauseAllHLSTasks()
             UIApplication.shared.endBackgroundTask(self?.backgroundTaskID ?? .invalid)
             self?.backgroundTaskID = .invalid
@@ -179,10 +189,12 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     private func handleEnterForeground() {
+        isBackgrounded = false
         if backgroundTaskID != .invalid {
             UIApplication.shared.endBackgroundTask(backgroundTaskID)
             backgroundTaskID = .invalid
         }
+        refreshDownloadKeepAlive()   // releases — foregrounded app isn't suspended, no keep-alive needed
         processQueue()
     }
 
@@ -196,6 +208,7 @@ final class DownloadManager: NSObject, ObservableObject {
         }
         hlsTasks.removeAll()
         persist()
+        refreshDownloadKeepAlive()
     }
 
     /// Single source of truth for whether the silent-audio keep-alive should be held while
@@ -532,6 +545,7 @@ final class DownloadManager: NSObject, ObservableObject {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
         hlsTasks[item.id]?.cancel()
         hlsTasks.removeValue(forKey: item.id)
+        refreshDownloadKeepAlive()
         // Clean up partial HLS folder so the re-download starts fresh
         let folder = downloadDir.appendingPathComponent(item.id.uuidString)
         try? FileManager.default.removeItem(at: folder)
@@ -564,6 +578,7 @@ final class DownloadManager: NSObject, ObservableObject {
     func remove(_ item: DownloadItem) {
         hlsTasks[item.id]?.cancel()
         hlsTasks.removeValue(forKey: item.id)
+        refreshDownloadKeepAlive()
         if let taskID = item.taskIdentifier {
             urlSession.getAllTasks { tasks in tasks.first { $0.taskIdentifier == taskID }?.cancel() }
         }
@@ -771,8 +786,10 @@ final class DownloadManager: NSObject, ObservableObject {
                 updateError(id, error)
             }
             hlsTasks.removeValue(forKey: id)
+            refreshDownloadKeepAlive()
         }
         hlsTasks[id] = task
+        refreshDownloadKeepAlive()
     }
 
     private func startMP4(_ item: DownloadItem) {
