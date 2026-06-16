@@ -60,7 +60,12 @@ struct HomeView: View {
                     .refreshable {
                         await withTaskGroup(of: Void.self) { group in
                             group.addTask { await vm.reload() }
-                            group.addTask { await ContinueWatchingManager.shared.syncWithAniList() }
+                            group.addTask {
+                                // Sequential: both sync funcs mutate the same CW store across
+                                // await points, so running them concurrently could clobber items.
+                                await ContinueWatchingManager.shared.syncWithAniList()
+                                await ContinueWatchingManager.shared.syncWithMAL()
+                            }
                         }
                     }
                     .coordinateSpace(name: "homeScroll")

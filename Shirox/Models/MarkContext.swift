@@ -9,6 +9,7 @@ struct MarkContext {
     let totalEpisodes: Int?
     let availableEpisodes: Int?
     let detailHref: String?
+    var isAiring: Bool? = nil
     var currentAniListProgress: Int? = nil
     var currentMALProgress: Int? = nil
     var currentAniListStatus: MediaListStatus? = nil

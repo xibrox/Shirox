@@ -47,19 +47,9 @@ import Combine
             markWatched(item)
             let nextEp = item.episodeNumber + 1
             Logger.shared.log("[CW] save threshold crossed: ep=\(item.episodeNumber) isAiring=\(String(describing: item.isAiring)) totalEps=\(String(describing: item.totalEpisodes)) availableEps=\(String(describing: item.availableEpisodes)) title=\(item.mediaTitle)", type: "Debug")
-            // Block "Up Next" if we've confirmed there's no next episode to load.
-            // Priority: AniList confirmed total → module available count → assume more exist.
-            // availableEpisodes covers ongoing shows at their current last episode and
-            // completed shows that lack AniList isAiring/totalEpisodes metadata.
-            let isLastEpisode: Bool
-            if item.isAiring == false, let cap = item.totalEpisodes {
-                isLastEpisode = item.episodeNumber >= cap
-            } else if let avail = item.availableEpisodes {
-                isLastEpisode = item.episodeNumber >= avail
-            } else {
-                isLastEpisode = false
-            }
-            Logger.shared.log("[CW] isLastEpisode=\(isLastEpisode)", type: "Debug")
+            // makePlaceholder is the single source of truth for whether a next/caught-up slot
+            // exists: it returns nil only for finished shows past their final episode. Airing
+            // shows keep the placeholder, which renders as the "Caught up" card.
             let placeholder = makePlaceholder(
                 episodeNumber: nextEp, from: item,
                 aniListID: item.aniListID, moduleId: item.moduleId,
@@ -70,7 +60,7 @@ import Combine
                 detailHref: item.detailHref
             )
             Logger.shared.log("[CW] placeholder for ep\(nextEp): \(placeholder == nil ? "nil (not created)" : "created")", type: "Debug")
-            if !isLastEpisode, let placeholder {
+            if let placeholder {
                 newItems.insert(placeholder, at: 0)
                 if newItems.count > maxItems { newItems = Array(newItems.prefix(maxItems)) }
             }
@@ -174,8 +164,16 @@ import Combine
                     }
                 }
 
-                // Don't create a placeholder if the user is already caught up on all aired episodes
-                if let avail = availableEpisodes, nextEp > avail { continue }
+                // User is caught up on all aired episodes: don't advance/create an "Up Next",
+                // but refresh an existing card's availability so its "Caught up" label stays accurate.
+                if let avail = availableEpisodes, nextEp > avail {
+                    if let idx = newItems.firstIndex(where: { matchesShow($0, aniListID: media.id, moduleId: nil, mediaTitle: "") }) {
+                        newItems[idx].availableEpisodes = avail
+                        newItems[idx].isAiring = isAiring
+                        if let updatedAt = entry.updatedAt { newItems[idx].aniListUpdatedAt = updatedAt }
+                    }
+                    continue
+                }
 
                 let existing = newItems.first { matchesShow($0, aniListID: media.id, moduleId: nil, mediaTitle: "") }
 
@@ -245,17 +243,60 @@ import Combine
             let active = library.filter {
                 $0.list_status.status == "watching" || $0.list_status.status == "rewatching"
             }
+            var newItems = items
             for entry in active {
                 let progress = entry.list_status.num_episodes_watched ?? 0
                 guard progress > 0 else { continue }
                 let aniListID = IDMappingService.shared.cachedAnilistId(forMALId: entry.node.id)
+
+                // Seed watched keys (highest-wins, insert only).
                 for ep in 1...progress {
                     if let key = Self.watchedKey(aniListID: aniListID, moduleId: nil,
                                                  mediaTitle: entry.node.title, episodeNumber: ep) {
                         watchedKeys.insert(key)
                     }
                 }
+
+                // Advance an existing Continue Watching card if MAL shows further progress.
+                // Matching needs a cached aniListID mapping; never moves a card backward.
+                guard let aniListID,
+                      let idx = newItems.firstIndex(where: {
+                          matchesShow($0, aniListID: aniListID, moduleId: nil, mediaTitle: "")
+                      }) else { continue }
+                let existing = newItems[idx]
+                let isAiring = entry.node.status == "currently_airing"
+                let total = entry.node.num_episodes.flatMap { $0 > 0 ? $0 : nil }
+                // MAL has no per-episode airing schedule. For airing shows, treat the watched
+                // count as the conservative aired count (refined later on detail open); for
+                // finished shows, the total is the cap.
+                let availForCard: Int? = isAiring
+                    ? max(progress, existing.availableEpisodes ?? 0)
+                    : (total ?? existing.availableEpisodes ?? progress)
+                let nextEp = progress + 1
+
+                // Leave real in-progress items alone; only advance a placeholder that's behind MAL.
+                guard existing.streamUrl.isEmpty, nextEp > existing.episodeNumber else {
+                    newItems[idx].isAiring = isAiring
+                    if let total { newItems[idx].totalEpisodes = max(total, existing.totalEpisodes ?? 0) }
+                    if let availForCard { newItems[idx].availableEpisodes = availForCard }
+                    continue
+                }
+
+                newItems.removeAll { matchesShow($0, aniListID: aniListID, moduleId: nil, mediaTitle: "") }
+                if let placeholder = makePlaceholder(
+                    episodeNumber: nextEp, from: existing,
+                    aniListID: aniListID, moduleId: existing.moduleId,
+                    mediaTitle: existing.mediaTitle.isEmpty ? entry.node.title : existing.mediaTitle,
+                    imageUrl: entry.node.main_picture?.large ?? existing.imageUrl,
+                    totalEpisodes: total ?? existing.totalEpisodes,
+                    availableEpisodes: availForCard,
+                    isAiring: isAiring,
+                    detailHref: existing.detailHref
+                ) {
+                    newItems.insert(placeholder, at: 0)
+                }
             }
+            items = Array(newItems.sorted { cwSortOrder($0, $1) }.prefix(maxItems))
             persist()
         } catch {
             if !ProviderManager.isOfflineError(error) {
@@ -275,7 +316,8 @@ import Combine
     /// Marks a single episode as watched.
     /// Advances CW to "Up Next N+1" unless CW is already past ep N.
     func markWatched(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int,
-                     imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil, detailHref: String? = nil) {
+                     imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil,
+                     isAiring: Bool? = nil, detailHref: String? = nil) {
         guard let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
                                         mediaTitle: mediaTitle, episodeNumber: episodeNumber)
         else { return }
@@ -296,13 +338,13 @@ import Combine
 
         removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)
 
-        let effectiveCap = availableEpisodes ?? current?.availableEpisodes ?? totalEpisodes ?? current?.totalEpisodes
-        let isLastEpisode = effectiveCap.map { episodeNumber >= $0 } ?? false
-        if !isLastEpisode, let placeholder = makePlaceholder(
+        // makePlaceholder returns nil only for finished shows past their final episode.
+        if let placeholder = makePlaceholder(
             episodeNumber: episodeNumber + 1, from: current,
             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle,
             imageUrl: imageUrl, totalEpisodes: totalEpisodes,
             availableEpisodes: availableEpisodes ?? current?.availableEpisodes,
+            isAiring: isAiring ?? current?.isAiring,
             detailHref: detailHref
         ) {
             arr.insert(placeholder, at: 0)
@@ -354,7 +396,8 @@ import Combine
     /// If ep N has real in-progress data it is preserved; otherwise a placeholder is created.
     func markWatched(upThrough episodeNumber: Int,
                      aniListID: Int?, moduleId: String?, mediaTitle: String,
-                     imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil, detailHref: String? = nil) {
+                     imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil,
+                     isAiring: Bool? = nil, detailHref: String? = nil) {
         guard episodeNumber > 0 else { return }
         
         // 1. Mark episodes 1...episodeNumber as watched
@@ -373,15 +416,15 @@ import Combine
         if let ref, ref.episodeNumber > episodeNumber { persist(); return }
         removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)
 
-        // 2. Queue up the NEXT episode (N + 1) as a placeholder, if it exists
+        // 2. Queue up the NEXT episode (N + 1). makePlaceholder returns nil only for
+        //    finished shows past their final episode; airing shows keep a caught-up card.
         let nextEp = episodeNumber + 1
-        let effectiveCap = availableEpisodes ?? ref?.availableEpisodes ?? totalEpisodes ?? ref?.totalEpisodes
-        let isLastEpisode = effectiveCap.map { episodeNumber >= $0 } ?? false
-        if !isLastEpisode, let placeholder = makePlaceholder(
+        if let placeholder = makePlaceholder(
             episodeNumber: nextEp, from: ref,
             aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle,
             imageUrl: imageUrl, totalEpisodes: totalEpisodes,
             availableEpisodes: availableEpisodes ?? ref?.availableEpisodes,
+            isAiring: isAiring ?? ref?.isAiring,
             detailHref: detailHref
         ) {
             arr.insert(placeholder, at: 0)
@@ -421,6 +464,7 @@ import Combine
                 aniListID: context.aniListID, moduleId: context.moduleId,
                 mediaTitle: context.mediaTitle, imageUrl: context.imageUrl,
                 totalEpisodes: context.totalEpisodes, availableEpisodes: context.availableEpisodes,
+                isAiring: context.isAiring,
                 detailHref: context.detailHref
             )
             await pushRemoteProgress(ep: ep, context: context)
@@ -587,16 +631,24 @@ import Combine
 
         // Allow empty imageUrl — card display falls back to TVDB thumbnail or gray placeholder
 
-        // Only block "Up Next" for explicitly-finished shows with a confirmed episode count.
-        // For airing or unknown shows, always allow the placeholder — stale ones are cleaned
-        // up by notifyNewEpisodesAvailable when the detail view reloads.
-        if srcIsAiring == false {
-            // For completed shows, totalEpisodes is the definitive cap.
-            // availableEpisodes is often the module's lazy-loaded count (can be as low as 1)
-            // and is meaningless for completed shows where all episodes have aired.
-            let cap = srcTotalEps
+        // Single source of truth for "is there a slot for this episode?".
+        // - Airing shows: always keep the placeholder. When episodeNumber is one past the
+        //   currently-aired count it renders as the "Caught up" card and flips to "Up Next"
+        //   once a new episode airs.
+        // - Finished shows: totalEpisodes is the definitive cap (fall back to available count).
+        // - Unknown airing status (e.g. module-only): cap by the aired/available count, then total.
+        if srcIsAiring == true {
+            // keep — caught-up card
+        } else if srcIsAiring == false {
+            let cap = srcTotalEps ?? srcAvailable
             if let cap, cap > 0, episodeNumber > cap {
                 Logger.shared.log("[CW] No more episodes (ep \(episodeNumber) > cap \(cap)), no placeholder created.", type: "General")
+                return nil
+            }
+        } else {
+            let cap = srcAvailable ?? srcTotalEps
+            if let cap, cap > 0, episodeNumber > cap {
+                Logger.shared.log("[CW] No more episodes (ep \(episodeNumber) > cap \(cap), unknown airing), no placeholder created.", type: "General")
                 return nil
             }
         }
@@ -754,7 +806,9 @@ import Combine
             ep = rawEp - off
         }
 
-        let isCompleted = totalEpisodes != nil && totalEpisodes == ep
+        // An airing show is never "completed": even if a stale module reports
+        // totalEpisodes as the currently-aired count, more episodes are still coming.
+        let isCompleted = context.isAiring != true && totalEpisodes != nil && totalEpisodes == ep
         let targetStatus: MediaListStatus = isCompleted ? .completed : .current
 
         // --- AniList ---

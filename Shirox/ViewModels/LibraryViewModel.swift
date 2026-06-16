@@ -62,7 +62,11 @@ final class LibraryViewModel: ObservableObject {
         cacheValid = false
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.load() }
-            group.addTask { await ContinueWatchingManager.shared.syncWithAniList() }
+            group.addTask {
+                // Sequential: both sync funcs mutate the same CW store across await points.
+                await ContinueWatchingManager.shared.syncWithAniList()
+                await ContinueWatchingManager.shared.syncWithMAL()
+            }
         }
     }
 
@@ -107,7 +111,11 @@ final class LibraryViewModel: ObservableObject {
         cacheValid = false
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.fetch(silent: silent) }
-            group.addTask { await ContinueWatchingManager.shared.syncWithAniList() }
+            group.addTask {
+                // Sequential: both sync funcs mutate the same CW store across await points.
+                await ContinueWatchingManager.shared.syncWithAniList()
+                await ContinueWatchingManager.shared.syncWithMAL()
+            }
         }
     }
 

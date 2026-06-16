@@ -1176,6 +1176,7 @@ struct AniListDetailView: View {
                                 totalEpisodes: totalEpisodes,
                                 aniListProgress: existingEntry?.progress,
                                 aniListStatus: existingEntry?.status,
+                                isAiring: media.status == "RELEASING",
                                 onTap: sel ? {
                                     // Prevent selecting if already downloaded or in progress
                                     let state = DownloadManager.shared.items.first {
@@ -1209,6 +1210,7 @@ struct AniListDetailView: View {
                                 totalEpisodes: totalEpisodes,
                                 aniListProgress: existingEntry?.progress,
                                 aniListStatus: existingEntry?.status,
+                                isAiring: media.status == "RELEASING",
                                 onTap: { tapEpisode(ep, media: media) },
                                 onTryOtherStream: { vm.watchEpisode(ep) }
                             )
@@ -1338,6 +1340,7 @@ private struct AniListEpisodeRowContainer: View {
     let totalEpisodes: Int?
     let aniListProgress: Int?
     let aniListStatus: MediaListStatus?
+    var isAiring: Bool? = nil
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
     var onTryOtherStream: (() -> Void)? = nil
@@ -1363,6 +1366,7 @@ private struct AniListEpisodeRowContainer: View {
             totalEpisodes: totalEpisodes,
             availableEpisodes: nil,
             detailHref: nil,
+            isAiring: isAiring,
             currentAniListProgress: aniListProgress,
             currentMALProgress: nil,
             currentAniListStatus: aniListStatus

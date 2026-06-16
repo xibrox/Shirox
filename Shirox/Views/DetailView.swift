@@ -1428,6 +1428,7 @@ struct DetailView: View {
                             aniListID: vm.aniListID ?? aniListID,
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
+                            isAiring: vm.aniListMedia.map { $0.status == "RELEASING" },
                             onTap: sel ? {
                                 // Block selecting an in-progress download — nothing useful
                                 // to do with it from the batch bar. Completed downloads
@@ -1468,6 +1469,7 @@ struct DetailView: View {
                             aniListID: vm.aniListID ?? aniListID,
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
+                            isAiring: vm.aniListMedia.map { $0.status == "RELEASING" },
                             onTap: { tapEpisode(episode) },
                             onTryOtherStream: { vm.loadStreams(for: episode) }
                         )
@@ -1716,6 +1718,7 @@ private struct ModuleEpisodeRowContainer: View {
     let aniListID: Int?
     let aniListProgress: Int?
     let aniListStatus: MediaListStatus?
+    var isAiring: Bool? = nil
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
     var onTryOtherStream: (() -> Void)? = nil
@@ -1743,6 +1746,7 @@ private struct ModuleEpisodeRowContainer: View {
             totalEpisodes: totalEpisodes,
             availableEpisodes: nil,
             detailHref: detailHref,
+            isAiring: isAiring,
             currentAniListProgress: aniListProgress,
             currentMALProgress: nil,
             currentAniListStatus: aniListStatus

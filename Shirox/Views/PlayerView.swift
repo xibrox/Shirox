@@ -868,7 +868,8 @@ struct PlayerView: View {
             imageUrl: ctx.imageUrl.isEmpty ? nil : ctx.imageUrl,
             totalEpisodes: ctx.totalEpisodes,
             availableEpisodes: nil,
-            detailHref: ctx.detailHref
+            detailHref: ctx.detailHref,
+            isAiring: ctx.isAiring
         )
         Task {
             await ContinueWatchingManager.shared.pushRemoteProgress(ep: ctx.episodeNumber, context: context)

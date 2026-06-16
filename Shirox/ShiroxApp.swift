@@ -293,6 +293,7 @@ private struct RootTabView: View {
             await moduleManager.checkForUpdates()
             await AniListAuthManager.shared.fetchViewer()
             await ContinueWatchingManager.shared.syncWithAniList()
+            await ContinueWatchingManager.shared.syncWithMAL()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsTab)) { _ in
             #if targetEnvironment(macCatalyst)

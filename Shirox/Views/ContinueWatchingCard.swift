@@ -290,14 +290,17 @@ struct ContinueWatchingCardDisplay: View {
 
         if let avail {
             let isOngoing = item.isAiring ?? (total == nil || avail < total!)
+            // Clamp the shown episode number to the aired count so a caught-up card never
+            // renders an out-of-range numerator (e.g. "Ep 9 / 8").
+            let shownEp = min(item.episodeNumber, avail)
             if isOngoing {
-                epPart = "Ep \(item.episodeNumber) / \(avail) • Ongoing"
+                epPart = "Ep \(shownEp) / \(avail) • Ongoing"
             } else {
                 // completed or single-season module show
-                epPart = "Ep \(item.episodeNumber) / \(avail)"
+                epPart = "Ep \(shownEp) / \(avail)"
             }
         } else if let total {
-            epPart = "Ep \(item.episodeNumber) / \(total)"
+            epPart = "Ep \(min(item.episodeNumber, total)) / \(total)"
         } else {
             epPart = "Ep \(item.episodeNumber)"
         }
@@ -315,6 +318,14 @@ struct ContinueWatchingCardDisplay: View {
             mediaTitle: item.mediaTitle,
             episodeNumber: item.episodeNumber
         )
+    }
+
+    /// A placeholder whose target episode is one past the currently-aired count on an
+    /// ongoing show — i.e. the user has watched everything available and is waiting for more.
+    private var isCaughtUp: Bool {
+        guard item.streamUrl.isEmpty, let avail = item.availableEpisodes else { return false }
+        let ongoing = item.isAiring ?? (item.totalEpisodes == nil || avail < (item.totalEpisodes ?? 0))
+        return ongoing && item.episodeNumber > avail
     }
 
     private var displayImageUrl: String {
@@ -348,6 +359,11 @@ struct ContinueWatchingCardDisplay: View {
                                 .font(.system(size: 8, weight: .bold))
                             Text(episodeLabelText(item: item, prefix: nil))
                                 .font(.caption2.weight(.medium))
+                        } else if isCaughtUp {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(episodeLabelText(item: item, prefix: "Caught up"))
+                                .font(.caption2.weight(.bold))
                         } else {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.system(size: 10, weight: .bold))
