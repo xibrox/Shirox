@@ -558,6 +558,9 @@ import Combine
     /// Builds a placeholder (streamUrl: "") for `episodeNumber`.
     /// Fields from `source` take priority over the individual fallback params.
     /// Returns nil when imageUrl is unavailable or episodeNumber exceeds availableEpisodes (or totalEpisodes).
+    /// Pass `id` to keep a refreshed placeholder's identity stable — regenerating the UUID for a
+    /// logically-unchanged card changes its ForEach row identity, which tears down any in-flight
+    /// NavigationLink push (e.g. tapping an "Up Next" card pops back to Home).
     private func makePlaceholder(episodeNumber: Int,
                                   from source: ContinueWatchingItem?,
                                   aniListID: Int?, moduleId: String?, mediaTitle: String,
@@ -566,7 +569,8 @@ import Combine
                                   isAiring: Bool? = nil,
                                   detailHref: String?,
                                   lastWatchedAt: Date = .now,
-                                  aniListUpdatedAt: Int? = nil) -> ContinueWatchingItem? {
+                                  aniListUpdatedAt: Int? = nil,
+                                  id: UUID = UUID()) -> ContinueWatchingItem? {
         let srcImageUrl   = [source?.imageUrl, imageUrl].compactMap { $0 }.first(where: { !$0.isEmpty }) ?? ""
         let srcAniListID  = source?.aniListID     ?? aniListID
         let srcModuleId   = source?.moduleId      ?? moduleId
@@ -598,7 +602,7 @@ import Combine
         }
 
         return ContinueWatchingItem(
-            id: UUID(), mediaTitle: srcMediaTitle, episodeNumber: episodeNumber,
+            id: id, mediaTitle: srcMediaTitle, episodeNumber: episodeNumber,
             episodeTitle: nil, imageUrl: srcImageUrl, streamUrl: "",
             headers: nil, subtitle: nil, streamTitle: nil, aniListID: srcAniListID,
             malID: source?.malID,
@@ -642,7 +646,8 @@ import Combine
                     episodeNumber: existing.episodeNumber, from: existing,
                     aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle,
                     imageUrl: imageUrl, totalEpisodes: totalEpisodes ?? existing.totalEpisodes,
-                    availableEpisodes: availableEpisodes, isAiring: isAiring ?? existing.isAiring, detailHref: detailHref ?? existing.detailHref
+                    availableEpisodes: availableEpisodes, isAiring: isAiring ?? existing.isAiring, detailHref: detailHref ?? existing.detailHref,
+                    id: existing.id
                 ) {
                     arr.insert(updated, at: 0)
                 } else {
