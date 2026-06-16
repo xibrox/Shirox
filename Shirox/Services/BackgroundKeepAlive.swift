@@ -26,11 +26,13 @@ final class BackgroundKeepAlive {
     private init() {}
 
     /// Registers a reason to stay alive; starts silent playback if it's the first.
-    func acquire(_ reason: String) {
+    /// Returns whether the keep-alive is effectively active (silent audio playing).
+    @discardableResult
+    func acquire(_ reason: String) -> Bool {
         let wasIdle = reasons.isEmpty
         reasons.insert(reason)
-        guard wasIdle else { return }
-        start()
+        guard wasIdle else { return player != nil }
+        return start()
     }
 
     /// Removes a reason; stops silent playback once none remain.
@@ -40,7 +42,8 @@ final class BackgroundKeepAlive {
         stop()
     }
 
-    private func start() {
+    @discardableResult
+    private func start() -> Bool {
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .moviePlayback)
@@ -52,8 +55,10 @@ final class BackgroundKeepAlive {
             p.play()
             player = p
             Logger.shared.log("[KeepAlive] Started (reasons: \(reasons))", type: "Stream")
+            return true
         } catch {
             Logger.shared.log("[KeepAlive] Failed to start: \(error)", type: "Error")
+            return false
         }
     }
 
