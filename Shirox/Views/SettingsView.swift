@@ -3,6 +3,7 @@ import Combine
 
 struct SettingsView: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
+    @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
     @AppStorage("forceLandscape") private var forceLandscape = false
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
@@ -171,6 +172,7 @@ struct SettingsView: View {
                             Text("\(count)").tag(count)
                         }
                     }
+                    Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
                 }
 
                 Section("Matching") {
