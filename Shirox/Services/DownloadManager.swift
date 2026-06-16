@@ -118,7 +118,11 @@ final class DownloadManager: NSObject, ObservableObject {
             processQueue()
         }
     }
-    
+
+    @AppStorage("backgroundDownloadsEnabled") var backgroundDownloadsEnabled: Bool = true {
+        didSet { refreshDownloadKeepAlive() }
+    }
+
     private let downloadDir: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let url = docs.appendingPathComponent("Downloads", isDirectory: true)
@@ -130,6 +134,8 @@ final class DownloadManager: NSObject, ObservableObject {
     private var hlsTasks: [UUID: Task<Void, Never>] = [:]
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var backgroundCompletionHandler: (() -> Void)?
+    private var isBackgrounded = false
+    private static let keepAliveReason = "hls-downloads"
 
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.background(withIdentifier: "com.shirox.downloads.v2")
@@ -191,7 +197,21 @@ final class DownloadManager: NSObject, ObservableObject {
         hlsTasks.removeAll()
         persist()
     }
-    
+
+    /// Single source of truth for whether the silent-audio keep-alive should be held while
+    /// downloading. Held only while the app is backgrounded AND at least one HLS download is
+    /// active AND the user hasn't disabled background downloads — so the `audio` background
+    /// mode keeps the process alive for the in-process HLS downloader. Released the moment no
+    /// HLS download is active so the app can suspend and stop draining battery. Idempotent and
+    /// reason-counted, so it coexists with the casting keep-alive.
+    private func refreshDownloadKeepAlive() {
+        if backgroundDownloadsEnabled && isBackgrounded && !hlsTasks.isEmpty {
+            BackgroundKeepAlive.shared.acquire(Self.keepAliveReason)
+        } else {
+            BackgroundKeepAlive.shared.release(Self.keepAliveReason)
+        }
+    }
+
     // MARK: - Public API
     
     func download(stream: StreamResult, episodeHref: String, context: DownloadContext, enrichSnapshot: Bool = true) {
