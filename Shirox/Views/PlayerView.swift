@@ -113,6 +113,9 @@ struct PlayerView: View {
     @State private var isRecoveringStall = false
     @State private var showStallRetry = false
 
+    // Audio-session interruption (calls, Siri, other media apps)
+    @State private var wasPlayingBeforeInterruption = false
+
     // TVDB episode title
     @State private var tvdbEpisodeTitle: String? = nil
 
@@ -380,6 +383,44 @@ struct PlayerView: View {
             )
             if isPlaying {
                 player.rate = Float(playbackSpeed)
+                // After a long suspension the forward buffer is gone and the CDN URL may
+                // have expired, so this resume can stall indefinitely. The watchdog armed
+                // before suspension ran on a frozen timer and is unreliable; arm a fresh
+                // one now that timers run again so an unrecoverable stall escalates to a
+                // refetch instead of spinning forever. If playback resumes cleanly the
+                // rate observer cancels it (position advances / status goes .playing).
+                cancelStallWatchdog(resetAttempts: false)
+                startStallWatchdog()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification).receive(on: RunLoop.main)) { note in
+            // A call, Siri, an alarm, or another media app deactivates our audio session
+            // and pauses the player. Without this the player stays dead after the
+            // interruption ends — the exact "stops working after returning" symptom when
+            // the interruption coincides with backgrounding.
+            guard let info = note.userInfo,
+                  let rawType = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
+            switch type {
+            case .began:
+                // The system has already paused us; remember whether we owe a resume.
+                wasPlayingBeforeInterruption = isPlaying
+            case .ended:
+                guard wasPlayingBeforeInterruption else { return }
+                wasPlayingBeforeInterruption = false
+                // While casting, the local player must stay silent (audio comes from the TV).
+                if castManager.isConnected { return }
+                // Only resume if the system says it's appropriate (e.g. call ended, not
+                // a permanent takeover by another media app).
+                let shouldResume = (info[AVAudioSessionInterruptionOptionKey] as? UInt)
+                    .map { AVAudioSession.InterruptionOptions(rawValue: $0).contains(.shouldResume) } ?? false
+                guard shouldResume else { return }
+                // The session was deactivated during the interruption — reactivate before resuming.
+                try? AVAudioSession.sharedInstance().setActive(true)
+                player?.rate = Float(playbackSpeed)
+                isPlaying = true
+            @unknown default:
+                break
             }
         }
         .statusBarHidden(true)
@@ -1454,6 +1495,17 @@ struct PlayerView: View {
                 withAnimation { showControls = true }
                 if autoNextEpisode { await loadAndAdvance() }
             }
+        }
+        // A stream that dies *after* it was already playing — most often an expired CDN
+        // URL after a long background — posts this instead of flipping the item's status
+        // to .failed, so the .failed KVO path in setupPlayer never catches it. Re-extract
+        // a fresh URL, preserving position. Guard to the live item so a stale observer
+        // left over from a swapped-out item can't trigger a spurious refetch.
+        NotificationCenter.default.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { note in
+            guard onStreamExpired != nil, !isRefetchingStream, player?.currentItem === item else { return }
+            let err = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+            Logger.shared.log("[StreamExpiry] failedToPlayToEndTime: \(err?.localizedDescription ?? "unknown") — refetching", type: "Player")
+            Task { @MainActor in await recoverByRefetch() }
         }
     }
 
