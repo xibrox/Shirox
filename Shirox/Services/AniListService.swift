@@ -406,6 +406,9 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private let apiKey = "4cd66d53-3c21-45a7-9dd2-e4a9c2ed20a8"
     private let cacheKey = "tvdb_mappings_cache_v4"
     private let malCacheKey = "tvdb_mal_mappings_cache_v1"
+    private let bulkFetchedAtKey = "anira_all_mappings_fetchedAt_v1"
+    /// How long a cached /mappings/all snapshot is considered fresh before re-fetching.
+    private let bulkTTL: TimeInterval = 60 * 60 * 24  // 1 day
 
     @Published private var token: String?
     private var tokenExpiry: Date?
@@ -424,6 +427,23 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private var episodeCache: [Int: [AniMapEpisode]] = [:]
     private var malEpisodeCache: [Int: [AniMapEpisode]] = [:]
     private var aniraEpisodeCache: [String: AniraEpisodeResponse] = [:]
+
+    // Bulk ID-mapping snapshot from anira's /mappings/all — resolved locally instead of
+    // hitting the per-id endpoint once per show. Seeded from disk on first use, refreshed
+    // over the network when stale (see loadAllMappings).
+    private var anilistMappingIndex: [Int: BulkMapping] = [:]
+    private var malMappingIndex: [Int: BulkMapping] = [:]
+    private var bulkLoaded = false
+    private var bulkLoadTask: Task<Void, Never>?
+
+    /// Subset of an anira /mappings/all entry we actually consume for TVDB resolution.
+    struct BulkMapping: Codable, Sendable {
+        let mal_id: Int?
+        let anilist_id: Int?
+        let tvdb_id: Int?
+        let tvdb_season: Int?
+        let tvdb_epoffset: Int?
+    }
 
     struct AniraEpisodeResponse: Decodable {
         struct Skip: Decodable {
@@ -498,6 +518,26 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         // - epOffsetFetched == true means the entry was populated from a full fresh fetch
         if let cached, cached.tid < 0 { return nil }
         if let cached, cached.epOffsetFetched == true { return (cached.tid, cached.season) }
+
+        // Primary: resolve from the bulk /mappings/all snapshot (one cached fetch, no per-id call).
+        await loadAllMappings()
+        let index = provider == .mal ? malMappingIndex : anilistMappingIndex
+        if let m = index[id] {
+            if let tid = m.tvdb_id {
+                setTVDBCache(CachedData(tid: tid, season: m.tvdb_season, epOffset: m.tvdb_epoffset,
+                                        epOffsetFetched: true,
+                                        posterPath: cached?.posterPath, fanartPath: cached?.fanartPath),
+                             id: id, provider: provider)
+                provider == .mal ? saveMALCache() : saveCache()
+                return (tid, m.tvdb_season)
+            }
+            // Present in the snapshot but no TVDB id → definitively no TVDB mapping.
+            setTVDBCache(CachedData(tid: -1, season: nil, epOffsetFetched: true), id: id, provider: provider)
+            provider == .mal ? saveMALCache() : saveCache()
+            return nil
+        }
+
+        // Fallback: id absent from the snapshot (e.g. added after the last refresh) — one per-id lookup.
         do {
             let key = mappingKey(for: provider)
             guard let url = URL(string: "\(mappingEndpoint)\(id)?mapping_key=\(key)") else { return nil }
@@ -517,6 +557,88 @@ enum BrowseCategory: String, CaseIterable, Hashable {
             Logger.shared.log("TVDB mapping error (\(provider.rawValue)): \(error)", type: "Error")
         }
         return nil
+    }
+
+    // MARK: - Bulk /mappings/all
+
+    /// Ensures the bulk mapping snapshot is loaded (deduping concurrent callers).
+    private func loadAllMappings() async {
+        if bulkLoaded { return }
+        if let task = bulkLoadTask { await task.value; return }
+        let task = Task { await performLoadAllMappings() }
+        bulkLoadTask = task
+        await task.value
+        bulkLoadTask = nil
+    }
+
+    private func performLoadAllMappings() async {
+        // 1. Seed from disk (any age) for instant availability.
+        if anilistMappingIndex.isEmpty, let disk = await loadBulkFromDisk() {
+            buildMappingIndices(from: disk)
+        }
+        // 2. Refresh from the network when we have nothing yet or the snapshot is stale.
+        let fetchedAt = UserDefaults.standard.double(forKey: bulkFetchedAtKey)
+        let isStale = Date().timeIntervalSince1970 - fetchedAt > bulkTTL
+        if anilistMappingIndex.isEmpty || isStale {
+            if let entries = await fetchAllMappings(), !entries.isEmpty {
+                buildMappingIndices(from: entries)
+                saveBulkToDisk(entries)
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: bulkFetchedAtKey)
+            }
+        }
+        // Only latch as "loaded" once we actually have data, so a failed cold start retries later.
+        bulkLoaded = !anilistMappingIndex.isEmpty
+    }
+
+    private func fetchAllMappings() async -> [BulkMapping]? {
+        guard let url = URL(string: "\(mappingEndpoint)all") else { return nil }
+        do {
+            let (data, resp) = try await Self.session.data(for: URLRequest(url: url))
+            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            // Decode the ~7MB payload off the main actor to avoid a UI hitch.
+            return try await Task.detached(priority: .utility) {
+                try JSONDecoder().decode([BulkMapping].self, from: data)
+            }.value
+        } catch where (error as? URLError)?.code == .cancelled || error is CancellationError {
+            return nil
+        } catch {
+            Logger.shared.log("anira /mappings/all fetch failed: \(error)", type: "Error")
+            return nil
+        }
+    }
+
+    private func buildMappingIndices(from entries: [BulkMapping]) {
+        var ani: [Int: BulkMapping] = [:]
+        var mal: [Int: BulkMapping] = [:]
+        ani.reserveCapacity(entries.count)
+        mal.reserveCapacity(entries.count)
+        for e in entries {
+            if let a = e.anilist_id { ani[a] = e }
+            if let m = e.mal_id { mal[m] = e }
+        }
+        anilistMappingIndex = ani
+        malMappingIndex = mal
+    }
+
+    private var bulkFileURL: URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("anira_all_mappings_v1.json")
+    }
+
+    private func saveBulkToDisk(_ entries: [BulkMapping]) {
+        guard let url = bulkFileURL else { return }
+        Task.detached(priority: .background) {
+            guard let data = try? JSONEncoder().encode(entries) else { return }
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    private func loadBulkFromDisk() async -> [BulkMapping]? {
+        guard let url = bulkFileURL else { return nil }
+        return await Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode([BulkMapping].self, from: data)
+        }.value
     }
 
     /// Returns true if we've already checked TVDB for this ID (result may be positive or negative).
