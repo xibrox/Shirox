@@ -173,6 +173,7 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
+                        .tint(.secondary)
                 }
 
                 Section("Matching") {
