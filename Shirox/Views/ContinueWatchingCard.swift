@@ -399,30 +399,29 @@ struct ContinueWatchingCardDisplay: View {
                 .lineLimit(1)
         }
         .task(id: item.id) {
+            // Resolve the episode-specific thumbnail via the same robust waterfall the
+            // detail episode rows use. getEpisode handles the absolute↔relative episode-number
+            // offset that module-sourced numbers need — a plain `.episode == n` match misses
+            // those and would fall through to a series poster. Only fall back to series
+            // artwork when no per-episode image exists.
+            let id: Int?
+            let provider: ProviderType
             if let aid = item.aniListID {
-                // 1. Use cached episode thumbnail immediately if available
-                if let cached = TVDBMappingService.shared.getCachedEpisode(for: aid, episodeNumber: item.episodeNumber)?.thumbnail {
-                    episodeThumbnail = cached
-                    return
-                }
-                // 2. Fetch from animap episodes endpoint
-                let episodes = await TVDBMappingService.shared.getEpisodes(for: aid)
-                if let thumb = episodes.first(where: { $0.episode == item.episodeNumber })?.thumbnail {
-                    episodeThumbnail = thumb
-                    return
-                }
-                // 3. Fall back to TVDB series banner/fanart
-                let artwork = await TVDBMappingService.shared.getArtwork(for: aid)
-                episodeThumbnail = artwork.fanart ?? artwork.poster
+                id = aid; provider = .anilist
             } else if let mid = item.malID {
-                let episodes = await TVDBMappingService.shared.getEpisodes(for: mid, provider: .mal)
-                if let thumb = episodes.first(where: { $0.episode == item.episodeNumber })?.thumbnail {
-                    episodeThumbnail = thumb
-                    return
-                }
-                let artwork = await TVDBMappingService.shared.getArtwork(for: mid, provider: .mal)
-                episodeThumbnail = artwork.fanart ?? artwork.poster
+                id = mid; provider = .mal
+            } else {
+                id = nil; provider = .anilist
             }
+            guard let id else { return }
+
+            if let thumb = await TVDBMappingService.shared.getEpisode(
+                for: id, episodeNumber: item.episodeNumber, provider: provider)?.thumbnail {
+                episodeThumbnail = thumb
+                return
+            }
+            let artwork = await TVDBMappingService.shared.getArtwork(for: id, provider: provider)
+            episodeThumbnail = artwork.fanart ?? artwork.poster
         }
     }
 }
