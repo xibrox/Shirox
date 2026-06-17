@@ -37,8 +37,10 @@ final class HLSProxyServer: @unchecked Sendable {
 
         do {
             let l = try NWListener(using: params, on: port)
-            l.stateUpdateHandler = { [weak self] state in
-                guard let self else { return }
+            l.stateUpdateHandler = { [weak self, weak l] state in
+                // Ignore late callbacks from a listener we've already replaced via restart() —
+                // a stale `.cancelled`/`.failed` must not clear isRunning for the live listener.
+                guard let self, let l, self.listener === l else { return }
                 switch state {
                 case .ready:
                     self.isRunning = true
@@ -78,6 +80,16 @@ final class HLSProxyServer: @unchecked Sendable {
         listener?.cancel()
         listener = nil
         isRunning = false
+    }
+
+    /// Tears down the current listener and starts a fresh one, suspending until it's ready.
+    /// A long app suspension kills the proxy's loopback sockets (and can leave the listener
+    /// dead while `isRunning` still reads stale-true), wedging downloaded HLS playback. A
+    /// plain `startAndWait` no-ops in that state; restarting guarantees a live server before
+    /// the player opens new connections.
+    func restartAndWait(headers: [String: String]) async {
+        stop()
+        await startAndWait(headers: headers)
     }
 
     func proxyURL(for url: URL) -> URL? {

@@ -392,6 +392,13 @@ struct PlayerView: View {
                 cancelStallWatchdog(resetAttempts: false)
                 startStallWatchdog()
             }
+            // A downloaded episode is served by the localhost HLS proxy, whose sockets the OS
+            // kills across a long suspension. AVPlayer often surfaces that as a hard .failed
+            // (not a stall), which the watchdog never catches — the player just sits dead until
+            // the user restarts the episode. Recover immediately when we come back failed.
+            if canRecoverStream, player.currentItem?.status == .failed {
+                Task { @MainActor in await recoverByRefetch() }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification).receive(on: RunLoop.main)) { note in
             // A call, Siri, an alarm, or another media app deactivates our audio session
@@ -1234,7 +1241,7 @@ struct PlayerView: View {
         }
 
 
-        if onStreamExpired != nil {
+        if canRecoverStream {
             Task { @MainActor [weak p] in
                 for await status in item.publisher(for: \.status).values {
                     guard let currentItem = p?.currentItem, currentItem === item else { break }
@@ -1502,7 +1509,7 @@ struct PlayerView: View {
         // a fresh URL, preserving position. Guard to the live item so a stale observer
         // left over from a swapped-out item can't trigger a spurious refetch.
         NotificationCenter.default.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { note in
-            guard onStreamExpired != nil, !isRefetchingStream, player?.currentItem === item else { return }
+            guard canRecoverStream, !isRefetchingStream, player?.currentItem === item else { return }
             let err = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             Logger.shared.log("[StreamExpiry] failedToPlayToEndTime: \(err?.localizedDescription ?? "unknown") — refetching", type: "Player")
             Task { @MainActor in await recoverByRefetch() }
@@ -1510,7 +1517,56 @@ struct PlayerView: View {
     }
 
     @MainActor
+    /// True when the current item is an offline copy — a downloaded `file://` (MP4) or the
+    /// localhost HLS proxy URL — rather than a network stream.
+    private var isLocalPlayback: Bool {
+        let url = currentStream.url
+        return url.isFileURL || url.host == "127.0.0.1" || url.host == "localhost"
+    }
+
+    /// Whether wedged/failed playback can be auto-recovered. Network streams re-extract a fresh
+    /// URL via `onStreamExpired`; offline copies re-resolve the local file and restart the proxy.
+    private var canRecoverStream: Bool { onStreamExpired != nil || isLocalPlayback }
+
+    /// Re-resolves the currently-playing downloaded episode to a fresh, server-backed local
+    /// stream. The localhost HLS proxy's loopback sockets die across a long background, so the
+    /// proxy is restarted before AVPlayer gets a new item — otherwise the new connections die too.
+    @MainActor
+    private func resolveLocalStream() async -> StreamResult? {
+        #if os(iOS)
+        let url = currentStream.url
+        if url.host == "127.0.0.1" || url.host == "localhost" {
+            await HLSProxyServer.shared.restartAndWait(headers: ["User-Agent": URLSession.randomUserAgent])
+        }
+        if let ctx = currentContext,
+           let download = DownloadManager.shared.completedDownload(
+               mediaTitle: ctx.mediaTitle,
+               episodeNumber: ctx.episodeNumber,
+               aniListID: ctx.aniListID,
+               moduleId: ctx.moduleId,
+               streamTitle: ctx.streamTitle),
+           let stream = await DownloadManager.shared.getStream(for: download) {
+            return stream
+        }
+        #endif
+        // Couldn't map back to a DownloadItem (sparse context). The file path is stable, so
+        // replaying the same local URL against the restarted proxy still recovers playback.
+        return currentStream
+    }
+
     private func refetchStream() async {
+        // Downloaded playback is served from a local file / the localhost HLS proxy, not a CDN.
+        // Re-extracting an online stream (onStreamExpired) would swap the user's offline copy for
+        // a network stream — and fail outright with no connection. Recover by re-resolving the
+        // local copy and restarting the proxy instead.
+        if isLocalPlayback {
+            isRefetchingStream = true
+            let stream = await resolveLocalStream()
+            isRefetchingStream = false
+            guard let stream else { return }
+            swapStream(stream, episodeNumber: currentContext?.episodeNumber ?? 1)
+            return
+        }
         guard let loader = onStreamExpired else { return }
         isRefetchingStream = true
         do {
@@ -1580,8 +1636,10 @@ struct PlayerView: View {
             // segment requests that wedged, clearing most transient CDN stalls.
             nudgePlayer()
             startStallWatchdog() // re-arm to escalate if the nudge didn't take
-        } else if attempt <= 3, onStreamExpired != nil {
-            // Step 2: URL is likely dead — re-run the extractor, preserving position.
+        } else if attempt <= 3, canRecoverStream {
+            // Step 2: the source is likely dead — re-resolve it, preserving position. For a
+            // network stream this re-runs the extractor; for a downloaded copy it restarts the
+            // local HLS proxy and re-resolves the offline file.
             await recoverByRefetch()
         } else {
             // Step 3: give up auto-recovery; let the user retry manually.
@@ -1630,7 +1688,7 @@ struct PlayerView: View {
         showStallRetry = false
         stallRecoveryAttempts = 0
         Task { @MainActor in
-            if onStreamExpired != nil {
+            if canRecoverStream {
                 await recoverByRefetch()
             } else {
                 nudgePlayer()
