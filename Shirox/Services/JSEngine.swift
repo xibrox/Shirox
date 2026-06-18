@@ -366,6 +366,17 @@ final class JSEngine: ObservableObject {
             return
         }
 
+        // Async module functions return a Promise; synchronous ones (e.g. the
+        // local-playback bridge) return a plain value. If the return isn't a
+        // thenable, resolve with it directly — calling .then/.catch on a string
+        // throws "undefined is not an object" and the completion never fires.
+        let thenValue = promise.objectForKeyedSubscript("then")
+        if thenValue == nil || thenValue?.isUndefined == true {
+            let str = promise.toString() ?? ""
+            DispatchQueue.main.async { completion(.success(str)) }
+            return
+        }
+
         let thenBlock: @convention(block) (JSValue) -> Void = { result in
             let str = result.toString() ?? ""
             DispatchQueue.main.async {

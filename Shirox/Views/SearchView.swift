@@ -17,6 +17,16 @@ struct SearchView: View {
 
     private var isLocalModule: Bool { moduleManager.activeModule?.isLocalPlayback == true }
 
+    private var platformBackground: Color {
+        #if os(iOS)
+        Color(UIColor.systemBackground)
+        #elseif os(tvOS)
+        Color.clear
+        #else
+        Color(NSColor.windowBackgroundColor)
+        #endif
+    }
+
     private var columnCount: Int {
         #if os(iOS)
         guard sizeClass == .regular else { return 2 }
@@ -43,10 +53,7 @@ struct SearchView: View {
                         moduleButton
                     }
                 }
-                .searchable(
-                    text: $vm.query,
-                    prompt: "Search anime…"
-                )
+                .modifier(ConditionalSearchable(enabled: !isLocalModule, text: $vm.query))
                 .onSubmit(of: .search) {
                     history.add(vm.query)
                     vm.search(usingModule: usingModule)
@@ -149,10 +156,12 @@ struct SearchView: View {
             } label: {
                 Label("Browse local file", systemImage: "play.rectangle.on.rectangle")
                     .font(.headline)
+                    .foregroundStyle(platformBackground)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
+                    .background(Color.primary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -162,7 +171,9 @@ struct SearchView: View {
             if case .success(let urls) = result, let url = urls.first {
                 pendingSubtitle = LocalPlaybackCoordinator.shared.importSubtitle(from: url)
             }
-            showVideoImporter = true   // continue to the video picker either way
+            // Open the video picker only after the subtitle picker has finished
+            // dismissing — presenting it immediately over the dismissing sheet fails.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { showVideoImporter = true }
         }
         .fileImporter(isPresented: $showVideoImporter,
                       allowedContentTypes: videoContentTypes,
@@ -369,6 +380,21 @@ private struct SearchActivationObserver: View {
             .onChangeOf(isSearching) { active in
                 if active { onActivate() }
             }
+    }
+}
+
+// MARK: - Conditional Searchable
+/// Applies `.searchable` only when enabled, so the local-playback module can hide
+/// the search bar entirely instead of showing an inert field.
+private struct ConditionalSearchable: ViewModifier {
+    let enabled: Bool
+    @Binding var text: String
+    func body(content: Content) -> some View {
+        if enabled {
+            content.searchable(text: $text, prompt: "Search anime…")
+        } else {
+            content
+        }
     }
 }
 
