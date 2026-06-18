@@ -1,10 +1,14 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PlayerSubtitleSettingsView: View {
     @ObservedObject var settings: SubtitleSettingsManager
     var availableTracks: [SubtitleTrack]?
     @Binding var selectedTrack: SubtitleTrack?
+    var allowLocalImport: Bool = false
+    var onImport: ((SubtitleTrack) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var showImporter = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +27,16 @@ struct PlayerSubtitleSettingsView: View {
                             trackRow(title: track.title, isActive: selectedTrack?.id == track.id) {
                                 selectedTrack = track
                             }
+                        }
+                    }
+                }
+
+                if allowLocalImport {
+                    Section {
+                        Button {
+                            showImporter = true
+                        } label: {
+                            Label("Import subtitle file…", systemImage: "square.and.arrow.down")
                         }
                     }
                 }
@@ -96,7 +110,23 @@ struct PlayerSubtitleSettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .fileImporter(isPresented: $showImporter,
+                          allowedContentTypes: Self.subtitleTypes,
+                          allowsMultipleSelection: false) { result in
+                if case .success(let urls) = result, let url = urls.first,
+                   let track = LocalPlaybackCoordinator.shared.importSubtitle(from: url) {
+                    onImport?(track)
+                    dismiss()
+                }
+            }
         }
+    }
+
+    private static var subtitleTypes: [UTType] {
+        var types: [UTType] = [.plainText, .text, .data]
+        if let vtt = UTType(filenameExtension: "vtt") { types.insert(vtt, at: 0) }
+        if let srt = UTType(filenameExtension: "srt") { types.insert(srt, at: 0) }
+        return types
     }
 
     @ViewBuilder

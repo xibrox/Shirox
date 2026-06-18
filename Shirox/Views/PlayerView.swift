@@ -304,6 +304,9 @@ struct PlayerView: View {
             saveProgress()
             tearDownNowPlaying()
             castManager.disconnect()
+            if currentContext?.isLocalPlayback == true {
+                LocalPlaybackCoordinator.shared.releaseAll()
+            }
         }
         .onChangeOf(volume) { newVolume in
             player?.volume = newVolume
@@ -449,7 +452,14 @@ struct PlayerView: View {
             PlayerSubtitleSettingsView(
                 settings: subtitleSettings,
                 availableTracks: subtitleTracks,
-                selectedTrack: $selectedSubtitleTrack
+                selectedTrack: $selectedSubtitleTrack,
+                allowLocalImport: currentContext?.isLocalPlayback == true,
+                onImport: { track in
+                    var tracks = subtitleTracks ?? []
+                    tracks.append(track)
+                    subtitleTracks = tracks
+                    selectedSubtitleTrack = track
+                }
             )
             .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
         }
@@ -958,7 +968,7 @@ struct PlayerView: View {
             effectiveSubtitle = currentStream.subtitle
             effectiveSubtitleHeaders = currentStream.subtitleHeaders.isEmpty ? nil : currentStream.subtitleHeaders
         }
-        let item = ContinueWatchingItem(
+        var item = ContinueWatchingItem(
             id: existingId ?? UUID(),
             mediaTitle: context.mediaTitle,
             episodeNumber: context.episodeNumber,
@@ -986,6 +996,9 @@ struct PlayerView: View {
             lastWatchedAt: .now,
             thumbnailUrl: context.thumbnailUrl
         )
+        if context.isLocalPlayback {
+            item.bookmarkData = LocalPlaybackCoordinator.shared.bookmarkData(forURLString: currentStream.url.absoluteString)
+        }
         ContinueWatchingManager.shared.save(item)
     }
 

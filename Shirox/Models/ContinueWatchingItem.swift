@@ -40,4 +40,5 @@ struct ContinueWatchingItem: Identifiable, Codable, Hashable {
     var lastWatchedAt: Date
     var thumbnailUrl: String?
     var aniListUpdatedAt: Int?
+    var bookmarkData: Data?   // security-scoped bookmark for local-file resume; nil for normal streams
 }

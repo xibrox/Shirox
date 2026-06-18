@@ -15,9 +15,12 @@ struct ModuleDefinition: Codable, Identifiable, Equatable {
     let quality: String?
     let language: String?
     let softsub: Bool?
+    let supportsLocalPlayback: Bool?   // true only for the special local-files module
     var jsonUrl: String?     // stored client-side; not present in module JSON
     var scriptContent: String? // cached script content
     var iconData: String?      // cached icon data (Base64)
+
+    var isLocalPlayback: Bool { supportsLocalPlayback == true }
 }
 
 struct ModuleAuthor: Codable, Equatable {

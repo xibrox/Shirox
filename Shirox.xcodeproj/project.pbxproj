@@ -56,6 +56,7 @@
 		121D9B6F2FCA5612000FF9B4 /* JSEngine+Details.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E48B2FCA397700C9BA56 /* JSEngine+Details.swift */; };
 		121D9B702FCA5612000FF9B4 /* NetworkFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4972FCA397700C9BA56 /* NetworkFetch.swift */; };
 		121D9B712FCA5612000FF9B4 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4962FCA397700C9BA56 /* ModuleSearchAliasManager.swift */; };
+		FCE3980671F64CF38B707BFA /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		121D9B722FCA5612000FF9B4 /* AniListSocialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E47F2FCA397700C9BA56 /* AniListSocialService.swift */; };
 		121D9B732FCA5612000FF9B4 /* CloudflareBypassManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4822FCA397700C9BA56 /* CloudflareBypassManager.swift */; };
 		121D9B742FCA5612000FF9B4 /* HLSQualityParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4882FCA397700C9BA56 /* HLSQualityParser.swift */; };
@@ -203,6 +204,7 @@
 		1279E5252FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
 		1279E5262FCA397700C9BA56 /* MarkContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46D2FCA397700C9BA56 /* MarkContext.swift */; };
 		1279E5272FCA397700C9BA56 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4962FCA397700C9BA56 /* ModuleSearchAliasManager.swift */; };
+		F4B629DD0CE540A681EBF6A5 /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		1279E5282FCA397700C9BA56 /* MALAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E48F2FCA397700C9BA56 /* MALAuthManager.swift */; };
 		1279E5292FCA397700C9BA56 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E22FCA397700C9BA56 /* PlayerView.swift */; };
 		1279E52A2FCA397700C9BA56 /* PlayerNextEpisodePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B62FCA397700C9BA56 /* PlayerNextEpisodePicker.swift */; };
@@ -324,6 +326,7 @@
 		1279E59E2FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4AA2FCA397700C9BA56 /* DownloadModulePickerView.swift */; };
 		1279E59F2FCA397700C9BA56 /* MarkContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46D2FCA397700C9BA56 /* MarkContext.swift */; };
 		1279E5A02FCA397700C9BA56 /* ModuleSearchAliasManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4962FCA397700C9BA56 /* ModuleSearchAliasManager.swift */; };
+		F6D3663CCB6E4EECAD29EB9E /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		1279E5A12FCA397700C9BA56 /* MALAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E48F2FCA397700C9BA56 /* MALAuthManager.swift */; };
 		1279E5A22FCA397700C9BA56 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E22FCA397700C9BA56 /* PlayerView.swift */; };
 		1279E5A32FCA397700C9BA56 /* PlayerNextEpisodePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4B62FCA397700C9BA56 /* PlayerNextEpisodePicker.swift */; };
@@ -462,6 +465,7 @@
 		1279E4942FCA397700C9BA56 /* ModuleJSRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleJSRunner.swift; sourceTree = "<group>"; };
 		1279E4952FCA397700C9BA56 /* ModuleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleManager.swift; sourceTree = "<group>"; };
 		1279E4962FCA397700C9BA56 /* ModuleSearchAliasManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSearchAliasManager.swift; sourceTree = "<group>"; };
+		E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPlaybackCoordinator.swift; sourceTree = "<group>"; };
 		1279E4972FCA397700C9BA56 /* NetworkFetch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkFetch.swift; sourceTree = "<group>"; };
 		1279E4982FCA397700C9BA56 /* PlayerPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerPresenter.swift; sourceTree = "<group>"; };
 		1279E4992FCA397700C9BA56 /* ProviderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderManager.swift; sourceTree = "<group>"; };
@@ -664,6 +668,7 @@
 				1279E4942FCA397700C9BA56 /* ModuleJSRunner.swift */,
 				1279E4952FCA397700C9BA56 /* ModuleManager.swift */,
 				1279E4962FCA397700C9BA56 /* ModuleSearchAliasManager.swift */,
+				E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */,
 				1279E4972FCA397700C9BA56 /* NetworkFetch.swift */,
 				1279E4982FCA397700C9BA56 /* PlayerPresenter.swift */,
 				1279E4992FCA397700C9BA56 /* ProviderManager.swift */,
@@ -1020,6 +1025,7 @@
 				121D9B6F2FCA5612000FF9B4 /* JSEngine+Details.swift in Sources */,
 				121D9B702FCA5612000FF9B4 /* NetworkFetch.swift in Sources */,
 				121D9B712FCA5612000FF9B4 /* ModuleSearchAliasManager.swift in Sources */,
+				FCE3980671F64CF38B707BFA /* LocalPlaybackCoordinator.swift in Sources */,
 				121D9B722FCA5612000FF9B4 /* AniListSocialService.swift in Sources */,
 				121D9B732FCA5612000FF9B4 /* CloudflareBypassManager.swift in Sources */,
 				121D9B742FCA5612000FF9B4 /* HLSQualityParser.swift in Sources */,
@@ -1189,6 +1195,7 @@
 				1279E5252FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */,
 				1279E5262FCA397700C9BA56 /* MarkContext.swift in Sources */,
 				1279E5272FCA397700C9BA56 /* ModuleSearchAliasManager.swift in Sources */,
+				F4B629DD0CE540A681EBF6A5 /* LocalPlaybackCoordinator.swift in Sources */,
 				1279E5282FCA397700C9BA56 /* MALAuthManager.swift in Sources */,
 				1279E5292FCA397700C9BA56 /* PlayerView.swift in Sources */,
 				1279E52A2FCA397700C9BA56 /* PlayerNextEpisodePicker.swift in Sources */,
@@ -1326,6 +1333,7 @@
 				1279E59E2FCA397700C9BA56 /* DownloadModulePickerView.swift in Sources */,
 				1279E59F2FCA397700C9BA56 /* MarkContext.swift in Sources */,
 				1279E5A02FCA397700C9BA56 /* ModuleSearchAliasManager.swift in Sources */,
+				F6D3663CCB6E4EECAD29EB9E /* LocalPlaybackCoordinator.swift in Sources */,
 				1279E5A12FCA397700C9BA56 /* MALAuthManager.swift in Sources */,
 				1279E5A22FCA397700C9BA56 /* PlayerView.swift in Sources */,
 				1279E5A32FCA397700C9BA56 /* PlayerNextEpisodePicker.swift in Sources */,

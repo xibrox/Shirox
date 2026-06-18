@@ -87,6 +87,16 @@ struct ContinueWatchingSection: View {
     }
 
     private func resume(_ item: ContinueWatchingItem) {
+        #if os(iOS)
+        if let data = item.bookmarkData {
+            if let url = LocalPlaybackCoordinator.shared.resolveBookmark(data) {
+                LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: item.watchedSeconds)
+            } else {
+                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
+            }
+            return
+        }
+        #endif
         guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
         Logger.shared.log("[Subtitles] CW resume: item.subtitle=\(item.subtitle ?? "nil") item.subtitleHeaders=\(item.subtitleHeaders?.count ?? -1) item.allSubtitles=\(item.allSubtitles?.count ?? -1) item.detailHref=\(item.detailHref ?? "nil") item.moduleId=\(item.moduleId ?? "nil")", type: "Debug")
 

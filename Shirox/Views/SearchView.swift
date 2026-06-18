@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UniformTypeIdentifiers
 
 struct SearchView: View {
     @StateObject private var vm = SearchViewModel()
@@ -9,6 +10,12 @@ struct SearchView: View {
     @State private var showModuleList = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var isLandscape = false
+    @State private var showVideoImporter = false
+    @State private var showSubtitleImporter = false
+    @State private var pendingSubtitle: SubtitleTrack?
+    @State private var addSubtitleUpFront = false
+
+    private var isLocalModule: Bool { moduleManager.activeModule?.isLocalPlayback == true }
 
     private var columnCount: Int {
         #if os(iOS)
@@ -88,7 +95,9 @@ struct SearchView: View {
     // MARK: - Main Content
     @ViewBuilder
     private var mainContent: some View {
-        if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
+        if isLocalModule {
+            localEntryView
+        } else if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
             if vm.query.isEmpty && !history.queries.isEmpty {
                 historyView
             } else {
@@ -113,6 +122,65 @@ struct SearchView: View {
         } else {
             resultsView
         }
+    }
+
+    // MARK: - Local Playback Entry
+    private var localEntryView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "folder.badge.plus")
+                .font(.system(size: 52))
+                .foregroundStyle(.secondary)
+            VStack(spacing: 4) {
+                Text("Play a Local File")
+                    .font(.headline)
+                Text("Pick a video from Files to play it in Shirox.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            Toggle("Add subtitle file", isOn: $addSubtitleUpFront)
+                .toggleStyle(.switch)
+                .tint(.secondary)
+                .fixedSize()
+            Button {
+                pendingSubtitle = nil
+                if addSubtitleUpFront { showSubtitleImporter = true }
+                else { showVideoImporter = true }
+            } label: {
+                Label("Browse local file", systemImage: "play.rectangle.on.rectangle")
+                    .font(.headline)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .fileImporter(isPresented: $showSubtitleImporter,
+                      allowedContentTypes: subtitleContentTypes,
+                      allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                pendingSubtitle = LocalPlaybackCoordinator.shared.importSubtitle(from: url)
+            }
+            showVideoImporter = true   // continue to the video picker either way
+        }
+        .fileImporter(isPresented: $showVideoImporter,
+                      allowedContentTypes: videoContentTypes,
+                      allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: pendingSubtitle, resumeFrom: nil)
+        }
+    }
+
+    private var videoContentTypes: [UTType] {
+        [.movie, .video, .mpeg4Movie, .quickTimeMovie, .data]
+    }
+
+    private var subtitleContentTypes: [UTType] {
+        var types: [UTType] = [.plainText, .text, .data]
+        if let vtt = UTType(filenameExtension: "vtt") { types.insert(vtt, at: 0) }
+        if let srt = UTType(filenameExtension: "srt") { types.insert(srt, at: 0) }
+        return types
     }
 
     // MARK: - Results Grid
