@@ -5,16 +5,21 @@ struct LibraryEntryEditSheet: View {
     let media: Media
     let onSave: (MediaListStatus, Int, Double) -> Void
     var onDelete: (() -> Void)? = nil
+    var scoreFormatOverride: ScoreFormat? = nil
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
+    @ObservedObject private var local = LocalLibraryManager.shared
     @State private var status: MediaListStatus
     @State private var progress: Int
     @State private var score: Double
     @State private var showDeleteConfirmation = false
+    @State private var showNewCollection = false
+    @State private var newCollectionName = ""
 
     private var scoreFormat: ScoreFormat {
-        media.provider == .anilist ? anilistAuth.scoreFormat : .point10
+        if let scoreFormatOverride { return scoreFormatOverride }
+        return media.provider == .anilist ? anilistAuth.scoreFormat : .point10
     }
 
     private func normalizeScoreIfNeeded() {
@@ -22,11 +27,15 @@ struct LibraryEntryEditSheet: View {
         score = (score / 100.0) * scoreFormat.maxScore
     }
 
-    init(entry: LibraryEntry?, media: Media, onSave: @escaping (MediaListStatus, Int, Double) -> Void, onDelete: (() -> Void)? = nil) {
+    init(entry: LibraryEntry?, media: Media,
+         scoreFormatOverride: ScoreFormat? = nil,
+         onSave: @escaping (MediaListStatus, Int, Double) -> Void,
+         onDelete: (() -> Void)? = nil) {
         self.entry = entry
         self.media = media
         self.onSave = onSave
         self.onDelete = onDelete
+        self.scoreFormatOverride = scoreFormatOverride
         _status = State(initialValue: entry?.status ?? .planning)
         _progress = State(initialValue: entry?.progress ?? 0)
         _score = State(initialValue: entry?.score ?? 0)
@@ -63,6 +72,31 @@ struct LibraryEntryEditSheet: View {
 
                 Section("Score") {
                     ScoreInputView(score: $score, format: scoreFormat)
+                }
+
+                if scoreFormatOverride != nil {
+                    Section("Collections") {
+                        ForEach(local.collections) { collection in
+                            Button {
+                                let member = collection.mediaUniqueIds.contains(media.uniqueId)
+                                local.setMembership(uniqueId: media.uniqueId, media: media,
+                                                    inCollection: collection.id, member: !member)
+                            } label: {
+                                HStack {
+                                    Text(collection.name).foregroundStyle(.primary)
+                                    Spacer()
+                                    if collection.mediaUniqueIds.contains(media.uniqueId) {
+                                        Image(systemName: "checkmark").foregroundStyle(.tint)
+                                    }
+                                }
+                            }
+                        }
+                        Button {
+                            showNewCollection = true
+                        } label: {
+                            Label("New Collection", systemImage: "plus")
+                        }
+                    }
                 }
 
                 if entry != nil, onDelete != nil {
@@ -106,6 +140,20 @@ struct LibraryEntryEditSheet: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will remove \(media.title.displayTitle) from your library.")
+            }
+            .alert("New Collection", isPresented: $showNewCollection) {
+                TextField("Name", text: $newCollectionName)
+                Button("Create") {
+                    let trimmed = newCollectionName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    newCollectionName = ""
+                    guard !trimmed.isEmpty else { return }
+                    let collection = local.createCollection(name: trimmed)
+                    local.setMembership(uniqueId: media.uniqueId, media: media,
+                                        inCollection: collection.id, member: true)
+                }
+                Button("Cancel", role: .cancel) { newCollectionName = "" }
+            } message: {
+                Text("Group this title under a custom collection.")
             }
         }
     }

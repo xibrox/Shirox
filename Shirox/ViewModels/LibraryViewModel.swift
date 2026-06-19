@@ -13,6 +13,17 @@ final class LibraryViewModel: ObservableObject {
     @Published var selectedStatus: MediaListStatus = .current
     @Published var selectedCustomList: String? = nil
 
+    @Published var source: LibrarySource = .provider(.anilist)
+
+    private var dataSource: LibraryDataSource {
+        switch source {
+        case .local:    return LocalLibraryDataSource()
+        case .provider: return RemoteLibraryDataSource()
+        }
+    }
+
+    var isLocal: Bool { if case .local = source { return true }; return false }
+
     /// Sorted unique custom list names from the full library
     @Published var customListNames: [String] = []
 
@@ -28,8 +39,26 @@ final class LibraryViewModel: ObservableObject {
             .removeDuplicates { $0 == $1 }
             .dropFirst()
             .sink { [weak self] _ in
-                guard let self else { return }
+                guard let self, case .provider = self.source else { return }
                 Task { await self.refresh() }
+            }
+            .store(in: &cancellables)
+
+        LocalLibraryManager.shared.$entries
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self, self.isLocal else { return }
+                self.cacheValid = false
+                Task { await self.load() }
+            }
+            .store(in: &cancellables)
+
+        LocalLibraryManager.shared.$collections
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self, self.isLocal else { return }
+                self.customListNames = LocalLibraryManager.shared.collections.map(\.name).sorted()
+                self.applyFilter()
             }
             .store(in: &cancellables)
 
@@ -58,6 +87,15 @@ final class LibraryViewModel: ObservableObject {
         applyFilter()
     }
 
+    func selectSource(_ source: LibrarySource) {
+        guard self.source != source else { return }
+        self.source = source
+        selectedCustomList = nil
+        selectedStatus = .current
+        cacheValid = false
+        Task { await load() }
+    }
+
     func refresh() async {
         cacheValid = false
         await withTaskGroup(of: Void.self) { group in
@@ -66,6 +104,7 @@ final class LibraryViewModel: ObservableObject {
                 // Sequential: both sync funcs mutate the same CW store across await points.
                 await ContinueWatchingManager.shared.syncWithAniList()
                 await ContinueWatchingManager.shared.syncWithMAL()
+                await MainActor.run { LocalLibraryManager.shared.syncFromContinueWatching() }
             }
         }
     }
@@ -78,10 +117,8 @@ final class LibraryViewModel: ObservableObject {
             applyFilter()
         }
         do {
-            try await ProviderManager.shared.call {
-                try await $0.updateEntry(mediaId: entry.media.id, status: status,
-                                         progress: progress, score: score)
-            }
+            try await dataSource.updateEntry(media: entry.media, status: status,
+                                              progress: progress, score: score)
             cacheValid = false
         } catch {
             self.error = error.localizedDescription
@@ -94,7 +131,7 @@ final class LibraryViewModel: ObservableObject {
         allEntries.removeAll { $0.media.uniqueId == entry.media.uniqueId }
         applyFilter()
         do {
-            try await ProviderManager.shared.call { try await $0.deleteEntry(entryId: entry.id) }
+            try await dataSource.deleteEntry(entry)
             cacheValid = false
         } catch {
             self.error = error.localizedDescription
@@ -115,6 +152,7 @@ final class LibraryViewModel: ObservableObject {
                 // Sequential: both sync funcs mutate the same CW store across await points.
                 await ContinueWatchingManager.shared.syncWithAniList()
                 await ContinueWatchingManager.shared.syncWithMAL()
+                await MainActor.run { LocalLibraryManager.shared.syncFromContinueWatching() }
             }
         }
     }
@@ -126,13 +164,17 @@ final class LibraryViewModel: ObservableObject {
         if allEntries.isEmpty && !silent { isLoading = true }
         if !silent { error = nil }
         do {
-            let result = try await ProviderManager.shared.call { try await $0.fetchLibrary() }
+            let result = try await dataSource.fetchLibrary()
             allEntries = result
             cacheValid = true
             lastFetchedAt = Date()
-            var seen = Set<String>()
-            customListNames = result.compactMap { $0.customListName }.filter { seen.insert($0).inserted }.sorted()
-            UserDefaults.standard.set(customListNames, forKey: "libraryCustomListNames")
+            if isLocal {
+                customListNames = LocalLibraryManager.shared.collections.map(\.name).sorted()
+            } else {
+                var seen = Set<String>()
+                customListNames = result.compactMap { $0.customListName }.filter { seen.insert($0).inserted }.sorted()
+                UserDefaults.standard.set(customListNames, forKey: "libraryCustomListNames")
+            }
             applyFilter()
         } catch {
             if !silent { self.error = error.localizedDescription }
@@ -141,8 +183,13 @@ final class LibraryViewModel: ObservableObject {
     }
 
     private func applyFilter() {
-        if let customList = selectedCustomList {
-            entries = allEntries.filter { $0.customListName == customList }
+        if let listName = selectedCustomList {
+            if isLocal {
+                let uids = Set(LocalLibraryManager.shared.collections.first { $0.name == listName }?.mediaUniqueIds ?? [])
+                entries = allEntries.filter { uids.contains($0.media.uniqueId) }
+            } else {
+                entries = allEntries.filter { $0.customListName == listName }
+            }
         } else {
             entries = allEntries.filter { $0.status == selectedStatus && $0.customListName == nil }
         }

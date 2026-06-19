@@ -49,6 +49,18 @@ struct DetailView: View {
         #endif
     }
 
+    /// A trackable Media for the bookmark button, built from the loaded module detail plus
+    /// any resolved AniList/MAL id. Nil when neither id is known (untrackable module item).
+    private var bookmarkMedia: Media? {
+        guard let detail = vm.detail else { return nil }
+        return LocalLibraryManager.lightweightMedia(
+            aniListID: aniListID, malID: malID,
+            title: detail.title.isEmpty ? item.title : detail.title,
+            imageUrl: detail.image.isEmpty ? item.image : detail.image,
+            episodes: detail.episodes.isEmpty ? nil : detail.episodes.count
+        )
+    }
+
     @ViewBuilder
     private var mainContent: some View {
         ZStack {
@@ -60,6 +72,11 @@ struct DetailView: View {
             } else if let error = vm.errorMessage {
                 errorView(error)
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            BookmarkButton(media: bookmarkMedia)
+                .padding(.trailing, 16)
+                .padding(.bottom, 24)
         }
     }
 

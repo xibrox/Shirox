@@ -211,6 +211,11 @@ struct AniListDetailView: View {
 
     private var navContent: AnyView {
         AnyView(navTitled
+        .overlay(alignment: .bottomTrailing) {
+            BookmarkButton(media: vm.media)
+                .padding(.trailing, 16)
+                .padding(.bottom, 24)
+        }
         #if os(iOS)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { editToolbarButton } }
         #endif

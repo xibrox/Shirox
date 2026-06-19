@@ -19,6 +19,9 @@ struct SettingsView: View {
     @AppStorage("autoPickLastStream") private var autoPickLastStream = false
     @AppStorage("dualSync") private var dualSync = false
     @AppStorage("rateOnFinish") private var rateOnFinish = true
+    @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
+    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10.rawValue
+    @State private var showClearLocalLibrary = false
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
@@ -164,6 +167,33 @@ struct SettingsView: View {
                     } label: {
                         Label("List Order & Custom Lists", systemImage: "list.bullet.indent")
                     }
+                }
+
+                Section {
+                    Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled)
+                        .tint(.secondary)
+                    Picker("Score Format", selection: $localScoreFormatRaw) {
+                        Text("100 Point").tag(ScoreFormat.point100.rawValue)
+                        Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
+                        Text("10 Point").tag(ScoreFormat.point10.rawValue)
+                        Text("5 Star").tag(ScoreFormat.point5.rawValue)
+                        Text("3 Smiley").tag(ScoreFormat.point3.rawValue)
+                    }
+                    Button(role: .destructive) {
+                        showClearLocalLibrary = true
+                    } label: {
+                        Label("Clear Local Library", systemImage: "trash")
+                    }
+                } header: {
+                    Text("Local Library")
+                } footer: {
+                    Text("Your on-device library works without signing in. Auto-track keeps its Watching list in sync with what you watch.")
+                }
+                .alert("Clear Local Library", isPresented: $showClearLocalLibrary) {
+                    Button("Clear", role: .destructive) { LocalLibraryManager.shared.clearAll() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This permanently removes all on-device entries and collections. AniList/MyAnimeList lists are not affected.")
                 }
 
                 Section("Downloads") {

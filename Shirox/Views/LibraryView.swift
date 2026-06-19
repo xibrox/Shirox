@@ -20,6 +20,7 @@ struct LibraryView: View {
     @State private var searchText = ""
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
+    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10.rawValue
 
     #if os(iOS)
         private let toolbarItemPlacement: [ToolbarItemPlacement] = [ToolbarItemPlacement.topBarLeading, ToolbarItemPlacement.topBarTrailing]
@@ -61,7 +62,8 @@ struct LibraryView: View {
     }
 
     private var scoreFormat: ScoreFormat {
-        activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
+        if vm.isLocal { return ScoreFormat(rawValue: localScoreFormatRaw) ?? .point10 }
+        return activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
     }
 
     private var displayUsername: String {
@@ -128,10 +130,17 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            if !isActiveProviderAuthenticated {
-                loginPrompt
-            } else {
-                libraryContent
+            Group {
+                if vm.isLocal || isActiveProviderAuthenticated {
+                    libraryContent
+                } else {
+                    loginPrompt
+                }
+            }
+            .onAppear {
+                if !anilistAuth.isLoggedIn && !malAuth.isLoggedIn {
+                    vm.selectSource(.local)
+                }
             }
         }
     }
@@ -224,7 +233,7 @@ struct LibraryView: View {
 
     private var libraryContent: some View {
         VStack(spacing: 0) {
-            ProviderSwitcher()
+            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
             // Combined row: Status on left, Genres on right
             HStack {
                 // Status & Custom List Menu
@@ -354,7 +363,9 @@ struct LibraryView: View {
                     searchText.isEmpty ? "Nothing here yet" : "No Results",
                     systemImage: searchText.isEmpty ? "tray" : "magnifyingglass",
                     description: Text(searchText.isEmpty
-                        ? "Add anime to \(vm.selectedCustomList ?? vm.selectedStatus.displayName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList")."
+                        ? (vm.isLocal
+                            ? "Add anime to \(vm.selectedCustomList ?? vm.selectedStatus.displayName) from any title's detail screen."
+                            : "Add anime to \(vm.selectedCustomList ?? vm.selectedStatus.displayName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList").")
                         : "No anime matching \"\(searchText)\".")
                 )
             } else {
@@ -370,7 +381,7 @@ struct LibraryView: View {
                             .opacity(0)
 
                             LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-                                if anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
+                                if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
                                     pendingEntry = entry
                                     showProviderPicker = true
                                 } else {
@@ -464,6 +475,7 @@ struct LibraryView: View {
             LibraryEntryEditSheet(
                 entry: entry,
                 media: entry.media,
+                scoreFormatOverride: vm.isLocal ? scoreFormat : nil,
                 onSave: { status, progress, score in
                     if status == .completed {
                         ContinueWatchingManager.shared.resetProgress(
@@ -472,7 +484,7 @@ struct LibraryView: View {
                     }
                     Task {
                         await vm.update(entry: entry, status: status, progress: progress, score: score)
-                        if dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                        if !vm.isLocal && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
                             if activeProviderType == .anilist, let idMal = entry.media.idMal {
                                 try? await MALProvider.shared.updateEntry(mediaId: idMal, status: status, progress: progress, score: score)
                             } else if activeProviderType == .mal {
@@ -486,7 +498,7 @@ struct LibraryView: View {
                 onDelete: {
                     Task {
                         await vm.delete(entry: entry)
-                        if dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                        if !vm.isLocal && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
                             if activeProviderType == .anilist, let idMal = entry.media.idMal {
                                 try? await MALProvider.shared.deleteEntry(entryId: idMal)
                             } else if activeProviderType == .mal {

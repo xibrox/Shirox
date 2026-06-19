@@ -99,6 +99,7 @@ struct ShiroxApp: App {
             _ = CastManager.shared
         #endif
         ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
+        LocalLibraryManager.shared.syncFromContinueWatching()
     }
 
     var body: some Scene {
