@@ -79,9 +79,11 @@ struct SearchView: View {
                 }
         }
         .adaptiveSheet(isPresented: $showModuleList) {
-            ModuleListView()
-                .environmentObject(moduleManager)
-                .tint(.primary)
+            NavigationStack {
+                ModuleListView()
+            }
+            .environmentObject(moduleManager)
+            .tint(.primary)
         }
         #if os(iOS)
         .background(
