@@ -32,6 +32,17 @@ struct CircularButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Controls Animation
+
+extension Animation {
+    /// Controls appear: a quick, lively spring with a tiny settle (no big overshoot) so the
+    /// bars rise into place with some life. Bounded to ~340ms.
+    static let playerControlsIn = Animation.spring(duration: 0.34, bounce: 0.18)
+    /// Controls disappear: a clean ease-out with no bounce — a settle on the way out reads
+    /// as buggy. Asymmetric on purpose: lively in, calm out. Both ≤400ms.
+    static let playerControlsOut = Animation.easeOut(duration: 0.26)
+}
+
 // MARK: - Player View
 
 private final class CompletionBox {
@@ -226,8 +237,13 @@ struct PlayerView: View {
                 }
             }
 
-            if showControls && !isLocked && controlsEnabled {
+            // Kept mounted (not gated on showControls) so toggling never rebuilds the
+            // GeometryReader/bars — visibility is driven by opacity+offset inside, which
+            // animates smoothly and stays interruptible on rapid taps. Hit-testing is
+            // switched off while hidden so taps fall through to the interaction layer.
+            if !isLocked && controlsEnabled {
                 controlsContent
+                    .allowsHitTesting(showControls)
             }
 
             if !isLocked && controlsEnabled && !castManager.isConnected {
@@ -444,7 +460,7 @@ struct PlayerView: View {
         .persistentSystemOverlaysHidden()
         .onChangeOf(videoReady) { ready in
             if ready {
-                withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
+                setControlsVisible(true)
                 scheduleHide()
             }
         }
@@ -567,7 +583,7 @@ struct PlayerView: View {
         Color.clear
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+                toggleControls()
                 if showControls { scheduleHide() }
             }
             .ignoresSafeArea()
@@ -578,7 +594,7 @@ struct PlayerView: View {
         ZStack {
             PlayerDoubleTapSeek(
                 onSingleTap: {
-                    withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+                    toggleControls()
                     if showControls { scheduleHide() }
                 },
                 onSeekBackward: { skip(by: -Double(skipShort)); scheduleHide() },
@@ -608,7 +624,7 @@ struct PlayerView: View {
                         player.rate = 2.0
                         // Hide the controls (title, gradients, play/pause) so the
                         // 2× badge sits cleanly at the top by itself while boosting.
-                        withAnimation(.easeInOut(duration: 0.2)) { showControls = false }
+                        setControlsVisible(false)
                     }
                 },
                 onEnded: {
@@ -696,10 +712,10 @@ struct PlayerView: View {
                     )
                 )
                 .ignoresSafeArea().allowsHitTesting(false)
+                .opacity(showControls ? 1 : 0)
 
             controlsOverlayBody
         }
-        .transition(.opacity)
     }
 
     @ViewBuilder
@@ -711,12 +727,18 @@ struct PlayerView: View {
             ZStack {
                 VStack(spacing: 0) {
                     topBarView(topPad: layouts.top, isLandscape: isLandscape)
+                        .opacity(showControls ? 1 : 0)
+                        .offset(y: showControls ? 0 : -14)
                     Spacer()
                     bottomBarView(bottomPad: layouts.bottom)
+                        .opacity(showControls ? 1 : 0)
+                        .offset(y: showControls ? 0 : 14)
                 }
                 .padding(.horizontal, layouts.horizontal)
 
                 centerControlsView
+                    .opacity(showControls ? 1 : 0)
+                    .scaleEffect(showControls ? 1 : 0.96)
             }
         }
     }
@@ -1100,7 +1122,7 @@ struct PlayerView: View {
     private func togglePlayPause() {
         if castManager.isConnected {
             if isPlaying { castManager.pause() } else { castManager.play() }
-            withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
+            setControlsVisible(true)
             scheduleHide()
             return
         }
@@ -1113,7 +1135,7 @@ struct PlayerView: View {
             player.rate = Float(playbackSpeed)
             isPlaying = true
         }
-        withAnimation(.easeInOut(duration: 0.2)) { showControls = true }
+        setControlsVisible(true)
         scheduleHide()
     }
 
@@ -1192,13 +1214,25 @@ struct PlayerView: View {
         }
     }
 
+    /// Single entry point for toggling the controls overlay so appear/disappear always
+    /// use the matching curve (fast-in / gentle-out) regardless of which gesture drove it.
+    private func setControlsVisible(_ visible: Bool) {
+        withAnimation(visible ? .playerControlsIn : .playerControlsOut) {
+            showControls = visible
+        }
+    }
+
+    private func toggleControls() {
+        setControlsVisible(!showControls)
+    }
+
     private func scheduleHide() {
         hideTask?.cancel()
         guard isPlaying else { return }
         hideTask = Task {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             guard !Task.isCancelled else { return }
-            withAnimation(.easeInOut(duration: 0.3)) { showControls = false }
+            setControlsVisible(false)
         }
     }
 
@@ -1569,7 +1603,7 @@ struct PlayerView: View {
         NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { _ in
             autoAdvanceTask = Task { @MainActor in
                 isPlaying = false
-                withAnimation { showControls = true }
+                setControlsVisible(true)
                 if autoNextEpisode { await loadAndAdvance() }
             }
         }
