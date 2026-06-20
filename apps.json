@@ -27,8 +27,8 @@
       },
       "versions": [
         {
-          "version": "0.0.91",
-          "buildVersion": "89",
+          "version": "0.0.92",
+          "buildVersion": "90",
           "date": "2026-06-19",
           "localizedDescription": "Beta release",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
@@ -38,5 +38,24 @@
       ]
     }
   ],
-  "news": []
+  "news": [
+    {
+      "title": "New in 0.0.92 - Local Library",
+      "identifier": "news-0.0.92-local-library",
+      "caption": "Track anime without signing into any account. A My Library section lives in the Library tab and works completely on device — bookmark anime, set a status, rate it, and create collections. Auto-tracking keeps your episode progress in sync as you watch, and your scores now survive switching Score Format. Player: a Retry button when buffering stalls, a resume seek fix for HLS, smoother controls, cleaner double-tap feedback, and 2x hold that sticks while you drag. Plus Library search bar and source switcher fixes, and a Local Files promo card on the Modules screen.",
+      "tintColor": "ef4444",
+      "date": "2026-06-20",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
+    {
+      "title": "New in 0.0.91 — Local Files",
+      "identifier": "news-0.0.91-local-files",
+      "caption": "Play videos straight from your device. Browse to any video in the Files app and watch it in the Shirox player with full controls — AirPlay, PiP, subtitles, and Continue Watching all included. Import your own subtitle files before or during playback.\n\nAlso fixed: the refresh and Edit buttons now appear at the top of the module list in Search, and the Local Files Browse button has a cleaner look.",
+      "tintColor": "ef4444",
+      "date": "2026-06-19",
+      "notify": true,
+      "appID": "com.shirox.app"
+    }
+  ]
 }
