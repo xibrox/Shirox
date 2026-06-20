@@ -212,10 +212,20 @@ final class DetailViewModel: ObservableObject {
                 media.title.english?.lowercased() == title.lowercased() ||
                 media.title.romaji?.lowercased() == title.lowercased()
             }
-            
-            if let match = perfectMatch {
+
+            // Fall back to the top (most relevant) search result when there's no exact match.
+            // Module titles rarely match AniList's exactly, and without an ID the player can't
+            // track progress to AniList/MAL at all — the whole point of matching. AniList ranks
+            // by relevance, so the first hit is almost always the right show.
+            let match = perfectMatch ?? results.first
+            if let match {
                 aniListID = match.id
-                AniListMappingManager.shared.saveMapping(title: title, aniListID: match.id)
+                // Only persist confident (exact) matches. A fuzzy fallback is used for this
+                // session but not cached as ground truth, so an occasional wrong guess doesn't
+                // stick permanently with no way to correct it.
+                if perfectMatch != nil {
+                    AniListMappingManager.shared.saveMapping(title: title, aniListID: match.id)
+                }
                 fetchAniListMetadata(id: match.id)
             }
         } catch {

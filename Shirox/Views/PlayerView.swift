@@ -209,16 +209,16 @@ struct PlayerView: View {
                         .allowsHitTesting(false)
                 }
 
-                if showStallRetry {
-                    stallRetryOverlay
-                }
-
                 #if os(iOS)
                 loadingDismissButton
                 #endif
             }
 
-            if controlsEnabled {
+            // While the retry modal is up, drop the interaction layer entirely. Its
+            // FullScreenSeekView is a UIKit gesture view, and UIKit recognizers keep
+            // firing through a SwiftUI overlay z-ordered on top — so without this the
+            // Retry button never wins the tap and the tap just toggles the controls.
+            if controlsEnabled && !showStallRetry {
                 if let player {
                     interactionLayer(player: player)
                 } else if castManager.isConnected {
@@ -246,6 +246,13 @@ struct PlayerView: View {
                 }
                 .ignoresSafeArea()
                 .allowsHitTesting(true)
+            }
+
+            // Top-most modal: must sit above interactionLayer / controls so its
+            // Retry button actually receives taps (the full-screen seek layer
+            // would otherwise intercept them and just toggle the controls).
+            if showStallRetry {
+                stallRetryOverlay
             }
         }
         .ignoresSafeArea()
@@ -884,7 +891,12 @@ struct PlayerView: View {
     @ViewBuilder
     private var stallRetryOverlay: some View {
         ZStack {
+            // contentShape so the dimmed backdrop swallows stray taps instead of
+            // letting them fall through to the player layers underneath.
             Color.black.opacity(0.6).ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { }
+
             VStack(spacing: 16) {
                 Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: 44, weight: .regular))
@@ -904,6 +916,28 @@ struct PlayerView: View {
                 .buttonStyle(.plain)
             }
             .padding(32)
+
+            // Keep an escape hatch: while the retry modal is up the normal
+            // tap-to-show-controls path is intentionally blocked, so the player's
+            // dismiss button wouldn't otherwise be reachable.
+            VStack {
+                HStack {
+                    Button(action: handleDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: isPad ? 24 : 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: isPad ? 56 : 44, height: isPad ? 56 : 44)
+                            .background(Color.white.opacity(0.25))
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.3), radius: 6)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding(.horizontal, isPad ? 30 : 20)
+            .padding(.top, isPad ? 30 : 20)
         }
         .transition(.opacity)
     }
@@ -1308,7 +1342,11 @@ struct PlayerView: View {
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
                 Logger.shared.log("[Player] Resuming from \(resumeFrom)s", type: "Debug")
-                p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                // Efficient (tolerant) seek: snaps to a nearby keyframe instead of forcing an
+                // exact frame. A zero-tolerance seek to a deep position on an HLS stream has to
+                // decode forward from the segment keyframe and frequently wedges in
+                // .waitingToPlayAtSpecifiedRate — the "won't stop buffering on resume" symptom.
+                p?.seek(to: CMTime(seconds: resumeFrom, preferredTimescale: 600)) { _ in
                     // Always set ready, even if seek was interrupted
                     DispatchQueue.main.async { videoReady = true }
                 }
@@ -1640,9 +1678,14 @@ struct PlayerView: View {
             try? await Task.sleep(nanoseconds: 8_000_000_000)
             guard !Task.isCancelled else { return }
             stallWatchdogTask = nil
-            // Still stalled at the same position?
-            guard player?.timeControlStatus == .waitingToPlayAtSpecifiedRate,
-                  abs(currentTime - stalledAt) < 0.5 else { return }
+            // Playing or paused again → the stall cleared, nothing to recover.
+            guard player?.timeControlStatus == .waitingToPlayAtSpecifiedRate else { return }
+            // Still waiting, but the playhead moved since we armed. A waiting player isn't
+            // advancing on its own, so a moved position means a SEEK into an unbuffered
+            // region (skip past the buffer, or resume-to-saved-position). A seek produces no
+            // fresh .playing→.waiting transition to re-trigger us, so re-arm at the new spot
+            // instead of bailing — otherwise that stall buffers forever with no recovery.
+            guard abs(currentTime - stalledAt) < 0.5 else { startStallWatchdog(); return }
             await attemptStallRecovery()
         }
     }
