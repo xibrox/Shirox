@@ -43,18 +43,15 @@ struct PlayerDoubleTapSeek: View {
         let showing = isLeft ? showLeftFeedback : showRightFeedback
         ZStack {
             if showing {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(width: 80, height: 80)
-                    VStack(spacing: 4) {
-                        Image(systemName: isLeft ? "chevron.left.2" : "chevron.right.2")
-                            .font(.system(size: 20, weight: .semibold))
-                        Text(isLeft ? "-\(Int(seekAmount))s" : "+\(Int(seekAmount))s")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .foregroundStyle(.white)
+                VStack(spacing: 6) {
+                    Image(systemName: isLeft ? "chevron.left.2" : "chevron.right.2")
+                        .font(.system(size: 26, weight: .bold))
+                    Text(isLeft ? "-\(Int(seekAmount))s" : "+\(Int(seekAmount))s")
+                        .font(.subheadline.weight(.semibold))
                 }
+                .foregroundStyle(.white)
+                .frame(width: 110, height: 110)
+                .background(Color.black.opacity(0.45), in: Circle())
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
         }
@@ -124,21 +121,23 @@ private struct FullScreenSeekView: UIViewRepresentable {
         let view = UIView()
         view.backgroundColor = .clear
 
-        // Double tap added first so its action fires before single-tap on the same event,
-        // allowing the didDoubleTap flag to suppress the second single-tap correctly.
         let doubleTap = SingleTouchTapGR(
             target: context.coordinator,
             action: #selector(Coordinator.handleDouble(_:))
         )
         doubleTap.numberOfTapsRequired = 2
-        doubleTap.delegate = context.coordinator
 
         let singleTap = SingleTouchTapGR(
             target: context.coordinator,
             action: #selector(Coordinator.handleSingle(_:))
         )
         singleTap.numberOfTapsRequired = 1
-        singleTap.delegate = context.coordinator
+
+        // Single-tap waits for the double-tap to fail before firing. Without this the
+        // first tap of a double-tap toggles the controls (popping in the full UI) before
+        // the seek lands, and rapid/inconsistent tapping flickers the overlay. The cost
+        // is the standard ~0.3s double-tap-detection delay on single-tap-to-show-controls.
+        singleTap.require(toFail: doubleTap)
 
         view.addGestureRecognizer(doubleTap)
         view.addGestureRecognizer(singleTap)
@@ -151,11 +150,10 @@ private struct FullScreenSeekView: UIViewRepresentable {
         context.coordinator.onSeekRight = onSeekRight
     }
 
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    final class Coordinator: NSObject {
         var onSingleTap: () -> Void
         var onSeekLeft: () -> Void
         var onSeekRight: () -> Void
-        var didDoubleTap = false
 
         init(onSingleTap: @escaping () -> Void,
              onSeekLeft: @escaping () -> Void,
@@ -166,25 +164,12 @@ private struct FullScreenSeekView: UIViewRepresentable {
         }
 
         @objc func handleSingle(_ gr: UITapGestureRecognizer) {
-            guard !didDoubleTap else { return }
             onSingleTap()
         }
 
         @objc func handleDouble(_ gr: UITapGestureRecognizer) {
-            didDoubleTap = true
             let isLeft = gr.location(in: gr.view).x < (gr.view?.bounds.width ?? 0) / 2
             if isLeft { onSeekLeft() } else { onSeekRight() }
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 400_000_000)
-                self?.didDoubleTap = false
-            }
-        }
-
-        func gestureRecognizer(_ gr: UIGestureRecognizer,
-                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-            // Allow single-tap and double-tap to be evaluated simultaneously
-            // so both can reference didDoubleTap without requiring(toFail:) delays.
-            return true
         }
     }
 }
