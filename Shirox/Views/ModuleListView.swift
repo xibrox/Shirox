@@ -8,7 +8,10 @@ struct ModuleListView: View {
     @State private var isRefreshing = false
     @State private var isAddingModule = false
     @State private var addModuleError: String?
+    @State private var isAddingLocalModule = false
     @FocusState private var isTextFieldFocused: Bool
+
+    private let localFilesModuleURL = "https://raw.githubusercontent.com/xibrox/local-files-module/refs/heads/main/local.json"
 
     var body: some View {
         List {
@@ -17,6 +20,14 @@ struct ModuleListView: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+
+                if !isLocalModuleInstalled {
+                    Section {
+                        localFilesPromoCard
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
 
                 if let error = addModuleError {
                     Section {
@@ -166,6 +177,73 @@ struct ModuleListView: View {
         }
         .padding(.vertical, 8)
         .background(Color.clear)
+    }
+
+    // MARK: - Local Files Promo
+    private var isLocalModuleInstalled: Bool {
+        moduleManager.modules.contains { $0.isLocalPlayback }
+    }
+
+    private var localFilesPromoCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "folder.badge.plus")
+                    .font(.title2)
+                    .foregroundStyle(Color.primary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Play Local Files")
+                        .font(.headline)
+                    Text("Watch videos from your device's Files app — subtitles, AirPlay, PiP, and Continue Watching included.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Text(localFilesModuleURL)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                Button {
+                    copyLocalFilesURL()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                addLocalFilesModule()
+            } label: {
+                HStack {
+                    Spacer()
+                    if isAddingLocalModule {
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Label("Add Module", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.primary)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 10)
+                .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(isAddingLocalModule)
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Error Banner
@@ -355,6 +433,47 @@ struct ModuleListView: View {
                     if moduleManager.errorMessage == nil {
                         moduleURL = ""
                         isTextFieldFocused = false
+                        #if os(iOS)
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        #endif
+                    } else {
+                        addModuleError = moduleManager.errorMessage
+                        #if os(iOS)
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        #endif
+                    }
+                }
+            }
+        }
+    }
+
+    private func copyLocalFilesURL() {
+        #if os(iOS)
+        UIPasteboard.general.string = localFilesModuleURL
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(localFilesModuleURL, forType: .string)
+        #endif
+    }
+
+    private func addLocalFilesModule() {
+        guard let url = URL(string: localFilesModuleURL) else {
+            addModuleError = "Invalid URL"
+            return
+        }
+        withAnimation {
+            addModuleError = nil
+            moduleManager.errorMessage = nil
+            isAddingLocalModule = true
+        }
+        Task {
+            await moduleManager.addModule(from: url)
+
+            await MainActor.run {
+                withAnimation {
+                    isAddingLocalModule = false
+                    if moduleManager.errorMessage == nil {
                         #if os(iOS)
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         #endif
