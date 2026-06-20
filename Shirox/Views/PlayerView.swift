@@ -595,7 +595,15 @@ struct PlayerView: View {
 
             SpeedBoostOverlay(
                 isLocked: isLocked,
-                onBegan: { if !castManager.isConnected { isSpeedBoosted = true; player.rate = 2.0 } },
+                onBegan: {
+                    if !castManager.isConnected {
+                        isSpeedBoosted = true
+                        player.rate = 2.0
+                        // Hide the controls (title, gradients, play/pause) so the
+                        // 2× badge sits cleanly at the top by itself while boosting.
+                        withAnimation(.easeInOut(duration: 0.2)) { showControls = false }
+                    }
+                },
                 onEnded: {
                     if isSpeedBoosted {
                         isSpeedBoosted = false
@@ -628,9 +636,20 @@ struct PlayerView: View {
             .background(.ultraThinMaterial, in: Capsule())
             Spacer()
         }
-        .padding(.top, 16).transition(.opacity)
+        // Sits just below the Dynamic Island / notch. Controls are hidden while
+        // boosting (see onBegan), so the badge owns the top of the screen alone.
+        .padding(.top, max(16, safeAreaTopInset + 8)).transition(.opacity)
         .animation(.easeInOut(duration: 0.15), value: isSpeedBoosted)
         .allowsHitTesting(false)
+    }
+
+    private var safeAreaTopInset: CGFloat {
+        #if os(iOS)
+        return (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .windows.first?.safeAreaInsets.top ?? 0
+        #else
+        return 0
+        #endif
     }
 
     @ViewBuilder
@@ -2273,7 +2292,10 @@ private final class SingleTouchLongPress: UILongPressGestureRecognizer {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-        if let location = touches.first?.location(in: view) {
+        // Only cancel on movement before the long-press has been recognized.
+        // Once it fires (state .began/.changed), let the finger move freely so
+        // the 2x speed boost stays active while dragging across the screen.
+        if state == .possible, let location = touches.first?.location(in: view) {
             let dx = abs(location.x - startLocation.x)
             let dy = abs(location.y - startLocation.y)
             if dx > 10 || dy > 10 {
