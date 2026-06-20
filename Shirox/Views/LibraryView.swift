@@ -129,19 +129,12 @@ struct LibraryView: View {
     }
 
     var body: some View {
+        // `libraryContent` is the single, always-present NavigationStack child so the
+        // `.searchable` bar stays attached to the navigation bar across push/pop (matching
+        // the working SearchView pattern). Logged-out users default to the local source, so
+        // there's always something to show; sign-in lives in the toolbar + Settings.
         NavigationStack {
-            Group {
-                if vm.isLocal || isActiveProviderAuthenticated {
-                    libraryContent
-                } else {
-                    loginPrompt
-                }
-            }
-            .onAppear {
-                if !anilistAuth.isLoggedIn && !malAuth.isLoggedIn {
-                    vm.selectSource(.local)
-                }
-            }
+            libraryContent
         }
     }
 
@@ -448,6 +441,18 @@ struct LibraryView: View {
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 8)
+                } else {
+                    Button("Sign In") {
+                        #if os(iOS)
+                        guard let window = presentationWindow else { return }
+                        if activeProviderType == .mal {
+                            MALAuthManager.shared.login(presentationAnchor: window)
+                        } else {
+                            AniListAuthManager.shared.login(presentationAnchor: window)
+                        }
+                        #endif
+                    }
+                    .font(.subheadline.weight(.semibold))
                 }
             }
         }
@@ -461,10 +466,12 @@ struct LibraryView: View {
         }
         #endif
         .onChangeOf(anilistAuth.isLoggedIn) { newValue in
-            if newValue { Task { await vm.load() } }
+            if newValue { vm.selectSource(.provider(.anilist)) }
+            else if !malAuth.isLoggedIn { vm.selectSource(.local) }
         }
         .onChangeOf(malAuth.isLoggedIn) { newValue in
-            if newValue { Task { await vm.load() } }
+            if newValue { vm.selectSource(.provider(.mal)) }
+            else if !anilistAuth.isLoggedIn { vm.selectSource(.local) }
         }
         .onChangeOf(providerManager.fallbackActive) {
             Task { await vm.refresh() }

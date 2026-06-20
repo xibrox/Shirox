@@ -34,6 +34,14 @@ final class LibraryViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        // Logged-out users have no provider library, so start on the on-device source.
+        // Setting this up front (rather than deferring to an .onAppear) keeps the Library's
+        // searchable content present from the first render, so the search bar stays attached
+        // to the navigation bar across push/pop.
+        if !AniListAuthManager.shared.isLoggedIn && !MALAuthManager.shared.isLoggedIn {
+            source = .local
+        }
+
         ProviderManager.shared.$orderedProviders
             .map { $0.first?.providerType }
             .removeDuplicates { $0 == $1 }
