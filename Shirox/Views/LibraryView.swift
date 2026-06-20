@@ -20,7 +20,7 @@ struct LibraryView: View {
     @State private var searchText = ""
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
-    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10.rawValue
+    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
 
     #if os(iOS)
         private let toolbarItemPlacement: [ToolbarItemPlacement] = [ToolbarItemPlacement.topBarLeading, ToolbarItemPlacement.topBarTrailing]
@@ -62,7 +62,7 @@ struct LibraryView: View {
     }
 
     private var scoreFormat: ScoreFormat {
-        if vm.isLocal { return ScoreFormat(rawValue: localScoreFormatRaw) ?? .point10 }
+        if vm.isLocal { return ScoreFormat(rawValue: localScoreFormatRaw) ?? .point10Decimal }
         return activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
     }
 
@@ -118,7 +118,9 @@ struct LibraryView: View {
             case .progress:
                 return sortAscending ? $0.progress < $1.progress : $0.progress > $1.progress
             case .score:
-                return sortAscending ? $0.score < $1.score : $0.score > $1.score
+                let a = $0.displayScore(in: scoreFormat)
+                let b = $1.displayScore(in: scoreFormat)
+                return sortAscending ? a < b : a > b
             case .updated:
                 let a = $0.updatedAt ?? 0
                 let b = $1.updatedAt ?? 0
@@ -392,7 +394,9 @@ struct LibraryView: View {
                                         entry: entry,
                                         status: entry.status,
                                         progress: entry.progress + 1,
-                                        score: entry.score
+                                        // Pass the score in the active format so the canonical
+                                        // value is preserved (not reinterpreted in a new scale).
+                                        score: entry.displayScore(in: scoreFormat)
                                     )
                                 }
                             } label: {
@@ -647,7 +651,7 @@ private struct LibraryRowView: View {
                             if scoreFormat != .point3 {
                                 Image(systemName: "star.fill").font(.system(size: 7))
                             }
-                            Text(scoreFormat.displayString(for: entry.score))
+                            scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
                                 .font(.caption2.weight(.bold))
                         }
                         .foregroundStyle(.yellow)
@@ -686,7 +690,7 @@ private struct LibraryRowView: View {
                                 Image(systemName: "star.fill")
                                     .font(.system(size: 9))
                             }
-                            Text(scoreFormat.displayString(for: entry.score))
+                            scoreFormat.scoreText(for: entry.displayScore(in: scoreFormat))
                                 .font(.caption2.weight(.semibold))
                         }
                         .foregroundStyle(.yellow)

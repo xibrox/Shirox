@@ -9,13 +9,13 @@ struct ProfileStatsView: View {
         if let stats = stats {
             VStack(spacing: 20) {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    statBox(title: "Total Anime", value: "\(stats.count)", icon: "play.tv")
-                    statBox(title: "Episodes", value: "\(stats.episodesWatched)", icon: "play.circle")
+                    statBox(title: "Total Anime", value: Text("\(stats.count)"), icon: "play.tv")
+                    statBox(title: "Episodes", value: Text("\(stats.episodesWatched)"), icon: "play.circle")
                     if stats.minutesWatched > 0 {
-                        statBox(title: "Time Watched", value: formatMinutes(stats.minutesWatched), icon: "clock")
+                        statBox(title: "Time Watched", value: Text(formatMinutes(stats.minutesWatched)), icon: "clock")
                     }
                     if stats.meanScore > 0 {
-                        statBox(title: "Mean Score", value: scoreFormat.displayString(for: stats.meanScore), icon: "star")
+                        statBox(title: "Mean Score", value: scoreFormat.scoreText(for: stats.meanScore), icon: "star")
                     }
                 }
                 .padding(.horizontal)
@@ -104,14 +104,14 @@ struct ProfileStatsView: View {
         .padding(.bottom, 30)
     }
 
-    private func statBox(title: String, value: String, icon: String) -> some View {
+    private func statBox(title: String, value: Text, icon: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundStyle(.accent)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.caption).foregroundStyle(.secondary)
-                Text(value).font(.subheadline.weight(.bold))
+                value.font(.subheadline.weight(.bold))
             }
             Spacer()
         }

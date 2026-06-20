@@ -35,10 +35,20 @@ import Combine
     // MARK: - Entry CRUD
 
     /// Inserts a new entry or updates the existing one for `media.uniqueId`.
+    /// `score` is in the current local score format; it is persisted on a
+    /// format-independent 0–100 canonical scale so format switches stay lossless.
     @discardableResult
     func upsert(media: Media, status: MediaListStatus, progress: Int, score: Double) -> LibraryEntry {
         let now = Int(Date().timeIntervalSince1970)
+        let format = Self.currentLocalFormat
         if let idx = entries.firstIndex(where: { $0.media.uniqueId == media.uniqueId }) {
+            // Preserve canonical precision when the rating wasn't actually touched
+            // (e.g. only status/progress changed, or auto-track re-saved). Recompute
+            // only when the displayed score genuinely changed.
+            let previousDisplay = entries[idx].displayScore(in: format)
+            if abs(score - previousDisplay) >= 0.0001 || entries[idx].scoreCanonical == nil {
+                entries[idx].scoreCanonical = format.toCanonical(score)
+            }
             entries[idx].status = status
             entries[idx].progress = progress
             entries[idx].score = score
@@ -49,11 +59,17 @@ import Combine
         let entry = LibraryEntry(
             id: media.id, media: media, status: status,
             progress: progress, score: score, updatedAt: now,
-            customListName: nil, timesRewatched: nil
+            customListName: nil, timesRewatched: nil,
+            scoreCanonical: format.toCanonical(score)
         )
         entries.insert(entry, at: 0)
         persist()
         return entry
+    }
+
+    /// The active local score format (from Settings), defaulting to 10-point decimal.
+    private static var currentLocalFormat: ScoreFormat {
+        ScoreFormat(rawValue: UserDefaults.standard.string(forKey: "localScoreFormat") ?? "") ?? .point10Decimal
     }
 
     /// Removes the entry and strips it from every collection.
@@ -157,7 +173,9 @@ import Combine
                 if status == .planning, progress > 0 { status = .current }
                 if isFinished, status == .current { status = .completed }
                 // Preserve the user's score and any manually-chosen status (dropped/paused).
-                upsert(media: existing.media, status: status, progress: progress, score: existing.score)
+                // Pass the score in the active format so upsert keeps the canonical value.
+                upsert(media: existing.media, status: status, progress: progress,
+                       score: existing.displayScore(in: Self.currentLocalFormat))
             } else {
                 upsert(media: media, status: isFinished ? .completed : .current,
                        progress: watchedCount, score: 0)
@@ -214,5 +232,26 @@ import Combine
               let store = try? JSONDecoder().decode(Store.self, from: data) else { return }
         entries = store.entries
         collections = store.collections
+        migrateScoreCanonicalIfNeeded()
+    }
+
+    /// Backfills the 0–100 canonical score for entries saved before it existed,
+    /// and repairs any out-of-range canonical left by the earlier stale-score bug.
+    /// Non-destructive backfill: interprets the stored display score under the
+    /// current local format (exact for that format), so no valid rating is altered.
+    private func migrateScoreCanonicalIfNeeded() {
+        let format = Self.currentLocalFormat
+        var changed = false
+        for i in entries.indices {
+            if entries[i].scoreCanonical == nil, entries[i].score > 0 {
+                entries[i].scoreCanonical = format.toCanonical(entries[i].score)
+                changed = true
+            } else if let c = entries[i].scoreCanonical, c < 0 || c > 100 {
+                // Corrupted by the pre-fix stale-score passthrough — clamp into range.
+                entries[i].scoreCanonical = min(max(c, 0), 100)
+                changed = true
+            }
+        }
+        if changed { persist() }
     }
 }

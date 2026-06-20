@@ -38,7 +38,9 @@ struct LibraryEntryEditSheet: View {
         self.scoreFormatOverride = scoreFormatOverride
         _status = State(initialValue: entry?.status ?? .planning)
         _progress = State(initialValue: entry?.progress ?? 0)
-        _score = State(initialValue: entry?.score ?? 0)
+        // Local entries convert from their canonical score into the active format;
+        // provider entries (override nil) fall back to their stored account score.
+        _score = State(initialValue: entry?.displayScore(in: scoreFormatOverride ?? .point10) ?? 0)
     }
 
     var body: some View {

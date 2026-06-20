@@ -20,7 +20,7 @@ struct SettingsView: View {
     @AppStorage("dualSync") private var dualSync = false
     @AppStorage("rateOnFinish") private var rateOnFinish = true
     @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
-    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10.rawValue
+    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
     @State private var showClearLocalLibrary = false
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
@@ -177,7 +177,7 @@ struct SettingsView: View {
                         Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
                         Text("10 Point").tag(ScoreFormat.point10.rawValue)
                         Text("5 Star").tag(ScoreFormat.point5.rawValue)
-                        Text("3 Smiley").tag(ScoreFormat.point3.rawValue)
+                        Text("3 Point").tag(ScoreFormat.point3.rawValue)
                     }
                     Button(role: .destructive) {
                         showClearLocalLibrary = true
