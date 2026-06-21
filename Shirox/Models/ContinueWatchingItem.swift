@@ -40,5 +40,11 @@ struct ContinueWatchingItem: Identifiable, Codable, Hashable {
     var lastWatchedAt: Date
     var thumbnailUrl: String?
     var aniListUpdatedAt: Int?
-    var bookmarkData: Data?   // security-scoped bookmark for local-file resume; nil for normal streams
+    var bookmarkData: Data?   // legacy: security-scoped bookmark for local-file resume; superseded by localImportName
+    /// Filename of the picked video copied into the app's persistent imports directory.
+    /// Resume reconstructs the file from the current container, so it survives the
+    /// transient/sandboxed picker URLs that broke bookmark-based resume. Nil for normal streams.
+    var localImportName: String?
+    /// Filename of an up-front subtitle copied alongside the video, so resume reloads it.
+    var localSubtitleImportName: String?
 }

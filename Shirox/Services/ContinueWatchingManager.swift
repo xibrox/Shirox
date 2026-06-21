@@ -44,6 +44,14 @@ import Combine
             return UserDefaults.standard.double(forKey: "watchedPercentage") / 100.0
         }()
         if item.totalSeconds > 0 && item.watchedSeconds / item.totalSeconds >= watchedThreshold {
+            if item.localImportName != nil {
+                // A single picked file has no "next episode" to queue. Drop the finished card
+                // (newItems already removed the prior in-progress entry) and reclaim its copies.
+                cleanupLocalImports(for: item)
+                items = newItems
+                persist()
+                return
+            }
             markWatched(item)
             let nextEp = item.episodeNumber + 1
             Logger.shared.log("[CW] save threshold crossed: ep=\(item.episodeNumber) isAiring=\(String(describing: item.isAiring)) totalEps=\(String(describing: item.totalEpisodes)) availableEps=\(String(describing: item.availableEpisodes)) title=\(item.mediaTitle)", type: "Debug")
@@ -81,7 +89,27 @@ import Combine
     /// Removes an item by its id.
     func remove(_ item: ContinueWatchingItem) {
         items.removeAll { $0.id == item.id }
+        cleanupLocalImports(for: item)
         persist()
+    }
+
+    /// Deletes the persistent local-file copies (video + up-front subtitle) owned by a
+    /// discarded item. No-op for normal streams. Safe to call for an item that's being
+    /// re-saved with the same import name — that path doesn't route through here.
+    private func cleanupLocalImports(for item: ContinueWatchingItem) {
+        if let name = item.localImportName { LocalPlaybackCoordinator.shared.removeImport(name: name) }
+        if let sub = item.localSubtitleImportName { LocalPlaybackCoordinator.shared.removeImport(name: sub) }
+    }
+
+    /// Reclaims local-file copies no longer referenced by any Continue Watching item.
+    /// Bounds imports storage to the active CW set; never deletes a still-resumable file.
+    func pruneOrphanedLocalImports() {
+        var referenced = Set<String>()
+        for item in items {
+            if let n = item.localImportName { referenced.insert(n) }
+            if let s = item.localSubtitleImportName { referenced.insert(s) }
+        }
+        LocalPlaybackCoordinator.shared.pruneOrphanedImports(keeping: referenced)
     }
 
     /// Removes the watched key and any CW item for a single episode.
