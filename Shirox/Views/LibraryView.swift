@@ -224,122 +224,290 @@ struct LibraryView: View {
         #endif
     }
 
-    // MARK: - Library content
+    // MARK: - Filter menus
 
-    private var libraryContent: some View {
-        VStack(spacing: 0) {
-            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
-            // Combined row: Status on left, Genres on right
-            HStack {
-                // Status & Custom List Menu
-                Menu {
-                    Section("Lists") {
-                        ForEach(orderedStatuses) { status in
-                            Button {
-                                vm.selectStatus(status)
-                            } label: {
-                                HStack {
-                                    Text(status.displayName)
-                                    if vm.selectedCustomList == nil && vm.selectedStatus == status {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !vm.customListNames.isEmpty {
-                        Section("Custom Lists") {
-                            ForEach(vm.customListNames, id: \.self) { name in
-                                Button {
-                                    vm.selectCustomList(vm.selectedCustomList == name ? nil : name)
-                                } label: {
-                                    HStack {
-                                        Label(name, systemImage: "list.star")
-                                        if vm.selectedCustomList == name {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+    /// Whether the status filter is off its default (default = `.current`, no custom list).
+    private var isStatusFilterActive: Bool {
+        vm.selectedCustomList != nil || vm.selectedStatus != .current
+    }
+
+    /// The status / custom-list picker items (shared by the macOS capsule and the iOS toolbar button).
+    @ViewBuilder
+    private var statusMenuContent: some View {
+        Section("Lists") {
+            ForEach(orderedStatuses) { status in
+                Button {
+                    vm.selectStatus(status)
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "line.3.horizontal.decrease")
-                            .font(.subheadline)
-                        Text(vm.selectedCustomList ?? vm.selectedStatus.displayName)
-                            .font(.subheadline.weight(.medium))
-                            .lineLimit(1)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
+                    HStack {
+                        Text(status.displayName)
+                        if vm.selectedCustomList == nil && vm.selectedStatus == status {
+                            Image(systemName: "checkmark")
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
-                    )
-                }
-                .menuIndicator(.hidden)
-                .foregroundStyle(.primary)
-                .buttonStyle(.plain)
-                
-                Spacer()
-                
-                // Genre Filter Menu (right)
-                if !availableGenres.isEmpty {
-                    Menu {
-                        Section("Genres") {
-                        if !selectedGenres.isEmpty {
-                            Button(role: .destructive) {
-                                selectedGenres.removeAll()
-                            } label: {
-                                Label("Clear All Filters", systemImage: "xmark.circle")
-                            }
-                        }
-                        ForEach(availableGenres, id: \.self) { genre in
-                            Button {
-                                if selectedGenres.contains(genre) {
-                                    selectedGenres.remove(genre)
-                                } else {
-                                    selectedGenres.insert(genre)
-                                }
-                            } label: {
-                                HStack {
-                                    Text(genre)
-                                    if selectedGenres.contains(genre) {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "tag")
-                                .font(.subheadline)
-                            Text(selectedGenres.isEmpty ? "All Genres" : "\(selectedGenres.count) selected")
-                                .font(.subheadline.weight(.medium))
-                                .lineLimit(1)
-                            Image(systemName: "chevron.down")
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-                    .menuIndicator(.hidden)
-                    .foregroundStyle(.primary)
-                    .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+        }
+        if !vm.customListNames.isEmpty {
+            Section("Custom Lists") {
+                ForEach(vm.customListNames, id: \.self) { name in
+                    Button {
+                        vm.selectCustomList(vm.selectedCustomList == name ? nil : name)
+                    } label: {
+                        HStack {
+                            Label(name, systemImage: "list.star")
+                            if vm.selectedCustomList == name {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The genre picker items (shared by the macOS capsule and the iOS toolbar button).
+    @ViewBuilder
+    private var genreMenuContent: some View {
+        Section("Genres") {
+            if !selectedGenres.isEmpty {
+                Button(role: .destructive) {
+                    selectedGenres.removeAll()
+                } label: {
+                    Label("Clear All Filters", systemImage: "xmark.circle")
+                }
+            }
+            ForEach(availableGenres, id: \.self) { genre in
+                Button {
+                    if selectedGenres.contains(genre) {
+                        selectedGenres.remove(genre)
+                    } else {
+                        selectedGenres.insert(genre)
+                    }
+                } label: {
+                    HStack {
+                        Text(genre)
+                        if selectedGenres.contains(genre) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// macOS keeps the static switcher + capsule filter row; these wrap the shared menu content.
+    @ViewBuilder
+    private func statusFilterMenu() -> some View {
+        Menu { statusMenuContent } label: {
+            LibraryFilterLabel(
+                systemImage: "line.3.horizontal.decrease",
+                text: vm.selectedCustomList ?? vm.selectedStatus.displayName,
+                isActive: isStatusFilterActive,
+                collapsed: false
+            )
+        }
+        .menuIndicator(.hidden)
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func genreFilterMenu() -> some View {
+        Menu { genreMenuContent } label: {
+            LibraryFilterLabel(
+                systemImage: "tag",
+                text: selectedGenres.isEmpty ? "All Genres" : "\(selectedGenres.count) selected",
+                isActive: !selectedGenres.isEmpty,
+                collapsed: false
+            )
+        }
+        .menuIndicator(.hidden)
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
+    }
+
+    /// The capsule filter row (List on the left, Genre on the right) shared by macOS and iOS.
+    @ViewBuilder
+    private var filterCapsuleRow: some View {
+        HStack {
+            statusFilterMenu()
+            Spacer()
+            if !availableGenres.isEmpty {
+                genreFilterMenu()
+            }
+        }
+    }
+
+    #if os(iOS)
+    /// True when the scrolling list (rather than a loading / empty / error state) is on screen.
+    private var showsLibraryList: Bool {
+        !vm.isLoading && vm.error == nil && !displayedEntries.isEmpty
+    }
+    #endif
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var libraryToolbar: some ToolbarContent {
+        ToolbarItem(placement: toolbarItemPlacement[0]) {
+            sortMenu
+        }
+        ToolbarItem(placement: toolbarItemPlacement[1]) {
+            if isActiveProviderAuthenticated {
+                HStack(spacing: 10) {
+                    if activeProviderType == .anilist {
+                        Button {
+                            showNotifications = true
+                        } label: {
+                            Image(systemName: "bell")
+                                .font(.system(size: 17, weight: .medium))
+                        }
+                        Divider().frame(height: 16)
+                    }
+
+                    Button {
+                        showProfile = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            if let url = activeAvatarURL {
+                                CachedAsyncImage(urlString: url)
+                                    .frame(width: 28, height: 28)
+                                    .clipShape(Circle())
+                            }
+                            Text(displayUsername)
+                                .font(.subheadline.weight(.medium))
+                                .layoutPriority(1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 8)
+            } else {
+                Button("Sign In") {
+                    #if os(iOS)
+                    guard let window = presentationWindow else { return }
+                    if activeProviderType == .mal {
+                        MALAuthManager.shared.login(presentationAnchor: window)
+                    } else {
+                        AniListAuthManager.shared.login(presentationAnchor: window)
+                    }
+                    #endif
+                }
+                .font(.subheadline.weight(.semibold))
+            }
+        }
+    }
+
+    // MARK: - Empty state
+
+    private var emptyStateTitle: LocalizedStringKey {
+        searchText.isEmpty ? "Nothing here yet" : "No Results"
+    }
+
+    private var emptyStateIcon: String {
+        searchText.isEmpty ? "tray" : "magnifyingglass"
+    }
+
+    private var emptyStateDescription: String {
+        if !searchText.isEmpty {
+            return "No anime matching \"\(searchText)\"."
+        }
+        let listName = vm.selectedCustomList ?? vm.selectedStatus.displayName
+        if vm.isLocal {
+            return "Add anime to \(listName) from any title's detail screen."
+        }
+        return "Add anime to \(listName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList")."
+    }
+
+    // MARK: - Entries list
+
+    @ViewBuilder
+    private func entryRow(_ entry: LibraryEntry) -> some View {
+        ZStack {
+            NavigationLink(destination: AniListDetailView(
+                mediaId: entry.media.id,
+                preloadedMedia: entry.media
+            )) {
+                EmptyView()
+            }
+            .opacity(0)
+
+            LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
+                if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
+                    pendingEntry = entry
+                    showProviderPicker = true
+                } else {
+                    selectedEntry = entry
+                }
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+        .listRowBackground(Color.clear)
+        #if !os(tvOS)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                Task {
+                    await vm.update(
+                        entry: entry,
+                        status: entry.status,
+                        progress: entry.progress + 1,
+                        // Pass the score in the active format so the canonical
+                        // value is preserved (not reinterpreted in a new scale).
+                        score: entry.displayScore(in: scoreFormat)
+                    )
+                }
+            } label: {
+                Label("+1 EP", systemImage: "plus.circle.fill")
+            }
+            .tint(.green)
+        }
+        #endif
+    }
+
+    private var entriesList: some View {
+        List {
+            #if os(iOS)
+            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 6, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            filterCapsuleRow
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            #endif
+            ForEach(displayedEntries, id: \.media.id) { entry in
+                entryRow(entry)
+            }
+        }
+        .listStyle(.plain)
+        .refreshable { await vm.refresh() }
+    }
+
+    // MARK: - Library content
+
+    private var libraryContentBase: some View {
+        VStack(spacing: 0) {
+            #if !os(iOS)
+            LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+            // Combined row: Status on left, Genres on right
+            filterCapsuleRow
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            #else
+            // The source switcher + filter row scroll away as the list's first rows; for the
+            // non-list states (loading / empty / error) they're pinned here so the source and
+            // filters stay usable.
+            if !showsLibraryList {
+                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                filterCapsuleRow
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+            }
+            #endif
 
             if vm.isLoading {
                 Spacer()
@@ -355,111 +523,15 @@ struct LibraryView: View {
                 }
             } else if displayedEntries.isEmpty {
                 ContentUnavailableView(
-                    searchText.isEmpty ? "Nothing here yet" : "No Results",
-                    systemImage: searchText.isEmpty ? "tray" : "magnifyingglass",
-                    description: Text(searchText.isEmpty
-                        ? (vm.isLocal
-                            ? "Add anime to \(vm.selectedCustomList ?? vm.selectedStatus.displayName) from any title's detail screen."
-                            : "Add anime to \(vm.selectedCustomList ?? vm.selectedStatus.displayName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList").")
-                        : "No anime matching \"\(searchText)\".")
+                    emptyStateTitle,
+                    systemImage: emptyStateIcon,
+                    description: Text(emptyStateDescription)
                 )
             } else {
-                List {
-                    ForEach(displayedEntries, id: \.media.id) { entry in
-                        ZStack {
-                            NavigationLink(destination: AniListDetailView(
-                                mediaId: entry.media.id,
-                                preloadedMedia: entry.media
-                            )) {
-                                EmptyView()
-                            }
-                            .opacity(0)
-
-                            LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-                                if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
-                                    pendingEntry = entry
-                                    showProviderPicker = true
-                                } else {
-                                    selectedEntry = entry
-                                }
-                            }
-                        }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowBackground(Color.clear)
-                        #if !os(tvOS)
-                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                Task {
-                                    await vm.update(
-                                        entry: entry,
-                                        status: entry.status,
-                                        progress: entry.progress + 1,
-                                        // Pass the score in the active format so the canonical
-                                        // value is preserved (not reinterpreted in a new scale).
-                                        score: entry.displayScore(in: scoreFormat)
-                                    )
-                                }
-                            } label: {
-                                Label("+1 EP", systemImage: "plus.circle.fill")
-                            }
-                            .tint(.green)
-                        }
-                        #endif
-                    }
-                }
-                .listStyle(.plain)
-                .refreshable { await vm.refresh() }
+                entriesList
             }
         }
-        .toolbar {
-            ToolbarItem(placement: toolbarItemPlacement[0]) {
-                sortMenu
-            }
-            ToolbarItem(placement: toolbarItemPlacement[1]) {
-                if isActiveProviderAuthenticated {
-                    HStack(spacing: 10) {
-                        if activeProviderType == .anilist {
-                            Button {
-                                showNotifications = true
-                            } label: {
-                                Image(systemName: "bell")
-                                    .font(.system(size: 17, weight: .medium))
-                            }
-                            Divider().frame(height: 16)
-                        }
-
-                        Button {
-                            showProfile = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                if let url = activeAvatarURL {
-                                    CachedAsyncImage(urlString: url)
-                                        .frame(width: 28, height: 28)
-                                        .clipShape(Circle())
-                                }
-                                Text(displayUsername)
-                                    .font(.subheadline.weight(.medium))
-                                    .layoutPriority(1)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 8)
-                } else {
-                    Button("Sign In") {
-                        #if os(iOS)
-                        guard let window = presentationWindow else { return }
-                        if activeProviderType == .mal {
-                            MALAuthManager.shared.login(presentationAnchor: window)
-                        } else {
-                            AniListAuthManager.shared.login(presentationAnchor: window)
-                        }
-                        #endif
-                    }
-                    .font(.subheadline.weight(.semibold))
-                }
-            }
-        }
+        .toolbar { libraryToolbar }
         .task { await vm.autoRefreshIfNeeded() }
         #if os(iOS)
         .onAppear {
@@ -480,8 +552,18 @@ struct LibraryView: View {
         .onChangeOf(providerManager.fallbackActive) {
             Task { await vm.refresh() }
         }
+        #if os(iOS)
+        .navigationTitle("Library")
+        .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search library")
+        #else
         .navigationTitle("Library")
         .searchable(text: $searchText, prompt: "Search library")
+        #endif
+    }
+
+    private var libraryContent: some View {
+        libraryContentBase
         .adaptiveSheet(item: $selectedEntry) { entry in
             LibraryEntryEditSheet(
                 entry: entry,
