@@ -386,6 +386,8 @@
 		1E9C0F13D08F553EC0BF3F9E /* LocalCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */; };
 		2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
 		31E5C6496E10906DA839A64E /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
+		AB8F741F717C0AE76F351730 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
+		21A14B5A00FF0B538691E91D /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		34FEC549807840C99DE4F688 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
 		42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
@@ -402,11 +404,15 @@
 		6FC6E208137E72EB598CBF77 /* LibraryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659CAEADDD8118DA5FF4FFF /* LibraryDataSource.swift */; };
 		73A9F2622811896FA3F83259 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
 		74D4BF07951EDE2E59789F11 /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
+		E47395E4C41916F4EDFCC2C1 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
+		F347119BB1CD5612676F79B0 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
 		8A3B1A010F48F8614C2559F0 /* LibraryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659CAEADDD8118DA5FF4FFF /* LibraryDataSource.swift */; };
 		8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		8D22B4007D9017AFA1627F10 /* BookmarkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA93DA5617959381E10D85 /* BookmarkButton.swift */; };
 		9759F7A614D6C4373F0D37C5 /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
+		34462597DF20227FD2D62D5A /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
+		577D15AB98AFB5CE8F633563 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		9CFE7CAE61ED10B6B8374D66 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
@@ -557,6 +563,8 @@
 		1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		21201D48C8E94395977F4564 /* ScoreInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreInputView.swift; sourceTree = "<group>"; };
 		340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySourceSwitcher.swift; sourceTree = "<group>"; };
+		3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollapsingHeader.swift; sourceTree = "<group>"; };
+		A88804D3B352FD28723122E3 /* NotificationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationBadge.swift; sourceTree = "<group>"; };
 		41894B1527B61C1E6E98EFA5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
 		4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiroxApp.swift; sourceTree = "<group>"; };
@@ -739,6 +747,8 @@
 				1279E4AF2FCA397700C9BA56 /* LibraryEntryEditSheet.swift */,
 				EEFA93DA5617959381E10D85 /* BookmarkButton.swift */,
 				340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */,
+				3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */,
+				A88804D3B352FD28723122E3 /* NotificationBadge.swift */,
 			);
 			path = Library;
 			sourceTree = "<group>";
@@ -1082,6 +1092,8 @@
 				121D9B472FCA5603000FF9B4 /* ContinueWatchingItem.swift in Sources */,
 				8D22B4007D9017AFA1627F10 /* BookmarkButton.swift in Sources */,
 				9759F7A614D6C4373F0D37C5 /* LibrarySourceSwitcher.swift in Sources */,
+				34462597DF20227FD2D62D5A /* LibraryCollapsingHeader.swift in Sources */,
+				577D15AB98AFB5CE8F633563 /* NotificationBadge.swift in Sources */,
 				8A3B1A010F48F8614C2559F0 /* LibraryDataSource.swift in Sources */,
 				73A9F2622811896FA3F83259 /* LocalLibraryManager.swift in Sources */,
 				4DB641D189C13294005C3837 /* LocalCollection.swift in Sources */,
@@ -1220,6 +1232,8 @@
 				1279E5212FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */,
 				CF57ECDF95BE10B042A36913 /* BookmarkButton.swift in Sources */,
 				74D4BF07951EDE2E59789F11 /* LibrarySourceSwitcher.swift in Sources */,
+				E47395E4C41916F4EDFCC2C1 /* LibraryCollapsingHeader.swift in Sources */,
+				F347119BB1CD5612676F79B0 /* NotificationBadge.swift in Sources */,
 				49945AAE0868AF20636E8A0B /* LibraryDataSource.swift in Sources */,
 				9CFE7CAE61ED10B6B8374D66 /* LocalLibraryManager.swift in Sources */,
 				1E9C0F13D08F553EC0BF3F9E /* LocalCollection.swift in Sources */,
@@ -1363,6 +1377,8 @@
 				1279E59A2FCA397700C9BA56 /* ContinueWatchingItem.swift in Sources */,
 				4A3FB3E3D839EB6C4116A186 /* BookmarkButton.swift in Sources */,
 				31E5C6496E10906DA839A64E /* LibrarySourceSwitcher.swift in Sources */,
+				AB8F741F717C0AE76F351730 /* LibraryCollapsingHeader.swift in Sources */,
+				21A14B5A00FF0B538691E91D /* NotificationBadge.swift in Sources */,
 				6FC6E208137E72EB598CBF77 /* LibraryDataSource.swift in Sources */,
 				C3E3DDF1AFBB7BB011E7F5C4 /* LocalLibraryManager.swift in Sources */,
 				F8F895AB3AE54DBC2CA63B35 /* LocalCollection.swift in Sources */,

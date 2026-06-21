@@ -88,6 +88,19 @@ struct ContinueWatchingSection: View {
 
     private func resume(_ item: ContinueWatchingItem) {
         #if os(iOS)
+        // Local file: resume from our persistent copy and reload the up-front subtitle if any.
+        if let name = item.localImportName {
+            if let url = LocalPlaybackCoordinator.shared.resolveImport(name: name) {
+                let subtitle = item.localSubtitleImportName
+                    .flatMap { LocalPlaybackCoordinator.shared.resolveImport(name: $0) }
+                    .map { SubtitleTrack(title: $0.deletingPathExtension().lastPathComponent, url: $0, headers: [:]) }
+                LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: subtitle, resumeFrom: item.watchedSeconds)
+            } else {
+                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
+            }
+            return
+        }
+        // Legacy bookmark resume for items saved before the copy-into-storage change.
         if let data = item.bookmarkData {
             if let url = LocalPlaybackCoordinator.shared.resolveBookmark(data) {
                 LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: item.watchedSeconds)

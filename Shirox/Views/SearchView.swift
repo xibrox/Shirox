@@ -10,10 +10,17 @@ struct SearchView: View {
     @State private var showModuleList = false
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var isLandscape = false
-    @State private var showVideoImporter = false
-    @State private var showSubtitleImporter = false
+    // A SINGLE file importer drives both phases. Two `.fileImporter` modifiers in one view
+    // tree collide in SwiftUI (only one ever presents, regardless of separate background
+    // views), so we switch `allowedContentTypes` by phase instead.
+    @State private var showFileImporter = false
+    @State private var importPhase: LocalImportPhase = .video
     @State private var pendingSubtitle: SubtitleTrack?
     @State private var addSubtitleUpFront = false
+    // When a subtitle is wanted, the video is picked first and staged (copied) here; it only
+    // plays once a subtitle is chosen or explicitly skipped.
+    @State private var pendingVideoURL: URL?
+    @State private var pendingVideoTitle: String?
 
     private var isLocalModule: Bool { moduleManager.activeModule?.isLocalPlayback == true }
 
@@ -134,6 +141,22 @@ struct SearchView: View {
     }
 
     // MARK: - Local Playback Entry
+
+    /// The video is always chosen first. While "Add subtitle file" is on, the first pick stages
+    /// the video and the second pick is the subtitle; otherwise the video plays immediately.
+    /// Driving the button label off this makes each step explicit, so the user always knows
+    /// which file the (otherwise identical-looking) Files picker is asking for.
+    private var needsVideoStep: Bool { pendingVideoURL == nil }
+
+    private var localStepDescription: String {
+        if !needsVideoStep {
+            return "Step 2 of 2 — choose a subtitle file for this video."
+        }
+        return addSubtitleUpFront
+            ? "Step 1 of 2 — choose the video, then you'll add a subtitle."
+            : "Pick a video from Files to play it in Shirox."
+    }
+
     private var localEntryView: some View {
         VStack(spacing: 20) {
             Image(systemName: "folder.badge.plus")
@@ -142,7 +165,7 @@ struct SearchView: View {
             VStack(spacing: 4) {
                 Text("Play a Local File")
                     .font(.headline)
-                Text("Pick a video from Files to play it in Shirox.")
+                Text(localStepDescription)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -151,12 +174,37 @@ struct SearchView: View {
                 .toggleStyle(.switch)
                 .tint(.secondary)
                 .fixedSize()
+                .disabled(!needsVideoStep)   // locked once a video is staged; clear it to change
+                .onChangeOf(addSubtitleUpFront) { _ in clearStagedVideo() }
+
+            // Feedback: show the staged video (and let the user drop it) before the subtitle step.
+            if let title = pendingVideoTitle {
+                HStack(spacing: 8) {
+                    Image(systemName: "film.fill")
+                        .foregroundStyle(.green)
+                    Text(title)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Button {
+                        clearStagedVideo()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .font(.subheadline)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.secondary.opacity(0.12), in: Capsule())
+            }
+
             Button {
-                pendingSubtitle = nil
-                if addSubtitleUpFront { showSubtitleImporter = true }
-                else { showVideoImporter = true }
+                importPhase = needsVideoStep ? .video : .subtitle
+                showFileImporter = true
             } label: {
-                Label("Browse local file", systemImage: "play.rectangle.on.rectangle")
+                Label(needsVideoStep ? "Choose video file" : "Choose subtitle file",
+                      systemImage: needsVideoStep ? "play.rectangle.on.rectangle" : "captions.bubble")
                     .font(.headline)
                     .foregroundStyle(platformBackground)
                     .padding(.horizontal, 20)
@@ -164,25 +212,56 @@ struct SearchView: View {
                     .background(Color.primary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
+
+            // On the subtitle step, allow playing the staged video without one.
+            if !needsVideoStep {
+                Button("Play without subtitle") { playStaged(subtitle: nil) }
+                    .font(.subheadline)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .fileImporter(isPresented: $showSubtitleImporter,
-                      allowedContentTypes: subtitleContentTypes,
+        .animation(.easeInOut(duration: 0.2), value: pendingVideoURL)
+        .fileImporter(isPresented: $showFileImporter,
+                      allowedContentTypes: importPhase == .subtitle ? subtitleContentTypes : videoContentTypes,
                       allowsMultipleSelection: false) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                pendingSubtitle = LocalPlaybackCoordinator.shared.importSubtitle(from: url)
+            switch importPhase {
+            case .video:
+                guard case .success(let urls) = result, let url = urls.first else { return }
+                if addSubtitleUpFront {
+                    // Stage: copy now (the picker's scope is transient) and move to the subtitle step.
+                    pendingVideoTitle = url.deletingPathExtension().lastPathComponent
+                    pendingVideoURL = LocalPlaybackCoordinator.shared.importVideo(from: url) ?? url
+                } else {
+                    LocalPlaybackCoordinator.shared.playPickedVideo(url, subtitle: nil)
+                }
+            case .subtitle:
+                // Cancelling leaves the user on the subtitle step (they can retry or skip).
+                guard case .success(let urls) = result, let url = urls.first else { return }
+                playStaged(subtitle: LocalPlaybackCoordinator.shared.importSubtitle(from: url))
             }
-            // Open the video picker only after the subtitle picker has finished
-            // dismissing — presenting it immediately over the dismissing sheet fails.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { showVideoImporter = true }
         }
-        .fileImporter(isPresented: $showVideoImporter,
-                      allowedContentTypes: videoContentTypes,
-                      allowsMultipleSelection: false) { result in
-            guard case .success(let urls) = result, let url = urls.first else { return }
-            LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: pendingSubtitle, resumeFrom: nil)
+    }
+
+    /// Launches the staged video with an optional subtitle, then resets the staged state.
+    private func playStaged(subtitle: SubtitleTrack?) {
+        guard let video = pendingVideoURL else { return }
+        LocalPlaybackCoordinator.shared.launch(videoURL: video, subtitle: subtitle, resumeFrom: nil)
+        pendingVideoURL = nil
+        pendingVideoTitle = nil
+        pendingSubtitle = nil
+    }
+
+    /// Drops a staged (already-copied) video and reclaims its copy.
+    private func clearStagedVideo() {
+        if let url = pendingVideoURL, let name = LocalPlaybackCoordinator.shared.importName(for: url) {
+            LocalPlaybackCoordinator.shared.removeImport(name: name)
         }
+        pendingVideoURL = nil
+        pendingVideoTitle = nil
+        pendingSubtitle = nil
     }
 
     private var videoContentTypes: [UTType] {
@@ -340,6 +419,10 @@ struct SearchView: View {
             .foregroundStyle(.secondary)
     }
 }
+
+// MARK: - Local Import Phase
+/// Which file the shared local-file importer is currently picking.
+private enum LocalImportPhase { case video, subtitle }
 
 // MARK: - Search History Manager
 private final class SearchHistoryManager: ObservableObject {

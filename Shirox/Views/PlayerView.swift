@@ -1072,7 +1072,10 @@ struct PlayerView: View {
             thumbnailUrl: context.thumbnailUrl
         )
         if context.isLocalPlayback {
-            item.bookmarkData = LocalPlaybackCoordinator.shared.bookmarkData(forURLString: currentStream.url.absoluteString)
+            // Resume from our own persistent copy, not the transient picker URL.
+            item.localImportName = LocalPlaybackCoordinator.shared.importName(for: currentStream.url)
+            let subtitleURL = selectedSubtitleTrack?.url ?? currentStream.allSubtitles?.first?.url
+            item.localSubtitleImportName = subtitleURL.flatMap { LocalPlaybackCoordinator.shared.importName(for: $0) }
         }
         ContinueWatchingManager.shared.save(item)
     }

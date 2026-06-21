@@ -18,6 +18,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
         let raw = UserDefaults.standard.string(forKey: "anilist_score_format") ?? ""
         return ScoreFormat(rawValue: raw) ?? .point10Decimal
     }()
+    @Published var unreadNotificationCount: Int = 0
 
     // From https://anilist.co/settings/developer — Redirect URI: shirox://auth
     private let clientId = "38624"
@@ -134,6 +135,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
         avatarURL = nil
         userId = nil
         scoreFormat = .point10Decimal
+        unreadNotificationCount = 0
         UserDefaults.standard.removeObject(forKey: "anilist_score_format")
         UserDefaults.standard.removeObject(forKey: "anilist_user_id")
     }
@@ -148,6 +150,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             id
             name
             avatar { large }
+            unreadNotificationCount
             mediaListOptions { scoreFormat }
           }
         }
@@ -189,6 +192,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
                 let id: Int
                 let name: String
                 let avatar: Avatar
+                let unreadNotificationCount: Int?
                 let mediaListOptions: MediaListOptions?
             }
             struct Avatar: Decodable {
@@ -204,6 +208,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             userId = viewer.id
             username = viewer.name
             avatarURL = viewer.avatar.large
+            unreadNotificationCount = viewer.unreadNotificationCount ?? 0
             UserDefaults.standard.set(viewer.id, forKey: "anilist_user_id")
             if let fmt = viewer.mediaListOptions?.scoreFormat {
                 let format = ScoreFormat(rawValue: fmt) ?? .point10Decimal
@@ -215,6 +220,32 @@ final class AniListAuthManager: NSObject, ObservableObject {
             // envelope or a Cloudflare/HTML interstitial). This is NOT proof the token is
             // invalid — only a real 401 is. Keep the session and try again next launch.
             Logger.shared.log("[AniList] fetchViewer: 200 but no Viewer in response — keeping session", type: "Network")
+        }
+    }
+
+    /// Lightweight refresh of just the unread-notification count. Keeps the existing value
+    /// on any network / non-200 / decode failure (only `fetchViewer` handles real 401s).
+    func refreshUnreadCount() async {
+        guard let token = accessToken else { return }
+        let query = "query { Viewer { unreadNotificationCount } }"
+        guard let url = URL(string: "https://graphql.anilist.co") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["query": query])
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request) else { return }
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 { return }
+
+        struct CountResponse: Decodable {
+            struct ResponseData: Decodable { let Viewer: Viewer }
+            struct Viewer: Decodable { let unreadNotificationCount: Int? }
+            let data: ResponseData?
+        }
+        if let decoded = try? JSONDecoder().decode(CountResponse.self, from: data),
+           let count = decoded.data?.Viewer.unreadNotificationCount {
+            unreadNotificationCount = count
         }
     }
 }

@@ -87,6 +87,8 @@ struct HomeView: View {
         .onAppear {
             #if os(iOS)
             PlayerPresenter.shared.resetToAppOrientation()
+            // Reclaim local-file copies left by cancelled picks or finished/removed items.
+            ContinueWatchingManager.shared.pruneOrphanedLocalImports()
             #endif
         }
     }
