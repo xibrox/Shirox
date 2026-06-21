@@ -358,10 +358,12 @@ struct LibraryView: View {
                 HStack(spacing: 10) {
                     if activeProviderType == .anilist {
                         Button {
+                            anilistAuth.unreadNotificationCount = 0
                             showNotifications = true
                         } label: {
                             Image(systemName: "bell")
                                 .font(.system(size: 17, weight: .medium))
+                                .notificationBadge(count: anilistAuth.unreadNotificationCount)
                         }
                         Divider().frame(height: 16)
                     }
@@ -421,6 +423,13 @@ struct LibraryView: View {
     }
 
     // MARK: - Entries list
+
+    /// Refreshes the AniList unread-notification count when signed in to AniList; no-op otherwise.
+    private func refreshUnreadCountIfNeeded() async {
+        if activeProviderType == .anilist && anilistAuth.isLoggedIn {
+            await anilistAuth.refreshUnreadCount()
+        }
+    }
 
     @ViewBuilder
     private func entryRow(_ entry: LibraryEntry) -> some View {
@@ -482,7 +491,11 @@ struct LibraryView: View {
             }
         }
         .listStyle(.plain)
-        .refreshable { await vm.refresh() }
+        .refreshable {
+            async let count: Void = refreshUnreadCountIfNeeded()
+            await vm.refresh()
+            await count
+        }
     }
 
     // MARK: - Library content
@@ -539,6 +552,7 @@ struct LibraryView: View {
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap { $0.windows }
                 .first { $0.isKeyWindow }
+            Task { await refreshUnreadCountIfNeeded() }
         }
         #endif
         .onChangeOf(anilistAuth.isLoggedIn) { newValue in
