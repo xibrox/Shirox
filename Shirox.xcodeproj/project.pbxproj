@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0F474E222FE9E7D600FAC2BA /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 0F474E212FE9E7D600FAC2BA /* Kingfisher */; };
+		0F474E242FE9E84200FAC2BA /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 0F474E232FE9E84200FAC2BA /* Kingfisher */; };
+		0F474E262FE9E84800FAC2BA /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 0F474E252FE9E84800FAC2BA /* Kingfisher */; };
 		0F6021372F71CCC900CEC66D /* shirox-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0F6021362F71CCC800CEC66D /* shirox-icon.icon */; };
 		0F6021382F71CCC900CEC66D /* shirox-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0F6021362F71CCC800CEC66D /* shirox-icon.icon */; };
 		0FB47691410BFA732D132352 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
@@ -610,6 +613,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0F474E242FE9E84200FAC2BA /* Kingfisher in Frameworks */,
 				7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */,
 				FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */,
 				1251C4572FCAD62E002AD0B2 /* GoogleCastDynamicCore in Frameworks */,
@@ -620,6 +624,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0F474E262FE9E84800FAC2BA /* Kingfisher in Frameworks */,
 				121D9B452FCA53AA000FF9B4 /* FakeWebKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -636,6 +641,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0F474E222FE9E7D600FAC2BA /* Kingfisher in Frameworks */,
 				42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */,
 				0FB47691410BFA732D132352 /* WebKit.framework in Frameworks */,
 				121D9B332FCA527E000FF9B4 /* GoogleCastDynamicCore in Frameworks */,
@@ -950,6 +956,7 @@
 			name = Shirox_tvOS;
 			packageProductDependencies = (
 				121D9B442FCA53AA000FF9B4 /* FakeWebKit */,
+				0F474E252FE9E84800FAC2BA /* Kingfisher */,
 			);
 			productName = Shirox_tvOS;
 			productReference = 121D9B382FCA5378000FF9B4 /* Shirox_tvOS.app */;
@@ -1046,6 +1053,7 @@
 			packageReferences = (
 				1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */,
 				121D9B432FCA53AA000FF9B4 /* XCRemoteSwiftPackageReference "FakeWebKit" */,
+				0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */,
 			);
 			productRefGroup = 73D712B4138A3740575F996E /* Products */;
 			projectDirPath = "";
@@ -1931,6 +1939,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.10.0;
+			};
+		};
 		121D9B432FCA53AA000FF9B4 /* XCRemoteSwiftPackageReference "FakeWebKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/undeaDD/FakeWebKit";
@@ -1950,6 +1966,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		0F474E212FE9E7D600FAC2BA /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+		0F474E232FE9E84200FAC2BA /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+		0F474E252FE9E84800FAC2BA /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0F474E202FE9E7D600FAC2BA /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
 		121D9B322FCA527E000FF9B4 /* GoogleCastDynamicCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */;
