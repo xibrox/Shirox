@@ -90,6 +90,7 @@ struct ShiroxApp: App {
     @StateObject private var moduleManager = ModuleManager.shared
 
     init() {
+        KingfisherImageCache.configure()
         URLCache.shared = URLCache(
             memoryCapacity: 20 * 1024 * 1024,
             diskCapacity: 150 * 1024 * 1024,

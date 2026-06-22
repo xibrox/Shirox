@@ -404,6 +404,7 @@
 		5EA50C4A17000000000000C1 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
 		5EA50C4A17000000000000C2 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
 		5EA50C4A17000000000000C3 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
+		5F7E32EBD5AABB9509A45DBD /* KingfisherImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */; };
 		6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		6FC6E208137E72EB598CBF77 /* LibraryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659CAEADDD8118DA5FF4FFF /* LibraryDataSource.swift */; };
 		73A9F2622811896FA3F83259 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
@@ -414,6 +415,7 @@
 		8D22B4007D9017AFA1627F10 /* BookmarkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA93DA5617959381E10D85 /* BookmarkButton.swift */; };
 		9759F7A614D6C4373F0D37C5 /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
 		9CFE7CAE61ED10B6B8374D66 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
+		9F50F6E1AAE95EEF54B70361 /* KingfisherImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */; };
 		A960D268997A4E1EFB9B0BCF /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3424495FC6BA30F806C576D8 /* Foundation.framework */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
@@ -433,7 +435,9 @@
 		BAEE9A1A2FCB000000000004 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		C3E3DDF1AFBB7BB011E7F5C4 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
 		CF57ECDF95BE10B042A36913 /* BookmarkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA93DA5617959381E10D85 /* BookmarkButton.swift */; };
+		E227DA58285C280ED3980B82 /* KingfisherImageCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC154F4B51E6E8262096B6AE /* KingfisherImageCacheTests.swift */; };
 		E47395E4C41916F4EDFCC2C1 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
+		E78EF025EB954FED7A2E0EFC /* KingfisherImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */; };
 		F347119BB1CD5612676F79B0 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		F4B629DD0CE540A681EBF6A5 /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		F6D3663CCB6E4EECAD29EB9E /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
@@ -593,6 +597,7 @@
 		9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCollection.swift; sourceTree = "<group>"; };
 		A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalLibraryTrackingTests.swift; sourceTree = "<group>"; };
 		A88804D3B352FD28723122E3 /* NotificationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationBadge.swift; sourceTree = "<group>"; };
+		A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KingfisherImageCache.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshot.swift; sourceTree = "<group>"; };
 		AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshotStore.swift; sourceTree = "<group>"; };
@@ -605,6 +610,7 @@
 		CF6B7E2E4A3D9F1B8C0E5A55 /* Shirox.local.xcconfig.template */ = {isa = PBXFileReference; lastKnownFileType = text; path = Shirox.local.xcconfig.template; sourceTree = "<group>"; };
 		E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPlaybackCoordinator.swift; sourceTree = "<group>"; };
 		E8D91E43B99205901655CDF0 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC154F4B51E6E8262096B6AE /* KingfisherImageCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KingfisherImageCacheTests.swift; sourceTree = "<group>"; };
 		EEFA93DA5617959381E10D85 /* BookmarkButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkButton.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -745,6 +751,7 @@
 				1279E49C2FCA397700C9BA56 /* SubtitleSettingsManager.swift */,
 				1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */,
 				1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */,
+				A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -903,6 +910,7 @@
 			isa = PBXGroup;
 			children = (
 				A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */,
+				EC154F4B51E6E8262096B6AE /* KingfisherImageCacheTests.swift */,
 			);
 			path = ShiroxTests;
 			sourceTree = SOURCE_ROOT;
@@ -1109,6 +1117,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
+				E227DA58285C280ED3980B82 /* KingfisherImageCacheTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1254,6 +1263,7 @@
 				121D9B562FCA5603000FF9B4 /* AniListMedia.swift in Sources */,
 				121D9B572FCA5603000FF9B4 /* MediaDetail.swift in Sources */,
 				121D9B582FCA5603000FF9B4 /* AniListNotification.swift in Sources */,
+				9F50F6E1AAE95EEF54B70361 /* KingfisherImageCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1400,6 +1410,7 @@
 				1279E55E2FCA397700C9BA56 /* PresentationDetent.swift in Sources */,
 				1279E55F2FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift in Sources */,
 				1279E5602FCA397700C9BA56 /* ActivityDetailView.swift in Sources */,
+				5F7E32EBD5AABB9509A45DBD /* KingfisherImageCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1546,6 +1557,7 @@
 				1279E5D72FCA397700C9BA56 /* PresentationDetent.swift in Sources */,
 				1279E5D82FCA397700C9BA56 /* BatchDownloadStreamPickerView.swift in Sources */,
 				1279E5D92FCA397700C9BA56 /* ActivityDetailView.swift in Sources */,
+				E78EF025EB954FED7A2E0EFC /* KingfisherImageCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
