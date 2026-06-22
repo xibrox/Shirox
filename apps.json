@@ -40,9 +40,9 @@
   ],
   "news": [
     {
-      "title": "New in 0.0.94 — Library & Local Files",
-      "identifier": "news-0.0.94-library-local-files",
-      "caption": "Library: the header now collapses as you scroll using iOS's native large-title behaviour, reclaiming space with an always-visible search bar, while the source switcher and List/Genre filter row scroll away with the title and snap back to the top. The bell in the Library toolbar shows a red badge with your unread AniList notification count (capped at 9+, hidden when there's nothing new); it clears when you open notifications and refreshes on appear and on pull-to-refresh.\n\nLocal Files: Continue Watching for local files no longer breaks on resume with \"File moved or unavailable.\" Picked files are now copied into the app's storage and played from that copy, so resuming keeps working across relaunches — imported subtitles persist too. The picker is now a clearer, step-by-step flow: pick the video first, then optionally add a subtitle, with a \"Play without subtitle\" option, which also fixes the Browse button doing nothing when the subtitle toggle was on.",
+      "title": "New in 0.0.94 — My Library holds everything",
+      "identifier": "news-0.0.94-my-library-everything",
+      "caption": "My Library now holds everything — not just anime matched to AniList or MyAnimeList. Titles you watch from streaming modules without a provider match, and your own imported local files, now appear in My Library too. They auto-track as you watch and can be bookmarked by hand, with the same collections, status, and scoring as any other title. Tap an entry to open it: module titles reopen their detail screen, local files resume playback.\n\nFixed: finishing a show now correctly marks it Completed in My Library at the right episode, instead of getting stuck on Watching a couple of episodes short.",
       "tintColor": "ef4444",
       "date": "2026-06-22",
       "notify": true,
