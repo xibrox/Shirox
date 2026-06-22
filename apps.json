@@ -27,8 +27,8 @@
       },
       "versions": [
         {
-          "version": "0.0.93",
-          "buildVersion": "91",
+          "version": "0.0.94",
+          "buildVersion": "92",
           "date": "2026-06-21",
           "localizedDescription": "Beta release",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
@@ -39,6 +39,15 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 0.0.94 — Library & Local Files",
+      "identifier": "news-0.0.94-library-local-files",
+      "caption": "Library: the header now collapses as you scroll using iOS's native large-title behaviour, reclaiming space with an always-visible search bar, while the source switcher and List/Genre filter row scroll away with the title and snap back to the top. The bell in the Library toolbar shows a red badge with your unread AniList notification count (capped at 9+, hidden when there's nothing new); it clears when you open notifications and refreshes on appear and on pull-to-refresh.\n\nLocal Files: Continue Watching for local files no longer breaks on resume with \"File moved or unavailable.\" Picked files are now copied into the app's storage and played from that copy, so resuming keeps working across relaunches — imported subtitles persist too. The picker is now a clearer, step-by-step flow: pick the video first, then optionally add a subtitle, with a \"Play without subtitle\" option, which also fixes the Browse button doing nothing when the subtitle toggle was on.",
+      "tintColor": "ef4444",
+      "date": "2026-06-22",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 0.0.92 - Local Library",
       "identifier": "news-0.0.92-local-library",
