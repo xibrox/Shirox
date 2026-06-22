@@ -49,15 +49,24 @@ struct DetailView: View {
         #endif
     }
 
-    /// A trackable Media for the bookmark button, built from the loaded module detail plus
-    /// any resolved AniList/MAL id. Nil when neither id is known (untrackable module item).
+    /// A LocalSource for the bookmark button when this title has no provider match — routes
+    /// tap-to-open back to this module's detail screen.
+    private var bookmarkSource: LocalSource? {
+        guard aniListID == nil, malID == nil else { return nil }
+        let mid = moduleId ?? ModuleManager.shared.activeModule?.id
+        return LocalSource(kind: .module, moduleId: mid, detailHref: vm.detailHref, localImportName: nil)
+    }
+
+    /// A trackable Media for the bookmark button: provider Media when an id is known, otherwise
+    /// a `.local` Media built from `bookmarkSource`. Nil only before the detail has loaded.
     private var bookmarkMedia: Media? {
         guard let detail = vm.detail else { return nil }
         return LocalLibraryManager.lightweightMedia(
             aniListID: aniListID, malID: malID,
             title: detail.title.isEmpty ? item.title : detail.title,
             imageUrl: detail.image.isEmpty ? item.image : detail.image,
-            episodes: detail.episodes.isEmpty ? nil : detail.episodes.count
+            episodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
+            localSource: bookmarkSource
         )
     }
 
@@ -74,7 +83,7 @@ struct DetailView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            BookmarkButton(media: bookmarkMedia)
+            BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
                 .padding(.trailing, 16)
                 .padding(.bottom, 24)
         }

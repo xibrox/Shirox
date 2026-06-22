@@ -995,6 +995,7 @@ private struct ProvidersSettingsSection: View {
         switch type {
         case .anilist: return aniListAuth.isLoggedIn
         case .mal:     return malAuth.isLoggedIn
+        case .local:   return false   // not a sign-in-able provider
         }
     }
 
@@ -1002,6 +1003,7 @@ private struct ProvidersSettingsSection: View {
         switch provider.providerType {
         case .anilist: return AniListAuthManager.shared.isLoggedIn ? "Signed in" : "Not signed in"
         case .mal: return malAuth.isLoggedIn ? "Signed in" : "Not signed in"
+        case .local: return "Not signed in"
         }
     }
 }

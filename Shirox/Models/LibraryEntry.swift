@@ -112,6 +112,9 @@ struct LibraryEntry: Identifiable, Codable, Sendable {
     /// Local-library only: format-independent 0–100 score, so switching the
     /// in-app score format never loses precision. nil for provider entries.
     var scoreCanonical: Double? = nil
+    /// Non-nil for on-device-only titles (module-scraped / imported file); routes tap-to-open.
+    /// nil for AniList/MAL-matched entries — existing persisted JSON decodes unchanged.
+    var localSource: LocalSource? = nil
 
     /// The score to show/edit in `format`. Local entries convert from their
     /// canonical value; provider entries fall back to `score` (their account

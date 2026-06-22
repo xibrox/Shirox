@@ -39,7 +39,7 @@ struct ProviderSwitcher: View {
             HStack(spacing: 8) {
                 // Stable order so the pills don't reorder when selectProvider moves
                 // the chosen provider to the front of orderedProviders.
-                ForEach(ProviderType.allCases, id: \.self) { type in
+                ForEach(ProviderType.userProviders, id: \.self) { type in
                     let selected = manager.primary?.providerType == type
                     Button {
                         manager.selectProvider(type)
@@ -95,7 +95,7 @@ struct ProviderMenuButton: View {
     /// so `cachedIcon` can show them in the menu even before Library/Settings are opened.
     private var iconWarmer: some View {
         ZStack {
-            ForEach(ProviderType.allCases, id: \.self) { type in
+            ForEach(ProviderType.userProviders, id: \.self) { type in
                 CachedAsyncImage(urlString: type.iconURL).frame(width: 1, height: 1)
             }
         }
@@ -106,7 +106,7 @@ struct ProviderMenuButton: View {
     var body: some View {
         if bothProvidersSignedIn {
             Menu {
-                ForEach(ProviderType.allCases, id: \.self) { type in
+                ForEach(ProviderType.userProviders, id: \.self) { type in
                     Button {
                         manager.selectProvider(type)
                     } label: {

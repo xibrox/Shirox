@@ -5,6 +5,7 @@ import SwiftUI
 /// fills when the title is already saved. Renders nothing when there is no trackable media.
 struct BookmarkButton: View {
     let media: Media?
+    var localSource: LocalSource? = nil
 
     @ObservedObject private var local = LocalLibraryManager.shared
     @State private var showCollections = false
@@ -17,7 +18,7 @@ struct BookmarkButton: View {
     var body: some View {
         if let media {
             Button {
-                local.bookmark(media: media)   // idempotent: Planning if new
+                local.bookmark(media: media, localSource: localSource)   // idempotent: Planning if new
                 showCollections = true
             } label: {
                 Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
@@ -30,7 +31,7 @@ struct BookmarkButton: View {
             }
             .buttonStyle(.plain)
             .adaptiveSheet(isPresented: $showCollections) {
-                LocalCollectionPickerSheet(media: media)
+                LocalCollectionPickerSheet(media: media, localSource: localSource)
             }
         }
     }
@@ -39,6 +40,7 @@ struct BookmarkButton: View {
 /// Sheet for toggling a title's collection membership and removing it from the library.
 private struct LocalCollectionPickerSheet: View {
     let media: Media
+    var localSource: LocalSource? = nil
     @ObservedObject private var local = LocalLibraryManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showNewCollection = false
@@ -52,7 +54,8 @@ private struct LocalCollectionPickerSheet: View {
                         Button {
                             let member = collection.mediaUniqueIds.contains(media.uniqueId)
                             local.setMembership(uniqueId: media.uniqueId, media: media,
-                                                inCollection: collection.id, member: !member)
+                                                inCollection: collection.id, member: !member,
+                                                localSource: localSource)
                         } label: {
                             HStack {
                                 Text(collection.name).foregroundStyle(.primary)
@@ -95,7 +98,8 @@ private struct LocalCollectionPickerSheet: View {
                     guard !trimmed.isEmpty else { return }
                     let collection = local.createCollection(name: trimmed)
                     local.setMembership(uniqueId: media.uniqueId, media: media,
-                                        inCollection: collection.id, member: true)
+                                        inCollection: collection.id, member: true,
+                                        localSource: localSource)
                 }
                 Button("Cancel", role: .cancel) { newCollectionName = "" }
             }

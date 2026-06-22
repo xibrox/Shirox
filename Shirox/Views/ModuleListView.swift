@@ -46,7 +46,7 @@ struct ModuleListView: View {
                 }
 
                 Section {
-                    ForEach(ProviderType.allCases, id: \.self) { type in
+                    ForEach(ProviderType.userProviders, id: \.self) { type in
                         builtInProviderRow(type)
                             .listRowInsets(EdgeInsets())
                             .listRowBackground(Color.clear)

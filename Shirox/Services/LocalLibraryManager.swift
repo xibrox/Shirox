@@ -38,7 +38,8 @@ import Combine
     /// `score` is in the current local score format; it is persisted on a
     /// format-independent 0–100 canonical scale so format switches stay lossless.
     @discardableResult
-    func upsert(media: Media, status: MediaListStatus, progress: Int, score: Double) -> LibraryEntry {
+    func upsert(media: Media, status: MediaListStatus, progress: Int, score: Double,
+                localSource: LocalSource? = nil) -> LibraryEntry {
         let now = Int(Date().timeIntervalSince1970)
         let format = Self.currentLocalFormat
         if let idx = entries.firstIndex(where: { $0.media.uniqueId == media.uniqueId }) {
@@ -53,6 +54,8 @@ import Combine
             entries[idx].progress = progress
             entries[idx].score = score
             entries[idx].updatedAt = now
+            // Enrich routing if newly known; never clobber an existing source with nil.
+            if entries[idx].localSource == nil, let localSource { entries[idx].localSource = localSource }
             persist()
             return entries[idx]
         }
@@ -60,7 +63,8 @@ import Combine
             id: media.id, media: media, status: status,
             progress: progress, score: score, updatedAt: now,
             customListName: nil, timesRewatched: nil,
-            scoreCanonical: format.toCanonical(score)
+            scoreCanonical: format.toCanonical(score),
+            localSource: localSource
         )
         entries.insert(entry, at: 0)
         persist()
@@ -82,16 +86,16 @@ import Combine
     }
 
     /// Idempotent "save this": adds as Planning if not already present.
-    func bookmark(media: Media) {
+    func bookmark(media: Media, localSource: LocalSource? = nil) {
         guard !isInLibrary(uniqueId: media.uniqueId) else { return }
-        upsert(media: media, status: .planning, progress: 0, score: 0)
+        upsert(media: media, status: .planning, progress: 0, score: 0, localSource: localSource)
     }
 
-    func toggleBookmark(media: Media) {
+    func toggleBookmark(media: Media, localSource: LocalSource? = nil) {
         if isInLibrary(uniqueId: media.uniqueId) {
             remove(uniqueId: media.uniqueId)
         } else {
-            bookmark(media: media)
+            bookmark(media: media, localSource: localSource)
         }
     }
 
@@ -123,10 +127,11 @@ import Combine
     /// Adds/removes an entry's membership in a collection. When adding and the entry is not
     /// yet in the library, it is bookmarked (Planning) first so collections always reference
     /// real entries.
-    func setMembership(uniqueId: String, media: Media, inCollection id: UUID, member: Bool) {
+    func setMembership(uniqueId: String, media: Media, inCollection id: UUID, member: Bool,
+                       localSource: LocalSource? = nil) {
         guard let idx = collections.firstIndex(where: { $0.id == id }) else { return }
         if member {
-            if !isInLibrary(uniqueId: uniqueId) { bookmark(media: media) }
+            if !isInLibrary(uniqueId: uniqueId) { bookmark(media: media, localSource: localSource) }
             if !collections[idx].mediaUniqueIds.contains(uniqueId) {
                 collections[idx].mediaUniqueIds.append(uniqueId)
             }
@@ -146,20 +151,71 @@ import Combine
 
     // MARK: - Auto-tracking
 
-    /// Mirrors Continue Watching into the local library when the user has auto-track enabled.
-    /// Only raises progress (never lowers), promotes Planning→Watching and Watching→Completed,
-    /// and never overwrites a hand-set score. No-op when the toggle is off.
-    func syncFromContinueWatching() {
-        let enabled = UserDefaults.standard.object(forKey: "localAutoTrackEnabled") == nil
+    /// Whether on-device auto-track is enabled (default ON).
+    private var autoTrackEnabled: Bool {
+        UserDefaults.standard.object(forKey: "localAutoTrackEnabled") == nil
             ? true
             : UserDefaults.standard.bool(forKey: "localAutoTrackEnabled")
-        guard enabled else { return }
+    }
+
+    /// Records a watched episode into the local library from a tracking event (see
+    /// `ContinueWatchingManager.pushRemoteProgress`). Raises progress monotonically to
+    /// `episode`, promotes Planning→Watching and Watching→Completed at the final episode,
+    /// never demotes a Completed/manual status, never overwrites a hand-set score. No-op when
+    /// the toggle is off or the event has no trackable identity.
+    func recordWatched(context: MarkContext, episode: Int) {
+        guard autoTrackEnabled else { return }
+
+        let source: LocalSource? = (context.aniListID == nil && context.malID == nil)
+            ? (context.moduleId.map { LocalSource(kind: .module, moduleId: $0,
+                                                  detailHref: context.detailHref, localImportName: nil) })
+            : nil
+        guard let media = Self.lightweightMedia(
+            aniListID: context.aniListID, malID: context.malID,
+            title: context.mediaTitle, imageUrl: context.imageUrl,
+            episodes: context.totalEpisodes, localSource: source
+        ) else { return }   // no provider id and no module identity → untrackable
+
+        let total = context.totalEpisodes
+        let isFinished = context.isAiring != true && total != nil && episode >= total!
+
+        if let existing = entry(forUniqueId: media.uniqueId) {
+            let progress = max(existing.progress, episode)
+            var status = existing.status
+            if status == .planning, progress > 0 { status = .current }
+            if isFinished, status == .current { status = .completed }
+            upsert(media: existing.media, status: status, progress: progress,
+                   score: existing.displayScore(in: Self.currentLocalFormat),
+                   localSource: existing.localSource ?? source)
+        } else {
+            upsert(media: media, status: isFinished ? .completed : .current,
+                   progress: episode, score: 0, localSource: source)
+        }
+    }
+
+    /// Mirrors Continue Watching into the local library when the user has auto-track enabled.
+    /// Only raises progress (never lowers), promotes Planning→Watching and Watching→Completed,
+    /// and never overwrites a hand-set score. No-op when the toggle is off. Acts as a monotonic
+    /// safety net alongside the event-driven `recordWatched`.
+    func syncFromContinueWatching() {
+        guard autoTrackEnabled else { return }
 
         for item in ContinueWatchingManager.shared.items {
+            let source: LocalSource?
+            if item.aniListID != nil || item.malID != nil {
+                source = nil
+            } else if let name = item.localImportName {
+                source = LocalSource(kind: .localFile, moduleId: nil, detailHref: nil, localImportName: name)
+            } else if let mid = item.moduleId {
+                source = LocalSource(kind: .module, moduleId: mid, detailHref: item.detailHref, localImportName: nil)
+            } else {
+                continue   // raw orphan stream with no identity
+            }
             guard let media = Self.lightweightMedia(
                 aniListID: item.aniListID, malID: item.malID,
-                title: item.mediaTitle, imageUrl: item.imageUrl, episodes: item.totalEpisodes
-            ) else { continue }   // module-only items with no AniList/MAL id are untrackable
+                title: item.mediaTitle, imageUrl: item.imageUrl,
+                episodes: item.totalEpisodes, localSource: source
+            ) else { continue }
 
             // A CW card's episodeNumber is the in-progress / "up next" episode; completed
             // episodes are one less. Clamp to a non-negative count.
@@ -175,26 +231,31 @@ import Combine
                 // Preserve the user's score and any manually-chosen status (dropped/paused).
                 // Pass the score in the active format so upsert keeps the canonical value.
                 upsert(media: existing.media, status: status, progress: progress,
-                       score: existing.displayScore(in: Self.currentLocalFormat))
+                       score: existing.displayScore(in: Self.currentLocalFormat),
+                       localSource: existing.localSource ?? source)
             } else {
                 upsert(media: media, status: isFinished ? .completed : .current,
-                       progress: watchedCount, score: 0)
+                       progress: watchedCount, score: 0, localSource: source)
             }
         }
     }
 
     // MARK: - Media construction
 
-    /// Builds a minimal `Media` for an auto-tracked / bookmarked title that has at least an
-    /// AniList or MAL id. Returns nil when neither id exists (untrackable module-only item).
+    /// Builds a `Media` for an auto-tracked / bookmarked title. Uses a provider Media when an
+    /// AniList/MAL id exists; otherwise builds a `.local` Media from `localSource`. Returns nil
+    /// only when there is neither a provider id nor a local source (an untrackable orphan).
     static func lightweightMedia(aniListID: Int?, malID: Int?, title: String,
-                                 imageUrl: String?, episodes: Int?) -> Media? {
+                                 imageUrl: String?, episodes: Int?,
+                                 localSource: LocalSource? = nil) -> Media? {
         let provider: ProviderType
         let id: Int
         if let aid = aniListID {
             provider = .anilist; id = aid
         } else if let mid = malID {
             provider = .mal; id = mid
+        } else if let source = localSource {
+            return Media.local(source: source, title: title, imageUrl: imageUrl, episodes: episodes)
         } else {
             return nil
         }

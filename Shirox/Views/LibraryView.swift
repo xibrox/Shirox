@@ -433,22 +433,11 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func entryRow(_ entry: LibraryEntry) -> some View {
-        ZStack {
-            NavigationLink(destination: AniListDetailView(
-                mediaId: entry.media.id,
-                preloadedMedia: entry.media
-            )) {
-                EmptyView()
-            }
-            .opacity(0)
-
-            LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
-                if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
-                    pendingEntry = entry
-                    showProviderPicker = true
-                } else {
-                    selectedEntry = entry
-                }
+        Group {
+            if let source = entry.localSource, source.kind == .localFile {
+                localFileRow(entry, source: source)
+            } else {
+                navigableRow(entry)
             }
         }
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -470,6 +459,63 @@ struct LibraryView: View {
                 Label("+1 EP", systemImage: "plus.circle.fill")
             }
             .tint(.green)
+        }
+        #endif
+    }
+
+    /// Module-scraped and AniList/MAL entries navigate to a detail screen (branched destination).
+    @ViewBuilder
+    private func navigableRow(_ entry: LibraryEntry) -> some View {
+        ZStack {
+            NavigationLink(destination: rowDestination(entry)) {
+                EmptyView()
+            }
+            .opacity(0)
+
+            LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
+                if !vm.isLocal && anilistAuth.isLoggedIn && malAuth.isLoggedIn && !dualSync {
+                    pendingEntry = entry
+                    showProviderPicker = true
+                } else {
+                    selectedEntry = entry
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func rowDestination(_ entry: LibraryEntry) -> some View {
+        if let source = entry.localSource, source.kind == .module {
+            DetailView(
+                item: SearchItem(
+                    title: entry.media.title.displayTitle,
+                    image: entry.media.coverImage.best ?? "",
+                    href: source.detailHref ?? ""
+                ),
+                moduleId: source.moduleId
+            )
+        } else {
+            AniListDetailView(mediaId: entry.media.id, preloadedMedia: entry.media)
+        }
+    }
+
+    /// Local imported files have no detail screen — tapping the row resumes playback.
+    @ViewBuilder
+    private func localFileRow(_ entry: LibraryEntry, source: LocalSource) -> some View {
+        LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
+            selectedEntry = entry   // tap the row content → edit sheet
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { resumeLocalFile(source) }
+    }
+
+    private func resumeLocalFile(_ source: LocalSource) {
+        #if os(iOS)
+        guard let name = source.localImportName else { return }
+        if let url = LocalPlaybackCoordinator.shared.resolveImport(name: name) {
+            LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: 0)
+        } else {
+            ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
         }
         #endif
     }

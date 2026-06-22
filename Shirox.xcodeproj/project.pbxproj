@@ -384,6 +384,9 @@
 		17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		17C26798164E438581BFC7F4 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		1E9C0F13D08F553EC0BF3F9E /* LocalCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */; };
+		AA105005000000000000F102 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
+		AA105005000000000000F103 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
+		AA105005000000000000F104 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
 		2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
 		31E5C6496E10906DA839A64E /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
 		AB8F741F717C0AE76F351730 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
@@ -572,6 +575,7 @@
 		5EA50C4A17000000000000F1 /* SeasonChainMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMath.swift; sourceTree = "<group>"; };
 		5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMapper.swift; sourceTree = "<group>"; };
 		9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCollection.swift; sourceTree = "<group>"; };
+		AA105005000000000000F101 /* LocalSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSource.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshot.swift; sourceTree = "<group>"; };
 		AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshotStore.swift; sourceTree = "<group>"; };
@@ -637,6 +641,7 @@
 				1279E4682FCA397700C9BA56 /* AniListUser.swift */,
 				1279E4692FCA397700C9BA56 /* ContinueWatchingItem.swift */,
 				9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */,
+				AA105005000000000000F101 /* LocalSource.swift */,
 				AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */,
 				1279E46A2FCA397700C9BA56 /* DownloadItem.swift */,
 				1279E46B2FCA397700C9BA56 /* EpisodeLink.swift */,
@@ -1097,6 +1102,7 @@
 				8A3B1A010F48F8614C2559F0 /* LibraryDataSource.swift in Sources */,
 				73A9F2622811896FA3F83259 /* LocalLibraryManager.swift in Sources */,
 				4DB641D189C13294005C3837 /* LocalCollection.swift in Sources */,
+				AA105005000000000000F102 /* LocalSource.swift in Sources */,
 				121D9B482FCA5603000FF9B4 /* AniListUser.swift in Sources */,
 				121D9B492FCA5603000FF9B4 /* ModuleDefinition.swift in Sources */,
 				121D9B9C2FCA5636000FF9B4 /* ProfileSocialView.swift in Sources */,
@@ -1237,6 +1243,7 @@
 				49945AAE0868AF20636E8A0B /* LibraryDataSource.swift in Sources */,
 				9CFE7CAE61ED10B6B8374D66 /* LocalLibraryManager.swift in Sources */,
 				1E9C0F13D08F553EC0BF3F9E /* LocalCollection.swift in Sources */,
+				AA105005000000000000F103 /* LocalSource.swift in Sources */,
 				1279E5222FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
 				17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */,
 				1279E5232FCA397700C9BA56 /* DownloadRowView.swift in Sources */,
@@ -1382,6 +1389,7 @@
 				6FC6E208137E72EB598CBF77 /* LibraryDataSource.swift in Sources */,
 				C3E3DDF1AFBB7BB011E7F5C4 /* LocalLibraryManager.swift in Sources */,
 				F8F895AB3AE54DBC2CA63B35 /* LocalCollection.swift in Sources */,
+				AA105005000000000000F104 /* LocalSource.swift in Sources */,
 				1279E59B2FCA397700C9BA56 /* CachedAsyncImage.swift in Sources */,
 				6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */,
 				1279E59C2FCA397700C9BA56 /* DownloadRowView.swift in Sources */,

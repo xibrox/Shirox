@@ -3,11 +3,17 @@ import Foundation
 enum ProviderType: String, Codable, CaseIterable, Hashable {
     case anilist = "anilist"
     case mal = "mal"
+    case local = "local"   // on-device-only title (module-scraped or imported file); never sign-in-able
+
+    /// Providers a user can sign into. Use this for login / provider-selection UIs;
+    /// `.local` is excluded because it has no account.
+    static let userProviders: [ProviderType] = [.anilist, .mal]
 
     var displayName: String {
         switch self {
         case .anilist: return "AniList"
         case .mal: return "MyAnimeList"
+        case .local: return "Local"
         }
     }
 
@@ -15,6 +21,7 @@ enum ProviderType: String, Codable, CaseIterable, Hashable {
         switch self {
         case .anilist: return "https://anilist.co/img/icons/apple-touch-icon.png"
         case .mal: return "https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png"
+        case .local: return ""   // no remote icon
         }
     }
 }
@@ -61,6 +68,38 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
         case "HIATUS": return "Hiatus"
         default: return status
         }
+    }
+}
+
+extension Media {
+    /// Deterministic positive id for an on-device-only title, derived from a stable
+    /// source key via FNV-1a (not Swift's per-launch-seeded hashValue), so the id and
+    /// resulting uniqueId ("local-<id>") are reproducible across launches.
+    static func localId(forKey key: String) -> Int {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in key.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        return Int(hash & 0x7FFF_FFFF_FFFF_FFFF)   // clear sign bit → positive
+    }
+
+    /// Builds a `.local` Media for a module-scraped or imported title.
+    static func local(source: LocalSource, title: String, imageUrl: String?, episodes: Int?) -> Media {
+        let key: String
+        switch source.kind {
+        case .module:    key = "\(source.moduleId ?? "")|\(source.detailHref ?? title)"
+        case .localFile: key = source.localImportName ?? title
+        }
+        return Media(
+            id: localId(forKey: key), idMal: nil, provider: .local,
+            title: MediaTitle(romaji: nil, english: title, native: nil),
+            coverImage: MediaCoverImage(large: imageUrl, extraLarge: nil),
+            bannerImage: nil, description: nil, episodes: episodes,
+            status: nil, averageScore: nil, genres: nil,
+            season: nil, seasonYear: nil, nextAiringEpisode: nil,
+            relations: nil, type: nil, format: nil
+        )
     }
 }
 
