@@ -158,6 +158,25 @@ import Combine
             : UserDefaults.standard.bool(forKey: "localAutoTrackEnabled")
     }
 
+    /// Pure status/progress merge for auto-track. Raises progress to the highest of the
+    /// existing and watched episode, promotes Planning→Watching and Watching→Completed at the
+    /// final (non-airing) episode, and never demotes an existing Completed or manually-chosen
+    /// (paused/dropped) status. `existing*` are nil for a brand-new entry. No side effects.
+    nonisolated static func mergedTracking(existingProgress: Int?, existingStatus: MediaListStatus?,
+                                           watchedEpisode: Int, totalEpisodes: Int?, isAiring: Bool?)
+        -> (progress: Int, status: MediaListStatus) {
+        let isFinished = isAiring != true
+            && (totalEpisodes.map { $0 > 0 && watchedEpisode >= $0 } ?? false)
+        let progress = max(existingProgress ?? 0, watchedEpisode)
+        guard let existingStatus else {
+            return (progress, isFinished ? .completed : .current)
+        }
+        var status = existingStatus
+        if status == .planning, progress > 0 { status = .current }
+        if isFinished, status == .current { status = .completed }
+        return (progress, status)
+    }
+
     /// Records a watched episode into the local library from a tracking event (see
     /// `ContinueWatchingManager.pushRemoteProgress`). Raises progress monotonically to
     /// `episode`, promotes Planning→Watching and Watching→Completed at the final episode,
@@ -176,21 +195,13 @@ import Combine
             episodes: context.totalEpisodes, localSource: source
         ) else { return }   // no provider id and no module identity → untrackable
 
-        let total = context.totalEpisodes
-        let isFinished = context.isAiring != true && total != nil && episode >= total!
-
-        if let existing = entry(forUniqueId: media.uniqueId) {
-            let progress = max(existing.progress, episode)
-            var status = existing.status
-            if status == .planning, progress > 0 { status = .current }
-            if isFinished, status == .current { status = .completed }
-            upsert(media: existing.media, status: status, progress: progress,
-                   score: existing.displayScore(in: Self.currentLocalFormat),
-                   localSource: existing.localSource ?? source)
-        } else {
-            upsert(media: media, status: isFinished ? .completed : .current,
-                   progress: episode, score: 0, localSource: source)
-        }
+        let existing = entry(forUniqueId: media.uniqueId)
+        let merged = Self.mergedTracking(
+            existingProgress: existing?.progress, existingStatus: existing?.status,
+            watchedEpisode: episode, totalEpisodes: context.totalEpisodes, isAiring: context.isAiring)
+        upsert(media: existing?.media ?? media, status: merged.status, progress: merged.progress,
+               score: existing?.displayScore(in: Self.currentLocalFormat) ?? 0,
+               localSource: existing?.localSource ?? source)
     }
 
     /// Mirrors Continue Watching into the local library when the user has auto-track enabled.
@@ -220,23 +231,15 @@ import Combine
             // A CW card's episodeNumber is the in-progress / "up next" episode; completed
             // episodes are one less. Clamp to a non-negative count.
             let watchedCount = max(item.episodeNumber - 1, 0)
-            let total = item.totalEpisodes
-            let isFinished = (total.map { watchedCount >= $0 && $0 > 0 }) ?? false
-
-            if let existing = entry(forUniqueId: media.uniqueId) {
-                let progress = max(existing.progress, watchedCount)
-                var status = existing.status
-                if status == .planning, progress > 0 { status = .current }
-                if isFinished, status == .current { status = .completed }
-                // Preserve the user's score and any manually-chosen status (dropped/paused).
-                // Pass the score in the active format so upsert keeps the canonical value.
-                upsert(media: existing.media, status: status, progress: progress,
-                       score: existing.displayScore(in: Self.currentLocalFormat),
-                       localSource: existing.localSource ?? source)
-            } else {
-                upsert(media: media, status: isFinished ? .completed : .current,
-                       progress: watchedCount, score: 0, localSource: source)
-            }
+            let existing = entry(forUniqueId: media.uniqueId)
+            let merged = Self.mergedTracking(
+                existingProgress: existing?.progress, existingStatus: existing?.status,
+                watchedEpisode: watchedCount, totalEpisodes: item.totalEpisodes, isAiring: item.isAiring)
+            // Preserve the user's score and any manually-chosen status (dropped/paused).
+            // Pass the score in the active format so upsert keeps the canonical value.
+            upsert(media: existing?.media ?? media, status: merged.status, progress: merged.progress,
+                   score: existing?.displayScore(in: Self.currentLocalFormat) ?? 0,
+                   localSource: existing?.localSource ?? source)
         }
     }
 

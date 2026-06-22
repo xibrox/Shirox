@@ -384,19 +384,17 @@
 		17265E759B724CB6BF9F6C7A /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		17C26798164E438581BFC7F4 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		1E9C0F13D08F553EC0BF3F9E /* LocalCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */; };
-		AA105005000000000000F102 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
-		AA105005000000000000F103 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
-		AA105005000000000000F104 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
+		21A14B5A00FF0B538691E91D /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		2FFDB0F7AE21B9B527B83D18 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
 		31E5C6496E10906DA839A64E /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
-		AB8F741F717C0AE76F351730 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
-		21A14B5A00FF0B538691E91D /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
+		34462597DF20227FD2D62D5A /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
 		34FEC549807840C99DE4F688 /* RatingPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */; };
 		3A42CE0D50F5B4711F556C97 /* ShiroxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */; };
 		42F7F6A06C1039A0472932B8 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
 		49945AAE0868AF20636E8A0B /* LibraryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659CAEADDD8118DA5FF4FFF /* LibraryDataSource.swift */; };
 		4A3FB3E3D839EB6C4116A186 /* BookmarkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA93DA5617959381E10D85 /* BookmarkButton.swift */; };
 		4DB641D189C13294005C3837 /* LocalCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */; };
+		577D15AB98AFB5CE8F633563 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		5EA50C4A17000000000000B1 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		5EA50C4A17000000000000B2 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
 		5EA50C4A17000000000000B3 /* SeasonChainMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F1 /* SeasonChainMath.swift */; };
@@ -407,16 +405,13 @@
 		6FC6E208137E72EB598CBF77 /* LibraryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659CAEADDD8118DA5FF4FFF /* LibraryDataSource.swift */; };
 		73A9F2622811896FA3F83259 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
 		74D4BF07951EDE2E59789F11 /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
-		E47395E4C41916F4EDFCC2C1 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
-		F347119BB1CD5612676F79B0 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		7C3F1DFEF54BF11BDDA8626B /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */; };
 		8A3B1A010F48F8614C2559F0 /* LibraryDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659CAEADDD8118DA5FF4FFF /* LibraryDataSource.swift */; };
 		8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
 		8D22B4007D9017AFA1627F10 /* BookmarkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA93DA5617959381E10D85 /* BookmarkButton.swift */; };
 		9759F7A614D6C4373F0D37C5 /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
-		34462597DF20227FD2D62D5A /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
-		577D15AB98AFB5CE8F633563 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		9CFE7CAE61ED10B6B8374D66 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
+		A960D268997A4E1EFB9B0BCF /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3424495FC6BA30F806C576D8 /* Foundation.framework */; };
 		AA000003000000000000AA01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA000003000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000003000000000000BB01 /* Assets.xcassets */; };
 		AA01000000000000000002AA /* DownloadedMediaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */; };
@@ -425,17 +420,34 @@
 		AA02000000000000000002AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
 		AA02000000000000000003AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
 		AA02000000000000000004AA /* DownloadedMediaSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */; };
+		AA105005000000000000F102 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
+		AA105005000000000000F103 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
+		AA105005000000000000F104 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
+		AB8F741F717C0AE76F351730 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
+		B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */; };
 		BAEE9A1A2FCB000000000002 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000003 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000004 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		C3E3DDF1AFBB7BB011E7F5C4 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
 		CF57ECDF95BE10B042A36913 /* BookmarkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA93DA5617959381E10D85 /* BookmarkButton.swift */; };
+		E47395E4C41916F4EDFCC2C1 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
+		F347119BB1CD5612676F79B0 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		F4B629DD0CE540A681EBF6A5 /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		F6D3663CCB6E4EECAD29EB9E /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		F8F895AB3AE54DBC2CA63B35 /* LocalCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */; };
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FCE3980671F64CF38B707BFA /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C226707E7AA5549144DA7C37 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8973251F34F3772E8FEE37EB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2A0E51843C9C485FFE7846CE;
+			remoteInfo = Shirox_iOS;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0F6021362F71CCC800CEC66D /* shirox-icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "shirox-icon.icon"; sourceTree = "<group>"; };
@@ -566,19 +578,22 @@
 		1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		21201D48C8E94395977F4564 /* ScoreInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreInputView.swift; sourceTree = "<group>"; };
 		340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySourceSwitcher.swift; sourceTree = "<group>"; };
+		3424495FC6BA30F806C576D8 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollapsingHeader.swift; sourceTree = "<group>"; };
-		A88804D3B352FD28723122E3 /* NotificationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationBadge.swift; sourceTree = "<group>"; };
 		41894B1527B61C1E6E98EFA5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
 		4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiroxApp.swift; sourceTree = "<group>"; };
 		4C8891C8EC305651E62AC138 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5EA50C4A17000000000000F1 /* SeasonChainMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMath.swift; sourceTree = "<group>"; };
 		5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMapper.swift; sourceTree = "<group>"; };
+		8AEB99F66BCE9D9EB4997319 /* ShiroxTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShiroxTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCollection.swift; sourceTree = "<group>"; };
-		AA105005000000000000F101 /* LocalSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSource.swift; sourceTree = "<group>"; };
+		A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalLibraryTrackingTests.swift; sourceTree = "<group>"; };
+		A88804D3B352FD28723122E3 /* NotificationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationBadge.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA01000000000000000001AA /* DownloadedMediaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshot.swift; sourceTree = "<group>"; };
 		AA02000000000000000001AA /* DownloadedMediaSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadedMediaSnapshotStore.swift; sourceTree = "<group>"; };
+		AA105005000000000000F101 /* LocalSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSource.swift; sourceTree = "<group>"; };
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAlive.swift; sourceTree = "<group>"; };
 		C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryManager.swift; sourceTree = "<group>"; };
@@ -609,6 +624,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		39E31904B93705CD633392E0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A960D268997A4E1EFB9B0BCF /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		896FE0E84327FF272C55EBF6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -629,6 +652,7 @@
 				CF6B7E2E4A3D9F1B8C0E5A22 /* Configurations */,
 				72DBC967D4D99D6643034FF4 /* Frameworks */,
 				73D712B4138A3740575F996E /* Products */,
+				66A91FC40C7DFC43C91BE38D /* ShiroxTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -861,11 +885,29 @@
 			path = Shirox;
 			sourceTree = "<group>";
 		};
+		466363FAB7A2BEBB437228DB /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				3424495FC6BA30F806C576D8 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		66A91FC40C7DFC43C91BE38D /* ShiroxTests */ = {
+			isa = PBXGroup;
+			children = (
+				A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */,
+			);
+			name = ShiroxTests;
+			path = ShiroxTests;
+			sourceTree = SOURCE_ROOT;
+		};
 		72DBC967D4D99D6643034FF4 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */,
 				1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */,
+				466363FAB7A2BEBB437228DB /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -876,6 +918,7 @@
 				E8D91E43B99205901655CDF0 /* Shirox.app */,
 				4C8891C8EC305651E62AC138 /* Shirox.app */,
 				121D9B382FCA5378000FF9B4 /* Shirox_tvOS.app */,
+				8AEB99F66BCE9D9EB4997319 /* ShiroxTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -930,6 +973,24 @@
 			productReference = E8D91E43B99205901655CDF0 /* Shirox.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4F4506326801BDD74CDC776D /* ShiroxTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C75DC2AA579961AE39851EEC /* Build configuration list for PBXNativeTarget "ShiroxTests" */;
+			buildPhases = (
+				0D7C42462608CC0CC47C2FD3 /* Sources */,
+				39E31904B93705CD633392E0 /* Frameworks */,
+				9A7D8AFF44691D3719D9269A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				77F7CD9873BDB11B4CB0203C /* PBXTargetDependency */,
+			);
+			name = ShiroxTests;
+			productName = ShiroxTests;
+			productReference = 8AEB99F66BCE9D9EB4997319 /* ShiroxTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		645C7C157C53E9B9F699AAEB /* Shirox_macOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7BCD640A953EDDB8BB1464DE /* Build configuration list for PBXNativeTarget "Shirox_macOS" */;
@@ -964,6 +1025,9 @@
 						DevelopmentTeam = JRMTH65Z3H;
 						ProvisioningStyle = Automatic;
 					};
+					4F4506326801BDD74CDC776D = {
+						TestTargetID = 2A0E51843C9C485FFE7846CE;
+					};
 					645C7C157C53E9B9F699AAEB = {
 						DevelopmentTeam = JRMTH65Z3H;
 						ProvisioningStyle = Automatic;
@@ -991,6 +1055,7 @@
 				2A0E51843C9C485FFE7846CE /* Shirox_iOS */,
 				645C7C157C53E9B9F699AAEB /* Shirox_macOS */,
 				121D9B372FCA5378000FF9B4 /* Shirox_tvOS */,
+				4F4506326801BDD74CDC776D /* ShiroxTests */,
 			);
 		};
 /* End PBXProject section */
@@ -1001,6 +1066,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				121D9BBF2FCA5642000FF9B4 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A7D8AFF44691D3719D9269A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1025,6 +1097,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		0D7C42462608CC0CC47C2FD3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		121D9B342FCA5378000FF9B4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1464,6 +1544,15 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		77F7CD9873BDB11B4CB0203C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Shirox_iOS;
+			target = 2A0E51843C9C485FFE7846CE /* Shirox_iOS */;
+			targetProxy = C226707E7AA5549144DA7C37 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		121D9B412FCA5379000FF9B4 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1534,6 +1623,22 @@
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
+		};
+		20AD46EDFB7C48E2F0E535CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.ShiroxTests;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shirox.app/Shirox";
+			};
+			name = Debug;
 		};
 		324FD2C6DEB3B54F600A6931 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1610,6 +1715,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "shirox-icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CURRENT_PROJECT_VERSION = 91;
+				ENABLE_TESTABILITY = YES;
 				INFOPLIST_FILE = Shirox/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1626,6 +1732,23 @@
 				s = s;
 			};
 			name = Debug;
+		};
+		4ABA65F6AEA4AB982A310557 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shirox.ShiroxTests;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shirox.app/Shirox";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
 		};
 		4E9229C27A951422A31C75A9 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1787,6 +1910,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
+		};
+		C75DC2AA579961AE39851EEC /* Build configuration list for PBXNativeTarget "ShiroxTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4ABA65F6AEA4AB982A310557 /* Release */,
+				20AD46EDFB7C48E2F0E535CF /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		E281F590D0056E68BB2F08EC /* Build configuration list for PBXNativeTarget "Shirox_iOS" */ = {
 			isa = XCConfigurationList;
