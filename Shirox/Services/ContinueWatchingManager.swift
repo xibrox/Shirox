@@ -938,6 +938,12 @@ import Combine
             }
         }
 
+        // Mirror into the on-device library using the anchor context + the absolute watched
+        // episode, so completion and the final episode are captured even when Continue Watching
+        // drops the finished card. Gated by localAutoTrackEnabled inside recordWatched, so it runs
+        // regardless of provider login/tracking toggles.
+        LocalLibraryManager.shared.recordWatched(context: context, episode: rawEp)
+
         let aniListWillWrite = aniListEnabled && AniListAuthManager.shared.isLoggedIn
         let malWillWrite     = malEnabled     && MALAuthManager.shared.isLoggedIn
         if aniListWillWrite || malWillWrite {
