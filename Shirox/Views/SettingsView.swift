@@ -423,7 +423,6 @@ struct SettingsView: View {
 
     #if os(iOS)
     private func updateCacheSizes() {
-        imageCacheSize = CacheManager.shared.imageCacheSize
         websiteDataSize = CacheManager.shared.websiteDataSize
         tempFilesSize = CacheManager.shared.tempFilesSize
         continueWatchingSize = CacheManager.shared.continueWatchingSize
@@ -431,7 +430,11 @@ struct SettingsView: View {
         searchAliasSize = CacheManager.shared.searchAliasSize
         idMappingSize = CacheManager.shared.idMappingSize
         episodeSortSize = CacheManager.shared.episodeSortSize
-        totalUsage = CacheManager.shared.totalDiskUsage
+        // Image cache + total are computed asynchronously (Kingfisher disk size).
+        Task {
+            imageCacheSize = await CacheManager.shared.imageCacheSize
+            totalUsage = await CacheManager.shared.totalDiskUsage
+        }
     }
     #endif
 

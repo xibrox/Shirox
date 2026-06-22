@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 #if os(iOS)
 import UIKit
@@ -11,7 +12,9 @@ import AppKit
 typealias PlatformImage = NSImage
 #endif
 
-/// Cross-platform image loader with in-memory NSCache + disk cache.
+/// Cross-platform image loader backed by Kingfisher's memory + disk cache.
+/// Keeps the app's domain logic that a stock loader doesn't handle: hotlink
+/// headers, Cloudflare-bypass recovery, base64 and `file://` fast paths.
 struct CachedAsyncImage: View {
     let urlString: String
     var base64String: String? = nil
@@ -19,19 +22,8 @@ struct CachedAsyncImage: View {
     @State private var loadFailed = false
     @State private var reloadToken = 0
 
-    private static let memCache: NSCache<NSString, PlatformImage> = {
-        let c = NSCache<NSString, PlatformImage>()
-        c.countLimit = 350
-        return c
-    }()
-
-    private static let diskCacheDir: URL = {
-        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ImageCache", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }()
-
+    /// URLSession used *only* by the Cloudflare fallback path. Kingfisher owns
+    /// all normal downloads + caching.
     private static let session: URLSession = {
         let cfg = URLSessionConfiguration.default
         cfg.urlCache = nil
@@ -39,80 +31,43 @@ struct CachedAsyncImage: View {
         return URLSession(configuration: cfg)
     }()
 
-    private static let defaultUserAgent =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-    /// Build an image-fetch request with browser-like headers. Many anime CDNs
-    /// hotlink-protect with a Referer requirement and reject the default
-    /// URLSession UA — sending these by default is harmless for hosts that don't.
-    private static func makeImageRequest(for url: URL) -> URLRequest {
+    /// Build a fallback image-fetch request with browser-like headers (+ CF
+    /// cookie/UA when supplied). Shares the header set with the Kingfisher path.
+    private static func makeImageRequest(for url: URL, cookieHeader: String? = nil, bypassUserAgent: String? = nil) -> URLRequest {
         var req = URLRequest(url: url)
-        req.setValue(defaultUserAgent, forHTTPHeaderField: "User-Agent")
-        if let scheme = url.scheme, let host = url.host {
-            req.setValue("\(scheme)://\(host)/", forHTTPHeaderField: "Referer")
+        for (key, value) in KingfisherImageCache.headers(for: url, cookieHeader: cookieHeader, bypassUserAgent: bypassUserAgent) {
+            req.setValue(value, forHTTPHeaderField: key)
         }
-        req.setValue("image/avif,image/webp,image/png,image/jpeg,*/*", forHTTPHeaderField: "Accept")
         return req
     }
 
-    private static func diskKey(for urlString: String) -> URL {
-        // Safe filename from URL string
-        let safe = urlString.data(using: .utf8).map { Data($0).base64EncodedString()
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "+", with: "-")
-        } ?? urlString.hash.description
-        let ext = (urlString as NSString).pathExtension.lowercased()
-        let filename = safe.prefix(180) + (["jpg","jpeg","png","webp"].contains(ext) ? ".\(ext)" : ".img")
-        return diskCacheDir.appendingPathComponent(String(filename))
-    }
-
-    private static func loadFromDisk(urlString: String) -> PlatformImage? {
-        let path = diskKey(for: urlString)
-        guard let data = try? Data(contentsOf: path) else { return nil }
-        return PlatformImage(data: data)
-    }
-
-    private static func saveToDisk(urlString: String, data: Data) {
-        let path = diskKey(for: urlString)
-        try? data.write(to: path, options: .atomic)
-    }
-
-    /// Read the raw bytes that disk-cache holds for `urlString`, if any.
-    /// Lets other subsystems (e.g. the snapshot store) reuse already-downloaded images
-    /// instead of re-fetching from the network.
+    /// Read the raw bytes Kingfisher holds on disk for `urlString`, if any.
+    /// Lets other subsystems (e.g. the snapshot store, provider banner) reuse
+    /// already-downloaded images instead of re-fetching from the network.
     static func cachedImageData(for urlString: String) -> Data? {
-        let path = diskKey(for: urlString)
-        return try? Data(contentsOf: path)
+        try? KingfisherManager.shared.cache.diskStorage.value(forKey: urlString)
     }
 
     static var diskCacheBytes: Int {
-        let dir = diskCacheDir
-        let keys: [URLResourceKey] = [.fileSizeKey]
-        guard let enumerator = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: keys) else { return 0 }
-        var total = 0
-        for case let file as URL in enumerator {
-            total += (try? file.resourceValues(forKeys: Set(keys)).fileSize) ?? 0
+        get async {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+                ImageCache.default.calculateDiskStorageSize { result in
+                    continuation.resume(returning: Int((try? result.get()) ?? 0))
+                }
+            }
         }
-        return total
     }
 
     static func resetCache() {
-        memCache.removeAllObjects()
-        if let contents = try? FileManager.default.contentsOfDirectory(at: diskCacheDir, includingPropertiesForKeys: nil) {
-            for file in contents { try? FileManager.default.removeItem(at: file) }
-        }
+        ImageCache.default.clearMemoryCache()
+        ImageCache.default.clearDiskCache()
         URLCache.shared.removeAllCachedResponses()
         NotificationCenter.default.post(name: NSNotification.Name("ClearImageCache"), object: nil)
     }
 
-    private var cachedImage: PlatformImage? {
-        guard !urlString.isEmpty else { return nil }
-        return Self.memCache.object(forKey: urlString as NSString)
-    }
-
     var body: some View {
         Group {
-            if let displayImage = platformImage ?? cachedImage {
+            if let displayImage = platformImage {
                 #if os(iOS)
                 Image(uiImage: displayImage)
                     .resizable()
@@ -151,146 +106,167 @@ struct CachedAsyncImage: View {
             if platformImage == nil { reloadToken += 1 }
         }
         .task(id: urlString + (base64String ?? "") + "#\(reloadToken)") {
-            loadFailed = false
-
-            if let base64 = base64String, !base64.isEmpty,
-               let data = Data(base64Encoded: base64),
-               let loaded = PlatformImage(data: data) {
-                platformImage = loaded
-                return
-            }
-
-            guard !urlString.isEmpty, let url = URL(string: urlString) else {
-                loadFailed = true
-                return
-            }
-
-            // Local file fast path: read bytes directly. The URLSession pipeline below
-            // does technically support file:// URLs, but it also runs the CF-bypass
-            // logic and writes a duplicate copy into the disk-cache folder under a
-            // base64-encoded key — neither of which makes sense for an image already
-            // sitting on local disk. Reading directly also makes it obvious in logs
-            // whether a snapshot file is the source of a render.
-            if url.isFileURL {
-                if let loaded = PlatformImage(contentsOfFile: url.path) {
-                    Self.memCache.setObject(loaded, forKey: urlString as NSString)
-                    platformImage = loaded
-                } else {
-                    loadFailed = true
-                }
-                return
-            }
-
-            if let cached = Self.memCache.object(forKey: urlString as NSString) {
-                platformImage = cached
-                return
-            }
-
-            // Try disk cache before network
-            if let diskImage = Self.loadFromDisk(urlString: urlString) {
-                Self.memCache.setObject(diskImage, forKey: urlString as NSString)
-                platformImage = diskImage
-                return
-            }
-
-            platformImage = nil
-
-            var imageRequest = Self.makeImageRequest(for: url)
-            // If this host was CF-bypassed, use the WebView's UA + cookies so the
-            // cf_clearance binding (UA + IP + cookie) matches.
-            if let host = url.host,
-               let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: host) {
-                imageRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
-                if !info.userAgent.isEmpty {
-                    imageRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
-                }
-            } else if let host = url.host,
-                      let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: host) {
-                imageRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
-                if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: host) {
-                    imageRequest.setValue(ua, forHTTPHeaderField: "User-Agent")
-                }
-            }
-
-            let data: Data
-            let response: URLResponse
-            do {
-                (data, response) = try await Self.session.data(for: imageRequest)
-            } catch {
-                // Silent for true offline failures — that's expected when the device
-                // has no network. Also silent for cancellations, which happen routinely
-                // when a cell scrolls offscreen before its image finishes loading.
-                // Everything else (DNS failure on a single host, server errors, etc.)
-                // still surfaces so we can debug it.
-                let isCancelled = (error as? URLError)?.code == .cancelled || error is CancellationError
-                if !ProviderManager.isOfflineError(error) && !isCancelled {
-                    Logger.shared.log("[Image] network error for \(url.host ?? urlString): \(error.localizedDescription)", type: "Error")
-                }
-                loadFailed = true
-                return
-            }
-
-            let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 200
-            let finalURL = (response as? HTTPURLResponse)?.url ?? url
-            let isImageContentType = ((response as? HTTPURLResponse)?
-                .value(forHTTPHeaderField: "Content-Type") ?? "")
-                .lowercased().hasPrefix("image/")
-            let responseText = isImageContentType ? "" : (String(data: data, encoding: .utf8) ?? "")
-
-            // If CF blocked the image CDN, solve the challenge for that host (deduped across a
-            // grid of posters so only one sheet appears) then retry with the fresh cookie.
-            if JSEngine.isTurnstileResponse(status: httpStatus, body: responseText) {
-                Logger.shared.log("[Image] CF challenge detected status=\(httpStatus) host=\(finalURL.host ?? "?")", type: "Debug")
-                let cfTarget = finalURL
-                let cfHostStr = cfTarget.host ?? ""
-
-                if CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) == nil {
-                    try? await CloudflareBypassManager.shared.triggerBypass(for: cfTarget)
-                }
-
-                var retryRequest = Self.makeImageRequest(for: cfTarget)
-                // cf_clearance is bound to the UA that solved the challenge —
-                // use the bypass WebView's actual UA + full cookie header, not our default.
-                if let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: cfHostStr) {
-                    retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
-                    if !info.userAgent.isEmpty {
-                        retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
-                    }
-                } else if let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) {
-                    retryRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
-                    if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: cfHostStr) {
-                        retryRequest.setValue(ua, forHTTPHeaderField: "User-Agent")
-                    }
-                }
-                guard let (retryData, retryResponse) = try? await Self.session.data(for: retryRequest) else {
-                    Logger.shared.log("[Image] CF retry network error host=\(cfHostStr)", type: "Error")
-                    loadFailed = true
-                    return
-                }
-                guard let loaded = PlatformImage(data: retryData) else {
-                    let st = (retryResponse as? HTTPURLResponse)?.statusCode ?? -1
-                    let snippet = (String(data: retryData, encoding: .utf8) ?? "").prefix(120)
-                    Logger.shared.log("[Image] CF retry decode failed host=\(cfHostStr) status=\(st) body=\(snippet)", type: "Error")
-                    loadFailed = true
-                    return
-                }
-                Self.memCache.setObject(loaded, forKey: urlString as NSString)
-                Self.saveToDisk(urlString: urlString, data: retryData)
-                platformImage = loaded
-                return
-            }
-
-            guard let loaded = PlatformImage(data: data) else {
-                let snippet = responseText.prefix(160).replacingOccurrences(of: "\n", with: " ")
-                Logger.shared.log("[Image] decode failed status=\(httpStatus) host=\(url.host ?? "?") len=\(data.count) body=\(snippet)", type: "Error")
-                loadFailed = true
-                return
-            }
-
-            Self.memCache.setObject(loaded, forKey: urlString as NSString)
-            Self.saveToDisk(urlString: urlString, data: data)
-            platformImage = loaded
+            await load()
         }
+    }
+
+    @MainActor
+    private func load() async {
+        loadFailed = false
+
+        if let base64 = base64String, !base64.isEmpty,
+           let data = Data(base64Encoded: base64),
+           let loaded = PlatformImage(data: data) {
+            platformImage = loaded
+            return
+        }
+
+        guard !urlString.isEmpty, let url = URL(string: urlString) else {
+            loadFailed = true
+            return
+        }
+
+        // Local file fast path: read bytes directly. Avoids running the CF
+        // pipeline and avoids writing a duplicate copy into Kingfisher's cache
+        // for an image already sitting on local disk.
+        if url.isFileURL {
+            if let loaded = PlatformImage(contentsOfFile: url.path) {
+                platformImage = loaded
+            } else {
+                loadFailed = true
+            }
+            return
+        }
+
+        // Instant paint if Kingfisher already has it in memory (no flicker).
+        if let memoryImage = ImageCache.default.retrieveImageInMemoryCache(forKey: urlString) {
+            platformImage = memoryImage
+            return
+        }
+
+        // Resolve CF cookie/UA on the MainActor, then hand Kingfisher a
+        // value-type request modifier (its downloader runs off-main).
+        let cookieHeader = url.host.flatMap { CloudflareBypassManager.shared.fullCookieHeader(for: $0) }
+        let bypassUA = url.host.flatMap { CloudflareBypassManager.shared.bypassUserAgent(for: $0) }
+        let reqHeaders = KingfisherImageCache.headers(for: url, cookieHeader: cookieHeader, bypassUserAgent: bypassUA)
+        let modifier = AnyModifier { request in
+            var mutable = request
+            for (key, value) in reqHeaders { mutable.setValue(value, forHTTPHeaderField: key) }
+            return mutable
+        }
+        // Key on `urlString` so `cachedImageData(for:)` and the snapshot store
+        // find the same entry the display path wrote.
+        let resource = Kingfisher.ImageResource(downloadURL: url, cacheKey: urlString)
+
+        let kfImage: PlatformImage? = await withCheckedContinuation { (continuation: CheckedContinuation<PlatformImage?, Never>) in
+            KingfisherManager.shared.retrieveImage(
+                with: resource,
+                options: [.requestModifier(modifier)]
+            ) { result in
+                continuation.resume(returning: try? result.get().image)
+            }
+        }
+
+        if let kfImage {
+            platformImage = kfImage
+            return
+        }
+
+        // Kingfisher couldn't load it — most often a cold Cloudflare challenge
+        // (an HTML body that won't decode). Fall back to the manual solve+retry,
+        // then back-fill Kingfisher's cache so later loads are warm.
+        if let recovered = await loadViaCloudflareFallback(url: url) {
+            platformImage = recovered
+        } else {
+            loadFailed = true
+        }
+    }
+
+    /// Manual Cloudflare-challenge recovery for a single image URL. Returns the
+    /// decoded image on success and seeds Kingfisher's cache so later loads are
+    /// warm. Returns nil on genuine failure (offline, 4xx, undecodable).
+    private func loadViaCloudflareFallback(url: URL) async -> PlatformImage? {
+        let cookieHeader = url.host.flatMap { CloudflareBypassManager.shared.fullCookieHeader(for: $0) }
+        let bypassUA = url.host.flatMap { CloudflareBypassManager.shared.bypassUserAgent(for: $0) }
+        var imageRequest = Self.makeImageRequest(for: url, cookieHeader: cookieHeader, bypassUserAgent: bypassUA)
+        // If this host was CF-bypassed, use the WebView's UA + cookies so the
+        // cf_clearance binding (UA + IP + cookie) matches.
+        if let host = url.host,
+           let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: host) {
+            imageRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
+            if !info.userAgent.isEmpty {
+                imageRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
+            }
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await Self.session.data(for: imageRequest)
+        } catch {
+            // Silent for true offline failures and cancellations (routine when a
+            // cell scrolls offscreen). Everything else surfaces for debugging.
+            let isCancelled = (error as? URLError)?.code == .cancelled || error is CancellationError
+            if !ProviderManager.isOfflineError(error) && !isCancelled {
+                Logger.shared.log("[Image] network error for \(url.host ?? url.absoluteString): \(error.localizedDescription)", type: "Error")
+            }
+            return nil
+        }
+
+        let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 200
+        let finalURL = (response as? HTTPURLResponse)?.url ?? url
+        let isImageContentType = ((response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Type") ?? "")
+            .lowercased().hasPrefix("image/")
+        let responseText = isImageContentType ? "" : (String(data: data, encoding: .utf8) ?? "")
+
+        // If CF blocked the image CDN, solve the challenge for that host then
+        // retry with the fresh cookie.
+        if JSEngine.isTurnstileResponse(status: httpStatus, body: responseText) {
+            Logger.shared.log("[Image] CF challenge detected status=\(httpStatus) host=\(finalURL.host ?? "?")", type: "Debug")
+            let cfTarget = finalURL
+            let cfHostStr = cfTarget.host ?? ""
+
+            if CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) == nil {
+                try? await CloudflareBypassManager.shared.triggerBypass(for: cfTarget)
+            }
+
+            var retryRequest = Self.makeImageRequest(for: cfTarget)
+            // cf_clearance is bound to the UA that solved the challenge — use the
+            // bypass WebView's actual UA + full cookie header, not our default.
+            if let info = await CloudflareBypassManager.shared.bypassSessionInfo(for: cfHostStr) {
+                retryRequest.setValue(info.cookieHeader, forHTTPHeaderField: "Cookie")
+                if !info.userAgent.isEmpty {
+                    retryRequest.setValue(info.userAgent, forHTTPHeaderField: "User-Agent")
+                }
+            } else if let cfHeader = CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) {
+                retryRequest.setValue(cfHeader, forHTTPHeaderField: "Cookie")
+                if let ua = CloudflareBypassManager.shared.bypassUserAgent(for: cfHostStr) {
+                    retryRequest.setValue(ua, forHTTPHeaderField: "User-Agent")
+                }
+            }
+            guard let (retryData, retryResponse) = try? await Self.session.data(for: retryRequest) else {
+                Logger.shared.log("[Image] CF retry network error host=\(cfHostStr)", type: "Error")
+                return nil
+            }
+            guard let loaded = PlatformImage(data: retryData) else {
+                let st = (retryResponse as? HTTPURLResponse)?.statusCode ?? -1
+                let snippet = (String(data: retryData, encoding: .utf8) ?? "").prefix(120)
+                Logger.shared.log("[Image] CF retry decode failed host=\(cfHostStr) status=\(st) body=\(snippet)", type: "Error")
+                return nil
+            }
+            KingfisherManager.shared.cache.store(loaded, original: retryData, forKey: urlString, toDisk: true) { _ in }
+            return loaded
+        }
+
+        guard let loaded = PlatformImage(data: data) else {
+            let snippet = responseText.prefix(160).replacingOccurrences(of: "\n", with: " ")
+            Logger.shared.log("[Image] decode failed status=\(httpStatus) host=\(url.host ?? "?") len=\(data.count) body=\(snippet)", type: "Error")
+            return nil
+        }
+
+        KingfisherManager.shared.cache.store(loaded, original: data, forKey: urlString, toDisk: true) { _ in }
+        return loaded
     }
 }
 

@@ -15,7 +15,9 @@ final class CacheManager: ObservableObject {
     
     // MARK: - Size Calculations
     
-    var imageCacheSize: Int { URLCache.shared.currentDiskUsage + CachedAsyncImage.diskCacheBytes }
+    var imageCacheSize: Int {
+        get async { URLCache.shared.currentDiskUsage + (await CachedAsyncImage.diskCacheBytes) }
+    }
     
     var websiteDataSize: Int {
         let libraryDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
@@ -69,7 +71,10 @@ final class CacheManager: ObservableObject {
     }
 
     var totalDiskUsage: Int {
-        imageCacheSize + websiteDataSize + tempFilesSize + continueWatchingSize + watchHistorySize + searchAliasSize + idMappingSize + episodeSortSize
+        get async {
+            (await imageCacheSize) + websiteDataSize + tempFilesSize + continueWatchingSize
+                + watchHistorySize + searchAliasSize + idMappingSize + episodeSortSize
+        }
     }
 
     // MARK: - Individual Reset Methods
