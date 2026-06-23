@@ -15,8 +15,11 @@ final class CacheManager: ObservableObject {
     
     // MARK: - Size Calculations
     
+    /// Kingfisher owns all image caching (its own disk storage, capped at 500 MB).
+    /// `URLCache.shared` no longer holds images — it's the general HTTP/API response
+    /// cache — so counting it here double-counted and pushed the figure past the cap.
     var imageCacheSize: Int {
-        get async { URLCache.shared.currentDiskUsage + (await CachedAsyncImage.diskCacheBytes) }
+        get async { await CachedAsyncImage.diskCacheBytes }
     }
     
     var websiteDataSize: Int {

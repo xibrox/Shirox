@@ -76,4 +76,29 @@ final class KingfisherImageCacheTests: XCTestCase {
         let size = await CacheManager.shared.imageCacheSize
         XCTAssertGreaterThanOrEqual(size, 0)
     }
+
+    /// Kingfisher owns the image cache now; `URLCache.shared` is the general
+    /// HTTP/API response cache. `imageCacheSize` must reflect only Kingfisher's
+    /// disk store, otherwise the figure double-counts and blows past the 500 MB cap.
+    @MainActor
+    func testImageSizeExcludesSharedURLCache() async {
+        let original = URLCache.shared
+        defer { URLCache.shared = original }
+
+        // memoryCapacity 0 forces the response onto disk so currentDiskUsage > 0.
+        let probe = URLCache(memoryCapacity: 0, diskCapacity: 50 * 1024 * 1024, diskPath: "imgcache-test")
+        URLCache.shared = probe
+        let url = URL(string: "https://test.example/urlcache-\(UUID().uuidString).json")!
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                                       headerFields: ["Content-Type": "application/json"])!
+        probe.storeCachedResponse(
+            CachedURLResponse(response: response, data: Data(count: 1 * 1024 * 1024)),
+            for: URLRequest(url: url)
+        )
+
+        let kingfisherBytes = await CachedAsyncImage.diskCacheBytes
+        let reported = await CacheManager.shared.imageCacheSize
+        XCTAssertEqual(reported, kingfisherBytes,
+            "imageCacheSize must reflect only Kingfisher's disk store, not URLCache.shared (probe disk usage: \(probe.currentDiskUsage))")
+    }
 }
