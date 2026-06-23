@@ -137,4 +137,84 @@ final class LocalLibraryTrackingTests: XCTestCase {
                             title: "Movie", imageUrl: nil, episodes: nil)
         XCTAssertNotEqual(a.uniqueId, b.uniqueId)
     }
+
+    // MARK: - remoteTrackDecision: rewatch / REPEATING preservation
+
+    /// THE BUG: an entry already REPEATING (rewatching) on AniList/MAL must stay REPEATING when
+    /// the next episode is auto-tracked — it was being demoted to CURRENT ("watching").
+    func testRepeatingStaysRepeatingMidRewatch() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .repeating, currentProgress: 3,
+            watchedEpisode: 4, totalEpisodes: 12, isCompleted: false, skipRewatch: true)
+        XCTAssertEqual(d, .write(status: .repeating, progress: 4, incrementRepeat: false))
+    }
+
+    /// Finishing the final episode of a rewatch completes the entry and bumps the repeat count.
+    func testRepeatingFinaleCompletesAndIncrementsRepeat() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .repeating, currentProgress: 11,
+            watchedEpisode: 12, totalEpisodes: 12, isCompleted: true, skipRewatch: true)
+        XCTAssertEqual(d, .write(status: .completed, progress: 12, incrementRepeat: true))
+    }
+
+    /// Re-watching an episode at/under tracked progress is skipped (no redundant write) while
+    /// REPEATING, with "never reduce progress" on.
+    func testRepeatingSkipsAlreadyTrackedEpisode() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .repeating, currentProgress: 5,
+            watchedEpisode: 5, totalEpisodes: 12, isCompleted: false, skipRewatch: true)
+        XCTAssertEqual(d, .skip)
+    }
+
+    // MARK: - remoteTrackDecision: completed → rewatch start (existing behavior)
+
+    /// A completed multi-episode entry begins a rewatch as REPEATING.
+    func testCompletedMultiEpStartsRepeating() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .completed, currentProgress: 12,
+            watchedEpisode: 1, totalEpisodes: 12, isCompleted: false, skipRewatch: false)
+        XCTAssertEqual(d, .write(status: .repeating, progress: 1, incrementRepeat: false))
+    }
+
+    /// A completed single-episode entry bumps the repeat count without a REPEATING phase.
+    func testCompletedSingleEpIncrementsRepeat() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .completed, currentProgress: 1,
+            watchedEpisode: 1, totalEpisodes: 1, isCompleted: true, skipRewatch: false)
+        XCTAssertEqual(d, .write(status: .completed, progress: 1, incrementRepeat: true))
+    }
+
+    /// With "never reduce progress" on, a completed entry is left untouched (no rewatch).
+    func testCompletedSkippedWhenNeverReduceProgress() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .completed, currentProgress: 12,
+            watchedEpisode: 1, totalEpisodes: 12, isCompleted: false, skipRewatch: true)
+        XCTAssertEqual(d, .skip)
+    }
+
+    // MARK: - remoteTrackDecision: normal progress
+
+    /// A normal in-progress entry advances CURRENT with raised progress.
+    func testCurrentAdvancesWatching() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .current, currentProgress: 4,
+            watchedEpisode: 5, totalEpisodes: 12, isCompleted: false, skipRewatch: true)
+        XCTAssertEqual(d, .write(status: .current, progress: 5, incrementRepeat: false))
+    }
+
+    /// Reaching the finale of a first watch completes the entry.
+    func testCurrentFinaleCompletes() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: .current, currentProgress: 11,
+            watchedEpisode: 12, totalEpisodes: 12, isCompleted: true, skipRewatch: true)
+        XCTAssertEqual(d, .write(status: .completed, progress: 12, incrementRepeat: false))
+    }
+
+    /// No existing remote entry starts a fresh CURRENT entry.
+    func testNoEntryStartsWatching() {
+        let d = ContinueWatchingManager.remoteTrackDecision(
+            currentStatus: nil, currentProgress: 0,
+            watchedEpisode: 1, totalEpisodes: 12, isCompleted: false, skipRewatch: true)
+        XCTAssertEqual(d, .write(status: .current, progress: 1, incrementRepeat: false))
+    }
 }

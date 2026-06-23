@@ -808,6 +808,42 @@ import Combine
         UserDefaults.standard.object(forKey: key) == nil ? def : UserDefaults.standard.bool(forKey: key)
     }
 
+    /// The write a remote (AniList/MAL) auto-track event should perform, or `.skip` to leave the
+    /// entry untouched. `incrementRepeat` means: set the rewatch/repeat count to existing + 1.
+    enum RemoteTrackDecision: Equatable {
+        case skip
+        case write(status: MediaListStatus, progress: Int, incrementRepeat: Bool)
+    }
+
+    /// Decides the remote auto-track write for a watched-episode event, shared by AniList and MAL
+    /// so both obey the same rewatch convention:
+    ///  • A COMPLETED entry begins a rewatch — REPEATING for multi-episode shows, or a straight
+    ///    repeat-count bump for single-episode entries — unless "never reduce progress" is on.
+    ///  • A REPEATING (rewatching) entry stays REPEATING until the finale, then completes and bumps
+    ///    the repeat count. (Previously it was demoted to CURRENT — the "rewatching → watching" bug.)
+    ///  • Any other status advances to CURRENT, or COMPLETED at the finale.
+    /// `currentStatus == nil` means there is no existing remote entry. Returns `.skip` when the event
+    /// must not touch the entry (already tracked / never-reduce-progress). Pure, no side effects.
+    nonisolated static func remoteTrackDecision(
+        currentStatus: MediaListStatus?, currentProgress: Int,
+        watchedEpisode ep: Int, totalEpisodes: Int?, isCompleted: Bool,
+        skipRewatch: Bool) -> RemoteTrackDecision {
+
+        switch currentStatus {
+        case .completed:
+            if skipRewatch { return .skip }
+            if totalEpisodes == 1 { return .write(status: .completed, progress: ep, incrementRepeat: true) }
+            return .write(status: .repeating, progress: ep, incrementRepeat: false)
+        case .repeating:
+            if isCompleted { return .write(status: .completed, progress: ep, incrementRepeat: true) }
+            if skipRewatch && ep <= currentProgress { return .skip }
+            return .write(status: .repeating, progress: ep, incrementRepeat: false)
+        default:
+            if skipRewatch && ep <= currentProgress { return .skip }
+            return .write(status: isCompleted ? .completed : .current, progress: ep, incrementRepeat: false)
+        }
+    }
+
     /// Pushes episode progress to AniList and MAL, replicating the player's full tracking logic.
     /// Handles .completed (rewatch), .repeating, and .current status correctly for both services.
     func pushRemoteProgress(ep rawEp: Int, context: MarkContext) async {
@@ -837,7 +873,6 @@ import Combine
         // An airing show is never "completed": even if a stale module reports
         // totalEpisodes as the currently-aired count, more episodes are still coming.
         let isCompleted = context.isAiring != true && totalEpisodes != nil && totalEpisodes == ep
-        let targetStatus: MediaListStatus = isCompleted ? .completed : .current
 
         // --- AniList ---
         if aniListEnabled, AniListAuthManager.shared.isLoggedIn {
@@ -850,31 +885,25 @@ import Combine
                 resolvedAniListID = nil
             }
             if let aid = resolvedAniListID {
-                if let current = try? await AniListProvider.shared.fetchEntry(mediaId: aid) {
-                    if current.status == .completed && skipRewatch {
-                        // "Never reduce progress" is on: leave the completed entry untouched
-                        // instead of resetting it to a lower ep via rewatch tracking.
-                        Logger.shared.log("[Tracking] AniList skip rewatch (never reduce progress): ep \(ep) on completed entry", type: "Info")
-                    } else if current.status == .completed {
-                        if totalEpisodes == 1 {
-                            let newRepeat = (current.timesRewatched ?? 0) + 1
-                            Logger.shared.log("[Tracking] AniList rewatch (single-ep): repeat → \(newRepeat)", type: "Info")
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: aid, status: .completed, progress: ep, repeat: newRepeat)
-                        } else {
-                            Logger.shared.log("[Tracking] AniList rewatch: setting REPEATING at ep \(ep)", type: "Info")
-                            try? await AniListLibraryService.shared.updateEntry(
-                                mediaId: aid, status: .repeating, progress: ep)
-                        }
-                    } else if skipRewatch && ep <= current.progress {
-                        Logger.shared.log("[Tracking] AniList skip: ep \(ep) <= tracked \(current.progress)", type: "Info")
+                let current = try? await AniListProvider.shared.fetchEntry(mediaId: aid)
+                let decision = Self.remoteTrackDecision(
+                    currentStatus: current?.status, currentProgress: current?.progress ?? 0,
+                    watchedEpisode: ep, totalEpisodes: totalEpisodes,
+                    isCompleted: isCompleted, skipRewatch: skipRewatch)
+                switch decision {
+                case .skip:
+                    Logger.shared.log("[Tracking] AniList skip: ep \(ep) (status \(current?.status.rawValue ?? "none"), tracked \(current?.progress ?? 0))", type: "Info")
+                case let .write(status, progress, incrementRepeat):
+                    if incrementRepeat {
+                        let newRepeat = (current?.timesRewatched ?? 0) + 1
+                        Logger.shared.log("[Tracking] AniList rewatch complete: \(status.rawValue) ep \(progress), repeat → \(newRepeat)", type: "Info")
+                        try? await AniListLibraryService.shared.updateEntry(
+                            mediaId: aid, status: status, progress: progress, repeat: newRepeat)
                     } else {
+                        Logger.shared.log("[Tracking] AniList update: \(status.rawValue) ep \(progress)", type: "Info")
                         try? await AniListProvider.shared.updateEntry(
-                            mediaId: aid, status: targetStatus, progress: ep, score: 0)
+                            mediaId: aid, status: status, progress: progress, score: 0)
                     }
-                } else {
-                    try? await AniListProvider.shared.updateEntry(
-                        mediaId: aid, status: targetStatus, progress: ep, score: 0)
                 }
             }
         }
@@ -890,49 +919,29 @@ import Combine
                 resolvedMALID = nil
             }
             if let mid = resolvedMALID {
-                if let current = try? await MALProvider.shared.fetchEntry(mediaId: mid) {
-                    if current.status == .completed && skipRewatch {
-                        // "Never reduce progress" is on: leave the completed entry untouched
-                        // instead of resetting num_watched_episodes to a lower ep via rewatch tracking.
-                        Logger.shared.log("[Tracking] MAL skip rewatch (never reduce progress): ep \(ep) on completed entry", type: "Info")
-                    } else if current.status == .completed {
-                        if totalEpisodes == 1 {
-                            let newRepeat = (current.timesRewatched ?? 0) + 1
-                            Logger.shared.log("[Tracking] MAL rewatch (single-ep): num_times_rewatched → \(newRepeat)", type: "Info")
-                            do {
-                                try await MALLibraryService.shared.updateEntry(
-                                    malId: mid, status: .completed, progress: ep, score: 0,
-                                    numTimesRewatched: newRepeat)
-                            } catch {
-                                Logger.shared.log("[Tracking] MAL single-ep rewatch update failed: \(error)", type: "Error")
-                            }
-                        } else {
-                            Logger.shared.log("[Tracking] MAL rewatch: setting rewatching at ep \(ep)", type: "Info")
-                            do {
-                                try await MALLibraryService.shared.updateEntry(
-                                    malId: mid, status: .repeating, progress: ep, score: 0)
-                            } catch {
-                                Logger.shared.log("[Tracking] MAL rewatch update failed: \(error)", type: "Error")
-                            }
-                        }
-                    } else if skipRewatch && ep <= current.progress {
-                        Logger.shared.log("[Tracking] MAL skip: ep \(ep) <= tracked \(current.progress)", type: "Info")
-                    } else {
-                        do {
-                            try await MALProvider.shared.updateEntry(
-                                mediaId: mid, status: targetStatus, progress: ep, score: 0)
-                            Logger.shared.log("[Tracking] MAL progress updated: ep \(ep), malId \(mid)", type: "Info")
-                        } catch {
-                            Logger.shared.log("[Tracking] MAL update failed: \(error)", type: "Error")
-                        }
-                    }
-                } else {
+                let current = try? await MALProvider.shared.fetchEntry(mediaId: mid)
+                let decision = Self.remoteTrackDecision(
+                    currentStatus: current?.status, currentProgress: current?.progress ?? 0,
+                    watchedEpisode: ep, totalEpisodes: totalEpisodes,
+                    isCompleted: isCompleted, skipRewatch: skipRewatch)
+                switch decision {
+                case .skip:
+                    Logger.shared.log("[Tracking] MAL skip: ep \(ep) (status \(current?.status.rawValue ?? "none"), tracked \(current?.progress ?? 0))", type: "Info")
+                case let .write(status, progress, incrementRepeat):
                     do {
-                        try await MALProvider.shared.updateEntry(
-                            mediaId: mid, status: targetStatus, progress: ep, score: 0)
-                        Logger.shared.log("[Tracking] MAL progress updated (new entry): ep \(ep), malId \(mid)", type: "Info")
+                        if incrementRepeat {
+                            let newRepeat = (current?.timesRewatched ?? 0) + 1
+                            try await MALLibraryService.shared.updateEntry(
+                                malId: mid, status: status, progress: progress, score: 0,
+                                numTimesRewatched: newRepeat)
+                            Logger.shared.log("[Tracking] MAL rewatch complete: \(status.rawValue) ep \(progress), num_times_rewatched → \(newRepeat)", type: "Info")
+                        } else {
+                            try await MALProvider.shared.updateEntry(
+                                mediaId: mid, status: status, progress: progress, score: 0)
+                            Logger.shared.log("[Tracking] MAL update: \(status.rawValue) ep \(progress), malId \(mid)", type: "Info")
+                        }
                     } catch {
-                        Logger.shared.log("[Tracking] MAL new-entry update failed: \(error)", type: "Error")
+                        Logger.shared.log("[Tracking] MAL update failed: \(error)", type: "Error")
                     }
                 }
             }
