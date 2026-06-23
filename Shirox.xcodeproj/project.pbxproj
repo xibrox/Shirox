@@ -430,6 +430,7 @@
 		AA105005000000000000F104 /* LocalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA105005000000000000F101 /* LocalSource.swift */; };
 		AB8F741F717C0AE76F351730 /* LibraryCollapsingHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */; };
 		B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */; };
+		D1A2B3C4E5F60718293A4B5C /* SeasonChainMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4E5F60718293A4B5D /* SeasonChainMathTests.swift */; };
 		BAEE9A1A2FCB000000000002 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000003 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000004 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
@@ -596,6 +597,7 @@
 		8AEB99F66BCE9D9EB4997319 /* ShiroxTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShiroxTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCollection.swift; sourceTree = "<group>"; };
 		A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalLibraryTrackingTests.swift; sourceTree = "<group>"; };
+		D1A2B3C4E5F60718293A4B5D /* SeasonChainMathTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeasonChainMathTests.swift; sourceTree = "<group>"; };
 		A88804D3B352FD28723122E3 /* NotificationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationBadge.swift; sourceTree = "<group>"; };
 		A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KingfisherImageCache.swift; sourceTree = "<group>"; };
 		AA000003000000000000BB01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -910,6 +912,7 @@
 			isa = PBXGroup;
 			children = (
 				A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */,
+				D1A2B3C4E5F60718293A4B5D /* SeasonChainMathTests.swift */,
 				EC154F4B51E6E8262096B6AE /* KingfisherImageCacheTests.swift */,
 			);
 			path = ShiroxTests;
@@ -1117,6 +1120,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B05F81C2BD3F840B5653C02B /* LocalLibraryTrackingTests.swift in Sources */,
+				D1A2B3C4E5F60718293A4B5C /* SeasonChainMathTests.swift in Sources */,
 				E227DA58285C280ED3980B82 /* KingfisherImageCacheTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -21,10 +21,16 @@ struct SiblingSeason: Equatable, Codable {
 /// Pure boundary math — no app dependencies, fully unit-testable.
 enum SeasonChainMath {
 
-    /// Maps a global (module-absolute) episode number to the correct sibling season
-    /// and its season-relative episode number. Returns nil when it can't resolve
-    /// (fewer than 2 siblings, or a needed prior-season count is missing) — caller falls back.
-    static func map(globalEpisode: Int, siblings: [SiblingSeason]) -> SeasonMapping? {
+    /// Maps a module episode number to the correct sibling season and its season-relative
+    /// episode number. The number is interpreted relative to `anchor` — the season/cour the
+    /// user matched and is watching — so a per-cour number lands on that cour while a
+    /// continuous number still flows forward across later cours. Returns nil when it can't
+    /// resolve (fewer than 2 siblings, or a needed prior-season count is missing) — caller
+    /// falls back.
+    static func map(globalEpisode: Int,
+                    anchorAniListID: Int? = nil,
+                    anchorMALID: Int? = nil,
+                    siblings: [SiblingSeason]) -> SeasonMapping? {
         guard globalEpisode > 0, siblings.count >= 2 else { return nil }
 
         // Cumulative episode base for each tvdb_season (sum of all earlier tvdb_seasons' totals).
@@ -48,7 +54,17 @@ enum SeasonChainMath {
             .map { (s: $0, start: (base[$0.tvdbSeason] ?? 0) + $0.tvdbEpoffset) }
             .sorted { $0.start < $1.start }
 
-        // Find the sibling whose (start, upper] range contains globalEpisode.
+        // The module numbers episodes from 1 at the *anchor* entry (the season/cour the user
+        // matched), not from the franchise's first season. Shift the incoming number by the
+        // anchor's own global start so a per-cour number lands on the cour being watched and a
+        // continuous number still flows forward. Unknown anchor → start 0 (legacy behavior).
+        let anchorStart = withStart.first { e in
+            (anchorAniListID != nil && e.s.aniListID == anchorAniListID) ||
+            (anchorMALID != nil && e.s.malID == anchorMALID)
+        }?.start ?? 0
+        let effectiveEpisode = globalEpisode + anchorStart
+
+        // Find the sibling whose (start, upper] range contains effectiveEpisode.
         // Upper bound = start + episodeCount when known, else the next sibling's start,
         // else +infinity (last sibling absorbs overflow).
         var chosen = withStart.last!
@@ -61,13 +77,13 @@ enum SeasonChainMath {
             } else {
                 upper = Int.max
             }
-            if globalEpisode > e.start && globalEpisode <= upper {
+            if effectiveEpisode > e.start && effectiveEpisode <= upper {
                 chosen = e
                 break
             }
         }
 
-        let relative = globalEpisode - chosen.start
+        let relative = effectiveEpisode - chosen.start
         guard relative > 0 else { return nil }
         return SeasonMapping(aniListID: chosen.s.aniListID, malID: chosen.s.malID,
                              relativeEpisode: relative, seasonEpisodeCount: chosen.s.episodeCount)

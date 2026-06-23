@@ -31,8 +31,11 @@ final class SeasonChainMapper {
             siblings = await withCounts(rawSiblings)
         }
 
-        // 4. Pure mapping
-        guard let mapping = SeasonChainMath.map(globalEpisode: globalEpisode, siblings: siblings) else {
+        // 4. Pure mapping (anchor-relative — the module numbers from 1 at the matched entry)
+        guard let mapping = SeasonChainMath.map(globalEpisode: globalEpisode,
+                                                anchorAniListID: anchorAniListID,
+                                                anchorMALID: anchorMALID,
+                                                siblings: siblings) else {
             return nil
         }
         Logger.shared.log(
