@@ -51,7 +51,8 @@ struct LibrarySourceSwitcher: View {
                 }
                 Spacer()
             }
-            .padding(.horizontal, 16)
+            // No internal horizontal padding — call sites supply the 16pt inset (matching
+            // `filterCapsuleRow`) so the pills sit flush-left with the List button + search bar.
             .padding(.vertical, 8)
         }
     }

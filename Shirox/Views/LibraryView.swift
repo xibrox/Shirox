@@ -550,6 +550,7 @@ struct LibraryView: View {
         VStack(spacing: 0) {
             #if !os(iOS)
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                .padding(.horizontal, 16)
             // Combined row: Status on left, Genres on right
             filterCapsuleRow
                 .padding(.horizontal, 16)
