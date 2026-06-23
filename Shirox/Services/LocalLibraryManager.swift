@@ -114,9 +114,25 @@ import Combine
     }
 
     func renameCollection(id: UUID, to name: String) {
-        guard let idx = collections.firstIndex(where: { $0.id == id }) else { return }
-        collections[idx].name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let idx = collections.firstIndex(where: { $0.id == id }),
+              let resolved = Self.resolvedCollectionName(in: collections, renaming: id, to: name)
+        else { return }
+        collections[idx].name = resolved
         persist()
+    }
+
+    /// The final name to apply for a rename, or `nil` to no-op. Trims whitespace, rejects an
+    /// empty result, and rejects a case-insensitive collision with a *different* collection
+    /// (renaming to its own current name is allowed). Mirrors the dedupe in `createCollection`.
+    nonisolated static func resolvedCollectionName(
+        in collections: [LocalCollection], renaming id: UUID, to name: String
+    ) -> String? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let collides = collections.contains {
+            $0.id != id && $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+        }
+        return collides ? nil : trimmed
     }
 
     func deleteCollection(id: UUID) {

@@ -16,6 +16,7 @@ struct LibraryEntryEditSheet: View {
     @State private var showDeleteConfirmation = false
     @State private var showNewCollection = false
     @State private var newCollectionName = ""
+    @StateObject private var editor = CollectionEditor()
 
     private var scoreFormat: ScoreFormat {
         if let scoreFormatOverride { return scoreFormatOverride }
@@ -92,6 +93,36 @@ struct LibraryEntryEditSheet: View {
                                     }
                                 }
                             }
+                            #if !os(tvOS)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    editor.requestDelete(collection)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(.red)
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    editor.beginRename(collection)
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                            #endif
+                            .contextMenu {
+                                Button {
+                                    editor.beginRename(collection)
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    editor.requestDelete(collection)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                         Button {
                             showNewCollection = true
@@ -157,6 +188,7 @@ struct LibraryEntryEditSheet: View {
             } message: {
                 Text("Group this title under a custom collection.")
             }
+            .collectionEditorAlerts(editor)
         }
     }
 }

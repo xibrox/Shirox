@@ -217,4 +217,41 @@ final class LocalLibraryTrackingTests: XCTestCase {
             watchedEpisode: 1, totalEpisodes: 12, isCompleted: false, skipRewatch: true)
         XCTAssertEqual(d, .write(status: .current, progress: 1, incrementRepeat: false))
     }
+
+    // MARK: - resolvedCollectionName: rename guard
+
+    private func makeCollections() -> [LocalCollection] {
+        [LocalCollection(id: UUID(), name: "Favorites"),
+         LocalCollection(id: UUID(), name: "Movies")]
+    }
+
+    /// A valid new name is trimmed and returned.
+    func testRenameTrimsWhitespace() {
+        let cols = makeCollections()
+        let resolved = LocalLibraryManager.resolvedCollectionName(
+            in: cols, renaming: cols[0].id, to: "  Top Picks  ")
+        XCTAssertEqual(resolved, "Top Picks")
+    }
+
+    /// An empty / whitespace-only name is rejected (no-op rename).
+    func testRenameRejectsEmptyName() {
+        let cols = makeCollections()
+        XCTAssertNil(LocalLibraryManager.resolvedCollectionName(
+            in: cols, renaming: cols[0].id, to: "   "))
+    }
+
+    /// Renaming onto a *different* collection's name (case-insensitive) is rejected.
+    func testRenameRejectsCollisionWithOtherCollection() {
+        let cols = makeCollections()
+        XCTAssertNil(LocalLibraryManager.resolvedCollectionName(
+            in: cols, renaming: cols[0].id, to: "movies"))
+    }
+
+    /// Keeping a collection's own name (any casing) is allowed.
+    func testRenameAllowsOwnNameUnchanged() {
+        let cols = makeCollections()
+        let resolved = LocalLibraryManager.resolvedCollectionName(
+            in: cols, renaming: cols[0].id, to: "favorites")
+        XCTAssertEqual(resolved, "favorites")
+    }
 }

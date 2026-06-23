@@ -37,6 +37,7 @@ struct LibraryView: View {
     @State private var selectedEntry: LibraryEntry? = nil
     @State private var pendingEntry: LibraryEntry? = nil
     @State private var showProviderPicker = false
+    @State private var showManageCollections = false
     @State private var otherEntry: LibraryEntry? = nil
     @State private var otherMedia: Media? = nil
     @State private var showOtherSheet = false
@@ -260,6 +261,13 @@ struct LibraryView: View {
                                 Image(systemName: "checkmark")
                             }
                         }
+                    }
+                }
+                if vm.isLocal {
+                    Button {
+                        showManageCollections = true
+                    } label: {
+                        Label("Manage Collections…", systemImage: "folder.badge.gearshape")
                     }
                 }
             }
@@ -755,6 +763,9 @@ struct LibraryView: View {
         }
         .adaptiveSheet(isPresented: $showNotifications) {
             NotificationsView(vm: profileVM)
+        }
+        .adaptiveSheet(isPresented: $showManageCollections) {
+            ManageCollectionsView()
         }
     }
 }
