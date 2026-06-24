@@ -190,8 +190,21 @@ final class HLSProxyServer: @unchecked Sendable {
 
     private func rewriteLocalManifest(_ text: String, baseURL: URL) -> String {
         let folderURL = baseURL.deletingLastPathComponent()
+        func proxied(_ fileName: String) -> String? {
+            proxyURL(for: folderURL.appendingPathComponent(fileName))?.absoluteString
+        }
         return text.components(separatedBy: .newlines).map { line -> String in
             let tr = line.trimmingCharacters(in: .whitespaces)
+            // fMP4 init segment: rewrite the quoted URI in #EXT-X-MAP so AVPlayer fetches it
+            // through the proxy too — a relative "init.mp4" would otherwise resolve against the
+            // proxy's /proxy path and lose the ?url= query, 404ing the init segment.
+            if tr.hasPrefix("#EXT-X-MAP:"), let r = tr.range(of: "URI=\"") {
+                let afterQuote = r.upperBound
+                guard let closing = tr[afterQuote...].firstIndex(of: "\"") else { return line }
+                let uri = String(tr[afterQuote..<closing])
+                guard let mapped = proxied(uri) else { return line }
+                return "#EXT-X-MAP:URI=\"\(mapped)\""
+            }
             guard !tr.isEmpty && !tr.hasPrefix("#") else { return line }
             let segURL = folderURL.appendingPathComponent(tr)
             return proxyURL(for: segURL)?.absoluteString ?? line
@@ -248,6 +261,7 @@ final class HLSProxyServer: @unchecked Sendable {
     private func getMimeType(for ext: String) -> String {
         switch ext.lowercased() {
         case "mp4": return "video/mp4"
+        case "m4s": return "video/iso.segment" // fMP4/CMAF media segment
         case "ts": return "video/mp2t"
         case "m3u8": return "application/x-mpegURL"
         default: return "application/octet-stream"
