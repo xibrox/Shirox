@@ -330,6 +330,11 @@ struct PlayerView: View {
             if currentContext?.isLocalPlayback == true {
                 LocalPlaybackCoordinator.shared.releaseAll()
             }
+            #if os(iOS)
+            // Give up audio focus on exit so system music (Spotify/Apple Music)
+            // can resume. .notifyOthersOnDeactivation triggers their auto-resume.
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            #endif
         }
         .onChangeOf(volume) { newVolume in
             player?.volume = newVolume
@@ -1245,6 +1250,9 @@ struct PlayerView: View {
         audioGroup = nil
         #if os(iOS)
         videoReady = false
+        // Take audio focus now that a player is actually opening. This is what
+        // interrupts system music — deliberately deferred from app launch.
+        try? AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
         #endif
 
         let asset: AVURLAsset
