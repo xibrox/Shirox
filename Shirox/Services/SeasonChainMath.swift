@@ -66,8 +66,12 @@ enum SeasonChainMath {
 
         // Find the sibling whose (start, upper] range contains effectiveEpisode.
         // Upper bound = start + episodeCount when known, else the next sibling's start,
-        // else +infinity (last sibling absorbs overflow).
-        var chosen = withStart.last!
+        // else +infinity (a last sibling with *unknown* count absorbs continuous overflow).
+        // No range matches → the episode lies beyond the known chain (e.g. the newest cour
+        // isn't in the offline data yet). Decline so the caller falls back to the anchor the
+        // user matched, rather than dumping the episode onto the last known cour as an
+        // impossible number (the "ep 13 of a 12-episode cour" bug).
+        var chosen: (s: SiblingSeason, start: Int)?
         for (i, e) in withStart.enumerated() {
             let upper: Int
             if let count = e.s.episodeCount {
@@ -82,6 +86,7 @@ enum SeasonChainMath {
                 break
             }
         }
+        guard let chosen else { return nil }
 
         let relative = effectiveEpisode - chosen.start
         guard relative > 0 else { return nil }

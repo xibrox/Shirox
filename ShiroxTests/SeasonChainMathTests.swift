@@ -65,4 +65,18 @@ final class SeasonChainMathTests: XCTestCase {
         XCTAssertEqual(m?.aniListID, 105333, "no anchor match → counts from S1")
         XCTAssertEqual(m?.relativeEpisode, 12)
     }
+
+    /// THE BUG: the newest cour (Science Future III, 199221) is still missing from the
+    /// cached offline chain. Watching its ep 1 (continuous module number 25, anchored to
+    /// the first Science Future cour) overflows past the last KNOWN cour (Science Future II,
+    /// 189117, 12 eps). The math used to dump it onto that last cour as ep 13 — an episode
+    /// that cannot exist. An episode beyond the known chain must decline (nil) so the caller
+    /// falls back to the anchor the user actually matched, never invent ep 13 of a 12-ep cour.
+    func testEpisodeBeyondKnownChainDeclinesInsteadOfOverflowingLastCour() {
+        let chainMissingNewest = drStoneChain().filter { $0.aniListID != 199221 }
+        let m = SeasonChainMath.map(globalEpisode: 25,
+                                    anchorAniListID: 172019, anchorMALID: 57592,
+                                    siblings: chainMissingNewest)
+        XCTAssertNil(m, "episode past the last known cour must not map to a nonexistent ep")
+    }
 }
