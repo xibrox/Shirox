@@ -123,6 +123,9 @@ struct PlayerView: View {
     @State private var stallRecoveryAttempts = 0
     @State private var isRecoveringStall = false
     @State private var showStallRetry = false
+    // When we were truly backgrounded (home/app-switch/lock), so foreground can tell a
+    // brief resign-active from a suspension long enough to have killed the source.
+    @State private var backgroundedAt: Date? = nil
 
     // Audio-session interruption (calls, Siri, other media apps)
     @State private var wasPlayingBeforeInterruption = false
@@ -398,6 +401,12 @@ struct PlayerView: View {
                 player?.rate = isPlaying ? Float(playbackSpeed) : 0
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            // Stamp the moment we're TRULY backgrounded (home / app switch / lock) — not a
+            // transient resign-active like Control Center or a banner. The foreground handler
+            // reads this to decide whether we were suspended long enough that the source died.
+            backgroundedAt = Date()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             guard let player else { return }
             // While casting, `isPlaying` mirrors the Chromecast's state and the local
@@ -405,6 +414,28 @@ struct PlayerView: View {
             // from both the device and the TV.
             if castManager.isConnected {
                 player.pause()
+                return
+            }
+            // How long we were actually suspended (didEnterBackground → now). A transient
+            // resign-active never set backgroundedAt, so it reads 0 and we take the cheap path.
+            let suspendedFor = backgroundedAt.map { Date().timeIntervalSince($0) } ?? 0
+            backgroundedAt = nil
+            // Once iOS suspends us the forward buffer is evicted and the source dies — a
+            // streaming CDN URL expires, a download's localhost HLS proxy loses its sockets. A
+            // PAUSED player has no stall watchdog (it never enters .waitingToPlayAtSpecifiedRate),
+            // so the resume-seek below just wedges on the dead source: black frame, infinite
+            // spinner, no recovery. (The PLAYING case self-heals — the watchdog escalates to a
+            // refetch.) So when we come back paused after a real suspension, proactively
+            // re-resolve the source. recoverByRefetch preserves position and keeps us paused.
+            // Decision (thresholds, paused-only, recoverable) is unit-tested in
+            // PlayerForegroundRecoveryTests.
+            if PlayerForegroundRecovery.shouldRecoverOnForeground(
+                suspendedFor: suspendedFor,
+                isPlaying: isPlaying,
+                isLocalPlayback: isLocalPlayback,
+                canRecoverStream: canRecoverStream
+            ) {
+                Task { @MainActor in await recoverByRefetch() }
                 return
             }
             player.seek(
@@ -1786,6 +1817,10 @@ struct PlayerView: View {
         isRecoveringStall = true
         defer { isRecoveringStall = false }
         let resumeAt = currentTime
+        // swapStream unconditionally force-plays (rate up, isPlaying = true), so capture the
+        // user's intent now — a recovery triggered while paused must stay paused, not start
+        // playing on its own when the user returns to the app.
+        let wasPlaying = isPlaying
         Logger.shared.log("[StallRecovery] Refetching stream, will resume at \(resumeAt)s", type: "Player")
         await refetchStream() // swaps in a fresh item, resets currentTime to 0
         // Wait for the fresh item to become ready, then restore position.
@@ -1794,7 +1829,12 @@ struct PlayerView: View {
             if Task.isCancelled { return }
             if let item = player?.currentItem, item.status == .readyToPlay {
                 await player?.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-                if isPlaying { player?.playImmediately(atRate: Float(playbackSpeed)) }
+                if wasPlaying {
+                    player?.playImmediately(atRate: Float(playbackSpeed))
+                } else {
+                    player?.pause()
+                    isPlaying = false
+                }
                 currentTime = resumeAt
                 Logger.shared.log("[StallRecovery] Resumed at \(resumeAt)s after refetch", type: "Player")
                 return
