@@ -261,11 +261,11 @@ final class AniListProvider: MediaProvider {
                 createdAt: n.createdAt)
         case .mediaDataChange(let n), .mediaMerge(let n), .mediaAddition(let n):
             return ProviderNotification(id: n.id,
-                kind: .mediaChange(context: n.context),
+                kind: .mediaChange(context: n.context, mediaId: n.media?.id),
                 createdAt: n.createdAt)
         case .mediaDeletion(let n):
             return ProviderNotification(id: n.id,
-                kind: .mediaChange(context: n.context),
+                kind: .mediaChange(context: n.context, mediaId: nil),
                 createdAt: n.createdAt)
         default:
             return ProviderNotification(id: n.id, kind: .unknown(context: nil), createdAt: n.createdAt)

@@ -1,10 +1,5 @@
 import SwiftUI
 
-// MARK: - Nav destination types
-
-private struct ActivityNavItem: Identifiable, Hashable { let id: Int }
-private struct MediaNavItem: Identifiable, Hashable { let id: Int }
-
 // MARK: - Loader that fetches an activity by ID then shows ActivityDetailView
 
 struct ActivityFetchView: View {
@@ -41,9 +36,6 @@ struct NotificationsView: View {
     @ObservedObject var vm: ProfileViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var navActivity: ActivityNavItem?
-    @State private var navMedia: MediaNavItem?
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -63,12 +55,6 @@ struct NotificationsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
-            }
-            .navigationDestinationCompat(item: $navActivity) { item in
-                ActivityFetchView(activityId: item.id)
-            }
-            .navigationDestinationCompat(item: $navMedia) { item in
-                AniListDetailView(mediaId: item.id, preloadedMedia: nil)
             }
         }
         .task { if vm.notifications.isEmpty { await vm.loadNotifications() } }
@@ -123,10 +109,18 @@ struct NotificationsView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(vm.notifications) { notif in
-                        Button { handleTap(notif) } label: {
-                            notificationRow(notif)
+                        Group {
+                            if isTappable(notif) {
+                                NavigationLink {
+                                    destinationView(for: notif)
+                                } label: {
+                                    notificationRow(notif)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                notificationRow(notif)
+                            }
                         }
-                        .buttonStyle(.plain)
                         .padding(.horizontal, 12)
                     }
                 }
@@ -215,7 +209,7 @@ struct NotificationsView: View {
         case .activityMessage(_, let context, _), .activityReply(_, let context, _),
              .activityMention(_, let context, _), .activityLike(_, let context, _):
             Text("Activity ") + Text(context ?? "")
-        case .mediaChange(let context):
+        case .mediaChange(let context, _):
             Text(context ?? "A title was updated")
         case .unknown(let context):
             Text(context ?? "Notification").foregroundStyle(.secondary)
@@ -224,22 +218,30 @@ struct NotificationsView: View {
 
     private func isTappable(_ notif: ProviderNotification) -> Bool {
         switch notif.kind {
-        case .airing, .activityMessage, .activityReply, .activityMention, .activityLike, .mediaChange:
-            return true
+        case .airing(_, _, let mediaId, _):
+            return mediaId != 0
+        case .activityMessage(let id, _, _), .activityReply(let id, _, _),
+             .activityMention(let id, _, _), .activityLike(let id, _, _):
+            return id != nil
+        case .mediaChange(_, let mediaId):
+            return mediaId != nil
         default:
             return false
         }
     }
 
-    private func handleTap(_ notif: ProviderNotification) {
+    @ViewBuilder
+    private func destinationView(for notif: ProviderNotification) -> some View {
         switch notif.kind {
         case .airing(_, _, let mediaId, _):
-            navMedia = MediaNavItem(id: mediaId)
+            AniListDetailView(mediaId: mediaId, preloadedMedia: nil)
         case .activityMessage(let activityId, _, _), .activityReply(let activityId, _, _),
              .activityMention(let activityId, _, _), .activityLike(let activityId, _, _):
-            if let id = activityId { navActivity = ActivityNavItem(id: id) }
+            if let id = activityId { ActivityFetchView(activityId: id) }
+        case .mediaChange(_, let mediaId):
+            if let id = mediaId { AniListDetailView(mediaId: id, preloadedMedia: nil) }
         default:
-            break
+            EmptyView()
         }
     }
 

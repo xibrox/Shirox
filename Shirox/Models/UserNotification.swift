@@ -7,7 +7,7 @@ enum NotificationKind {
     case activityReply(activityId: Int?, context: String?, avatarURL: String?)
     case activityMention(activityId: Int?, context: String?, avatarURL: String?)
     case activityLike(activityId: Int?, context: String?, avatarURL: String?)
-    case mediaChange(context: String?)
+    case mediaChange(context: String?, mediaId: Int?)
     case unknown(context: String?)
 }
 
