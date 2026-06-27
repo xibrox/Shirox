@@ -627,6 +627,7 @@ struct DetailView: View {
             isAiring: item.isAiring,
             resumeFrom: item.watchedSeconds,
             detailHref: href,
+            episodeHref: item.episodeHref,
             streamTitle: item.streamTitle,
             workingDetailHref: href,
             thumbnailUrl: item.thumbnailUrl
@@ -640,14 +641,16 @@ struct DetailView: View {
             return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
         }}
 
+        // Anchor on the saved episode href so multi-season flat lists advance to the right
+        // season; fall back to number for items saved before episodeHref was recorded.
+        var currentHref = item.episodeHref
         let onWatchNext: WatchNextLoader? = href.map { href in { currentEpNum in
             let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-            guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                idx + 1 < episodes.count else { return nil }
-            let nextEp = episodes[idx + 1]
+            guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else { return nil }
             let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
             guard !streams.isEmpty else { return nil }
-            return (streams: streams, episodeNumber: Int(nextEp.number))
+            currentHref = nextEp.href
+            return (streams: streams, episodeNumber: Int(nextEp.number), episodeHref: nextEp.href)
         }}
 
         let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
@@ -1719,6 +1722,7 @@ struct DetailView: View {
                 isAiring: saved?.isAiring,
                 resumeFrom: resumeSeconds,
                 detailHref: item.detailHref,
+                episodeHref: item.episodeHref,
                 streamTitle: item.streamTitle,
                 workingDetailHref: item.detailHref,
                 thumbnailUrl: nil

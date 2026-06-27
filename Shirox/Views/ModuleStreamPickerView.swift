@@ -22,7 +22,7 @@ struct ModuleStreamPickerView: View {
     let animeTitle: String
     let episodeNumber: Int
     let onDismiss: () -> Void
-    let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?) -> Void  // allStreams, selectedStream, href, availableCount
+    let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?, String?) -> Void  // allStreams, selectedStream, showHref, availableCount, episodeHref
 
     @EnvironmentObject private var moduleManager: ModuleManager
     @AppStorage("useDefaultExtension") private var useDefaultExtension = false
@@ -45,10 +45,10 @@ struct ModuleStreamPickerView: View {
                         animeTitle: animeTitle,
                         episodeNumber: episodeNumber,
                         rowVm: vmStore.get(for: module, mediaId: mediaId, animeTitle: animeTitle, episodeNumber: episodeNumber)
-                    ) { streams, selectedStream, episodeHref, availableCount in
+                    ) { streams, selectedStream, showHref, availableCount, episodeHref in
                         moduleManager.selectModule(module)
                         onDismiss()
-                        onStreamsLoaded(streams, selectedStream, episodeHref, availableCount)
+                        onStreamsLoaded(streams, selectedStream, showHref, availableCount, episodeHref)
                     }
                 }
             }
@@ -98,7 +98,8 @@ private final class ModuleStreamRowViewModel: ObservableObject {
     @Published var state: State = .idle
     @Published var searchTitle: String
     @Published var readyStreams: [StreamResult]?
-    @Published var selectedEpisodeHref: String?  // Track the href for Next Episode
+    @Published var selectedEpisodeHref: String?  // Show/search-result href (used to re-fetch the episode list)
+    @Published var selectedEpisodeActualHref: String?  // The matched episode's own unique href (anchors Next Episode)
     @Published var availableCount: Int?        // Track total episodes in this module result
     @Published var cloudflareURL: URL?         // Set when *this* module's runner hit a Turnstile wall
 
@@ -206,6 +207,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber) {
                 state = .loadingStreams
                 selectedEpisodeHref = savedHref
+                selectedEpisodeActualHref = matched.href
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
                 if streams.isEmpty {
                     settle(.error("No streams found for episode \(targetEpisodeNumber)"))
@@ -276,6 +278,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber) {
                 state = .loadingStreams
                 selectedEpisodeHref = item.href
+                selectedEpisodeActualHref = matched.href
                 let streams = try await r.fetchStreams(episodeUrl: matched.href)
                 if streams.isEmpty {
                     settle(.error("No streams found for episode \(targetEpisodeNumber)"))
@@ -327,11 +330,12 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             if streams.isEmpty {
                 settle(.error("No streams found"))
             } else {
-                readyStreams = streams
                 // Use the current search result href if available (from manual episode selection)
                 if let href = currentSearchResultHref {
                     selectedEpisodeHref = href
                 }
+                selectedEpisodeActualHref = episode.href
+                readyStreams = streams
             }
         } catch {
             if (error as? CancellationError) != nil { return }
@@ -367,7 +371,7 @@ private struct ModuleStreamRow: View {
     let mediaId: Int?
     let animeTitle: String
     let episodeNumber: Int
-    let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?) -> Void
+    let onStreamsLoaded: ([StreamResult], StreamResult?, String?, Int?, String?) -> Void
 
     @ObservedObject var rowVm: ModuleStreamRowViewModel
     @State private var showAllResults = false
@@ -380,7 +384,7 @@ private struct ModuleStreamRow: View {
         animeTitle: String,
         episodeNumber: Int,
         rowVm: ModuleStreamRowViewModel,
-        onStreamsLoaded: @escaping ([StreamResult], StreamResult?, String?, Int?) -> Void
+        onStreamsLoaded: @escaping ([StreamResult], StreamResult?, String?, Int?, String?) -> Void
     ) {
         self.module = module
         self.mediaId = mediaId
@@ -395,9 +399,9 @@ private struct ModuleStreamRow: View {
         return lastUsed != nil ? lastUsed == module.id : ModuleManager.shared.activeModule?.id == module.id
     }
 
-    private func fireStreamsLoaded(_ streams: [StreamResult], selected: StreamResult?, href: String?, count: Int?) {
+    private func fireStreamsLoaded(_ streams: [StreamResult], selected: StreamResult?, href: String?, count: Int?, episodeHref: String?) {
         UserDefaults.standard.set(module.id, forKey: "lastUsedModuleId")
-        onStreamsLoaded(streams, selected, href, count)
+        onStreamsLoaded(streams, selected, href, count, episodeHref)
     }
 
     var body: some View {
@@ -416,12 +420,12 @@ private struct ModuleStreamRow: View {
             guard let streams else { return }
             
             if streams.count == 1 {
-                fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
+                fireStreamsLoaded(streams, selected: streams[0], href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
             } else if autoPickLastStream,
                isPreferredModule,
                let savedTitle = ModuleSearchAliasManager.shared.getLastStreamTitle(moduleId: module.id),
                let match = streams.first(where: { $0.title == savedTitle }) {
-                fireStreamsLoaded(streams, selected: match, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
+                fireStreamsLoaded(streams, selected: match, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
             } else {
                 showStreamPicker = true
             }
@@ -434,7 +438,7 @@ private struct ModuleStreamRow: View {
                         ModuleSearchAliasManager.shared.setLastStreamTitle(moduleId: module.id, title: stream.title)
                         showStreamPicker = false
                         let allStreams = rowVm.readyStreams ?? [stream]
-                        fireStreamsLoaded(allStreams, selected: stream, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount)
+                        fireStreamsLoaded(allStreams, selected: stream, href: rowVm.selectedEpisodeHref, count: rowVm.availableCount, episodeHref: rowVm.selectedEpisodeActualHref)
                     },
                     onDismiss: {
                         showStreamPicker = false

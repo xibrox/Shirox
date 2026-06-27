@@ -284,9 +284,11 @@ struct AniListDetailView: View {
                 let s = stream
                 let href = vm.pendingModuleStreamEpisodeHref
                 vm.pendingModuleStreamEpisodeHref = nil
+                let actualHref = vm.pendingModuleStreamActualHref
+                vm.pendingModuleStreamActualHref = nil
                 let avail = vm.pendingModuleStreamAvailableCount
                 vm.pendingModuleStreamAvailableCount = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + streamSelectionDelay) { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + streamSelectionDelay) { vm.selectStream(s, searchResultHref: href, episodeActualHref: actualHref, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
             } else if !vm.showFinalStreamPicker {
                 vm.dismissModulePicker()
             }
@@ -297,8 +299,8 @@ struct AniListDetailView: View {
                     animeTitle: media.title.searchTitle,
                     episodeNumber: ep,
                     onDismiss: { vm.showStreamPicker = false }
-                ) { streams, selectedStream, episodeHref, availableCount in
-                    vm.onStreamsLoaded(streams, selectedStream: selectedStream, episodeHref: episodeHref, availableCount: availableCount)
+                ) { streams, selectedStream, showHref, availableCount, episodeHref in
+                    vm.onStreamsLoaded(streams, selectedStream: selectedStream, episodeHref: showHref, availableCount: availableCount, actualEpisodeHref: episodeHref)
                 }
                 .environmentObject(moduleManager)
             }
@@ -309,9 +311,11 @@ struct AniListDetailView: View {
                 let s = stream
                 let href = vm.pendingFinalStreamEpisodeHref
                 vm.pendingFinalStreamEpisodeHref = nil
+                let actualHref = vm.pendingFinalStreamActualHref
+                vm.pendingFinalStreamActualHref = nil
                 let avail = vm.pendingFinalStreamAvailableCount
                 vm.pendingFinalStreamAvailableCount = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + streamSelectionDelay) { vm.selectStream(s, searchResultHref: href, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + streamSelectionDelay) { vm.selectStream(s, searchResultHref: href, episodeActualHref: actualHref, availableEpisodes: avail, onSequelAdvanced: { nav in if case .aniListID(let id) = nav { sequelMediaId = id } }) }
             } else {
                 vm.dismissFinalPicker()
             }
@@ -794,28 +798,26 @@ struct AniListDetailView: View {
             isAiring: vm.media.map { $0.status == "RELEASING" } ?? item.isAiring,
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
+            episodeHref: item.episodeHref,
             streamTitle: item.streamTitle,
             workingDetailHref: item.detailHref,
             thumbnailUrl: item.thumbnailUrl
         )
 
+        // Anchor on the saved episode href so multi-season flat lists advance to the right
+        // season; fall back to number for items saved before episodeHref was recorded.
+        var currentHref = item.episodeHref
         let onWatchNext: WatchNextLoader? = { currentEpNum in
             guard let module = ModuleManager.shared.activeModule, let href = item.detailHref else { return nil }
             let runner = ModuleJSRunner()
             try await runner.load(module: module)
             let episodes = try await runner.fetchEpisodes(url: href)
             guard !episodes.isEmpty else { return nil }
-            var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
-            if idx == nil {
-                idx = episodes.enumerated().min(by: {
-                    abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
-                })?.offset
-            }
-            guard let currentIdx = idx, currentIdx + 1 < episodes.count else { return nil }
-            let nextEp = episodes[currentIdx + 1]
+            guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else { return nil }
             let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
             guard !streams.isEmpty else { return nil }
-            return (streams: streams, episodeNumber: Int(nextEp.number))
+            currentHref = nextEp.href
+            return (streams: streams, episodeNumber: Int(nextEp.number), episodeHref: nextEp.href)
         }
 
         let epNum = item.episodeNumber

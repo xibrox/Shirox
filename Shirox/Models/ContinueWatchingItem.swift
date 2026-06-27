@@ -31,6 +31,10 @@ struct ContinueWatchingItem: Identifiable, Codable, Hashable {
     let malID: Int?
     let moduleId: String?
     let detailHref: String?
+    /// The playing episode's own unique href (not the show/detail href). Anchors next-episode
+    /// resolution on resume so multi-season flat lists (numbers repeat) advance to the right
+    /// season. Optional + decoded if-present, so items saved before this field stay valid.
+    var episodeHref: String?
     var watchedSeconds: Double
     var totalSeconds: Double
     var totalEpisodes: Int?

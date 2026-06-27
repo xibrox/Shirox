@@ -390,33 +390,35 @@ final class DetailViewModel: ObservableObject {
                 ? resumeWatchedSeconds
                 : ContinueWatchingManager.shared.items.first(where: { $0.moduleId == ModuleManager.shared.activeModule?.id && $0.mediaTitle == (detail?.title ?? "") && $0.episodeNumber == Int(selectedEpisode?.number ?? 1) })?.watchedSeconds,
             detailHref: detailHref,
+            episodeHref: selectedEpisode?.href,
             streamTitle: stream.title,
             workingDetailHref: detailHref,
             thumbnailUrl: nil
         )
 
-        // Build a WatchNextLoader that dynamically finds the next episode by current episode number
+        // Build a WatchNextLoader that advances through the flat episode list by position.
+        // Episode numbers repeat across seasons (S1 1…12, S2 1…4), so we anchor on the
+        // selected episode's unique href and track a forward-only index — otherwise
+        // "next after S2 E1" resolves to S1 E2 (the first occurrence of number 2).
         let episodes = detail?.episodes ?? []
         let watchNextLoader: WatchNextLoader? = {
             guard !episodes.isEmpty else { return nil }
-            
-            // If current episode is the last one, don't create the loader
-            let currentEpNum = Int(selectedEpisode?.number ?? 1)
-            if let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-               idx + 1 >= episodes.count {
-                return nil
-            }
-            
+
+            let startAnchor = episodes.firstIndex(where: { $0.href == selectedEpisode?.href })
+                ?? episodes.firstIndex(where: { Int($0.number) == Int(selectedEpisode?.number ?? 1) })
+                ?? 0
+            // If the selected episode is the last one, don't create the loader.
+            guard startAnchor + 1 < episodes.count else { return nil }
+
+            var anchor = startAnchor
             return { [weak self] currentEpNum in
-                guard let self,
-                      let idx = self.detail?.episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                      let episodes = self.detail?.episodes,
-                      idx + 1 < episodes.count
+                guard let self, let episodes = self.detail?.episodes,
+                      let step = EpisodeNavigator.next(currentNumber: currentEpNum, anchor: anchor, in: episodes)
                 else { return nil }
-                let nextEp = episodes[idx + 1]
-                let streams = try await self.fetchStreams(for: nextEp)
+                anchor = step.current
+                let streams = try await self.fetchStreams(for: step.episode)
                 guard !streams.isEmpty else { return nil }
-                return (streams: streams, episodeNumber: Int(nextEp.number))
+                return (streams: streams, episodeNumber: Int(step.episode.number), episodeHref: step.episode.href)
             }
         }()
 

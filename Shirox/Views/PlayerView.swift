@@ -12,7 +12,7 @@ import GoogleCast
 
 // MARK: - Typealiases
 
-typealias WatchNextLoader = (Int) async throws -> (streams: [StreamResult], episodeNumber: Int)?
+typealias WatchNextLoader = (Int) async throws -> (streams: [StreamResult], episodeNumber: Int, episodeHref: String?)?
 typealias StreamRefetchLoader = () async throws -> [StreamResult]
 typealias SequelLoader = () async throws -> (items: [SearchItem], mediaID: Int)
 
@@ -99,6 +99,7 @@ struct PlayerView: View {
     @State private var showQualityPicker = false
     @State private var nextEpisodeStreams: [StreamResult] = []
     @State private var nextEpisodeNumber: Int = 0
+    @State private var nextEpisodeHref: String?
     @State private var showSequelPicker = false
     @State private var sequelResults: [SearchItem] = []
     @State private var pendingSequelMediaID: Int? = nil
@@ -531,9 +532,10 @@ struct PlayerView: View {
         .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
             nextEpisodeStreams = []
             nextEpisodeNumber = 0
+            nextEpisodeHref = nil
         }) {
             PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
-                swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams)
+                swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams, episodeHref: nextEpisodeHref)
             }            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, nextEpisodeStreams.count)))])
         }
         .sheet(isPresented: $showSequelPicker, onDismiss: {
@@ -1099,6 +1101,7 @@ struct PlayerView: View {
             malID: context.malID,
             moduleId: context.moduleId,
             detailHref: context.detailHref,
+            episodeHref: context.episodeHref,
             watchedSeconds: currentTime,
             totalSeconds: duration,
             totalEpisodes: context.totalEpisodes,
@@ -1710,7 +1713,7 @@ struct PlayerView: View {
             let stream = await resolveLocalStream()
             isRefetchingStream = false
             guard let stream else { return }
-            swapStream(stream, episodeNumber: currentContext?.episodeNumber ?? 1)
+            swapStream(stream, episodeNumber: currentContext?.episodeNumber ?? 1, episodeHref: currentContext?.episodeHref)
             return
         }
         guard let loader = onStreamExpired else { return }
@@ -1730,8 +1733,8 @@ struct PlayerView: View {
                 ?? fallbackStreams.first
                 ?? titleMatchingStreams.first
                 ?? streams[0]
-                
-            swapStream(match, episodeNumber: currentContext?.episodeNumber ?? 1)
+
+            swapStream(match, episodeNumber: currentContext?.episodeNumber ?? 1, episodeHref: currentContext?.episodeHref)
         } catch { isRefetchingStream = false }
     }
 
@@ -1861,10 +1864,55 @@ struct PlayerView: View {
 
         guard let epNum = currentContext?.episodeNumber else { return }
 
+        // Resolve the real next episode first (correct across seasons), then prefer a
+        // downloaded copy of *that* episode matched by its unique href. The old approach —
+        // looking up a download for `epNum + 1` before resolving — could play the wrong
+        // season's copy when episode numbers repeat. The number-based lookup survives only
+        // as an offline fallback below, for when the loader can't reach the network.
+        if let loader = onWatchNext {
+            Logger.shared.log("[PlayerView] Starting next episode load for episode \(epNum)", type: "Debug")
+            isLoadingNextEpisode = true
+            do {
+                let result = try await loader(epNum)
+                guard !Task.isCancelled else { isLoadingNextEpisode = false; return }
+
+                if let result, !result.streams.isEmpty {
+                    isLoadingNextEpisode = false
+                    Logger.shared.log("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)", type: "Debug")
+
+                    #if os(iOS)
+                    // Prefer a downloaded copy of the resolved next episode, matched by its
+                    // unique href so multi-season shows never play the wrong season's file.
+                    if let ctx = currentContext,
+                       let download = DownloadManager.shared.downloadItem(
+                            forEpisodeHref: result.episodeHref,
+                            aniListID: ctx.aniListID,
+                            moduleId: ctx.moduleId,
+                            mediaTitle: ctx.mediaTitle,
+                            episodeNumber: result.episodeNumber),
+                       download.state == .completed,
+                       let localStream = await DownloadManager.shared.getStream(for: download) {
+                        Logger.shared.log("[PlayerView] Next episode \(result.episodeNumber) is downloaded — playing local copy", type: "Debug")
+                        swapStream(localStream, episodeNumber: result.episodeNumber, allStreams: [localStream], episodeHref: result.episodeHref)
+                        return
+                    }
+                    #endif
+
+                    pickAndSwapNextStream(result)
+                    return
+                }
+
+                isLoadingNextEpisode = false
+            } catch {
+                Logger.shared.log("[PlayerView] Error in loadAndAdvance: \(error)", type: "Error")
+                isLoadingNextEpisode = false
+            }
+        }
+
         #if os(iOS)
-        // Prefer a downloaded copy of the next episode. Downloads are keyed by integer
-        // episode number, so we look for epNum + 1 directly — this keeps auto-advance
-        // working offline and stops it from streaming an episode the user already has.
+        // Offline / loader-unavailable fallback: play a downloaded next episode if one
+        // exists. Best-effort by number (epNum + 1) — we couldn't resolve the real next
+        // href, so on multi-season shows this may match another season's same-numbered copy.
         if let ctx = currentContext,
            let download = DownloadManager.shared.completedDownload(
                mediaTitle: ctx.mediaTitle,
@@ -1874,74 +1922,52 @@ struct PlayerView: View {
                streamTitle: ctx.streamTitle),
            let localStream = await DownloadManager.shared.getStream(for: download) {
             guard !Task.isCancelled else { return }
-            Logger.shared.log("[PlayerView] Next episode \(epNum + 1) is downloaded — playing local copy", type: "Debug")
-            swapStream(localStream, episodeNumber: epNum + 1)
+            Logger.shared.log("[PlayerView] Falling back to downloaded next episode \(epNum + 1)", type: "Debug")
+            swapStream(localStream, episodeNumber: epNum + 1, episodeHref: download.episodeHref)
             return
         }
         #endif
 
-        guard let loader = onWatchNext else {
-            if onSequelNeeded != nil { await loadSequel() }
+        if onSequelNeeded != nil { await loadSequel() }
+    }
+
+    /// Picks the stream that best matches the current selection (sub/dub + title) from a
+    /// resolved next-episode result and swaps to it, or shows the in-player picker when the
+    /// match is ambiguous.
+    private func pickAndSwapNextStream(_ result: (streams: [StreamResult], episodeNumber: Int, episodeHref: String?)) {
+        let isSub = currentStream.subtitle != nil
+
+        // Prefer stream with same title as selected stream (e.g., "SUB" -> "SUB", "DUB" -> "DUB")
+        let exactTitleMatch = result.streams.first { $0.title == currentContext?.streamTitle }
+        if let exactMatch = exactTitleMatch {
+            Logger.shared.log("[PlayerView] Found exact stream title match: \(exactMatch.title)", type: "Debug")
+            swapStream(exactMatch, episodeNumber: result.episodeNumber, allStreams: result.streams, episodeHref: result.episodeHref)
             return
         }
 
-        Logger.shared.log("[PlayerView] Starting next episode load for episode \(epNum)", type: "Debug")
-        isLoadingNextEpisode = true
-        do {
-            let result = try await loader(epNum)
-            guard !Task.isCancelled else { isLoadingNextEpisode = false; return }
+        // Break down complex expression for compiler
+        let matchingStreams = result.streams.filter { $0.title == currentStream.title && ($0.subtitle != nil) == isSub }
+        let fallbackStreams = result.streams.filter { ($0.subtitle != nil) == isSub }
+        let titleMatchingStreams = result.streams.filter { $0.title == currentStream.title }
 
-            guard let result = result else {
-                isLoadingNextEpisode = false
-                if onSequelNeeded != nil {
-                    await loadSequel()
-                }
-                return
-            }
+        let match = matchingStreams.first
+            ?? fallbackStreams.first
+            ?? titleMatchingStreams.first
 
-            isLoadingNextEpisode = false
-            Logger.shared.log("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)", type: "Debug")
-
-            guard !result.streams.isEmpty else {
-                return
-            }
-
-            let isSub = currentStream.subtitle != nil
-
-            // Prefer stream with same title as selected stream (e.g., "SUB" -> "SUB", "DUB" -> "DUB")
-            let exactTitleMatch = result.streams.first { $0.title == currentContext?.streamTitle }
-            if let exactMatch = exactTitleMatch {
-                Logger.shared.log("[PlayerView] Found exact stream title match: \(exactMatch.title)", type: "Debug")
-                swapStream(exactMatch, episodeNumber: result.episodeNumber, allStreams: result.streams)
-                return
-            }
-
-            // Break down complex expression for compiler
-            let matchingStreams = result.streams.filter { $0.title == currentStream.title && ($0.subtitle != nil) == isSub }
-            let fallbackStreams = result.streams.filter { ($0.subtitle != nil) == isSub }
-            let titleMatchingStreams = result.streams.filter { $0.title == currentStream.title }
-
-            let match = matchingStreams.first
-                ?? fallbackStreams.first
-                ?? titleMatchingStreams.first
-
-            if let match {
-                Logger.shared.log("[PlayerView] Auto-selected stream: \(match.title)", type: "Debug")
-                swapStream(match, episodeNumber: result.episodeNumber, allStreams: result.streams)
-            }
-            else if result.streams.count == 1 {
-                Logger.shared.log("[PlayerView] Auto-selected single stream: \(result.streams[0].title)", type: "Debug")
-                swapStream(result.streams[0], episodeNumber: result.episodeNumber, allStreams: result.streams)
-            }
-            else {
-                Logger.shared.log("[PlayerView] Showing stream picker with \(result.streams.count) streams", type: "Debug")
-                nextEpisodeNumber = result.episodeNumber
-                nextEpisodeStreams = result.streams
-                showNextEpisodePicker = true
-            }
-        } catch {
-            Logger.shared.log("[PlayerView] Error in loadAndAdvance: \(error)", type: "Error")
-            isLoadingNextEpisode = false
+        if let match {
+            Logger.shared.log("[PlayerView] Auto-selected stream: \(match.title)", type: "Debug")
+            swapStream(match, episodeNumber: result.episodeNumber, allStreams: result.streams, episodeHref: result.episodeHref)
+        }
+        else if result.streams.count == 1 {
+            Logger.shared.log("[PlayerView] Auto-selected single stream: \(result.streams[0].title)", type: "Debug")
+            swapStream(result.streams[0], episodeNumber: result.episodeNumber, allStreams: result.streams, episodeHref: result.episodeHref)
+        }
+        else {
+            Logger.shared.log("[PlayerView] Showing stream picker with \(result.streams.count) streams", type: "Debug")
+            nextEpisodeNumber = result.episodeNumber
+            nextEpisodeStreams = result.streams
+            nextEpisodeHref = result.episodeHref
+            showNextEpisodePicker = true
         }
     }
 
@@ -1984,7 +2010,7 @@ struct PlayerView: View {
                 guard !streams.isEmpty else { return }
                 let match = streams.first(where: { $0.title == currentContext?.streamTitle }) ?? streams[0]
                 let epNum = Int(ep1.number)
-                swapStream(match, episodeNumber: epNum, allStreams: streams)
+                swapStream(match, episodeNumber: epNum, allStreams: streams, episodeHref: ep1.href)
                 // swapStream preserves old aniListID — override context with sequel's identity
                 // so ContinueWatching saves episode 1 progress under the correct show
                 if let id = capturedMediaID, let ctx = currentContext {
@@ -2001,6 +2027,7 @@ struct PlayerView: View {
                         isAiring: nil,
                         resumeFrom: nil,
                         detailHref: item.href,
+                        episodeHref: ep1.href,
                         streamTitle: match.title,
                         workingDetailHref: item.href,
                         thumbnailUrl: nil
@@ -2032,7 +2059,7 @@ struct PlayerView: View {
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
         if let ctx = currentContext {
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
         }
         subtitleCues = []
         selectedSubtitleTrack = nil
@@ -2058,7 +2085,7 @@ struct PlayerView: View {
         scheduleHide()
     }
 
-    private func swapStream(_ next: StreamResult, episodeNumber: Int, allStreams: [StreamResult] = []) {
+    private func swapStream(_ next: StreamResult, episodeNumber: Int, allStreams: [StreamResult] = [], episodeHref: String? = nil) {
         didTrackEpisode = false
         completionBox.context = nil
         // onWatchNext confirmed ep `episodeNumber` exists. If availableEpisodes is stale
@@ -2071,7 +2098,7 @@ struct PlayerView: View {
                 aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId,
                 totalEpisodes: ctx.totalEpisodes, availableEpisodes: episodeNumber,
                 isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom,
-                detailHref: ctx.detailHref, streamTitle: ctx.streamTitle,
+                detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: ctx.streamTitle,
                 workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl
             )
         }
@@ -2094,6 +2121,7 @@ struct PlayerView: View {
         showNextEpisodePicker = false
         nextEpisodeStreams = []
         nextEpisodeNumber = 0
+        nextEpisodeHref = nil
         didSeekToResume = true
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
@@ -2104,7 +2132,7 @@ struct PlayerView: View {
             // "Up Next N+1" placeholder if auto-next fails or is disabled. Use the pre-bump value
             // (or nil if it was bumped), so isLastEpisode relies on totalEpisodes instead.
             let nextAvailableEpisodes = preSwapAvailableEpisodes.flatMap { $0 < episodeNumber ? nil : $0 }
-            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: nextAvailableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
+            currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: nextAvailableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, episodeHref: episodeHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil)
         }
         audioGroup = nil
         Task {

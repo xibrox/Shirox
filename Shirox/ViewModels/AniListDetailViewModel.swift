@@ -26,10 +26,12 @@ final class AniListDetailViewModel: ObservableObject {
 
     /// Deferred streams waiting to be presented after a sheet fully dismisses.
     var pendingModuleStream: StreamResult?   // single-stream from ModuleStreamPickerView
-    var pendingModuleStreamEpisodeHref: String?  // episode href for Next Episode
+    var pendingModuleStreamEpisodeHref: String?  // show/search-result href (used to re-fetch episodes)
+    var pendingModuleStreamActualHref: String?   // the matched episode's own href (anchors Next Episode)
     var pendingModuleStreamAvailableCount: Int?  // episode count from module search result
     var pendingFinalStream: StreamResult?    // chosen stream from AniListStreamResultSheet
-    var pendingFinalStreamEpisodeHref: String?  // episode href when selecting from final picker
+    var pendingFinalStreamEpisodeHref: String?  // show/search-result href (used to re-fetch episodes)
+    var pendingFinalStreamActualHref: String?    // the matched episode's own href (anchors Next Episode)
     var pendingFinalStreamAvailableCount: Int?   // saved count for final picker
 
     /// Resume position if navigated from Continue Watching (only applies to the specific episode)
@@ -72,30 +74,33 @@ final class AniListDetailViewModel: ObservableObject {
         selectedEpisodeNumber = nil
     }
 
-    func onStreamsLoaded(_ streams: [StreamResult], selectedStream: StreamResult? = nil, episodeHref: String? = nil, availableCount: Int? = nil) {
+    func onStreamsLoaded(_ streams: [StreamResult], selectedStream: StreamResult? = nil, episodeHref: String? = nil, availableCount: Int? = nil, actualEpisodeHref: String? = nil) {
         let sorted = streams.sorted { $0.title < $1.title }
         if let selected = selectedStream {
             // User already picked from quality picker — auto-play, but keep all streams for in-player switching
             pendingStreams = sorted
             pendingModuleStream = selected
             pendingModuleStreamEpisodeHref = episodeHref
+            pendingModuleStreamActualHref = actualEpisodeHref
             pendingModuleStreamAvailableCount = availableCount
         } else if sorted.count == 1 {
             // Store and let onDismiss present after the sheet fully clears.
             pendingStreams = sorted
             pendingModuleStream = sorted[0]
             pendingModuleStreamEpisodeHref = episodeHref
+            pendingModuleStreamActualHref = actualEpisodeHref
             pendingModuleStreamAvailableCount = availableCount
         } else {
             pendingStreams = sorted
             pendingFinalStreamEpisodeHref = episodeHref
+            pendingFinalStreamActualHref = actualEpisodeHref
             pendingFinalStreamAvailableCount = availableCount
             showFinalStreamPicker = true
         }
         showStreamPicker = false
     }
 
-    func selectStream(_ stream: StreamResult, searchResultHref: String? = nil, availableEpisodes: Int? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
+    func selectStream(_ stream: StreamResult, searchResultHref: String? = nil, episodeActualHref: String? = nil, availableEpisodes: Int? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil) {
         selectedStream = stream
         guard let media else { return }
         let currentEpNum = selectedEpisodeNumber ?? 1
@@ -125,6 +130,7 @@ final class AniListDetailViewModel: ObservableObject {
                 ? resumeWatchedSeconds
                 : ContinueWatchingManager.shared.items.first(where: { $0.aniListID == media.id && $0.episodeNumber == currentEpNum })?.watchedSeconds,
             detailHref: searchResultHref,
+            episodeHref: episodeActualHref,
             streamTitle: stream.title,
             workingDetailHref: searchResultHref,
             thumbnailUrl: episodeThumbnail
@@ -142,11 +148,12 @@ final class AniListDetailViewModel: ObservableObject {
                 return nil
             }
 
-            return { currentEpNum in
-                Logger.shared.log("[AniListDetailVM] onWatchNext called for episode \(currentEpNum) using stored href: \(resultHref)", type: "Debug")
-                let nextEpNum = currentEpNum + 1
-                if total > 0, nextEpNum > total { return nil }
-
+            // Anchor on the matched episode's own href: the module may number a season's
+            // episodes with an offset (S2 = 25…48) or restart from 1, so advance by list
+            // position rather than `currentEpNum + 1` (which would jump to season 1).
+            var currentHref = episodeActualHref
+            var fallbackNumber = currentEpNum  // last resort if the href isn't in the list
+            return { _ in
                 do {
                     let runner = ModuleJSRunner()
                     try await runner.load(module: module)
@@ -155,17 +162,20 @@ final class AniListDetailViewModel: ObservableObject {
                     let episodes = try await runner.fetchEpisodes(url: resultHref)
                     Logger.shared.log("[AniListDetailVM] Got \(episodes.count) episodes from stored href", type: "Debug")
 
-                    guard let ep = episodes.first(where: { $0.number == Double(nextEpNum) }) else {
-                        Logger.shared.log("[AniListDetailVM] Episode \(nextEpNum) not found", type: "Error")
+                    guard let step = EpisodeNavigator.next(afterHref: currentHref, in: episodes)
+                        ?? EpisodeNavigator.next(currentNumber: fallbackNumber, anchor: 0, in: episodes) else {
+                        Logger.shared.log("[AniListDetailVM] No next episode after current", type: "Error")
                         return nil
                     }
 
-                    let streams = try await runner.fetchStreams(episodeUrl: ep.href)
+                    let streams = try await runner.fetchStreams(episodeUrl: step.episode.href)
                         .sorted { $0.title < $1.title }
-                    Logger.shared.log("[AniListDetailVM] Got \(streams.count) streams for episode \(nextEpNum)", type: "Debug")
+                    Logger.shared.log("[AniListDetailVM] Got \(streams.count) streams for episode \(Int(step.episode.number))", type: "Debug")
 
                     guard !streams.isEmpty else { return nil }
-                    return (streams: streams, episodeNumber: nextEpNum)
+                    currentHref = step.episode.href
+                    fallbackNumber = Int(step.episode.number)
+                    return (streams: streams, episodeNumber: Int(step.episode.number), episodeHref: step.episode.href)
                 } catch {
                     Logger.shared.log("[AniListDetailVM] Error loading next episode: \(error)", type: "Error")
                     return nil

@@ -140,12 +140,17 @@ struct ContinueWatchingSection: View {
             isAiring: item.isAiring,
             resumeFrom: item.watchedSeconds,
             detailHref: item.detailHref,
+            episodeHref: item.episodeHref,
             streamTitle: item.streamTitle,
             workingDetailHref: item.detailHref,
             thumbnailUrl: item.thumbnailUrl
         )
 
-        // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList)
+        // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList).
+        // Anchor on the saved episode href so multi-season flat lists (numbers repeat) advance
+        // to the right season; the number-based match remains a fallback for items saved before
+        // episodeHref was recorded.
+        var currentHref = item.episodeHref
         let onWatchNext: WatchNextLoader? = { currentEpNum in
             Logger.shared.log("[ContinueWatching] onWatchNext called for episode \(currentEpNum)", type: "Debug")
 
@@ -170,23 +175,14 @@ struct ContinueWatchingSection: View {
                         return nil
                     }
 
-                    // Find current episode
-                    var idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum })
-                    if idx == nil {
-                        idx = episodes.enumerated().min(by: {
-                            abs(Int($0.element.number) - currentEpNum) < abs(Int($1.element.number) - currentEpNum)
-                        })?.offset
-                    }
-
-                    guard let currentIdx = idx, currentIdx + 1 < episodes.count else {
+                    guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else {
                         return nil
                     }
-
-                    let nextEp = episodes[currentIdx + 1]
                     let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
 
                     guard !streams.isEmpty else { return nil }
-                    return (streams: streams, episodeNumber: Int(nextEp.number))
+                    currentHref = nextEp.href
+                    return (streams: streams, episodeNumber: Int(nextEp.number), episodeHref: nextEp.href)
                 } catch {
                     Logger.shared.log("[ContinueWatching] Next episode failed (module): \(error)", type: "Error")
                     return nil
@@ -196,15 +192,13 @@ struct ContinueWatchingSection: View {
             else if let href = item.detailHref {
                 do {
                     let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-                    guard let idx = episodes.firstIndex(where: { Int($0.number) == currentEpNum }),
-                          idx + 1 < episodes.count else {
+                    guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else {
                         return nil
                     }
-
-                    let nextEp = episodes[idx + 1]
                     let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
                     guard !streams.isEmpty else { return nil }
-                    return (streams: streams, episodeNumber: Int(nextEp.number))
+                    currentHref = nextEp.href
+                    return (streams: streams, episodeNumber: Int(nextEp.number), episodeHref: nextEp.href)
                 } catch {
                     Logger.shared.log("[ContinueWatching] Next episode failed (anilist): \(error)", type: "Error")
                     return nil
