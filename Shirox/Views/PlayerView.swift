@@ -298,6 +298,14 @@ struct PlayerView: View {
             Logger.shared.log("[Subtitles] onAppear: subtitleTracks=\(subtitleTracks?.count ?? -1) currentStream.allSubtitles=\(currentStream.allSubtitles?.count ?? -1) currentStream.subtitle=\(currentStream.subtitle ?? "nil") needsTrackRefresh=\(needsTrackRefresh) onStreamExpired=\(onStreamExpired != nil)", type: "Debug")
             if (needsStreamRefresh || needsTrackRefresh), let loader = onStreamExpired {
                 Task {
+                    // Defer this proactive backfill until the first frame is ready. The loader runs
+                    // extractStreamUrl on the @MainActor, and firing it during onAppear starves the
+                    // player's initial item setup + resume seek (also main-actor), stranding playback
+                    // behind a several-second JS extraction even when the stored URL is perfectly
+                    // valid — the "long spinner on a fresh Continue Watching resume" symptom. A
+                    // genuinely dead URL is recovered separately by the .failed KVO path, so deferring
+                    // here only delays metadata backfill (quality list / subtitle tracks), not playback.
+                    await waitForVideoReady()
                     do {
                         let streams = try await loader()
                         Logger.shared.log("[Subtitles] onAppear loader returned \(streams.count) streams; allSubtitles counts: \(streams.map { $0.allSubtitles?.count ?? -1 })", type: "Debug")
@@ -1282,6 +1290,22 @@ struct PlayerView: View {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             guard !Task.isCancelled else { return }
             setControlsVisible(false)
+        }
+    }
+
+    /// Suspends until the player has its first frame ready (`videoReady`) or a safety timeout
+    /// elapses, so deferred background work doesn't compete with the main-actor-bound initial
+    /// load + resume seek. `videoReady` is always flipped true eventually (on readyToPlay, on
+    /// seek completion, or by setupPlayer's own load timeout), so this can't hang indefinitely;
+    /// the timeout here is just a backstop. Polling mirrors how setupPlayer's load-timeout Task
+    /// reads `videoReady`.
+    @MainActor
+    private func waitForVideoReady(timeout: TimeInterval = 12) async {
+        guard !videoReady else { return }
+        let deadline = Date().addingTimeInterval(timeout)
+        while !videoReady && Date() < deadline {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            if Task.isCancelled { return }
         }
     }
 
