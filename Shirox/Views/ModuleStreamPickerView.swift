@@ -184,6 +184,13 @@ private final class ModuleStreamRowViewModel: ObservableObject {
         currentTask = Task { await selectEpisode(episode) }
     }
 
+    /// Franchise episodes preceding this AniList season, so a combined-season module list can be
+    /// indexed to the right season. 0 for module-only flows (no AniList id) or single-season shows.
+    private func seasonOffset() async -> Int {
+        guard let mediaId else { return 0 }
+        return await SeasonChainMapper.shared.resolveOffset(anchorAniListID: mediaId, anchorMALID: nil) ?? 0
+    }
+
     // Fast path: skip search entirely, go straight to episodes using the saved href.
     // Falls back to full search if the href no longer works.
     func findFast(savedHref: String) async {
@@ -204,7 +211,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             availableCount = episodes.count
             currentSearchResultHref = savedHref
 
-            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber) {
+            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber, seasonOffset: await seasonOffset()) {
                 state = .loadingStreams
                 selectedEpisodeHref = savedHref
                 selectedEpisodeActualHref = matched.href
@@ -253,7 +260,10 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             if results.isEmpty {
                 settle(.notFound)
             } else {
-                settle(.searchResults(results))
+                // Surface the entry that matches the AniList title's season first, so multi-season
+                // shows (separate per-season entries) don't bury the right one behind look-alikes.
+                let ordered = SearchResultMatcher.ranked(query: originalAnimeTitle, items: results, title: { $0.title })
+                settle(.searchResults(ordered))
             }
         } catch {
             if (error as? CancellationError) != nil { return }
@@ -275,7 +285,7 @@ private final class ModuleStreamRowViewModel: ObservableObject {
             }
             availableCount = episodes.count
 
-            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber) {
+            if let matched = matchEpisode(from: episodes, target: targetEpisodeNumber, seasonOffset: await seasonOffset()) {
                 state = .loadingStreams
                 selectedEpisodeHref = item.href
                 selectedEpisodeActualHref = matched.href
@@ -296,8 +306,23 @@ private final class ModuleStreamRowViewModel: ObservableObject {
 
     /// Finds the episode matching `target`, handling modules that use absolute episode
     /// numbering (e.g., Season 2 numbered as episodes 25–48 instead of 1–24).
-    private func matchEpisode(from episodes: [EpisodeLink], target: Int) -> EpisodeLink? {
+    ///
+    /// `seasonOffset` is the number of franchise episodes preceding this AniList season. When
+    /// the module concatenates every season into one list (e.g. AniWorld groups all seasons
+    /// under one show, numbering restarts per season), a per-season number like "1" is
+    /// ambiguous and the exact match would grab season 1. With a known offset we select by
+    /// absolute position instead — but only when the list is actually long enough to contain
+    /// that season, so single-season lists fall straight through to the existing logic.
+    private func matchEpisode(from episodes: [EpisodeLink], target: Int, seasonOffset: Int = 0) -> EpisodeLink? {
         let targetDouble = Double(target)
+
+        // 0. Combined multi-season list: pick by absolute position.
+        if seasonOffset > 0 {
+            let absoluteIndex = seasonOffset + target - 1 // 0-based
+            if episodes.indices.contains(absoluteIndex) {
+                return episodes[absoluteIndex]
+            }
+        }
 
         // 1. Exact match
         if let exact = episodes.first(where: { $0.number == targetDouble }) {

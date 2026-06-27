@@ -93,4 +93,108 @@ enum SeasonChainMath {
         return SeasonMapping(aniListID: chosen.s.aniListID, malID: chosen.s.malID,
                              relativeEpisode: relative, seasonEpisodeCount: chosen.s.episodeCount)
     }
+
+    /// Forward complement of `map`: the number of franchise episodes that precede the anchor
+    /// season/cour (its 0-based global start). Adding a per-season episode number to this gives
+    /// the franchise-absolute episode, used to pick the right entry from a module that
+    /// concatenates every season into one list (e.g. AniWorld). Returns 0 when the anchor is
+    /// the first season, or nil when a needed prior-season count is missing or the anchor isn't
+    /// in the chain — caller then applies no offset.
+    static func priorEpisodeCount(anchorAniListID: Int? = nil,
+                                  anchorMALID: Int? = nil,
+                                  siblings: [SiblingSeason]) -> Int? {
+        guard !siblings.isEmpty else { return nil }
+
+        // Cumulative episode base for each tvdb_season (mirrors `map`).
+        let bySeason = Dictionary(grouping: siblings, by: \.tvdbSeason)
+        let seasonsAsc = bySeason.keys.sorted()
+        var base: [Int: Int] = [:]
+        var running = 0
+        for (idx, s) in seasonsAsc.enumerated() {
+            base[s] = running
+            if idx < seasonsAsc.count - 1 {
+                let totals = bySeason[s]!.compactMap { c in c.episodeCount.map { $0 + c.tvdbEpoffset } }
+                guard let total = totals.max() else { return nil } // missing count -> can't sum
+                running += total
+            }
+        }
+
+        guard let anchor = siblings.first(where: {
+            (anchorAniListID != nil && $0.aniListID == anchorAniListID) ||
+            (anchorMALID != nil && $0.malID == anchorMALID)
+        }) else { return nil }
+
+        // If the anchor sits in a non-last tvdb_season, base already counts every earlier
+        // season. Within its own season, tvdbEpoffset delimits the cour (no count needed).
+        return (base[anchor.tvdbSeason] ?? 0) + anchor.tvdbEpoffset
+    }
+}
+
+/// Season-aware ordering of a module's search results against an AniList title.
+///
+/// AniList lists each season as its own entry ("Frieren: Beyond Journey's End Season 2"), while a
+/// module's search returns many similarly-named entries in an arbitrary order — so the right
+/// season can be buried (e.g. "3rd Season" first, "Season 2" second, base "…" later). This ranks
+/// the results so the entry whose base title *and* season number match the query comes first,
+/// making the correct season the obvious choice. Pure + unit-testable.
+enum SearchResultMatcher {
+    struct Parsed: Equatable { let base: String; let season: Int }
+
+    /// Stable-sorts `items` so the best season match leads. Score: base+season match (3) >
+    /// same base, other season (2) > one base contains the other (1) > unrelated (0). Ties keep
+    /// the module's original order.
+    static func ranked<T>(query: String, items: [T], title: (T) -> String) -> [T] {
+        let q = parse(query)
+        func score(_ raw: String) -> Int {
+            let c = parse(raw)
+            if c.base == q.base && c.season == q.season { return 3 }
+            if c.base == q.base { return 2 }
+            if !q.base.isEmpty, c.base.contains(q.base) || q.base.contains(c.base) { return 1 }
+            return 0
+        }
+        return items.enumerated()
+            .sorted { a, b in
+                let sa = score(title(a.element)), sb = score(title(b.element))
+                return sa != sb ? sa > sb : a.offset < b.offset
+            }
+            .map(\.element)
+    }
+
+    /// Splits a title into a normalized base and its season number (1 when none is stated).
+    /// Handles "… Season N" and "… Nth Season"; leaves other forms (roman numerals,
+    /// spelled-out) in the base, which simply keeps them out of season matching.
+    static func parse(_ raw: String) -> Parsed {
+        let tokens = normalize(raw).split(separator: " ").map(String.init)
+        var season = 1
+        var base: [String] = []
+        var i = 0
+        while i < tokens.count {
+            let tok = tokens[i]
+            if tok == "season", i + 1 < tokens.count, let n = Int(tokens[i + 1]) {
+                season = n; i += 2; continue
+            }
+            if let n = ordinal(tok), i + 1 < tokens.count, tokens[i + 1] == "season" {
+                season = n; i += 2; continue
+            }
+            base.append(tok); i += 1
+        }
+        return Parsed(base: base.joined(separator: " "), season: season)
+    }
+
+    private static func normalize(_ s: String) -> String {
+        var t = s
+        for (entity, char) in ["&#039;": "'", "&#39;": "'", "&amp;": "&", "&quot;": "\""] {
+            t = t.replacingOccurrences(of: entity, with: char)
+        }
+        t = t.folding(options: .diacriticInsensitive, locale: nil).lowercased()
+        t = t.replacingOccurrences(of: "'", with: "") // "journey's" == "journeys"
+        let cleaned = t.map { ($0.isLetter || $0.isNumber) ? $0 : Character(" ") }
+        return String(cleaned).split(separator: " ").joined(separator: " ")
+    }
+
+    /// "2nd" -> 2, "3rd" -> 3, "21st" -> 21; nil when `tok` isn't an ordinal.
+    private static func ordinal(_ tok: String) -> Int? {
+        guard let suffix = ["st", "nd", "rd", "th"].first(where: { tok.hasSuffix($0) }) else { return nil }
+        return Int(tok.dropLast(suffix.count))
+    }
 }

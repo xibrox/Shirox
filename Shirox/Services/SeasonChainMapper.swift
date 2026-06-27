@@ -44,6 +44,35 @@ final class SeasonChainMapper {
         return mapping
     }
 
+    /// Forward offset for episode *selection*: how many franchise episodes precede the anchor
+    /// season. Adding a per-season episode number gives the franchise-absolute episode, used to
+    /// pick the right entry from a module that concatenates every season (e.g. AniWorld).
+    /// nil when the chain can't be resolved (no tvdb mapping, single entry, or missing counts) —
+    /// caller then applies no offset.
+    func resolveOffset(anchorAniListID: Int?, anchorMALID: Int?) async -> Int? {
+        let tvdb: Int?
+        if let a = anchorAniListID, let t = IDMappingService.shared.tvdbId(forAnilistId: a) {
+            tvdb = t
+        } else if let m = anchorMALID, let t = IDMappingService.shared.tvdbId(forMALId: m) {
+            tvdb = t
+        } else {
+            tvdb = nil
+        }
+        guard let tvdbId = tvdb else { return nil }
+
+        let rawSiblings = IDMappingService.shared.siblings(forTvdbId: tvdbId)
+        guard rawSiblings.count >= 2 else { return nil } // single entry → nothing precedes it
+
+        // Counts are only needed to sum across distinct tvdb_seasons; within one season the
+        // sorted epoffsets already delimit cours.
+        let multiSeason = Set(rawSiblings.map(\.tvdbSeason)).count > 1
+        let siblings = multiSeason ? await withCounts(rawSiblings) : rawSiblings
+
+        return SeasonChainMath.priorEpisodeCount(anchorAniListID: anchorAniListID,
+                                                 anchorMALID: anchorMALID,
+                                                 siblings: siblings)
+    }
+
     /// Returns the siblings with episodeCount populated from anira episode lists (cached).
     private func withCounts(_ siblings: [SiblingSeason]) async -> [SiblingSeason] {
         var out: [SiblingSeason] = []
