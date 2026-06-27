@@ -100,6 +100,12 @@ struct PlayerView: View {
     @State private var nextEpisodeStreams: [StreamResult] = []
     @State private var nextEpisodeNumber: Int = 0
     @State private var nextEpisodeHref: String?
+    // Next-episode prefetch (resolve the next stream URL early so the swap is near-instant).
+    // The loader is stateful, so we call it at most once per episode and cache the result here;
+    // loadAndAdvance consumes the cache rather than calling the loader again.
+    @State private var didPrefetchNext = false
+    @State private var prefetchTask: Task<(streams: [StreamResult], episodeNumber: Int, episodeHref: String?)?, Never>? = nil
+    @State private var prefetchedResult: (streams: [StreamResult], episodeNumber: Int, episodeHref: String?)? = nil
     @State private var showSequelPicker = false
     @State private var sequelResults: [SearchItem] = []
     @State private var pendingSequelMediaID: Int? = nil
@@ -324,6 +330,7 @@ struct PlayerView: View {
             hideTask?.cancel()
             autoAdvanceTask?.cancel()
             autoAdvanceTask = nil
+            prefetchTask?.cancel()
             cancelStallWatchdog(resetAttempts: true)
             if let obs = timeObserver { player?.removeTimeObserver(obs) }
             rateObserver?.invalidate()
@@ -1417,6 +1424,14 @@ struct PlayerView: View {
                     didTrackEpisode = true
                     trackAniListProgress()
                 }
+                if PlayerNextEpisodePrefetch.shouldStart(
+                        progress: progress,
+                        threshold: watchedPercentage / 100.0,
+                        hasLoader: onWatchNext != nil,
+                        alreadyStarted: didPrefetchNext) {
+                    didPrefetchNext = true
+                    startPrefetchNext()
+                }
             }
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
@@ -1859,53 +1874,66 @@ struct PlayerView: View {
         }
     }
 
+    /// Resolves the next episode's stream URL in the background (once per episode), caching the
+    /// result for loadAndAdvance to consume. Silent: a failure leaves `prefetchedResult` nil and
+    /// the live path retries at advance time. The loader is stateful, so this is the single call.
+    private func startPrefetchNext() {
+        guard let loader = onWatchNext, let epNum = currentContext?.episodeNumber else { return }
+        Logger.shared.log("[PlayerView] Prefetching next episode after \(epNum)", type: "Debug")
+        prefetchTask = Task { @MainActor in
+            let result = try? await loader(epNum)
+            if let result { Logger.shared.log("[PlayerView] Prefetched \(result.streams.count) streams for episode \(result.episodeNumber)", type: "Debug") }
+            prefetchedResult = result
+            return result
+        }
+    }
+
     private func loadAndAdvance() async {
         Logger.shared.log("[PlayerView] loadAndAdvance() called", type: "Debug")
 
         guard let epNum = currentContext?.episodeNumber else { return }
 
-        // Resolve the real next episode first (correct across seasons), then prefer a
-        // downloaded copy of *that* episode matched by its unique href. The old approach —
-        // looking up a download for `epNum + 1` before resolving — could play the wrong
-        // season's copy when episode numbers repeat. The number-based lookup survives only
-        // as an offline fallback below, for when the loader can't reach the network.
-        if let loader = onWatchNext {
-            Logger.shared.log("[PlayerView] Starting next episode load for episode \(epNum)", type: "Debug")
-            isLoadingNextEpisode = true
-            do {
-                let result = try await loader(epNum)
+        if onWatchNext != nil {
+            // 1. Instant: the prefetch already resolved — swap with no spinner.
+            if let result = prefetchedResult, !result.streams.isEmpty {
+                Logger.shared.log("[PlayerView] Using prefetched next episode \(result.episodeNumber)", type: "Debug")
+                await applyWatchNextResult(result)
+                return
+            }
+            // 2. In-flight: a prefetch is running — await the SAME task. Never start a second
+            //    loader call; the loader's season-aware cursor is stateful and one is already
+            //    committed to this transition.
+            if let task = prefetchTask {
+                isLoadingNextEpisode = true
+                let result = await task.value
                 guard !Task.isCancelled else { isLoadingNextEpisode = false; return }
-
                 if let result, !result.streams.isEmpty {
                     isLoadingNextEpisode = false
-                    Logger.shared.log("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)", type: "Debug")
-
-                    #if os(iOS)
-                    // Prefer a downloaded copy of the resolved next episode, matched by its
-                    // unique href so multi-season shows never play the wrong season's file.
-                    if let ctx = currentContext,
-                       let download = DownloadManager.shared.downloadItem(
-                            forEpisodeHref: result.episodeHref,
-                            aniListID: ctx.aniListID,
-                            moduleId: ctx.moduleId,
-                            mediaTitle: ctx.mediaTitle,
-                            episodeNumber: result.episodeNumber),
-                       download.state == .completed,
-                       let localStream = await DownloadManager.shared.getStream(for: download) {
-                        Logger.shared.log("[PlayerView] Next episode \(result.episodeNumber) is downloaded — playing local copy", type: "Debug")
-                        swapStream(localStream, episodeNumber: result.episodeNumber, allStreams: [localStream], episodeHref: result.episodeHref)
-                        return
-                    }
-                    #endif
-
-                    pickAndSwapNextStream(result)
+                    await applyWatchNextResult(result)
                     return
                 }
-
                 isLoadingNextEpisode = false
-            } catch {
-                Logger.shared.log("[PlayerView] Error in loadAndAdvance: \(error)", type: "Error")
-                isLoadingNextEpisode = false
+                // nil → prefetch failed; fall through to a fresh live call. Safe because the
+                // loaders commit their cursor only on success.
+            }
+            // 3. Live: no prefetch was started (e.g. the user tapped Next well before the
+            //    threshold), or the prefetch produced nil.
+            if let loader = onWatchNext {
+                Logger.shared.log("[PlayerView] Live next-episode load for episode \(epNum)", type: "Debug")
+                isLoadingNextEpisode = true
+                do {
+                    let result = try await loader(epNum)
+                    guard !Task.isCancelled else { isLoadingNextEpisode = false; return }
+                    if let result, !result.streams.isEmpty {
+                        isLoadingNextEpisode = false
+                        await applyWatchNextResult(result)
+                        return
+                    }
+                    isLoadingNextEpisode = false
+                } catch {
+                    Logger.shared.log("[PlayerView] Error in loadAndAdvance: \(error)", type: "Error")
+                    isLoadingNextEpisode = false
+                }
             }
         }
 
@@ -1929,6 +1957,31 @@ struct PlayerView: View {
         #endif
 
         if onSequelNeeded != nil { await loadSequel() }
+    }
+
+    /// Applies a resolved next-episode result: prefer a downloaded copy of the exact episode
+    /// (matched by its unique href so multi-season shows never play the wrong season's file),
+    /// otherwise pick the best stream / show the in-player picker. Shared by the prefetch-consume
+    /// and live paths of loadAndAdvance.
+    @MainActor
+    private func applyWatchNextResult(_ result: (streams: [StreamResult], episodeNumber: Int, episodeHref: String?)) async {
+        Logger.shared.log("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)", type: "Debug")
+        #if os(iOS)
+        if let ctx = currentContext,
+           let download = DownloadManager.shared.downloadItem(
+                forEpisodeHref: result.episodeHref,
+                aniListID: ctx.aniListID,
+                moduleId: ctx.moduleId,
+                mediaTitle: ctx.mediaTitle,
+                episodeNumber: result.episodeNumber),
+           download.state == .completed,
+           let localStream = await DownloadManager.shared.getStream(for: download) {
+            Logger.shared.log("[PlayerView] Next episode \(result.episodeNumber) is downloaded — playing local copy", type: "Debug")
+            swapStream(localStream, episodeNumber: result.episodeNumber, allStreams: [localStream], episodeHref: result.episodeHref)
+            return
+        }
+        #endif
+        pickAndSwapNextStream(result)
     }
 
     /// Picks the stream that best matches the current selection (sub/dub + title) from a
@@ -2122,6 +2175,10 @@ struct PlayerView: View {
         nextEpisodeStreams = []
         nextEpisodeNumber = 0
         nextEpisodeHref = nil
+        // Reset prefetch so the newly-playing episode prefetches its own next.
+        didPrefetchNext = false
+        prefetchTask = nil
+        prefetchedResult = nil
         didSeekToResume = true
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next

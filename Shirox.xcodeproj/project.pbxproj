@@ -406,6 +406,10 @@
 		5EA50C4A17000000000000BB /* PlayerForegroundRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000FA /* PlayerForegroundRecovery.swift */; };
 		5EA50C4A17000000000000BC /* PlayerForegroundRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000FA /* PlayerForegroundRecovery.swift */; };
 		5EA50C4A17000000000000BD /* PlayerForegroundRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000FB /* PlayerForegroundRecoveryTests.swift */; };
+		5EA50C4A170000000000020A /* PlayerNextEpisodePrefetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A170000000000010A /* PlayerNextEpisodePrefetch.swift */; };
+		5EA50C4A170000000000020B /* PlayerNextEpisodePrefetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A170000000000010A /* PlayerNextEpisodePrefetch.swift */; };
+		5EA50C4A170000000000020C /* PlayerNextEpisodePrefetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A170000000000010A /* PlayerNextEpisodePrefetch.swift */; };
+		5EA50C4A170000000000020D /* PlayerNextEpisodePrefetchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A170000000000010B /* PlayerNextEpisodePrefetchTests.swift */; };
 		5EA50C4A17000000000000C1 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
 		5EA50C4A17000000000000C2 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
 		5EA50C4A17000000000000C3 /* SeasonChainMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */; };
@@ -610,6 +614,8 @@
 		5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMapper.swift; sourceTree = "<group>"; };
 		5EA50C4A17000000000000FA /* PlayerForegroundRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerForegroundRecovery.swift; sourceTree = "<group>"; };
 		5EA50C4A17000000000000FB /* PlayerForegroundRecoveryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerForegroundRecoveryTests.swift; sourceTree = "<group>"; };
+		5EA50C4A170000000000010A /* PlayerNextEpisodePrefetch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNextEpisodePrefetch.swift; sourceTree = "<group>"; };
+		5EA50C4A170000000000010B /* PlayerNextEpisodePrefetchTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerNextEpisodePrefetchTests.swift; sourceTree = "<group>"; };
 		8AEB99F66BCE9D9EB4997319 /* ShiroxTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShiroxTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCollection.swift; sourceTree = "<group>"; };
 		A17FA7407A878469627A820E /* LocalLibraryTrackingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalLibraryTrackingTests.swift; sourceTree = "<group>"; };
@@ -769,6 +775,7 @@
 				5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */,
 				5EA50C4A17000000000000F1 /* SeasonChainMath.swift */,
 				5EA50C4A17000000000000FA /* PlayerForegroundRecovery.swift */,
+				5EA50C4A170000000000010A /* PlayerNextEpisodePrefetch.swift */,
 				1279E49C2FCA397700C9BA56 /* SubtitleSettingsManager.swift */,
 				1279E49D2FCA397700C9BA56 /* VTTSubtitlesLoader.swift */,
 				1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */,
@@ -936,6 +943,7 @@
 				D1A2B3C4E5F60718293A4B5D /* SeasonChainMathTests.swift */,
 				D1A2B3C4E5F60718293A4B61 /* EpisodeNavigatorTests.swift */,
 				5EA50C4A17000000000000FB /* PlayerForegroundRecoveryTests.swift */,
+				5EA50C4A170000000000010B /* PlayerNextEpisodePrefetchTests.swift */,
 				EC154F4B51E6E8262096B6AE /* KingfisherImageCacheTests.swift */,
 				1A7A8A35299253F63C43AAE9 /* HLSManifestParserTests.swift */,
 			);
@@ -1147,6 +1155,7 @@
 				D1A2B3C4E5F60718293A4B5C /* SeasonChainMathTests.swift in Sources */,
 				D1A2B3C4E5F60718293A4B60 /* EpisodeNavigatorTests.swift in Sources */,
 				5EA50C4A17000000000000BD /* PlayerForegroundRecoveryTests.swift in Sources */,
+				5EA50C4A170000000000020D /* PlayerNextEpisodePrefetchTests.swift in Sources */,
 				E227DA58285C280ED3980B82 /* KingfisherImageCacheTests.swift in Sources */,
 				819E19615C97015436A0D005 /* HLSManifestParserTests.swift in Sources */,
 			);
@@ -1187,6 +1196,7 @@
 				5EA50C4A17000000000000C1 /* SeasonChainMapper.swift in Sources */,
 				5EA50C4A17000000000000B1 /* SeasonChainMath.swift in Sources */,
 				5EA50C4A17000000000000BA /* PlayerForegroundRecovery.swift in Sources */,
+				5EA50C4A170000000000020A /* PlayerNextEpisodePrefetch.swift in Sources */,
 				121D9B6C2FCA5612000FF9B4 /* ModuleManager.swift in Sources */,
 				121D9B6D2FCA5612000FF9B4 /* ProviderManager.swift in Sources */,
 				121D9B6E2FCA5612000FF9B4 /* AniListService.swift in Sources */,
@@ -1409,6 +1419,7 @@
 				5EA50C4A17000000000000C2 /* SeasonChainMapper.swift in Sources */,
 				5EA50C4A17000000000000B2 /* SeasonChainMath.swift in Sources */,
 				5EA50C4A17000000000000BB /* PlayerForegroundRecovery.swift in Sources */,
+				5EA50C4A170000000000020B /* PlayerNextEpisodePrefetch.swift in Sources */,
 				1279E53D2FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */,
 				1279E53E2FCA397700C9BA56 /* NetworkFetch.swift in Sources */,
 				1279E53F2FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */,
@@ -1559,6 +1570,7 @@
 				5EA50C4A17000000000000C3 /* SeasonChainMapper.swift in Sources */,
 				5EA50C4A17000000000000B3 /* SeasonChainMath.swift in Sources */,
 				5EA50C4A17000000000000BC /* PlayerForegroundRecovery.swift in Sources */,
+				5EA50C4A170000000000020C /* PlayerNextEpisodePrefetch.swift in Sources */,
 				1279E5B62FCA397700C9BA56 /* PlayerDoubleTapSeek.swift in Sources */,
 				1279E5B72FCA397700C9BA56 /* NetworkFetch.swift in Sources */,
 				1279E5B82FCA397700C9BA56 /* PlayerCenterControls.swift in Sources */,

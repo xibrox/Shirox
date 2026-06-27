@@ -415,9 +415,12 @@ final class DetailViewModel: ObservableObject {
                 guard let self, let episodes = self.detail?.episodes,
                       let step = EpisodeNavigator.next(currentNumber: currentEpNum, anchor: anchor, in: episodes)
                 else { return nil }
-                anchor = step.current
                 let streams = try await self.fetchStreams(for: step.episode)
                 guard !streams.isEmpty else { return nil }
+                // Commit the cursor only on success, so a failed/empty fetch leaves it untouched
+                // and the next call (e.g. a prefetch-failure retry) resolves the same episode
+                // rather than skipping one.
+                anchor = step.current
                 return (streams: streams, episodeNumber: Int(step.episode.number), episodeHref: step.episode.href)
             }
         }()
