@@ -633,11 +633,11 @@ struct DetailView: View {
             thumbnailUrl: item.thumbnailUrl
         )
 
-        let epNum = item.episodeNumber
-
-        let onExpired: StreamRefetchLoader? = href.map { href in {
+        let onExpired: StreamRefetchLoader? = href.map { href in { episodeNumber, episodeHref in
             let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-            guard let episode = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+            // Anchor on the current episode's href (number repeats on flat multi-season lists),
+            // so a post-advance refetch resolves the episode actually on screen.
+            guard let episode = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
             return try await JSEngine.shared.fetchStreams(episodeUrl: episode.href).sorted { $0.title < $1.title }
         }}
 

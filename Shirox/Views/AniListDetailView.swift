@@ -820,8 +820,7 @@ struct AniListDetailView: View {
             return (streams: streams, episodeNumber: Int(nextEp.number), episodeHref: nextEp.href)
         }
 
-        let epNum = item.episodeNumber
-        let onExpired: StreamRefetchLoader? = {
+        let onExpired: StreamRefetchLoader? = { episodeNumber, episodeHref in
             guard let moduleId = item.moduleId,
                   let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }),
                   let href = item.detailHref
@@ -829,7 +828,9 @@ struct AniListDetailView: View {
             let runner = ModuleJSRunner()
             try await runner.load(module: module)
             let episodes = try await runner.fetchEpisodes(url: href)
-            guard let ep = episodes.first(where: { $0.number == Double(epNum) }) else { return [] }
+            // Anchor on the current episode's href (number repeats on flat multi-season lists),
+            // so a post-advance refetch resolves the episode actually on screen.
+            guard let ep = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
             return try await runner.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
         }
 

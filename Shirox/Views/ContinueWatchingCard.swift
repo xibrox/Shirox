@@ -210,19 +210,20 @@ struct ContinueWatchingSection: View {
             }
         }
 
-        let epNum = item.episodeNumber
-        let onExpired: StreamRefetchLoader? = {
+        // Anchor on the current episode's href (number repeats on flat multi-season lists),
+        // so a post-advance refetch resolves the episode actually on screen.
+        let onExpired: StreamRefetchLoader? = { episodeNumber, episodeHref in
             if let moduleId = item.moduleId,
                let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }),
                let href = item.detailHref {
                 let runner = ModuleJSRunner()
                 try await runner.load(module: module)
                 let episodes = try await runner.fetchEpisodes(url: href)
-                guard let ep = episodes.first(where: { $0.number == Double(epNum) }) else { return [] }
+                guard let ep = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
                 return try await runner.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
             } else if let href = item.detailHref {
                 let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-                guard let ep = episodes.first(where: { Int($0.number) == epNum }) else { return [] }
+                guard let ep = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
                 return try await JSEngine.shared.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
             }
             return []

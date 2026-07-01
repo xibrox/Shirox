@@ -61,6 +61,20 @@ enum EpisodeNavigator {
         return (current, episodes[current + 1])
     }
 
+    /// The currently-playing episode *itself* (not its successor): anchor on the unique
+    /// `href` when known, else fall back to an exact `number` match.
+    ///
+    /// Stream-refetch / recovery must re-resolve *the episode on screen*. After an in-player
+    /// auto-advance the launch episode number is stale, and on a flat multi-season list the
+    /// numbers repeat, so a fixed-number lookup returns the wrong episode (playing ep 8 but
+    /// refetching ep 7). The saved href is unique, so it disambiguates. Returns `nil` when
+    /// neither matches — a refetch that can't identify the episode must abort rather than
+    /// resurrect a nearest-but-wrong one.
+    static func resolve(href: String?, orNumber number: Int, in episodes: [EpisodeLink]) -> EpisodeLink? {
+        if let href, let ep = episodes.first(where: { $0.href == href }) { return ep }
+        return episodes.first(where: { Int($0.number) == number })
+    }
+
     /// Convenience for the resume paths: anchor on the unique `href` when one was saved,
     /// otherwise fall back to the episode closest to `number` (legacy items predate the
     /// stored href). Returns just the next episode, or `nil` at the end of the list.

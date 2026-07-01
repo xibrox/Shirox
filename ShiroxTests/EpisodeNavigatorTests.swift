@@ -119,4 +119,43 @@ final class EpisodeNavigatorTests: XCTestCase {
         let next = EpisodeNavigator.next(afterHref: nil, orNumber: 1, in: eps)
         XCTAssertEqual(next?.href, "ep26", "nearest to 1 is ep25, so next is ep26")
     }
+
+    // MARK: - resolve (stream refetch / recovery of the current episode)
+
+    /// THE REFETCH BUG: after auto-advancing 7→8, a foreground/stall refetch must re-resolve the
+    /// episode *currently on screen*. On a flat two-season list both seasons have an "ep 2", so a
+    /// number-only lookup would return season 1's — the href anchor pins season 2.
+    func testResolvePrefersHrefOnRepeatedNumbers() {
+        let eps = twoSeasonChain()
+        let ep = EpisodeNavigator.resolve(href: "s2/ep2", orNumber: 2, in: eps)
+        XCTAssertEqual(ep?.href, "s2/ep2", "must refetch the season-2 occurrence, not season 1")
+    }
+
+    /// Offset numbering (module labels S2 as eps 25–28): the current number won't match, but the
+    /// saved href still identifies the episode to refetch.
+    func testResolveHandlesOffsetNumberingViaHref() {
+        let eps = (25...28).map { EpisodeLink(number: Double($0), href: "s2/ep\($0)") }
+        let ep = EpisodeNavigator.resolve(href: "s2/ep26", orNumber: 2, in: eps)
+        XCTAssertEqual(ep?.number, 26)
+    }
+
+    /// Legacy items with no saved href fall back to an exact number match.
+    func testResolveFallsBackToNumberWithoutHref() {
+        let eps = (1...5).map { EpisodeLink(number: Double($0), href: "ep\($0)") }
+        XCTAssertEqual(EpisodeNavigator.resolve(href: nil, orNumber: 3, in: eps)?.href, "ep3")
+    }
+
+    /// href wins even when a different episode happens to carry the target number.
+    func testResolveHrefBeatsNumber() {
+        let eps = twoSeasonChain()
+        // Ask for href s2/ep3 but number 1 (mismatched on purpose) — href must win.
+        XCTAssertEqual(EpisodeNavigator.resolve(href: "s2/ep3", orNumber: 1, in: eps)?.href, "s2/ep3")
+    }
+
+    /// Neither an unknown href nor an absent number matches → nil (refetch aborts rather than
+    /// resurrecting the wrong episode).
+    func testResolveReturnsNilWhenNothingMatches() {
+        let eps = twoSeasonChain()
+        XCTAssertNil(EpisodeNavigator.resolve(href: "does/not/exist", orNumber: 99, in: eps))
+    }
 }

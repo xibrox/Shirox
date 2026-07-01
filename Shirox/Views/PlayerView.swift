@@ -13,7 +13,11 @@ import GoogleCast
 // MARK: - Typealiases
 
 typealias WatchNextLoader = (Int) async throws -> (streams: [StreamResult], episodeNumber: Int, episodeHref: String?)?
-typealias StreamRefetchLoader = () async throws -> [StreamResult]
+/// Re-resolves the stream(s) for the episode identified by `episodeNumber`/`episodeHref`.
+/// The player passes the *currently playing* episode (from `currentContext`), not the one it
+/// launched with — after an in-player auto-advance those differ, and a refetch keyed on the
+/// launch episode would swap the wrong episode's video under the new episode's UI.
+typealias StreamRefetchLoader = (_ episodeNumber: Int, _ episodeHref: String?) async throws -> [StreamResult]
 typealias SequelLoader = () async throws -> (items: [SearchItem], mediaID: Int)
 
 enum SequelNavigation {
@@ -315,7 +319,7 @@ struct PlayerView: View {
                     // here only delays metadata backfill (quality list / subtitle tracks), not playback.
                     await waitForVideoReady()
                     do {
-                        let streams = try await loader()
+                        let streams = try await loader(currentContext?.episodeNumber ?? 1, currentContext?.episodeHref)
                         Logger.shared.log("[Subtitles] onAppear loader returned \(streams.count) streams; allSubtitles counts: \(streams.map { $0.allSubtitles?.count ?? -1 })", type: "Debug")
                         guard !streams.isEmpty else { return }
                         await MainActor.run {
@@ -1809,7 +1813,9 @@ struct PlayerView: View {
         guard let loader = onStreamExpired else { return }
         isRefetchingStream = true
         do {
-            let streams = try await loader()
+            // Refetch the episode currently on screen, not the one the player launched with —
+            // after an auto-advance currentContext points at the new episode.
+            let streams = try await loader(currentContext?.episodeNumber ?? 1, currentContext?.episodeHref)
             isRefetchingStream = false
             guard !streams.isEmpty else { return }
             let isSub = currentStream.subtitle != nil
