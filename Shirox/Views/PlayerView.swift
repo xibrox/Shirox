@@ -62,6 +62,10 @@ struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer? = nil
     @State private var isPlaying = false
+    /// Last play/pause state pushed to the progress sync, so we report a genuine
+    /// play↔pause flip exactly once (nil = nothing reported yet). Dedups the
+    /// button, Control Center, and buffering/seek status flaps into one report.
+    @State private var lastReportedPaused: Bool? = nil
     @State private var currentTime: Double = 0
     @State private var duration: Double = 0
     @State private var showControls = true
@@ -1088,6 +1092,18 @@ struct PlayerView: View {
         saveProgress()
     }
 
+    /// Push an immediate progress sync when playback genuinely flips between playing and
+    /// paused, from any source — the in-player button, Control Center / lock screen, or an
+    /// audio interruption. Deduplicated against `lastReportedPaused` so repeated .paused
+    /// callbacks and buffering/seek status flaps don't spam the server. Relies on `isPlaying`
+    /// already reflecting the new state (the caller sets it first), since `saveProgress()`
+    /// derives Jellyfin's `IsPaused` from it.
+    private func reportPlaybackStateChange(paused: Bool) {
+        guard lastReportedPaused != paused else { return }
+        lastReportedPaused = paused
+        saveProgress()
+    }
+
     private func saveProgress() {
         guard let context = currentContext, duration > 0 else { return }
         // Derive the id from the live stream URL so progress follows a "Next Up" swap to the new
@@ -1202,13 +1218,18 @@ struct PlayerView: View {
         }
         guard let player else { return }
         if isPlaying {
-            saveProgress()
             player.pause()
             isPlaying = false
         } else {
             player.rate = Float(playbackSpeed)
             isPlaying = true
         }
+        // Report the new play/pause state *after* `isPlaying` flips, so the Jellyfin
+        // progress report's `IsPaused` reflects the state we just entered — previously this
+        // read the stale flag and always told the server "playing", so paused sessions kept
+        // advancing. The dedup means the `rateObserver` callback this pause/resume triggers
+        // won't double-report.
+        reportPlaybackStateChange(paused: !isPlaying)
         setControlsVisible(true)
         scheduleHide()
     }
@@ -1411,13 +1432,21 @@ struct PlayerView: View {
                 case .waitingToPlayAtSpecifiedRate:
                     // A stall: AVPlayer is waiting on the network. It never escalates to
                     // .failed, so without a watchdog it can wait forever. Arm recovery.
+                    // Not a user pause, so it doesn't touch the reported play/pause state.
                     startStallWatchdog()
                 case .playing:
                     // Playback resumed — clear any in-flight watchdog and reset the budget
                     // so each independent stall gets a fresh escalation.
                     cancelStallWatchdog(resetAttempts: true)
+                    // Sync the resume to the server for pauses that bypass togglePlayPause
+                    // (Control Center, lock screen, interruption end). Skip while scrubbing
+                    // (transient) and while casting (the local player is intentionally paused
+                    // even as the TV plays — cast has its own progress sync).
+                    if !isScrubbing && !castManager.isConnected { reportPlaybackStateChange(paused: false) }
                 case .paused:
                     cancelStallWatchdog(resetAttempts: false)
+                    // Same for pauses triggered outside the in-player button.
+                    if !isScrubbing && !castManager.isConnected { reportPlaybackStateChange(paused: true) }
                 @unknown default:
                     break
                 }
