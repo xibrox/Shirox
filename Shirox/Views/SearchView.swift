@@ -23,6 +23,7 @@ struct SearchView: View {
     @State private var pendingVideoTitle: String?
 
     private var isLocalModule: Bool { moduleManager.activeModule?.isLocalPlayback == true }
+    private var isJellyfinModule: Bool { moduleManager.activeModule?.isJellyfin == true }
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -60,7 +61,7 @@ struct SearchView: View {
                         moduleButton
                     }
                 }
-                .modifier(ConditionalSearchable(enabled: !isLocalModule, text: $vm.query))
+                .modifier(ConditionalSearchable(enabled: !isLocalModule && !isJellyfinModule, text: $vm.query))
                 .onSubmit(of: .search) {
                     history.add(vm.query)
                     vm.search(usingModule: usingModule)
@@ -111,7 +112,9 @@ struct SearchView: View {
     // MARK: - Main Content
     @ViewBuilder
     private var mainContent: some View {
-        if isLocalModule {
+        if isJellyfinModule {
+            JellyfinEntryView()
+        } else if isLocalModule {
             localEntryView
         } else if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
             if vm.query.isEmpty && !history.queries.isEmpty {

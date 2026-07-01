@@ -9,9 +9,11 @@ struct ModuleListView: View {
     @State private var isAddingModule = false
     @State private var addModuleError: String?
     @State private var isAddingLocalModule = false
+    @State private var isAddingJellyfinModule = false
     @FocusState private var isTextFieldFocused: Bool
 
     private let localFilesModuleURL = "https://raw.githubusercontent.com/xibrox/local-files-module/refs/heads/main/local.json"
+    private let jellyfinModuleURL = "https://raw.githubusercontent.com/xibrox/jellyfin-module/refs/heads/main/jellyfin.json"
 
     var body: some View {
         List {
@@ -24,6 +26,14 @@ struct ModuleListView: View {
                 if !isLocalModuleInstalled {
                     Section {
                         localFilesPromoCard
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+
+                if !isJellyfinModuleInstalled {
+                    Section {
+                        jellyfinPromoCard
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -239,6 +249,73 @@ struct ModuleListView: View {
             }
             .buttonStyle(.plain)
             .disabled(isAddingLocalModule)
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Jellyfin Promo
+    private var isJellyfinModuleInstalled: Bool {
+        moduleManager.modules.contains { $0.isJellyfin }
+    }
+
+    private var jellyfinPromoCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "server.rack")
+                    .font(.title2)
+                    .foregroundStyle(Color.primary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Connect Jellyfin")
+                        .font(.headline)
+                    Text("Stream your own Jellyfin server — browse your library, resume where you left off, and sync watch state back.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Text(jellyfinModuleURL)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                Button {
+                    copyJellyfinURL()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                addJellyfinModule()
+            } label: {
+                HStack {
+                    Spacer()
+                    if isAddingJellyfinModule {
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Label("Add Module", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.primary)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 10)
+                .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(isAddingJellyfinModule)
         }
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -473,6 +550,47 @@ struct ModuleListView: View {
             await MainActor.run {
                 withAnimation {
                     isAddingLocalModule = false
+                    if moduleManager.errorMessage == nil {
+                        #if os(iOS)
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        #endif
+                    } else {
+                        addModuleError = moduleManager.errorMessage
+                        #if os(iOS)
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        #endif
+                    }
+                }
+            }
+        }
+    }
+
+    private func copyJellyfinURL() {
+        #if os(iOS)
+        UIPasteboard.general.string = jellyfinModuleURL
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(jellyfinModuleURL, forType: .string)
+        #endif
+    }
+
+    private func addJellyfinModule() {
+        guard let url = URL(string: jellyfinModuleURL) else {
+            addModuleError = "Invalid URL"
+            return
+        }
+        withAnimation {
+            addModuleError = nil
+            moduleManager.errorMessage = nil
+            isAddingJellyfinModule = true
+        }
+        Task {
+            await moduleManager.addModule(from: url)
+
+            await MainActor.run {
+                withAnimation {
+                    isAddingJellyfinModule = false
                     if moduleManager.errorMessage == nil {
                         #if os(iOS)
                         UINotificationFeedbackGenerator().notificationOccurred(.success)

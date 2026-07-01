@@ -19,4 +19,5 @@ struct PlayerContext {
     let workingDetailHref: String?    // actual working search result href that has full episode data
     let thumbnailUrl: String?         // episode thumbnail (16:9), nil falls back to cover art
     var isLocalPlayback: Bool = false // true when playing a user-picked local file
+    var jellyfinItemId: String? = nil // set when streaming from a Jellyfin server
 }

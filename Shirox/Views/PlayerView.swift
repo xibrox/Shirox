@@ -75,6 +75,10 @@ struct PlayerView: View {
     @State private var lastSavedSeconds: Double = 0
     @State private var loadingOpacity = 0.8
     @State private var didSeekToResume = false
+    /// The position a just-issued resume seek is heading to, until playback actually reaches it.
+    /// A stall-recovery nudge targets this instead of `currentTime` (which reads 0 while a deep
+    /// seek into an on-demand HLS transcode is still buffering) so the nudge can't reset resume to 0.
+    @State private var pendingResumeTarget: Double?
     @State private var skipSegments: SkipSegments?
     @State private var activeSkipSegment: SkipSegmentType?
     @State private var skippedSegments: Set<SkipSegmentType> = []
@@ -348,6 +352,10 @@ struct PlayerView: View {
             castManager.disconnect()
             if currentContext?.isLocalPlayback == true {
                 LocalPlaybackCoordinator.shared.releaseAll()
+            }
+            if let jellyfinItemId = JellyfinPlaybackCoordinator.itemId(forStreamURL: currentStream.url)
+                ?? currentContext?.jellyfinItemId {
+                JellyfinService.shared.reportStopped(itemId: jellyfinItemId, positionSeconds: currentTime)
             }
             #if os(iOS)
             // Give up audio focus on exit so system music (Spotify/Apple Music)
@@ -1082,6 +1090,15 @@ struct PlayerView: View {
 
     private func saveProgress() {
         guard let context = currentContext, duration > 0 else { return }
+        // Derive the id from the live stream URL so progress follows a "Next Up" swap to the new
+        // episode; fall back to the launch context for the first episode.
+        if let jellyfinItemId = JellyfinPlaybackCoordinator.itemId(forStreamURL: currentStream.url)
+            ?? context.jellyfinItemId {
+            // Jellyfin is the source of truth for resume — report up, never write to local CW.
+            JellyfinService.shared.reportProgress(itemId: jellyfinItemId,
+                                                  positionSeconds: currentTime, isPaused: !isPlaying)
+            return
+        }
         let urlString = currentStream.url.absoluteString
         let episodeNumber = context.episodeNumber
         let existingId = ContinueWatchingManager.shared.items
@@ -1459,6 +1476,7 @@ struct PlayerView: View {
             }
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
+                pendingResumeTarget = resumeFrom
                 Logger.shared.log("[Player] Resuming from \(resumeFrom)s", type: "Debug")
                 // Efficient (tolerant) seek: snaps to a nearby keyframe instead of forcing an
                 // exact frame. A zero-tolerance seek to a deep position on an HLS stream has to
@@ -1468,6 +1486,10 @@ struct PlayerView: View {
                     // Always set ready, even if seek was interrupted
                     DispatchQueue.main.async { videoReady = true }
                 }
+            }
+            // Resume landed — stop steering nudges toward the (now reached) resume target.
+            if let target = pendingResumeTarget, currentTime >= target - 3 {
+                pendingResumeTarget = nil
             }
             if let segments = skipSegments {
                 let timeMs = currentTime * 1000
@@ -1844,7 +1866,9 @@ struct PlayerView: View {
 
     private func nudgePlayer() {
         guard let player else { return }
-        let t = currentTime
+        // While a resume seek is still buffering, `currentTime` reads ~0; nudging there would
+        // discard the resume. Steer to the resume target until playback actually reaches it.
+        let t = pendingResumeTarget ?? currentTime
         Logger.shared.log("[StallRecovery] Nudging player at \(t)s", type: "Player")
         player.seek(to: CMTime(seconds: t, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { _ in
             DispatchQueue.main.async {
