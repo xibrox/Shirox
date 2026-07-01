@@ -113,6 +113,13 @@ struct CachedAsyncImage: View {
     @MainActor
     private func load() async {
         loadFailed = false
+        // Clear the previous image when the key changes so a recycled row (e.g. a
+        // LazyVStack/LazyVGrid cell reused for a different item) can't keep showing
+        // the old thumbnail while the new one loads. The sync fast paths below
+        // (base64/file/in-memory) overwrite this before SwiftUI renders, so warm
+        // hits still paint with no blank frame; only the async network path shows
+        // the placeholder instead of a stale image.
+        platformImage = nil
 
         if let base64 = base64String, !base64.isEmpty,
            let data = Data(base64Encoded: base64),
