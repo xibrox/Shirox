@@ -40,6 +40,7 @@ struct AniListDetailView: View {
     @State private var isReversed = false
     @State private var selectedTab = 0
     @State private var sequelMediaId: Int? = nil
+    @State private var watchOrder: [TVDBMappingService.AniraMediaEntry] = []
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -226,6 +227,9 @@ struct AniListDetailView: View {
 
     var body: some View {
         navContent
+        .task(id: mediaId) {
+            watchOrder = await TVDBMappingService.shared.fetchWatchOrder(id: mediaId)
+        }
         .task {
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             await vm.load(id: mediaId, preloaded: preloadedMedia)
@@ -684,21 +688,26 @@ struct AniListDetailView: View {
                     episodesSection(media: media)
                         .frame(maxWidth: .infinity)
                 } else {
-                    if let relations = media.relations?.edges, !relations.isEmpty {
-                        relationsSection(relations: relations)
+                    VStack(alignment: .leading, spacing: 20) {
+                        WatchOrderSection(entries: watchOrder)
+
+                        if let relations = media.relations?.edges, !relations.isEmpty {
+                            relationsSection(relations: relations)
+                                .frame(maxWidth: .infinity)
+                        } else if watchOrder.isEmpty {
+                            VStack(spacing: 20) {
+                                Image(systemName: "link.badge.plus")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary.opacity(0.5))
+                                Text("No relations found")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                             .frame(maxWidth: .infinity)
-                    } else {
-                        VStack(spacing: 20) {
-                            Image(systemName: "link.badge.plus")
-                                .font(.system(size: 48))
-                                .foregroundStyle(.secondary.opacity(0.5))
-                            Text("No relations found")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                            .padding(.vertical, 60)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 60)
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1408,6 +1417,9 @@ private struct AniListEpisodeRowContainer: View {
             number: ep,
             thumbnail: aniMapEpisode?.thumbnail ?? fallbackThumbnail,
             title: aniMapEpisode?.title,
+            fillerType: aniMapEpisode?.filler_type,
+            airdate: aniMapEpisode?.airdate,
+            episodeDescription: aniMapEpisode?.description,
             progress: progress,
             onTap: onTap,
             onMarkWatched: {

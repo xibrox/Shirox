@@ -4,6 +4,9 @@ struct ThumbnailEpisodeRow: View {
     let number: Int
     var thumbnail: String? = nil
     var title: String? = nil
+    var fillerType: String? = nil
+    var airdate: String? = nil
+    var episodeDescription: String? = nil
     var progress: Double? = nil
     let onTap: () -> Void
     var onMarkWatched: (() -> Void)? = nil
@@ -15,6 +18,8 @@ struct ThumbnailEpisodeRow: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     var downloadState: DownloadState? = nil
+
+    @State private var isDescriptionExpanded = false
 
     private var isComplete: Bool { (progress ?? 0) >= 0.9 }
 
@@ -87,15 +92,32 @@ struct ThumbnailEpisodeRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Episode \(number)")
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    
+                    HStack(spacing: 6) {
+                        Text("Episode \(number)")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        if let badge = Self.fillerBadge(for: fillerType) {
+                            Text(badge.label)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(badge.tint)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(badge.tint.opacity(0.15), in: Capsule())
+                                .overlay(Capsule().strokeBorder(badge.tint.opacity(0.35), lineWidth: 0.5))
+                        }
+                    }
+
                     if let t = title, !t.isEmpty {
                         Text(t)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                    }
+
+                    if let dateText = Self.formattedAirdate(airdate) {
+                        Text(dateText)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -124,6 +146,19 @@ struct ThumbnailEpisodeRow: View {
                         .font(.system(size: 16))
                     }
 
+                    if !isSelectionMode, let desc = episodeDescription, !desc.isEmpty {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { isDescriptionExpanded.toggle() }
+                        } label: {
+                            Image(systemName: isDescriptionExpanded ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(8)
+                                .background(Color.primary.opacity(0.06), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     if !isSelectionMode {
                         Image(systemName: "play.fill")
                             .font(.caption.weight(.semibold))
@@ -136,6 +171,17 @@ struct ThumbnailEpisodeRow: View {
             .padding(.horizontal, 14)
             .padding(.top, 12)
             .padding(.bottom, (progress ?? 0) > 0 && !isComplete && !isSelectionMode ? 6 : 12)
+
+            if isDescriptionExpanded, let desc = episodeDescription, !desc.isEmpty {
+                Text(desc)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             if let p = progress, p > 0, !isComplete, !isSelectionMode {
                 GeometryReader { geo in
@@ -199,5 +245,52 @@ struct ThumbnailEpisodeRow: View {
                 }
             }
         }
+    }
+}
+
+extension ThumbnailEpisodeRow {
+    /// Filler classifications we surface as a badge. Only `filler` and `mixed-manga`
+    /// get badged; canon/unknown/nil are intentionally not shown.
+    enum FillerBadge: Equatable {
+        case filler
+        case mixed
+
+        var label: String {
+            switch self {
+            case .filler: return "Filler"
+            case .mixed:  return "Mixed"
+            }
+        }
+        var tint: Color {
+            switch self {
+            case .filler: return .red
+            case .mixed:  return .orange
+            }
+        }
+    }
+
+    /// Maps an Anira `filler_type` value to a badge, or nil when no badge should show.
+    static func fillerBadge(for fillerType: String?) -> FillerBadge? {
+        switch fillerType {
+        case "filler":      return .filler
+        case "mixed-manga": return .mixed
+        default:            return nil
+        }
+    }
+
+    /// Formats an Anira `airdate` ("yyyy-MM-dd") into "MMM d, yyyy" (e.g. "Oct 3, 2002"),
+    /// or nil when absent/unparseable. Uses en_US_POSIX + UTC for deterministic output.
+    static func formattedAirdate(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.timeZone = TimeZone(identifier: "UTC")
+        input.dateFormat = "yyyy-MM-dd"
+        guard let date = input.date(from: raw) else { return nil }
+        let output = DateFormatter()
+        output.locale = Locale(identifier: "en_US_POSIX")
+        output.timeZone = TimeZone(identifier: "UTC")
+        output.dateFormat = "MMM d, yyyy"
+        return output.string(from: date)
     }
 }

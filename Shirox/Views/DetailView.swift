@@ -38,6 +38,7 @@ struct DetailView: View {
     @State private var selectedTab = 0
     @State private var showMatchingSearch = false
     @State private var sequelSearchItem: SearchItem? = nil
+    @State private var watchOrder: [TVDBMappingService.AniraMediaEntry] = []
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -183,6 +184,7 @@ struct DetailView: View {
             }
             isReversed = EpisodeSortManager.shared.isReversed(for: "\(moduleId ?? "unknown")_\(item.id)")
         }
+        .task(id: vm.aniListID) { await loadWatchOrder() }
         .onChangeOf(isReversed) { newValue in
             EpisodeSortManager.shared.setReversed(newValue, for: "\(moduleId ?? "unknown")_\(item.id)")
         }
@@ -364,6 +366,11 @@ struct DetailView: View {
             .filter { $0.moduleId == moduleId && $0.mediaTitle == detail.title }
             .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
             .first
+    }
+
+    private func loadWatchOrder() async {
+        guard let aid = vm.aniListID ?? aniListID else { watchOrder = []; return }
+        watchOrder = await TVDBMappingService.shared.fetchWatchOrder(id: aid)
     }
 
     @ViewBuilder
@@ -995,17 +1002,19 @@ struct DetailView: View {
         let mappedRelations: [MediaRelationEdge]? = vm.aniListMedia?.relations?.edges.filter({ $0.node.type != "MANGA" }).map { edge in
             MediaRelationEdge(relationType: edge.relationType, node: edge.node)
         }
-        if let relations = mappedRelations, !relations.isEmpty {
-            let columnCount: Int = {
-                #if os(iOS)
-                return horizontalSizeClass == .regular ? 4 : 2
-                #else
-                return 4
-                #endif
-            }()
-            let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+        VStack(alignment: .leading, spacing: 20) {
+            WatchOrderSection(entries: watchOrder)
 
-            VStack(alignment: .leading, spacing: 20) {
+            if let relations = mappedRelations, !relations.isEmpty {
+                let columnCount: Int = {
+                    #if os(iOS)
+                    return horizontalSizeClass == .regular ? 4 : 2
+                    #else
+                    return 4
+                    #endif
+                }()
+                let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(relations) { edge in
                         NavigationLink {
@@ -1017,54 +1026,54 @@ struct DetailView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-            }
-            .padding(.top, 8)
-        } else if vm.isLoadingAniListMedia {
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Loading relations…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
-        } else if vm.isMatchingAniList {
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Searching AniList...")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
-        } else {
-            VStack(spacing: 16) {
-                Image(systemName: "link.badge.plus")
-                    .font(.largeTitle)
-                    .foregroundStyle(.secondary.opacity(0.5))
-                
-                VStack(spacing: 4) {
-                    Text("Not linked to AniList")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Link this series to enable tracking and relations.")
+            } else if vm.isLoadingAniListMedia {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Loading relations…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
-                Button {
-                    showMatchingSearch = true
-                } label: {
-                    Text("Link with AniList")
-                        .font(.subheadline.weight(.bold))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.primary, in: Capsule())
-                        .foregroundStyle(platformBackground)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else if vm.isMatchingAniList {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Searching AniList...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else if watchOrder.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "link.badge.plus")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary.opacity(0.5))
+
+                    VStack(spacing: 4) {
+                        Text("Not linked to AniList")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Link this series to enable tracking and relations.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button {
+                        showMatchingSearch = true
+                    } label: {
+                        Text("Link with AniList")
+                            .font(.subheadline.weight(.bold))
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.primary, in: Capsule())
+                            .foregroundStyle(platformBackground)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
         }
+        .padding(.top, 8)
     }
 
     @ViewBuilder
@@ -1869,6 +1878,9 @@ private struct ModuleEpisodeRowContainer: View {
                     number: epNum,
                     thumbnail: preferredThumbnail,
                     title: preferredTitle,
+                    fillerType: aniMapEpisode?.filler_type,
+                    airdate: aniMapEpisode?.airdate,
+                    episodeDescription: aniMapEpisode?.description,
                     progress: progress,
                     onTap: onTap,
                     onMarkWatched: {

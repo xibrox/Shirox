@@ -427,6 +427,7 @@ enum BrowseCategory: String, CaseIterable, Hashable {
     private var episodeCache: [Int: [AniMapEpisode]] = [:]
     private var malEpisodeCache: [Int: [AniMapEpisode]] = [:]
     private var aniraEpisodeCache: [String: AniraEpisodeResponse] = [:]
+    private var watchOrderCache: [Int: [AniraMediaEntry]] = [:]
 
     // Bulk ID-mapping snapshot from anira's /mappings/all — resolved locally instead of
     // hitting the per-id endpoint once per show. Seeded from disk on first use, refreshed
@@ -456,6 +457,23 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         let description: String?
         let thumbnail: String?
         let skips: [Skip]?
+    }
+
+    /// One entry from Anira's `/watch_order` (and identically-shaped `/similar`) response.
+    /// `mappings.anilist_id` can be null for entries that only exist on other databases.
+    struct AniraMediaEntry: Decodable, Identifiable {
+        let title: String?
+        let cover: String?
+        let mappings: Mappings
+
+        struct Mappings: Decodable {
+            let anilist_id: Int?
+            let mal_id: Int?
+            let media_type: String?
+        }
+
+        /// Stable list identity — prefers AniList id, then MAL id, then title.
+        var id: String { "\(mappings.anilist_id ?? mappings.mal_id ?? 0)-\(title ?? "")" }
     }
 
     private static let session: URLSession = {
@@ -663,6 +681,20 @@ enum BrowseCategory: String, CaseIterable, Hashable {
         else { return nil }
         aniraEpisodeCache[key] = result
         return result
+    }
+
+    /// Anira's recommended franchise watch order for a title. Returns [] when Anira has no
+    /// data or returns a non-array error body for an unmapped id (mirrors the defensive
+    /// decoding used for episodes). Cached in-memory per id.
+    func fetchWatchOrder(id: Int, provider: ProviderType = .anilist) async -> [AniraMediaEntry] {
+        if let cached = watchOrderCache[id] { return cached }
+        let key = mappingKey(for: provider)
+        guard let url = URL(string: "https://api.anira.dev/media/\(id)/watch_order?mapping_key=\(key)"),
+              let (data, _) = try? await Self.session.data(for: URLRequest(url: url)),
+              let results = try? JSONDecoder().decode([AniraMediaEntry].self, from: data)
+        else { return [] }
+        watchOrderCache[id] = results
+        return results
     }
 
     func getCachedArtwork(for id: Int, provider: ProviderType = .anilist) -> (poster: String?, fanart: String?) {
