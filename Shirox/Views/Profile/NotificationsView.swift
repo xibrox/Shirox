@@ -209,8 +209,12 @@ struct NotificationsView: View {
         case .activityMessage(_, let context, _), .activityReply(_, let context, _),
              .activityMention(_, let context, _), .activityLike(_, let context, _):
             Text("Activity ") + Text(context ?? "")
-        case .mediaChange(let context, _):
-            Text(context ?? "A title was updated")
+        case .mediaChange(let title, let context, _, _):
+            if let title, !title.isEmpty {
+                Text(title).bold() + Text(context ?? " was recently added to the site.")
+            } else {
+                Text(context ?? "A title was updated")
+            }
         case .unknown(let context):
             Text(context ?? "Notification").foregroundStyle(.secondary)
         }
@@ -223,7 +227,7 @@ struct NotificationsView: View {
         case .activityMessage(let id, _, _), .activityReply(let id, _, _),
              .activityMention(let id, _, _), .activityLike(let id, _, _):
             return id != nil
-        case .mediaChange(_, let mediaId):
+        case .mediaChange(_, _, _, let mediaId):
             return mediaId != nil
         default:
             return false
@@ -238,7 +242,7 @@ struct NotificationsView: View {
         case .activityMessage(let activityId, _, _), .activityReply(let activityId, _, _),
              .activityMention(let activityId, _, _), .activityLike(let activityId, _, _):
             if let id = activityId { ActivityFetchView(activityId: id) }
-        case .mediaChange(_, let mediaId):
+        case .mediaChange(_, _, _, let mediaId):
             if let id = mediaId { AniListDetailView(mediaId: id, preloadedMedia: nil) }
         default:
             EmptyView()

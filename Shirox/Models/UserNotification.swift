@@ -7,7 +7,7 @@ enum NotificationKind {
     case activityReply(activityId: Int?, context: String?, avatarURL: String?)
     case activityMention(activityId: Int?, context: String?, avatarURL: String?)
     case activityLike(activityId: Int?, context: String?, avatarURL: String?)
-    case mediaChange(context: String?, mediaId: Int?)
+    case mediaChange(title: String?, context: String?, coverURL: String?, mediaId: Int?)
     case unknown(context: String?)
 }
 
@@ -25,6 +25,7 @@ extension NotificationKind {
         case .activityReply(_, _, let url): return url.map { .avatar($0) }
         case .activityMention(_, _, let url): return url.map { .avatar($0) }
         case .activityLike(_, _, let url): return url.map { .avatar($0) }
+        case .mediaChange(_, _, let url, _): return url.map { .cover($0) }
         default: return nil
         }
     }
