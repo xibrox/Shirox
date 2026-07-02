@@ -67,6 +67,40 @@ final class AniListService {
         return try await fetchPage(query: query, variables: ["search": keyword])
     }
 
+    /// Normalized set of adult (`isAdult: true`) anime title variants + synonyms
+    /// matching `keyword`. Used by NSFWContentFilter to screen module results.
+    func searchAdultTitles(keyword: String) async throws -> Set<String> {
+        struct AdultPage: Decodable { let Page: AdultContent }
+        struct AdultContent: Decodable { let media: [AdultMedia] }
+        struct AdultMedia: Decodable {
+            let title: AniListTitle
+            let synonyms: [String]?
+        }
+        let query = """
+        query ($search: String) {
+          Page(page: 1, perPage: 25) {
+            media(search: $search, type: ANIME, isAdult: true) {
+              title { romaji english native }
+              synonyms
+            }
+          }
+        }
+        """
+        let data = try await post(query: query, variables: ["search": keyword])
+        let response = try JSONDecoder().decode(GraphQLResponse<AdultPage>.self, from: data)
+        var result = Set<String>()
+        for media in response.data?.Page.media ?? [] {
+            let variants: [String?] = [media.title.romaji, media.title.english, media.title.native]
+                + (media.synonyms ?? []).map(Optional.some)
+            for raw in variants {
+                guard let raw, !raw.isEmpty else { continue }
+                let norm = NSFWContentFilter.normalize(raw)
+                if !norm.isEmpty { result.insert(norm) }
+            }
+        }
+        return result
+    }
+
     func trending() async throws -> [AniListMedia] {
         let query = """
         query {

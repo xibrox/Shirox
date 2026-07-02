@@ -102,6 +102,7 @@ struct ShiroxApp: App {
         #endif
         ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
         LocalLibraryManager.shared.syncFromContinueWatching()
+        HostBlocklist.shared.loadIfNeeded()
     }
 
     var body: some Scene {

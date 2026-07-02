@@ -1362,6 +1362,12 @@ struct PlayerView: View {
         try? AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
         #endif
 
+        if !currentStream.url.isFileURL, HostBlocklist.shared.isBlocked(currentStream.url) {
+            Logger.shared.log("[Player] Refusing blocked host: \(currentStream.url.host ?? "?")", type: "Error")
+            videoReady = false
+            return
+        }
+
         let asset: AVURLAsset
         if currentStream.url.isFileURL {
             asset = AVURLAsset(url: currentStream.url)

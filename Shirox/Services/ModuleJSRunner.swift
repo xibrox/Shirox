@@ -215,6 +215,10 @@ final class ModuleJSRunner {
                 reject.call(withArguments: ["Invalid URL: \(urlString)"])
                 return
             }
+            if HostBlocklist.shared.isBlocked(url) {
+                reject.call(withArguments: ["Blocked host: \(url.host ?? urlString)"])
+                return
+            }
 
             let method = (methodVal.isNull || methodVal.isUndefined) ? "GET" : (methodVal.toString() ?? "GET")
             let body: String? = (bodyVal.isNull || bodyVal.isUndefined) ? nil : bodyVal.toString()

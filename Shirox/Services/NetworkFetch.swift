@@ -337,6 +337,15 @@ class NetworkFetchSimpleMonitor: NSObject, ObservableObject {
                 ])
                 return
             }
+            if HostBlocklist.shared.isBlocked(url) {
+                completion([
+                    "originalUrl": urlString,
+                    "requests": [],
+                    "success": false,
+                    "error": "Blocked host"
+                ])
+                return
+            }
             setupWebView()
             loadURL(url: url, headers: headers)
         }
@@ -665,7 +674,10 @@ extension NetworkFetchSimpleMonitor: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
     @available(iOS 15.0, macOS 13.0, *)
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
-        if let url = navigationAction.request.url { addRequest(url.absoluteString) }
+        if let url = navigationAction.request.url {
+            if HostBlocklist.shared.isBlocked(url) { return .cancel }
+            addRequest(url.absoluteString)
+        }
         return .allow
     }
 }
@@ -768,6 +780,23 @@ class NetworkFetchMonitor: NSObject, ObservableObject {
                     "cookies": NSNull(),
                     "success": false,
                     "error": "Invalid URL format",
+                    "cutoffTriggered": false,
+                    "cutoffUrl": NSNull(),
+                    "htmlCaptured": false,
+                    "cookiesCaptured": false,
+                    "elementsClicked": [],
+                    "waitResults": [:]
+                ])
+                return
+            }
+            if HostBlocklist.shared.isBlocked(url) {
+                completion([
+                    "originalUrl": urlString,
+                    "requests": [],
+                    "html": NSNull(),
+                    "cookies": NSNull(),
+                    "success": false,
+                    "error": "Blocked host",
                     "cutoffTriggered": false,
                     "cutoffUrl": NSNull(),
                     "htmlCaptured": false,
@@ -1331,7 +1360,10 @@ extension NetworkFetchMonitor: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {}
     @available(iOS 15.0, macOS 13.0, *)
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
-        if let url = navigationAction.request.url { addRequest(url.absoluteString) }
+        if let url = navigationAction.request.url {
+            if HostBlocklist.shared.isBlocked(url) { return .cancel }
+            addRequest(url.absoluteString)
+        }
         return .allow
     }
 }

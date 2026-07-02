@@ -60,7 +60,8 @@ final class SearchViewModel: ObservableObject {
                     }
                     if !Task.isCancelled {
                         var seen = Set<String>()
-                        moduleResults = res.filter { seen.insert($0.href).inserted }
+                        let deduped = res.filter { seen.insert($0.href).inserted }
+                        moduleResults = await NSFWContentFilter.shared.filter(deduped, keyword: q)
                         aniListResults = []
                     }
                 } else {

@@ -194,6 +194,7 @@ final class CloudflareBypassManager: ObservableObject {
     /// Polls up to 30 s for `cf_clearance` to appear, then throws `.timeout`.
     func triggerBypass(for url: URL) async throws {
         guard let host = url.host else { return }
+        if HostBlocklist.shared.isBlocked(url) { return }
         if cookie(for: host) != nil { return }
 
         // Another caller is already solving this host — wait for it instead of opening a
