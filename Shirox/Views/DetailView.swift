@@ -588,7 +588,9 @@ struct DetailView: View {
             let showMatches = resolvedAniListID != nil
                 ? cw.aniListID == resolvedAniListID
                 : cw.moduleId == moduleId && cw.mediaTitle == currentTitle
-            return showMatches && cw.episodeNumber == epNum && !cw.streamUrl.isEmpty
+            // Anchor on the episode's unique href so tapping S2 E5 doesn't resume S1 E5's
+            // stream when their numbers collide on a flat multi-season list.
+            return showMatches && cw.matchesEpisode(number: epNum, href: episode.href) && !cw.streamUrl.isEmpty
         }
         if let item = cwItem {
             resumeWatching(item: item)
@@ -1450,10 +1452,19 @@ struct DetailView: View {
                     let eps = Array(visibleEpisodes[startIndex..<endIndex])
                     return isReversed ? eps.reversed() : eps
                 }()
+                // How many times each episode number appears across the whole show — >1 means a
+                // flat multi-season list restarts numbering, so number-based watched state is
+                // ambiguous. Paired with showUsesHrefTracking to suppress cross-season bleed.
+                let episodeNumberCounts = Dictionary(grouping: detail.episodes, by: { Int($0.number) }).mapValues(\.count)
+                let showUsesHrefTracking = continueWatching.hasAnyWatchedHref(
+                    aniListID: vm.aniListID ?? aniListID,
+                    moduleId: ModuleManager.shared.activeModule?.id,
+                    mediaTitle: detail.title)
 
                 LazyVStack(spacing: 8) {
                     ForEach(displayedEpisodes) { episode in
                         let epNum = Int(episode.number)
+                        let numberIsAmbiguous = (episodeNumberCounts[epNum] ?? 0) > 1
                         #if os(iOS)
                         let sel = isSelectionMode
                         let selected = selectedEpisodeNumbers.contains(epNum)
@@ -1467,6 +1478,8 @@ struct DetailView: View {
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
                             isAiring: vm.aniListMedia.map { $0.status == "RELEASING" },
+                            numberIsAmbiguous: numberIsAmbiguous,
+                            showUsesHrefTracking: showUsesHrefTracking,
                             onTap: sel ? {
                                 // Block selecting an in-progress download — nothing useful
                                 // to do with it from the batch bar. Completed downloads
@@ -1508,6 +1521,8 @@ struct DetailView: View {
                             aniListProgress: existingEntry?.progress,
                             aniListStatus: existingEntry?.status,
                             isAiring: vm.aniListMedia.map { $0.status == "RELEASING" },
+                            numberIsAmbiguous: numberIsAmbiguous,
+                            showUsesHrefTracking: showUsesHrefTracking,
                             onTap: { tapEpisode(episode) },
                             onTryOtherStream: { vm.loadStreams(for: episode) }
                         )
@@ -1639,7 +1654,7 @@ struct DetailView: View {
                             store.localFileURL(in: snapshot, relative: $0).absoluteString
                         }
                         let displayTitle = epSnap?.title ?? downloadItem.episodeTitle
-                        let progressValue: Double? = offlineProgress(for: epNum, snapshot: snapshot)
+                        let progressValue: Double? = offlineProgress(for: epNum, href: downloadItem.episodeHref, snapshot: snapshot)
                         let isSel = selectedEpisodeNumbers.contains(epNum)
 
                         ThumbnailEpisodeRow(
@@ -1681,7 +1696,9 @@ struct DetailView: View {
     }
 
     /// Computes the watched-progress fraction for an episode using ContinueWatchingManager.
-    private func offlineProgress(for episodeNumber: Int, snapshot: DownloadedMediaSnapshot) -> Double? {
+    /// Matches the in-progress item on the episode's unique href (numbers repeat across seasons
+    /// on a flat list) so S1 E5's progress doesn't bleed onto S2 E5's downloaded row.
+    private func offlineProgress(for episodeNumber: Int, href: String?, snapshot: DownloadedMediaSnapshot) -> Double? {
         if continueWatching.isWatched(
             aniListID: snapshot.aniListID,
             moduleId: snapshot.moduleId,
@@ -1691,8 +1708,9 @@ struct DetailView: View {
             return 1.0
         }
         guard let cw = continueWatching.items.first(where: {
-            ($0.aniListID != nil && $0.aniListID == snapshot.aniListID && $0.episodeNumber == episodeNumber) ||
-            ($0.mediaTitle == snapshot.mediaTitle && $0.moduleId == snapshot.moduleId && $0.episodeNumber == episodeNumber)
+            (($0.aniListID != nil && $0.aniListID == snapshot.aniListID) ||
+             ($0.mediaTitle == snapshot.mediaTitle && $0.moduleId == snapshot.moduleId))
+            && $0.matchesEpisode(number: episodeNumber, href: href)
         }), cw.totalSeconds > 0 else { return nil }
         return min(cw.watchedSeconds / cw.totalSeconds, 1.0)
     }
@@ -1704,8 +1722,10 @@ struct DetailView: View {
 
             // Look up saved progress for this exact episode so the player resumes
             // where the user left off instead of restarting from 0 every time.
+            // Anchor on the episode's unique href so a downloaded S2 E5 doesn't inherit
+            // S1 E5's resume position when their numbers collide on a multi-season list.
             let saved = ContinueWatchingManager.shared.items.first {
-                $0.episodeNumber == item.episodeNumber
+                $0.matchesEpisode(number: item.episodeNumber, href: item.episodeHref)
                     && (
                         ($0.aniListID != nil && $0.aniListID == item.aniListID)
                         || ($0.mediaTitle == item.mediaTitle && $0.moduleId == item.moduleId)
@@ -1758,6 +1778,10 @@ private struct ModuleEpisodeRowContainer: View {
     let aniListProgress: Int?
     let aniListStatus: MediaListStatus?
     var isAiring: Bool? = nil
+    /// True when this episode's number repeats elsewhere in the show (flat multi-season list).
+    var numberIsAmbiguous: Bool = false
+    /// True when the user has completed/marked any episode of this show in-app.
+    var showUsesHrefTracking: Bool = false
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
     var onTryOtherStream: (() -> Void)? = nil
@@ -1785,6 +1809,7 @@ private struct ModuleEpisodeRowContainer: View {
             totalEpisodes: totalEpisodes,
             availableEpisodes: nil,
             detailHref: detailHref,
+            episodeHref: episode.href,
             isAiring: isAiring,
             currentAniListProgress: aniListProgress,
             currentMALProgress: nil,
@@ -1816,16 +1841,25 @@ private struct ModuleEpisodeRowContainer: View {
     }
 
     private var progress: Double? {
-        if continueWatching.isWatched(aniListID: aniListID, moduleId: moduleId,
-                                      mediaTitle: mediaTitle, episodeNumber: epNum) {
-            return 1.0
-        }
-        
+        // Reconcile the season-unique href marker with the legacy number key so completing
+        // S1 E5 doesn't light up S2 E5 on a flat multi-season list (see isEpisodeWatched).
+        let watched = ContinueWatchingManager.isEpisodeWatched(
+            watchedByHref: continueWatching.isWatchedHref(
+                aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeHref: episode.href),
+            watchedByNumber: continueWatching.isWatched(
+                aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum),
+            showUsesHrefTracking: showUsesHrefTracking,
+            numberIsAmbiguous: numberIsAmbiguous)
+        if watched { return 1.0 }
+
         let mid = moduleId
+        // Match on the unique episode href, not the number: on a flat multi-season list the
+        // numbers repeat (S1 1…12, S2 1…12), so a number-only match bleeds S1 E5's progress
+        // onto S2 E5. Falls back to number for legacy items without a saved href.
         guard let item = continueWatching.items.first(where: {
                   (($0.aniListID != nil && $0.aniListID == aniListID) ||
                   ($0.moduleId == mid && $0.mediaTitle == mediaTitle))
-                  && $0.episodeNumber == epNum
+                  && $0.matchesEpisode(number: epNum, href: episode.href)
               }),
               item.totalSeconds > 0
         else { return nil }
@@ -1899,7 +1933,8 @@ private struct ModuleEpisodeRowContainer: View {
                     },
                     onResetProgress: {
                         ContinueWatchingManager.shared.resetEpisodeProgress(
-                            aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
+                            aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                            episodeHref: episode.href)
                     },
                     onDownload: onDownload,
                     onDeleteDownload: deleteDownloadAction,
@@ -1929,7 +1964,8 @@ private struct ModuleEpisodeRowContainer: View {
                     },
                     onResetProgress: {
                         ContinueWatchingManager.shared.resetEpisodeProgress(
-                            aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum)
+                            aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum,
+                            episodeHref: episode.href)
                     },
                     onDownload: onDownload,
                     onDeleteDownload: deleteDownloadAction,

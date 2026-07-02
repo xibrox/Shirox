@@ -9,6 +9,7 @@ import Combine
     private enum Keys {
         static let storage = "continueWatchingItems"
         static let watched = "watchedEpisodeKeys"
+        static let watchedHrefs = "watchedEpisodeHrefKeys"
         static let dataVersion = "cwDataVersion"
     }
 
@@ -16,6 +17,11 @@ import Combine
 
     @Published private(set) var items: [ContinueWatchingItem] = []
     @Published private(set) var watchedKeys: Set<String> = []
+    /// Show-namespaced markers ("ah:<id>:<href>" / "mh:<mid>:<title>:<href>") for episodes
+    /// completed or marked in-app. Unlike `watchedKeys` these are season-unique (the href is),
+    /// so they disambiguate flat multi-season lists where episode numbers repeat. Purely
+    /// additive — reads still fall back to `watchedKeys` for shows without any marker.
+    @Published private(set) var watchedHrefKeys: Set<String> = []
 
     // MARK: - Private Properties
 
@@ -113,11 +119,14 @@ import Combine
     }
 
     /// Removes the watched key and any CW item for a single episode.
-    func resetEpisodeProgress(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int) {
+    func resetEpisodeProgress(aniListID: Int?, moduleId: String?, mediaTitle: String,
+                              episodeNumber: Int, episodeHref: String? = nil) {
         if let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
                                      mediaTitle: mediaTitle, episodeNumber: episodeNumber) {
             watchedKeys.remove(key)
         }
+        removeWatchedHref(aniListID: aniListID, moduleId: moduleId,
+                          mediaTitle: mediaTitle, episodeHref: episodeHref)
         items.removeAll {
             matchesShow($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
             && $0.episodeNumber == episodeNumber
@@ -132,6 +141,9 @@ import Combine
         } else if let mid = moduleId, !mid.isEmpty {
             let prefix = "m:\(mid):\(mediaTitle):"
             watchedKeys = watchedKeys.filter { !$0.hasPrefix(prefix) }
+        }
+        if let hrefPrefix = Self.watchedHrefPrefix(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle) {
+            watchedHrefKeys = watchedHrefKeys.filter { !$0.hasPrefix(hrefPrefix) }
         }
         var arr = items
         removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)
@@ -157,8 +169,10 @@ import Combine
     func resetAllData() {
         items = []
         watchedKeys = []
+        watchedHrefKeys = []
         UserDefaults.standard.removeObject(forKey: Keys.storage)
         UserDefaults.standard.removeObject(forKey: Keys.watched)
+        UserDefaults.standard.removeObject(forKey: Keys.watchedHrefs)
         UserDefaults.standard.set(Self.currentDataVersion, forKey: Keys.dataVersion)
     }
 
@@ -333,6 +347,31 @@ import Combine
         }
     }
 
+    /// Whether an episode row should render as watched, reconciling per-episode href markers
+    /// (season-unique) with the legacy number-based watched keys.
+    ///
+    /// - watchedByHref: this exact episode (by its unique href) was completed/marked in-app.
+    /// - watchedByNumber: the number-based watched key is set (remote sync, legacy items, or
+    ///   a manual mark-as-watched).
+    /// - showUsesHrefTracking: the show has at least one href marker — i.e. the user has
+    ///   completed/marked an episode of it in-app.
+    /// - numberIsAmbiguous: this episode's number repeats elsewhere in the show's list (a flat
+    ///   multi-season list restarts numbering each season).
+    ///
+    /// An href marker is authoritative. Absent one, the number key is trusted — except when the
+    /// show is href-tracked AND the number is ambiguous, where the key may belong to a different
+    /// season's episode of the same number, so it's suppressed to stop the cross-season bleed.
+    /// Shows with no in-app completion (showUsesHrefTracking == false) keep the legacy behavior
+    /// unchanged. Pure, no side effects.
+    nonisolated static func isEpisodeWatched(
+        watchedByHref: Bool, watchedByNumber: Bool,
+        showUsesHrefTracking: Bool, numberIsAmbiguous: Bool) -> Bool {
+        if watchedByHref { return true }
+        guard watchedByNumber else { return false }
+        if !showUsesHrefTracking { return true }
+        return !numberIsAmbiguous
+    }
+
     /// Returns true if the episode has been watched to completion.
     func isWatched(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int) -> Bool {
         guard let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
@@ -345,11 +384,13 @@ import Combine
     /// Advances CW to "Up Next N+1" unless CW is already past ep N.
     func markWatched(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int,
                      imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil,
-                     isAiring: Bool? = nil, detailHref: String? = nil) {
+                     isAiring: Bool? = nil, detailHref: String? = nil, episodeHref: String? = nil) {
         guard let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
                                         mediaTitle: mediaTitle, episodeNumber: episodeNumber)
         else { return }
         watchedKeys.insert(key)
+        insertWatchedHref(aniListID: aniListID, moduleId: moduleId,
+                          mediaTitle: mediaTitle, episodeHref: episodeHref)
 
         var arr = items
         let current = arr.first(where: {
@@ -386,11 +427,14 @@ import Combine
     /// If CW has a real in-progress item (any ep), leaves it alone.
     /// Otherwise replaces CW with "Up Next N" so the card points to this episode.
     func markUnwatched(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeNumber: Int,
-                       imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil, detailHref: String? = nil) {
+                       imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil,
+                       detailHref: String? = nil, episodeHref: String? = nil) {
         guard let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
                                         mediaTitle: mediaTitle, episodeNumber: episodeNumber)
         else { return }
         watchedKeys.remove(key)
+        removeWatchedHref(aniListID: aniListID, moduleId: moduleId,
+                          mediaTitle: mediaTitle, episodeHref: episodeHref)
 
         var arr = items
         let current = arr.first(where: {
@@ -425,9 +469,9 @@ import Combine
     func markWatched(upThrough episodeNumber: Int,
                      aniListID: Int?, moduleId: String?, mediaTitle: String,
                      imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil,
-                     isAiring: Bool? = nil, detailHref: String? = nil) {
+                     isAiring: Bool? = nil, detailHref: String? = nil, episodeHref: String? = nil) {
         guard episodeNumber > 0 else { return }
-        
+
         // 1. Mark episodes 1...episodeNumber as watched
         for ep in 1...episodeNumber {
             if let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
@@ -435,6 +479,9 @@ import Combine
                 watchedKeys.insert(key)
             }
         }
+        // Record the season-unique href for the tapped episode (only its href is known here).
+        insertWatchedHref(aniListID: aniListID, moduleId: moduleId,
+                          mediaTitle: mediaTitle, episodeHref: episodeHref)
         
         var arr = items
         let ref = arr.first(where: {
@@ -493,7 +540,7 @@ import Combine
                 mediaTitle: context.mediaTitle, imageUrl: context.imageUrl,
                 totalEpisodes: context.totalEpisodes, availableEpisodes: context.availableEpisodes,
                 isAiring: context.isAiring,
-                detailHref: context.detailHref
+                detailHref: context.detailHref, episodeHref: context.episodeHref
             )
             await pushRemoteProgress(ep: ep, context: context)
             return .applied
@@ -582,7 +629,8 @@ import Combine
             aniListID: context.aniListID, moduleId: context.moduleId,
             mediaTitle: context.mediaTitle, episodeNumber: ep,
             imageUrl: context.imageUrl, totalEpisodes: context.totalEpisodes,
-            availableEpisodes: context.availableEpisodes, detailHref: context.detailHref
+            availableEpisodes: context.availableEpisodes, detailHref: context.detailHref,
+            episodeHref: context.episodeHref
         )
         let keysAbove = watchedKeys.filter { key in
             if let aid = context.aniListID, key.hasPrefix("a:\(aid):") {
@@ -784,12 +832,16 @@ import Combine
         }
     }
 
-    /// Private overload used by save() — marks an item's episode as watched in watchedKeys.
+    /// Private overload used by save() — marks an item's episode as watched in watchedKeys,
+    /// and records the season-unique href marker so a flat multi-season list doesn't show the
+    /// same-numbered episode of another season as completed.
     private func markWatched(_ item: ContinueWatchingItem) {
         if let key = Self.watchedKey(aniListID: item.aniListID, moduleId: item.moduleId,
                                      mediaTitle: item.mediaTitle, episodeNumber: item.episodeNumber) {
             watchedKeys.insert(key)
         }
+        insertWatchedHref(aniListID: item.aniListID, moduleId: item.moduleId,
+                          mediaTitle: item.mediaTitle, episodeHref: item.episodeHref)
     }
 
     private static func watchedKey(aniListID: Int?, moduleId: String?,
@@ -800,6 +852,57 @@ import Combine
             return "m:\(mid):\(canonical):\(episodeNumber)"
         }
         return nil
+    }
+
+    /// Season-unique watched marker for one episode, namespaced by show identity so a whole
+    /// show's markers can be found/cleared by prefix. Nil when the href is empty or the show
+    /// has no identity (mirrors `watchedKey`'s aniListID-then-module precedence).
+    private static func watchedHrefKey(aniListID: Int?, moduleId: String?,
+                                        mediaTitle: String, episodeHref: String?) -> String? {
+        guard let href = episodeHref, !href.isEmpty else { return nil }
+        if let aid = aniListID { return "ah:\(aid):\(href)" }
+        if let mid = moduleId, !mid.isEmpty {
+            let canonical = mediaTitle.trimmingCharacters(in: .whitespaces).lowercased()
+            return "mh:\(mid):\(canonical):\(href)"
+        }
+        return nil
+    }
+
+    /// The prefix shared by every href marker of a show — used to test/clear them in bulk.
+    private static func watchedHrefPrefix(aniListID: Int?, moduleId: String?, mediaTitle: String) -> String? {
+        if let aid = aniListID { return "ah:\(aid):" }
+        if let mid = moduleId, !mid.isEmpty {
+            let canonical = mediaTitle.trimmingCharacters(in: .whitespaces).lowercased()
+            return "mh:\(mid):\(canonical):"
+        }
+        return nil
+    }
+
+    /// True if this exact episode (by unique href) was completed/marked in-app.
+    func isWatchedHref(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeHref: String?) -> Bool {
+        guard let key = Self.watchedHrefKey(aniListID: aniListID, moduleId: moduleId,
+                                            mediaTitle: mediaTitle, episodeHref: episodeHref) else { return false }
+        return watchedHrefKeys.contains(key)
+    }
+
+    /// True if the show has any href marker — i.e. the user has completed/marked an episode of
+    /// it in-app. Gates the season-aware watched rule so untouched shows keep legacy behavior.
+    func hasAnyWatchedHref(aniListID: Int?, moduleId: String?, mediaTitle: String) -> Bool {
+        guard let prefix = Self.watchedHrefPrefix(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
+        else { return false }
+        return watchedHrefKeys.contains { $0.hasPrefix(prefix) }
+    }
+
+    private func insertWatchedHref(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeHref: String?) {
+        guard let key = Self.watchedHrefKey(aniListID: aniListID, moduleId: moduleId,
+                                            mediaTitle: mediaTitle, episodeHref: episodeHref) else { return }
+        watchedHrefKeys.insert(key)
+    }
+
+    private func removeWatchedHref(aniListID: Int?, moduleId: String?, mediaTitle: String, episodeHref: String?) {
+        guard let key = Self.watchedHrefKey(aniListID: aniListID, moduleId: moduleId,
+                                            mediaTitle: mediaTitle, episodeHref: episodeHref) else { return }
+        watchedHrefKeys.remove(key)
     }
 
     // MARK: - Remote Tracking
@@ -1045,6 +1148,8 @@ import Combine
             UserDefaults.standard.set(data, forKey: Keys.storage)
             let watchedData = try JSONEncoder().encode(watchedKeys)
             UserDefaults.standard.set(watchedData, forKey: Keys.watched)
+            let watchedHrefData = try JSONEncoder().encode(watchedHrefKeys)
+            UserDefaults.standard.set(watchedHrefData, forKey: Keys.watchedHrefs)
         } catch {
             assertionFailure("ContinueWatchingManager: encode failed — \(error)")
         }
@@ -1065,6 +1170,12 @@ import Combine
         if let wdata = UserDefaults.standard.data(forKey: Keys.watched),
            let wdecoded = try? JSONDecoder().decode(Set<String>.self, from: wdata) {
             watchedKeys = wdecoded
+        }
+        // Additive field introduced without a data-version bump — absent for existing installs,
+        // which simply start with no href markers and keep the legacy number-key behavior.
+        if let hdata = UserDefaults.standard.data(forKey: Keys.watchedHrefs),
+           let hdecoded = try? JSONDecoder().decode(Set<String>.self, from: hdata) {
+            watchedHrefKeys = hdecoded
         }
     }
 }

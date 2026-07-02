@@ -9,6 +9,9 @@ struct MarkContext {
     let totalEpisodes: Int?
     let availableEpisodes: Int?
     let detailHref: String?
+    /// The tapped episode's own unique href — records a season-unique watched marker so a flat
+    /// multi-season list doesn't show another season's same-numbered episode as watched.
+    var episodeHref: String? = nil
     var isAiring: Bool? = nil
     var currentAniListProgress: Int? = nil
     var currentMALProgress: Int? = nil
