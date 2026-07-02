@@ -158,4 +158,24 @@ final class EpisodeNavigatorTests: XCTestCase {
         let eps = twoSeasonChain()
         XCTAssertNil(EpisodeNavigator.resolve(href: "does/not/exist", orNumber: 99, in: eps))
     }
+
+    /// THE SEASON-1 LEAK: a legacy Continue-Watching item saved before episodeHref existed
+    /// carries no href, so recovery can only offer a number. On a flat two-season list that
+    /// number is ambiguous (S1 and S2 both have an "ep 2"), and a first-match lookup returns
+    /// season 1 — the "leave the app, come back on season 1" bug. An ambiguous number must
+    /// abort (nil), never resurrect season 1.
+    func testResolveReturnsNilForAmbiguousNumberWithoutHref() {
+        let eps = twoSeasonChain()
+        XCTAssertNil(EpisodeNavigator.resolve(href: nil, orNumber: 2, in: eps),
+                     "a repeated number with no href is ambiguous — must not resolve to season 1")
+    }
+
+    /// Same leak via a *present-but-unmatched* href: the saved href no longer appears in the
+    /// refetched list (module changed its URL format / re-paginated). Falling back to the
+    /// ambiguous number would still land on season 1, so this must abort too.
+    func testResolveReturnsNilWhenHrefUnmatchedAndNumberAmbiguous() {
+        let eps = twoSeasonChain()
+        XCTAssertNil(EpisodeNavigator.resolve(href: "s2/ep2?token=stale", orNumber: 2, in: eps),
+                     "unmatched href + repeated number must abort, not fall back to season 1")
+    }
 }

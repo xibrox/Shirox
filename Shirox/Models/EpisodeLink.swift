@@ -70,9 +70,16 @@ enum EpisodeNavigator {
     /// refetching ep 7). The saved href is unique, so it disambiguates. Returns `nil` when
     /// neither matches — a refetch that can't identify the episode must abort rather than
     /// resurrect a nearest-but-wrong one.
+    ///
+    /// The number fallback (no href / unmatched href — e.g. legacy Continue-Watching items, or a
+    /// module that changed its URL format) only fires when the number is *unambiguous*. On a flat
+    /// multi-season list the number repeats and a first-match lookup always lands on season 1 —
+    /// the "leave the app, come back on season 1" bug. When the number is ambiguous we can't tell
+    /// which season is on screen, so we abort (nil) rather than silently swap in season 1.
     static func resolve(href: String?, orNumber number: Int, in episodes: [EpisodeLink]) -> EpisodeLink? {
         if let href, let ep = episodes.first(where: { $0.href == href }) { return ep }
-        return episodes.first(where: { Int($0.number) == number })
+        let numberMatches = episodes.filter { Int($0.number) == number }
+        return numberMatches.count == 1 ? numberMatches.first : nil
     }
 
     /// Convenience for the resume paths: anchor on the unique `href` when one was saved,
