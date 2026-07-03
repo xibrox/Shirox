@@ -3,6 +3,9 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    // Continue Watching context-menu navigation. Driven from here so the hidden
+    // NavigationLink that performs the push sits OUTSIDE the ScrollView below.
+    @State private var cwNavTarget: ContinueWatchingNavTarget?
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -39,7 +42,7 @@ struct HomeView: View {
                             }
                             #if os(iOS)
                             if !continueWatching.items.isEmpty {
-                                ContinueWatchingSection(items: continueWatching.items)
+                                ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
                             }
                             #endif
                             if !vm.trending.isEmpty {
@@ -82,6 +85,8 @@ struct HomeView: View {
                     ProviderMenuButton()
                 }
             }
+            // Outside the ScrollView: the hidden NavigationLink that performs the push.
+            .continueWatchingNavigation($cwNavTarget)
         }
         .task { await vm.load() }
         .onAppear {

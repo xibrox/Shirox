@@ -1,13 +1,49 @@
 import SwiftUI
 import Combine
 
+// MARK: - Continue Watching context-menu navigation
+
+/// Where a Continue Watching context-menu item wants to navigate.
+enum ContinueWatchingNavTarget {
+    case detail(ContinueWatchingItem)
+    case anilist(ContinueWatchingItem)
+}
+
+@ViewBuilder
+private func cwNavDestination(_ target: ContinueWatchingNavTarget) -> some View {
+    switch target {
+    case .detail(let item):
+        if let href = item.detailHref, let mid = item.moduleId {
+            DetailView(
+                item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href),
+                moduleId: mid,
+                aniListID: item.aniListID
+            )
+        }
+    case .anilist(let item):
+        if let aid = item.aniListID {
+            AniListDetailView(mediaId: aid, preloadedMedia: nil)
+        }
+    }
+}
+
+extension View {
+    /// Drives Continue Watching context-menu navigation from HomeView. Attach outside the
+    /// ScrollView. Uses `navigationDestinationCompat`, which pushes via a hidden
+    /// `NavigationLink` on iOS (the app's `NavigationStack` is really a `NavigationView`,
+    /// which ignores `navigationDestination(...)`).
+    func continueWatchingNavigation(_ target: Binding<ContinueWatchingNavTarget?>) -> some View {
+        self.navigationDestinationCompat(item: target) { cwNavDestination($0) }
+    }
+}
+
 // MARK: - ContinueWatchingSection
 
 struct ContinueWatchingSection: View {
     let items: [ContinueWatchingItem]
+    /// Owned by HomeView so the driving NavigationLink lives outside the ScrollView.
+    @Binding var navTarget: ContinueWatchingNavTarget?
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var selectedForDetail: ContinueWatchingItem?
-    @State private var selectedForAniList: ContinueWatchingItem?
 
     private var cardWidth: CGFloat {
         sizeClass == .regular ? 260 : 210
@@ -36,20 +72,6 @@ struct ContinueWatchingSection: View {
                     }
                 }
                 .padding(.horizontal, 16)
-            }
-        }
-        .navigationDestinationCompat(item: $selectedForDetail) { item in
-            if let href = item.detailHref, let mid = item.moduleId {
-                DetailView(
-                    item: SearchItem(title: item.mediaTitle, image: item.imageUrl, href: href),
-                    moduleId: mid,
-                    aniListID: item.aniListID
-                )
-            }
-        }
-        .navigationDestinationCompat(item: $selectedForAniList) { item in
-            if let aid = item.aniListID {
-                AniListDetailView(mediaId: aid, preloadedMedia: nil)
             }
         }
     }
@@ -266,14 +288,14 @@ struct ContinueWatchingSection: View {
                 if let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
                     ModuleManager.shared.selectModule(module)
                 }
-                selectedForDetail = item
+                navTarget = .detail(item)
             } label: {
                 Label("View Details", systemImage: "list.bullet.below.rectangle")
             }
         }
         if item.aniListID != nil {
             Button {
-                selectedForAniList = item
+                navTarget = .anilist(item)
             } label: {
                 Label("View on AniList", systemImage: "tv")
             }

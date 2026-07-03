@@ -130,7 +130,23 @@ extension View {
         item: Binding<V?>,
         @ViewBuilder destination: @escaping (V) -> D
     ) -> some View {
-        if #available(iOS 16, macOS 13, tvOS 16, *) {
+        #if os(iOS)
+        // IMPORTANT: on iOS the app shims `NavigationStack` over `NavigationView`
+        // (see Shared/NavigationStack.swift), and `NavigationView` silently ignores
+        // `navigationDestination(...)` — the destination builds but never pushes. Drive
+        // the push with a hidden `NavigationLink(isActive:)`, which `NavigationView` honors.
+        self.background(
+            NavigationLink(
+                destination: Group { if let v = item.wrappedValue { destination(v) } },
+                isActive: Binding(
+                    get: { item.wrappedValue != nil },
+                    set: { if !$0 { item.wrappedValue = nil } }
+                )
+            ) { EmptyView() }
+        )
+        #else
+        // macOS/tvOS use the real SwiftUI.NavigationStack via the shim.
+        if #available(macOS 13, tvOS 16, *) {
             let isPresented = Binding<Bool>(
                 get: { item.wrappedValue != nil },
                 set: { if !$0 { item.wrappedValue = nil } }
@@ -149,6 +165,7 @@ extension View {
                 ) { EmptyView() }
             )
         }
+        #endif
     }
 }
 
