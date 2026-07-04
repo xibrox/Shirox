@@ -14,7 +14,7 @@
       "bundleIdentifier": "com.shirox.app",
       "developerName": "xibrox",
       "subtitle": "Personal anime library manager for iOS",
-      "localizedDescription": "Shirox is a free, open-source personal anime library manager for iOS 15+.\n\n• Organize your anime collection with community-built modules\n• AniList integration for library management and discovery\n• Continue Watching — pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
+      "localizedDescription": "Shirox is a free, open-source personal anime library manager for iOS 15+.\n\n• Organize your anime collection with community-built modules\n• AniList integration for library management and discovery\n• Continue Watching: pick up right where you left off\n• Picture-in-Picture and AirPlay support\n• Subtitle support",
       "iconURL": "https://raw.githubusercontent.com/xibrox/Shirox/main/Shirox/shirox-icon.icon/Assets/白-shiro.png",
       "tintColor": "ef4444",
       "category": "entertainment",
@@ -49,9 +49,9 @@
   ],
   "news": [
     {
-      "title": "New in 0.1.1 — Manga tracking",
+      "title": "New in 0.1.1 - Manga tracking",
       "identifier": "news-0.1.1-manga-tracking",
-      "caption": "Manga now tracks itself, just like anime. Open a manga and it automatically matches to its AniList entry; as you read, your chapter progress syncs to AniList, MyAnimeList, and your on-device My Library — no buttons to press.\n\nThe Library tab has a new Anime | Manga switch, so your manga sit alongside your anime with the same status, score, and collections. Reading a manga adds it to My Library on its own. If an auto-match ever picks the wrong series, tap the link button on the manga's detail screen to search AniList and relink it — posters and all.",
+      "caption": "Manga now tracks itself, just like anime. Open a manga and it automatically matches to its AniList entry; as you read, your chapter progress syncs to AniList, MyAnimeList, and your on-device My Library, no buttons to press.\n\nThe Library tab has a new Anime | Manga switch, so your manga sit alongside your anime with the same status, score, and collections. Reading a manga adds it to My Library on its own. If an auto-match ever picks the wrong series, tap the link button on the manga's detail screen to search AniList and relink it, posters and all.",
       "tintColor": "ef4444",
       "date": "2026-07-04",
       "notify": true,
@@ -67,9 +67,9 @@
       "appID": "com.shirox.app"
     },
     {
-      "title": "New in 0.0.94 — My Library holds everything",
+      "title": "New in 0.0.94 - My Library holds everything",
       "identifier": "news-0.0.94-my-library-everything",
-      "caption": "My Library now holds everything — not just anime matched to AniList or MyAnimeList. Titles you watch from streaming modules without a provider match, and your own imported local files, now appear in My Library too. They auto-track as you watch and can be bookmarked by hand, with the same collections, status, and scoring as any other title. Tap an entry to open it: module titles reopen their detail screen, local files resume playback.\n\nFixed: finishing a show now correctly marks it Completed in My Library at the right episode, instead of getting stuck on Watching a couple of episodes short.",
+      "caption": "My Library now holds everything, not just anime matched to AniList or MyAnimeList. Titles you watch from streaming modules without a provider match, and your own imported local files, now appear in My Library too. They auto-track as you watch and can be bookmarked by hand, with the same collections, status, and scoring as any other title. Tap an entry to open it: module titles reopen their detail screen, local files resume playback.\n\nFixed: finishing a show now correctly marks it Completed in My Library at the right episode, instead of getting stuck on Watching a couple of episodes short.",
       "tintColor": "ef4444",
       "date": "2026-06-22",
       "notify": true,
@@ -78,16 +78,16 @@
     {
       "title": "New in 0.0.92 - Local Library",
       "identifier": "news-0.0.92-local-library",
-      "caption": "Track anime without signing into any account. A My Library section lives in the Library tab and works completely on device — bookmark anime, set a status, rate it, and create collections. Auto-tracking keeps your episode progress in sync as you watch, and your scores now survive switching Score Format. Player: a Retry button when buffering stalls, a resume seek fix for HLS, smoother controls, cleaner double-tap feedback, and 2x hold that sticks while you drag. Plus Library search bar and source switcher fixes, and a Local Files promo card on the Modules screen.",
+      "caption": "Track anime without signing into any account. A My Library section lives in the Library tab and works completely on device: bookmark anime, set a status, rate it, and create collections. Auto-tracking keeps your episode progress in sync as you watch, and your scores now survive switching Score Format. Player: a Retry button when buffering stalls, a resume seek fix for HLS, smoother controls, cleaner double-tap feedback, and 2x hold that sticks while you drag. Plus Library search bar and source switcher fixes, and a Local Files promo card on the Modules screen.",
       "tintColor": "ef4444",
       "date": "2026-06-20",
       "notify": true,
       "appID": "com.shirox.app"
     },
     {
-      "title": "New in 0.0.91 — Local Files",
+      "title": "New in 0.0.91 - Local Files",
       "identifier": "news-0.0.91-local-files",
-      "caption": "Play videos straight from your device. Browse to any video in the Files app and watch it in the Shirox player with full controls — AirPlay, PiP, subtitles, and Continue Watching all included. Import your own subtitle files before or during playback.\n\nAlso fixed: the refresh and Edit buttons now appear at the top of the module list in Search, and the Local Files Browse button has a cleaner look.",
+      "caption": "Play videos straight from your device. Browse to any video in the Files app and watch it in the Shirox player with full controls: AirPlay, PiP, subtitles, and Continue Watching all included. Import your own subtitle files before or during playback.\n\nAlso fixed: the refresh and Edit buttons now appear at the top of the module list in Search, and the Local Files Browse button has a cleaner look.",
       "tintColor": "ef4444",
       "date": "2026-06-19",
       "notify": true,
