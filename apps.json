@@ -32,7 +32,7 @@
           "date": "2026-07-04",
           "localizedDescription": "Read manga with manga modules. Vertical strip or paged reading, no loading screens between chapters, auto-scroll, pinch zoom, and a Continue Reading row on Home that takes you back to your exact spot.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 8856647,
+          "size": 9038062,
           "minOSVersion": "15.0"
         }
       ]
