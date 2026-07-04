@@ -47,6 +47,8 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
 
     var uniqueId: String { "\(provider.rawValue)-\(id)" }
 
+    var isManga: Bool { type == "MANGA" }
+
     func hash(into hasher: inout Hasher) { hasher.combine(uniqueId) }
     static func == (lhs: Media, rhs: Media) -> Bool { lhs.uniqueId == rhs.uniqueId }
 
@@ -100,6 +102,19 @@ extension Media {
             season: nil, seasonYear: nil, nextAiringEpisode: nil,
             relations: nil, type: nil, format: nil
         )
+    }
+
+    /// Builds a `.local` manga Media (`type: "MANGA"`). `chapters` populates the
+    /// `episodes` field, reused as the chapter-count unit for manga.
+    static func localManga(source: LocalSource, title: String, imageUrl: String?, chapters: Int?) -> Media {
+        let base = local(source: source, title: title, imageUrl: imageUrl, episodes: chapters)
+        return Media(
+            id: base.id, idMal: base.idMal, provider: base.provider,
+            title: base.title, coverImage: base.coverImage,
+            bannerImage: nil, description: nil, episodes: chapters,
+            status: nil, averageScore: nil, genres: nil,
+            season: nil, seasonYear: nil, nextAiringEpisode: nil,
+            relations: nil, type: "MANGA", format: nil)
     }
 }
 

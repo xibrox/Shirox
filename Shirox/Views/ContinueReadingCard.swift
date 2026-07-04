@@ -82,7 +82,8 @@ struct ContinueReadingSection: View {
                     chapters: chapters,
                     chapterIndex: idx,
                     resumePage: isResume ? item.pageIndex : nil,
-                    resumeFraction: isResume ? item.pageFraction : nil
+                    resumeFraction: isResume ? item.pageFraction : nil,
+                    match: MangaMatchManager.shared.cachedMatch(mangaHref: item.mangaHref)
                 )
             } catch {
                 ToastManager.shared.show(message: "Failed to load chapters", type: .error)

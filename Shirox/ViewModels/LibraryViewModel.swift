@@ -12,6 +12,7 @@ final class LibraryViewModel: ObservableObject {
     @Published var error: String?
     @Published var selectedStatus: MediaListStatus = .current
     @Published var selectedCustomList: String? = nil
+    @Published var mediaType: MediaKind = .anime
 
     @Published var source: LibrarySource = .provider(.anilist)
 
@@ -104,6 +105,15 @@ final class LibraryViewModel: ObservableObject {
         Task { await load() }
     }
 
+    func selectMediaType(_ kind: MediaKind) {
+        guard mediaType != kind else { return }
+        mediaType = kind
+        selectedCustomList = nil
+        selectedStatus = .current
+        cacheValid = false
+        Task { await load() }
+    }
+
     func refresh() async {
         cacheValid = false
         await withTaskGroup(of: Void.self) { group in
@@ -125,8 +135,20 @@ final class LibraryViewModel: ObservableObject {
             applyFilter()
         }
         do {
-            try await dataSource.updateEntry(media: entry.media, status: status,
-                                              progress: progress, score: score)
+            if mediaType == .manga, case .provider(let type) = source {
+                switch type {
+                case .anilist:
+                    try await AniListLibraryService.shared.updateEntry(
+                        mediaId: entry.media.id, status: status, progress: progress, score: score, type: .manga)
+                case .mal:
+                    try await MALMangaLibraryService.shared.updateEntry(
+                        malId: entry.media.id, status: status, progress: progress, score: score)
+                default: break
+                }
+            } else {
+                try await dataSource.updateEntry(media: entry.media, status: status,
+                                                  progress: progress, score: score)
+            }
             cacheValid = false
         } catch {
             self.error = error.localizedDescription
@@ -139,7 +161,15 @@ final class LibraryViewModel: ObservableObject {
         allEntries.removeAll { $0.media.uniqueId == entry.media.uniqueId }
         applyFilter()
         do {
-            try await dataSource.deleteEntry(entry)
+            if mediaType == .manga, case .provider(let type) = source {
+                switch type {
+                case .anilist: try await AniListLibraryService.shared.deleteEntry(entryId: entry.id)
+                case .mal:     try await MALMangaLibraryService.shared.deleteEntry(malId: entry.media.id)
+                default: break
+                }
+            } else {
+                try await dataSource.deleteEntry(entry)
+            }
             cacheValid = false
         } catch {
             self.error = error.localizedDescription
@@ -172,7 +202,12 @@ final class LibraryViewModel: ObservableObject {
         if allEntries.isEmpty && !silent { isLoading = true }
         if !silent { error = nil }
         do {
-            let result = try await dataSource.fetchLibrary()
+            let result: [LibraryEntry]
+            if mediaType == .manga {
+                result = try await fetchMangaLibrary()
+            } else {
+                result = try await dataSource.fetchLibrary()
+            }
             allEntries = result
             cacheValid = true
             lastFetchedAt = Date()
@@ -188,6 +223,61 @@ final class LibraryViewModel: ObservableObject {
             if !silent { self.error = error.localizedDescription }
         }
         if !silent { isLoading = false }
+    }
+
+    /// Fetches the manga library for the current source. Local reads the on-device
+    /// store (filtered to manga); AniList/MAL fetch their MANGA lists directly
+    /// (read-only display path — no provider fallback machinery needed for v1).
+    private func fetchMangaLibrary() async throws -> [LibraryEntry] {
+        switch source {
+        case .local:
+            return LocalLibraryManager.shared.entries.filter { $0.media.isManga }
+        case .provider(let type):
+            switch type {
+            case .anilist:
+                guard let userId = await AniListAuthManager.shared.userId else { return [] }
+                let raw = try await AniListLibraryService.shared.fetchAllLists(userId: userId, type: .manga)
+                return raw.map { r in
+                    let m = r.media   // AniListMedia
+                    // Build a manga-tagged Media directly so `isManga` is reliable and the
+                    // chapter total (episodes field) is populated from `chapters`.
+                    let media = Media(
+                        id: m.id, idMal: m.idMal, provider: .anilist,
+                        title: MediaTitle(romaji: m.title.romaji, english: m.title.english, native: m.title.native),
+                        coverImage: MediaCoverImage(large: m.coverImage.large, extraLarge: m.coverImage.extraLarge),
+                        bannerImage: m.bannerImage, description: m.description, episodes: m.chapters,
+                        status: m.status, averageScore: m.averageScore, genres: m.genres,
+                        season: nil, seasonYear: nil, nextAiringEpisode: nil, relations: nil,
+                        type: "MANGA", format: m.format)
+                    return LibraryEntry(
+                        id: r.id, media: media,
+                        status: r.status, progress: r.progress, score: r.score,
+                        updatedAt: r.updatedAt, customListName: r.customListName,
+                        timesRewatched: r.repeat)
+                }
+            case .mal:
+                let entries = try await MALMangaLibraryService.shared.fetchLibrary()
+                return entries.map { e in
+                    let node = e.node
+                    let media = Media(
+                        id: node.id, idMal: node.id, provider: .mal,
+                        title: MediaTitle(romaji: node.title, english: nil, native: nil),
+                        coverImage: MediaCoverImage(large: node.main_picture?.medium, extraLarge: node.main_picture?.large),
+                        bannerImage: nil, description: node.synopsis, episodes: node.num_chapters,
+                        status: node.status, averageScore: node.mean.map { Int($0 * 10) },
+                        genres: node.genres?.map { $0.name }, season: nil, seasonYear: nil,
+                        nextAiringEpisode: nil, relations: nil, type: "MANGA", format: node.media_type)
+                    return LibraryEntry(
+                        id: node.id, media: media,
+                        status: MALMangaLibraryService.shared.mapStatusFromMAL(e.list_status.status),
+                        progress: e.list_status.num_chapters_read ?? 0,
+                        score: Double(e.list_status.score ?? 0), updatedAt: nil,
+                        customListName: nil, timesRewatched: e.list_status.num_times_reread)
+                }
+            default:
+                return []
+            }
+        }
     }
 
     private func applyFilter() {

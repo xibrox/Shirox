@@ -67,6 +67,29 @@ final class AniListService {
         return try await fetchPage(query: query, variables: ["search": keyword])
     }
 
+    /// AniList MANGA search, used to auto-match a module-scraped manga to a
+    /// tracking entry. Selects `idMal` (→ MAL tracking for free) and `chapters`
+    /// (total, for Completed promotion; nil when ongoing).
+    func searchManga(keyword: String) async throws -> [AniListMedia] {
+        let query = """
+        query ($search: String) {
+          Page(page: 1, perPage: 25) {
+            media(search: $search, type: MANGA, sort: SEARCH_MATCH, isAdult: false) {
+              id
+              idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              chapters
+              averageScore
+              genres
+              description(asHtml: false)
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: ["search": keyword])
+    }
+
     /// Normalized set of adult (`isAdult: true`) anime title variants + synonyms
     /// matching `keyword`. Used by NSFWContentFilter to screen module results.
     func searchAdultTitles(keyword: String) async throws -> Set<String> {

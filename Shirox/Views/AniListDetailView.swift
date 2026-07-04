@@ -1588,7 +1588,9 @@ struct AniListMatchingSearchView: View {
     let initialTitle: String
     var isLinked: Bool = false
     let onSelect: (Media?) -> Void
-    
+    /// Optional custom search (e.g. manga). Defaults to the provider's anime search.
+    var searchOverride: ((String) async throws -> [Media])? = nil
+
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var results: [Media] = []
@@ -1749,7 +1751,11 @@ struct AniListMatchingSearchView: View {
             
             isLoading = true
             do {
-                results = try await ProviderManager.shared.call { try await $0.search(searchText) }
+                if let searchOverride {
+                    results = try await searchOverride(searchText)
+                } else {
+                    results = try await ProviderManager.shared.call { try await $0.search(searchText) }
+                }
             } catch {
                 print("[MappingSearch] Search failed: \(error)")
             }

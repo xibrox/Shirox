@@ -220,6 +220,47 @@ import Combine
                localSource: existing?.localSource ?? source)
     }
 
+    /// Records a read chapter into the local library as a manga entry. Monotonic
+    /// progress; Planning→Reading at chapter>0; Reading→Completed at totalChapters
+    /// (skipped when nil/ongoing); never demotes Completed/manual status; never
+    /// overwrites a hand-set score. No-op when auto-track is off.
+    func recordReadChapter(match: MangaMatch, moduleId: String?, chapter: Int,
+                           title: String, coverImage: String?) {
+        guard autoTrackEnabled else { return }
+
+        // Module source only when there's no provider identity (mirrors recordWatched).
+        let source: LocalSource? = (match.aniListID == nil && match.malID == nil)
+            ? LocalSource(kind: .module, moduleId: moduleId, detailHref: match.mangaHref, localImportName: nil)
+            : nil
+
+        let media: Media
+        if match.aniListID != nil || match.malID != nil {
+            // Provider-matched → manga-tagged provider Media (uniqueId "anilist-<id>"/"mal-<id>",
+            // so the same manga collapses onto one entry). Prefer AniList id, like lightweightMedia.
+            let provider: ProviderType = match.aniListID != nil ? .anilist : .mal
+            let id = match.aniListID ?? match.malID!
+            media = Media(
+                id: id, idMal: match.malID, provider: provider,
+                title: MediaTitle(romaji: nil, english: title, native: nil),
+                coverImage: MediaCoverImage(large: coverImage, extraLarge: nil),
+                bannerImage: nil, description: nil, episodes: match.totalChapters,
+                status: nil, averageScore: nil, genres: nil, season: nil, seasonYear: nil,
+                nextAiringEpisode: nil, relations: nil, type: "MANGA", format: nil)
+        } else {
+            media = Media.localManga(source: source!, title: title, imageUrl: coverImage,
+                                     chapters: match.totalChapters)
+        }
+
+        let existing = entry(forUniqueId: media.uniqueId)
+        let merged = Self.mergedTracking(
+            existingProgress: existing?.progress, existingStatus: existing?.status,
+            watchedEpisode: chapter, totalEpisodes: match.totalChapters,
+            isAiring: match.totalChapters == nil ? true : false)
+        upsert(media: existing?.media ?? media, status: merged.status, progress: merged.progress,
+               score: existing?.displayScore(in: Self.currentLocalFormat) ?? 0,
+               localSource: existing?.localSource ?? source)
+    }
+
     /// Mirrors Continue Watching into the local library when the user has auto-track enabled.
     /// Only raises progress (never lowers), promotes Planning→Watching and Watching→Completed,
     /// and never overwrites a hand-set score. No-op when the toggle is off. Acts as a monotonic

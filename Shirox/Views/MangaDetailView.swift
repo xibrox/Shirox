@@ -13,6 +13,7 @@ struct MangaDetailView: View {
     @State private var isSynopsisExpanded = false
     @State private var newestFirst = false
     @State private var readerContext: ReaderContext?
+    @State private var showMatchSheet = false
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -61,7 +62,57 @@ struct MangaDetailView: View {
             MangaReaderView(context: ctx)
         }
         #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if vm.detail != nil { matchToolbarButton }
+            }
+        }
+        .sheet(isPresented: $showMatchSheet) {
+            AniListMatchingSearchView(
+                initialTitle: vm.detail?.title ?? item.title,
+                isLinked: vm.match != nil,
+                onSelect: { picked in
+                    if let picked {
+                        let match = MangaMatch(
+                            mangaHref: item.href, title: item.title,
+                            aniListID: picked.id, malID: picked.idMal,
+                            coverImage: picked.coverImage.best, totalChapters: picked.episodes,
+                            confident: true)
+                        MangaMatchManager.shared.saveMatch(match)
+                        vm.match = match
+                    } else {
+                        MangaMatchManager.shared.clearMatch(mangaHref: item.href)
+                        vm.match = nil
+                    }
+                },
+                searchOverride: { keyword in
+                    let results = try await AniListService.shared.searchManga(keyword: keyword)
+                    return results.map { m in
+                        Media(
+                            id: m.id, idMal: m.idMal, provider: .anilist,
+                            title: MediaTitle(romaji: m.title.romaji, english: m.title.english, native: m.title.native),
+                            coverImage: MediaCoverImage(large: m.coverImage.large, extraLarge: m.coverImage.extraLarge),
+                            bannerImage: nil, description: m.description, episodes: m.chapters,
+                            status: nil, averageScore: m.averageScore, genres: m.genres,
+                            season: nil, seasonYear: nil, nextAiringEpisode: nil, relations: nil,
+                            type: "MANGA", format: nil)
+                    }
+                }
+            )
+        }
         .task { await vm.load(item: item) }
+    }
+
+    // MARK: - Tracking match
+
+    /// Top-right control mirroring DetailView's AniList link button. Opens the
+    /// shared `AniListMatchingSearchView` (posters + unlink), pointed at manga.
+    @ViewBuilder private var matchToolbarButton: some View {
+        Button { showMatchSheet = true } label: {
+            Image(systemName: vm.match != nil ? "link.circle.fill" : "link.badge.plus")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.primary)
+        }
     }
 
     // MARK: - Layout
@@ -343,7 +394,8 @@ struct MangaDetailView: View {
             chapters: detail.chapters,
             chapterIndex: chapterIndex,
             resumePage: resumePage,
-            resumeFraction: resumeFraction
+            resumeFraction: resumeFraction,
+            match: vm.match
         )
     }
     #endif

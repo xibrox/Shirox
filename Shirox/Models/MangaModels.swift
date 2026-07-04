@@ -51,6 +51,9 @@ struct ReaderContext: Identifiable {
     /// How far into `resumePage` the reader was (0...1) — vertical mode
     /// restores the exact scroll position, not just the page top.
     let resumeFraction: Double?
+    /// Tracking identity for this manga, if matched. Lets the reader push chapter
+    /// progress without re-matching. nil ⇒ local-only read tracking.
+    let match: MangaMatch?
 }
 
 /// One "Continue Reading" entry — the user's last position in a manga.

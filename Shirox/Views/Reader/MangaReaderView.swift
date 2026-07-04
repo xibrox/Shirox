@@ -509,11 +509,26 @@ struct MangaReaderView: View {
         isLoading = false
     }
 
+    /// Single chokepoint for "chapter finished": records local read state and
+    /// always records chapter progress into My Library (via the coordinator),
+    /// pushing to AniList/MAL too when the manga is linked + logged in.
+    private func markRead(chapterIdx: Int) {
+        guard context.chapters.indices.contains(chapterIdx) else { return }
+        let chapter = context.chapters[chapterIdx]
+        MangaProgressManager.shared.markChapterRead(
+            mangaHref: context.mangaHref, chapterHref: chapter.href)
+        Task {
+            await MangaTrackingCoordinator.shared.record(
+                match: context.match, mangaHref: context.mangaHref, moduleId: context.moduleId,
+                chapterNumber: chapter.number,
+                title: context.mangaTitle, coverImage: context.coverImage)
+        }
+    }
+
     private func jumpToChapter(_ idx: Int) {
         guard context.chapters.indices.contains(idx) else { return }
         if idx > displayedChapterIndex {
-            MangaProgressManager.shared.markChapterRead(
-                mangaHref: context.mangaHref, chapterHref: displayedChapter.href)
+            markRead(chapterIdx: displayedChapterIndex)
         }
         stopAutoScroll()
         saveTask?.cancel()
@@ -529,8 +544,7 @@ struct MangaReaderView: View {
         guard let item = strip[safe: globalIdx], item.chapterIdx != displayedChapterIndex else { return }
         if item.chapterIdx > displayedChapterIndex {
             for idx in displayedChapterIndex..<item.chapterIdx {
-                MangaProgressManager.shared.markChapterRead(
-                    mangaHref: context.mangaHref, chapterHref: context.chapters[idx].href)
+                markRead(chapterIdx: idx)
             }
         }
         displayedChapterIndex = item.chapterIdx
@@ -545,8 +559,7 @@ struct MangaReaderView: View {
         guard context.chapters.indices.contains(target) else { return }
         if let start = strip.firstIndex(where: { $0.chapterIdx == target }) {
             if target > displayedChapterIndex {
-                MangaProgressManager.shared.markChapterRead(
-                    mangaHref: context.mangaHref, chapterHref: displayedChapter.href)
+                markRead(chapterIdx: displayedChapterIndex)
             }
             currentPage = strip[start].globalIdx   // paged: drives the TabView tag
             displayedChapterIndex = target
@@ -751,8 +764,7 @@ struct MangaReaderView: View {
             pageFraction: fraction,
             lastReadAt: .now))
         if MangaProgressManager.reachedLastPage(pageIndex: item.pageIdx, totalPages: total) {
-            MangaProgressManager.shared.markChapterRead(
-                mangaHref: context.mangaHref, chapterHref: chapterMeta.href)
+            markRead(chapterIdx: item.chapterIdx)
         }
     }
 }

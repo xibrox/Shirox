@@ -42,6 +42,11 @@ struct LibraryView: View {
     @State private var otherMedia: Media? = nil
     @State private var showOtherSheet = false
     @State private var isLoadingOtherEntry = false
+    // Manga navigation: provider-synced rows resolve to a module asynchronously,
+    // so manga taps drive a programmatic NavigationLink rather than an eager one.
+    @State private var pendingMangaItem: SearchItem? = nil
+    @State private var mangaLinkActive = false
+    @State private var resolvingMangaId: Int? = nil
     #if os(iOS)
     @State private var presentationWindow: UIWindow?
     #endif
@@ -241,7 +246,7 @@ struct LibraryView: View {
                     vm.selectStatus(status)
                 } label: {
                     HStack {
-                        Text(status.displayName)
+                        Text(status.displayName(for: vm.mediaType))
                         if vm.selectedCustomList == nil && vm.selectedStatus == status {
                             Image(systemName: "checkmark")
                         }
@@ -310,7 +315,7 @@ struct LibraryView: View {
         Menu { statusMenuContent } label: {
             LibraryFilterLabel(
                 systemImage: "line.3.horizontal.decrease",
-                text: vm.selectedCustomList ?? vm.selectedStatus.displayName,
+                text: vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType),
                 isActive: isStatusFilterActive,
                 collapsed: false
             )
@@ -345,6 +350,87 @@ struct LibraryView: View {
                 genreFilterMenu()
             }
         }
+    }
+
+    /// Anime | Manga capsule pills, matching `LibrarySourceSwitcher`'s pill style.
+    @ViewBuilder private var mediaTypeSegment: some View {
+        HStack(spacing: 8) {
+            mediaTypePill(title: "Anime", systemImage: "tv", kind: .anime)
+            mediaTypePill(title: "Manga", systemImage: "book", kind: .manga)
+            Spacer()
+        }
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func mediaTypePill(title: String, systemImage: String, kind: MediaKind) -> some View {
+        let selected = vm.mediaType == kind
+        Button { vm.selectMediaType(kind) } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 16, height: 16)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Capsule().fill(selected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08)))
+            .overlay(Capsule().strokeBorder(selected ? Color.primary.opacity(0.3) : Color.clear, lineWidth: 1))
+            .foregroundStyle(selected ? Color.primary : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Hidden programmatic link for manga rows (module-source rows navigate directly;
+    /// provider-synced rows resolve to a module first). Uses the classic isActive
+    /// NavigationLink so it works with this file's NavigationStack.
+    @ViewBuilder private var mangaNavLink: some View {
+        NavigationLink(
+            destination: Group { if let item = pendingMangaItem { MangaDetailView(item: item) } },
+            isActive: $mangaLinkActive
+        ) { EmptyView() }
+        .hidden()
+    }
+
+    private func openManga(_ entry: LibraryEntry) {
+        if let source = entry.localSource, source.kind == .module {
+            pendingMangaItem = SearchItem(
+                title: entry.media.title.displayTitle,
+                image: entry.media.coverImage.best ?? "",
+                href: source.detailHref ?? "")
+            mangaLinkActive = true
+        } else {
+            resolvingMangaId = entry.media.id
+            Task {
+                defer { resolvingMangaId = nil }
+                if let item = await MangaModuleResolver.shared.resolve(title: entry.media.title.displayTitle) {
+                    pendingMangaItem = item
+                    mangaLinkActive = true
+                } else {
+                    #if os(iOS)
+                    ToastManager.shared.show(message: "Install a manga module to read this", type: .error)
+                    #endif
+                }
+            }
+        }
+    }
+
+    /// Manga entries: tap opens the reader detail (resolving a module first for
+    /// provider-synced rows); the pencil opens the edit sheet.
+    @ViewBuilder
+    private func mangaRow(_ entry: LibraryEntry) -> some View {
+        LibraryRowView(entry: entry, scoreFormat: scoreFormat) {
+            selectedEntry = entry
+        }
+        .overlay(alignment: .center) {
+            if resolvingMangaId == entry.media.id {
+                ProgressView()
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { openManga(entry) }
     }
 
     #if os(iOS)
@@ -420,14 +506,15 @@ struct LibraryView: View {
     }
 
     private var emptyStateDescription: String {
+        let noun = vm.mediaType == .manga ? "manga" : "anime"
         if !searchText.isEmpty {
-            return "No anime matching \"\(searchText)\"."
+            return "No \(noun) matching \"\(searchText)\"."
         }
-        let listName = vm.selectedCustomList ?? vm.selectedStatus.displayName
+        let listName = vm.selectedCustomList ?? vm.selectedStatus.displayName(for: vm.mediaType)
         if vm.isLocal {
-            return "Add anime to \(listName) from any title's detail screen."
+            return "Add \(noun) to \(listName) from any title's detail screen."
         }
-        return "Add anime to \(listName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList")."
+        return "Add \(noun) to \(listName) on \(activeProviderType == .mal ? "MyAnimeList" : "AniList")."
     }
 
     // MARK: - Entries list
@@ -442,7 +529,9 @@ struct LibraryView: View {
     @ViewBuilder
     private func entryRow(_ entry: LibraryEntry) -> some View {
         Group {
-            if let source = entry.localSource, source.kind == .localFile {
+            if entry.media.isManga {
+                mangaRow(entry)
+            } else if let source = entry.localSource, source.kind == .localFile {
                 localFileRow(entry, source: source)
             } else {
                 navigableRow(entry)
@@ -464,7 +553,7 @@ struct LibraryView: View {
                     )
                 }
             } label: {
-                Label("+1 EP", systemImage: "plus.circle.fill")
+                Label(entry.media.isManga ? "+1 CH" : "+1 EP", systemImage: "plus.circle.fill")
             }
             .tint(.green)
         }
@@ -535,6 +624,10 @@ struct LibraryView: View {
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 6, trailing: 16))
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
+            mediaTypeSegment
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 6, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             filterCapsuleRow
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
                 .listRowSeparator(.hidden)
@@ -559,6 +652,9 @@ struct LibraryView: View {
             #if !os(iOS)
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
                 .padding(.horizontal, 16)
+            mediaTypeSegment
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
             // Combined row: Status on left, Genres on right
             filterCapsuleRow
                 .padding(.horizontal, 16)
@@ -571,6 +667,9 @@ struct LibraryView: View {
                 LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
+                mediaTypeSegment
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
                 filterCapsuleRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -599,6 +698,7 @@ struct LibraryView: View {
                 entriesList
             }
         }
+        .background { mangaNavLink }
         .toolbar { libraryToolbar }
         .task { await vm.autoRefreshIfNeeded() }
         #if os(iOS)
@@ -646,7 +746,7 @@ struct LibraryView: View {
                     }
                     Task {
                         await vm.update(entry: entry, status: status, progress: progress, score: score)
-                        if !vm.isLocal && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                        if !vm.isLocal && vm.mediaType != .manga && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
                             if activeProviderType == .anilist, let idMal = entry.media.idMal {
                                 try? await MALProvider.shared.updateEntry(mediaId: idMal, status: status, progress: progress, score: score)
                             } else if activeProviderType == .mal {
@@ -660,7 +760,7 @@ struct LibraryView: View {
                 onDelete: {
                     Task {
                         await vm.delete(entry: entry)
-                        if !vm.isLocal && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
+                        if !vm.isLocal && vm.mediaType != .manga && dualSync && anilistAuth.isLoggedIn && malAuth.isLoggedIn {
                             if activeProviderType == .anilist, let idMal = entry.media.idMal {
                                 try? await MALProvider.shared.deleteEntry(entryId: idMal)
                             } else if activeProviderType == .mal {
@@ -880,6 +980,12 @@ private struct LibraryRowView: View {
     }
 
     private var progressLabel: String {
+        if entry.media.isManga {
+            if let total = entry.media.episodes {
+                return "\(entry.progress) / \(total) ch"
+            }
+            return "\(entry.progress) ch read"
+        }
         if let total = entry.media.episodes {
             return "\(entry.progress) / \(total) episodes"
         }

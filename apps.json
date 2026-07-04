@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "0.1.1",
+          "buildVersion": "100",
+          "date": "2026-07-04",
+          "localizedDescription": "Manga now tracks itself. Each manga auto-matches to its AniList entry, and reading chapters updates your progress on AniList, MyAnimeList, and your on-device My Library. A new Anime | Manga switch in the Library tab shows your manga next to your anime, and you can relink a wrong match from the manga's detail screen.",
+          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "size": 8856647,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.0",
           "buildVersion": "99",
           "date": "2026-07-04",
@@ -39,6 +48,15 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 0.1.1 — Manga tracking",
+      "identifier": "news-0.1.1-manga-tracking",
+      "caption": "Manga now tracks itself, just like anime. Open a manga and it automatically matches to its AniList entry; as you read, your chapter progress syncs to AniList, MyAnimeList, and your on-device My Library — no buttons to press.\n\nThe Library tab has a new Anime | Manga switch, so your manga sit alongside your anime with the same status, score, and collections. Reading a manga adds it to My Library on its own. If an auto-match ever picks the wrong series, tap the link button on the manga's detail screen to search AniList and relink it — posters and all.",
+      "tintColor": "ef4444",
+      "date": "2026-07-04",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 0.1.0 - Manga",
       "identifier": "news-0.1.0-manga",

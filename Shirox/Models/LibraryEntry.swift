@@ -1,5 +1,11 @@
 import Foundation
 
+/// AniList list type. Anime lists and manga lists are separate collections.
+enum MediaListType: String {
+    case anime = "ANIME"
+    case manga = "MANGA"
+}
+
 enum ScoreFormat: String, Codable {
     case point100        = "POINT_100"
     case point10Decimal  = "POINT_10_DECIMAL"
@@ -78,6 +84,9 @@ enum ScoreFormat: String, Codable {
     }
 }
 
+/// Distinguishes anime vs manga for library/UI branching (progress unit, labels).
+enum MediaKind { case anime, manga }
+
 enum MediaListStatus: String, Codable, CaseIterable, Identifiable {
     case current   = "CURRENT"
     case planning  = "PLANNING"
@@ -96,6 +105,16 @@ enum MediaListStatus: String, Codable, CaseIterable, Identifiable {
         case .dropped:   return "Dropped"
         case .paused:    return "Paused"
         case .repeating: return "Rewatching"
+        }
+    }
+
+    /// Media-aware label: "Reading"/"Rereading" for manga, else the anime label.
+    func displayName(for kind: MediaKind) -> String {
+        guard kind == .manga else { return displayName }
+        switch self {
+        case .current:   return "Reading"
+        case .repeating: return "Rereading"
+        default:         return displayName
         }
     }
 }

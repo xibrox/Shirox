@@ -20,10 +20,10 @@ final class AniListLibraryService {
 
     // MARK: - Fetch all lists (status + custom)
 
-    func fetchAllLists(userId: Int) async throws -> [AniListRawEntry] {
+    func fetchAllLists(userId: Int, type: MediaListType = .anime) async throws -> [AniListRawEntry] {
         let query = """
         query ($userId: Int) {
-          MediaListCollection(userId: $userId, type: ANIME) {
+          MediaListCollection(userId: $userId, type: \(type.rawValue)) {
             lists {
               name
               isCustomList
@@ -38,6 +38,7 @@ final class AniListLibraryService {
                   title { romaji english native }
                   coverImage { large extraLarge }
                   episodes
+                  chapters
                   status
                   nextAiringEpisode { episode }
                   averageScore
@@ -102,11 +103,11 @@ final class AniListLibraryService {
 
     // MARK: - Fetch single entry for a media id
 
-    func fetchEntry(mediaId: Int) async throws -> AniListRawEntry? {
+    func fetchEntry(mediaId: Int, type: MediaListType = .anime) async throws -> AniListRawEntry? {
         guard let userId = await AniListAuthManager.shared.userId else { return nil }
         let query = """
         query ($userId: Int, $mediaId: Int) {
-          MediaList(userId: $userId, mediaId: $mediaId, type: ANIME) {
+          MediaList(userId: $userId, mediaId: $mediaId, type: \(type.rawValue)) {
             id
             status
             progress
@@ -118,6 +119,7 @@ final class AniListLibraryService {
               title { romaji english native }
               coverImage { large extraLarge }
               episodes
+              chapters
               status
               averageScore
               genres
@@ -161,7 +163,7 @@ final class AniListLibraryService {
 
     // MARK: - Update entry
 
-    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil) async throws {
+    func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil, type: MediaListType = .anime) async throws {
         let mutation = """
         mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int) {
           SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat) {

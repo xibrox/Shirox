@@ -6,6 +6,7 @@ final class MangaDetailViewModel: ObservableObject {
     @Published var detail: MangaDetail?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var match: MangaMatch?
 
     func load(item: SearchItem) async {
         // Idempotent: re-called by Retry; skip if a load is already in flight.
@@ -21,6 +22,7 @@ final class MangaDetailViewModel: ObservableObject {
                 description: Self.decodeHTMLEntities(info.description),
                 tags: info.tags,
                 chapters: chapters)
+            match = await MangaMatchManager.shared.match(mangaHref: item.href, title: item.title)
         } catch {
             errorMessage = error.localizedDescription
         }

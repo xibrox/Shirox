@@ -8,6 +8,7 @@ struct AniListMedia: Identifiable, Codable {
     let bannerImage: String?
     let description: String?
     let episodes: Int?
+    let chapters: Int?        // manga total; nil for anime or ongoing manga
     let status: String?
     let averageScore: Int?
     let genres: [String]?
