@@ -39,7 +39,7 @@ final class SearchViewModel: ObservableObject {
                     CloudflareBypassManager.shared.pendingVerificationURL = nil
                     var res: [SearchItem]
                     do {
-                        res = try await JSEngine.shared.search(keyword: q)
+                        res = try await moduleSearch(q)
                     } catch {
                         // Modules often swallow a CF wall as a JSON parse error and rethrow.
                         // If a Turnstile host was flagged, fall through to verify; else surface it.
@@ -55,7 +55,7 @@ final class SearchViewModel: ObservableObject {
                         try? await CloudflareBypassManager.shared.triggerBypass(for: cfURL)
                         if !Task.isCancelled {
                             CloudflareBypassManager.shared.pendingVerificationURL = nil
-                            res = try await JSEngine.shared.search(keyword: q)
+                            res = try await moduleSearch(q)
                         }
                     }
                     if !Task.isCancelled {
@@ -81,6 +81,15 @@ final class SearchViewModel: ObservableObject {
                 isLoading = false
             }
         }
+    }
+
+    /// Manga modules use the Luna contract (raw-object returns); everything
+    /// else uses the Sora searchResults path. Both produce [SearchItem].
+    private func moduleSearch(_ q: String) async throws -> [SearchItem] {
+        if ModuleManager.shared.activeModule?.isManga == true {
+            return try await JSEngine.shared.mangaSearch(keyword: q)
+        }
+        return try await JSEngine.shared.search(keyword: q)
     }
 
     func clearResults() {

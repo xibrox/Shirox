@@ -61,6 +61,7 @@ final class JSEngine: ObservableObject {
         setupFetchAliases()
         setupSoraCompat()
         setupScrapingUtilities()
+        setupMangaBridge()
         setupTimers()
         context.setupNetworkFetch()
         context.setupNetworkFetchSimple()

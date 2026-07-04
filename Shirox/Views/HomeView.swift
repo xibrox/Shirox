@@ -3,9 +3,11 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    @ObservedObject private var mangaProgress = MangaProgressManager.shared
     // Continue Watching context-menu navigation. Driven from here so the hidden
     // NavigationLink that performs the push sits OUTSIDE the ScrollView below.
     @State private var cwNavTarget: ContinueWatchingNavTarget?
+    @State private var readerContext: ReaderContext?
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -43,6 +45,9 @@ struct HomeView: View {
                             #if os(iOS)
                             if !continueWatching.items.isEmpty {
                                 ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
+                            }
+                            if !mangaProgress.items.isEmpty {
+                                ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
                             }
                             #endif
                             if !vm.trending.isEmpty {
@@ -87,6 +92,11 @@ struct HomeView: View {
             }
             // Outside the ScrollView: the hidden NavigationLink that performs the push.
             .continueWatchingNavigation($cwNavTarget)
+            #if os(iOS)
+            .fullScreenCover(item: $readerContext) { ctx in
+                MangaReaderView(context: ctx)
+            }
+            #endif
         }
         .task { await vm.load() }
         .onAppear {

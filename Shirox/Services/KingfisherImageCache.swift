@@ -23,12 +23,17 @@ enum KingfisherImageCache {
     /// with a Referer requirement and reject the default URLSession UA. When a
     /// host has been Cloudflare-bypassed, pass its cookie header + the WebView's
     /// UA so the `cf_clearance` binding (UA + cookie) matches.
-    static func headers(for url: URL, cookieHeader: String?, bypassUserAgent: String?) -> [String: String] {
+    /// `refererOverride` replaces the default own-origin Referer — manga CDNs
+    /// require the SOURCE SITE's origin, not the image host's.
+    static func headers(for url: URL, cookieHeader: String?, bypassUserAgent: String?,
+                        refererOverride: String? = nil) -> [String: String] {
         var h: [String: String] = [
             "User-Agent": bypassUserAgent ?? defaultUserAgent,
             "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*",
         ]
-        if let scheme = url.scheme, let host = url.host {
+        if let refererOverride, !refererOverride.isEmpty {
+            h["Referer"] = refererOverride
+        } else if let scheme = url.scheme, let host = url.host {
             h["Referer"] = "\(scheme)://\(host)/"
         }
         if let cookieHeader, !cookieHeader.isEmpty {

@@ -294,7 +294,11 @@ struct SearchView: View {
                 } else {
                     ForEach(vm.moduleResults) { item in
                         NavigationLink {
-                            DetailView(item: item)
+                            if moduleManager.activeModule?.isManga == true {
+                                MangaDetailView(item: item)
+                            } else {
+                                DetailView(item: item)
+                            }
                         } label: {
                             AnimeCardView(item: item)
                         }

@@ -75,6 +75,22 @@ final class ModuleManager: ObservableObject {
         }
     }
 
+    /// Like selectModule, but suspends until the module's JS is loaded.
+    /// Returns false when the script failed to load. Used by flows that must
+    /// call into the module immediately after switching (Continue Reading).
+    func selectAndAwaitReady(_ module: ModuleDefinition) async -> Bool {
+        activeModule = module
+        UserDefaults.standard.set(module.id, forKey: activeKey)
+        do {
+            try await JSEngine.shared.loadModule(module)
+            moduleReadyId = module.id
+            return true
+        } catch {
+            Logger.shared.log("[ModuleManager] Failed to load JS for module \(module.sourceName): \(error.localizedDescription)", type: "Error")
+            return false
+        }
+    }
+
     // MARK: - Reorder Modules
 
     func moveModules(from source: IndexSet, to destination: Int) {
