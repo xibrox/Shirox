@@ -32,7 +32,7 @@
           "date": "2026-07-04",
           "localizedDescription": "Manga now tracks itself. Each manga auto-matches to its AniList entry, and reading chapters updates your progress on AniList, MyAnimeList, and your on-device My Library. A new Anime | Manga switch in the Library tab shows your manga next to your anime, and you can relink a wrong match from the manga's detail screen.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 8856647,
+          "size": 9106413,
           "minOSVersion": "15.0"
         },
         {
