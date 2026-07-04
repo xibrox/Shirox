@@ -27,10 +27,10 @@
       },
       "versions": [
         {
-          "version": "0.0.100",
-          "buildVersion": "98",
-          "date": "2026-07-03",
-          "localizedDescription": "Beta release",
+          "version": "0.1.0",
+          "buildVersion": "99",
+          "date": "2026-07-04",
+          "localizedDescription": "Read manga with manga modules. Vertical strip or paged reading, no loading screens between chapters, auto-scroll, pinch zoom, and a Continue Reading row on Home that takes you back to your exact spot.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
           "size": 8856647,
           "minOSVersion": "15.0"
@@ -39,6 +39,15 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 0.1.0 - Manga",
+      "identifier": "news-0.1.0-manga",
+      "caption": "You can now install manga modules and search them from the Search tab, just like anime modules. Every manga has a detail page with cover, tags, synopsis, and a chapter list that remembers what you've read.\n\nThe reader has three modes: vertical strip, paged left-to-right, and paged right-to-left. The next chapter loads ahead of you, so there's no loading screen between chapters. Auto-scroll with adjustable speed, pinch zoom in the paged modes, and the screen stays awake while you read. A new Continue Reading row on Home takes you back to the exact spot you left off.",
+      "tintColor": "ef4444",
+      "date": "2026-07-04",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 0.0.94 — My Library holds everything",
       "identifier": "news-0.0.94-my-library-everything",
