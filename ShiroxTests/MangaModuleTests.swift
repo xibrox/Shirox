@@ -187,4 +187,59 @@ final class MangaModuleTests: XCTestCase {
         ]]
         XCTAssertEqual(JSEngine.parseMangaChapters(object)[0].number, 3)
     }
+
+    func testDescendingModuleIsNormalizedToAscending() {
+        // Some modules list chapters newest -> oldest (e.g. 650 … 2, 1). The
+        // reader assumes index 0 is the oldest chapter, so parsing must flip
+        // descending input to ascending order.
+        let object: [String: Any] = ["en": [
+            ["3", [["id": "https://example.com/3", "chapter": 3, "scanlation_group": "Chapter 3"]]],
+            ["2", [["id": "https://example.com/2", "chapter": 2, "scanlation_group": "Chapter 2"]]],
+            ["1", [["id": "https://example.com/1", "chapter": 1, "scanlation_group": "Chapter 1"]]],
+        ]]
+        let chapters = JSEngine.parseMangaChapters(object)
+        XCTAssertEqual(chapters.map(\.number), [1, 2, 3])
+        XCTAssertEqual(chapters.first?.href, "https://example.com/1")
+        XCTAssertEqual(chapters.last?.href, "https://example.com/3")
+    }
+
+    func testEqualNumberChaptersKeepModuleOrder() {
+        // Unnumbered specials all resolve to 0; a stable sort must keep the
+        // module's own order for ties rather than shuffling them.
+        let object: [String: Any] = ["en": [
+            ["Oneshot", [["id": "https://example.com/a", "scanlation_group": "Oneshot A"]]],
+            ["Extra", [["id": "https://example.com/b", "scanlation_group": "Extra B"]]],
+        ]]
+        let chapters = JSEngine.parseMangaChapters(object)
+        XCTAssertEqual(chapters.map(\.href), ["https://example.com/a", "https://example.com/b"])
+    }
+
+    func testUnnumberedSpecialsSortAfterNumberedChapters() {
+        // A descending module often lists the newest special first. Because its
+        // number can't be parsed it must land at the END of the ascending list
+        // (newest release last) — never before chapter 1.
+        let object: [String: Any] = ["en": [
+            ["Oneshot", [["id": "https://example.com/special", "scanlation_group": "Bonus Oneshot"]]],
+            ["3", [["id": "https://example.com/3", "chapter": 3]]],
+            ["2", [["id": "https://example.com/2", "chapter": 2]]],
+            ["1", [["id": "https://example.com/1", "chapter": 1]]],
+        ]]
+        let chapters = JSEngine.parseMangaChapters(object)
+        XCTAssertEqual(chapters.map(\.href), [
+            "https://example.com/1", "https://example.com/2",
+            "https://example.com/3", "https://example.com/special",
+        ])
+    }
+
+    func testParsedZeroChapterStaysBeforeChapterOne() {
+        // MangaKatana is 0-based: chapter 0 is a REAL first chapter and must
+        // sort ahead of chapter 1 — it must not be lumped with the unnumbered
+        // specials that get pushed to the end.
+        let object: [String: Any] = ["en": [
+            ["1", [["id": "https://example.com/c2", "chapter": 1]]],
+            ["0", [["id": "https://example.com/c1", "chapter": 0]]],
+        ]]
+        let chapters = JSEngine.parseMangaChapters(object)
+        XCTAssertEqual(chapters.map(\.href), ["https://example.com/c1", "https://example.com/c2"])
+    }
 }

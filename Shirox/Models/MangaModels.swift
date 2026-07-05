@@ -1,7 +1,8 @@
 import Foundation
 
-/// One readable chapter of a manga, in the order the module returned it
-/// (Luna convention: oldest → newest).
+/// One readable chapter of a manga. `parseMangaChapters` normalizes the list to
+/// ascending order (oldest → newest, index 0 = chapter 1) regardless of the
+/// order the module returned, which the reader's navigation/stitching rely on.
 struct MangaChapter: Identifiable, Codable, Equatable {
     var id: String { href }
     let href: String

@@ -80,13 +80,18 @@ extension JSEngine {
 
     /// `{ "<lang>": [ [label, [{id, title?, chapter, scanlation_group}, …]], … ] }`
     /// Prefers "en", falls back to the first language key (sorted, for
-    /// determinism). Takes the first version of each chapter. Preserves module
-    /// order (Luna convention: oldest → newest).
+    /// determinism). Takes the first version of each chapter, then normalizes to
+    /// ascending order (oldest → newest) so index 0 is always chapter 1 —
+    /// modules that list newest → oldest (e.g. 650 … 1) get flipped, which the
+    /// reader relies on for correct next/prev navigation and stitching.
     nonisolated static func parseMangaChapters(_ object: Any) -> [MangaChapter] {
         guard let dict = object as? [String: Any] else { return [] }
         let langKey = dict["en"] != nil ? "en" : dict.keys.sorted().first
         guard let langKey, let entries = dict[langKey] as? [[Any]] else { return [] }
-        var chapters: [MangaChapter] = []
+        // `hasNumber` distinguishes a genuinely parsed chapter number (incl. a
+        // real 0, e.g. MangaKatana's 0-based first chapter) from the fallback
+        // used for unnumbered specials — the two must sort differently.
+        var chapters: [(chapter: MangaChapter, hasNumber: Bool)] = []
         for entry in entries {
             guard entry.count >= 2,
                   let versions = entry[1] as? [[String: Any]],
@@ -94,19 +99,38 @@ extension JSEngine {
                   let href = first["id"] as? String, !href.isEmpty else { continue }
             let label = (entry[0] as? String) ?? String(describing: entry[0])
             let number: Double
+            let hasNumber: Bool
             if let d = first["chapter"] as? Double {
-                number = d
+                number = d; hasNumber = true
             } else if let i = first["chapter"] as? Int {
-                number = Double(i)
+                number = Double(i); hasNumber = true
+            } else if let parsed = Double(label) {
+                number = parsed; hasNumber = true
             } else {
-                number = Double(label) ?? 0
+                number = 0; hasNumber = false
             }
             let title = (first["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             let group = (first["scanlation_group"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            chapters.append(MangaChapter(
+            chapters.append((MangaChapter(
                 href: href, number: number, label: label,
-                title: title, group: group, language: langKey))
+                title: title, group: group, language: langKey), hasNumber))
         }
+        // Normalize to ascending chapter number so index 0 is always chapter 1.
+        // Numbered chapters come first (ascending); unnumbered specials keep the
+        // module's own order and land at the END — in a descending module the
+        // newest release is often an unnumbered special listed first, and the
+        // user wants it last, never before chapter 1. Stable on the original
+        // index so equal keys never shuffle.
         return chapters
+            .enumerated()
+            .sorted { lhs, rhs in
+                let (l, r) = (lhs.element, rhs.element)
+                if l.hasNumber != r.hasNumber { return l.hasNumber }
+                if l.hasNumber, l.chapter.number != r.chapter.number {
+                    return l.chapter.number < r.chapter.number
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map { $0.element.chapter }
     }
 }
