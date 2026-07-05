@@ -88,12 +88,32 @@ struct MangaReaderView: View {
     // Auto-scroll (vertical mode)
     @State private var autoScroller = ReaderAutoScroller()
     @State private var isAutoScrolling = false
-    @AppStorage("mangaAutoScrollSpeed") private var autoScrollSpeed = 40.0
+    @AppStorage("mangaAutoScrollSpeed") private var autoScrollSpeed = 120.0
+    // Live speed range (pt/s): top is ~6.7× the old "Turbo" preset (120).
+    private static let autoScrollSpeedRange: ClosedRange<Double> = 20...800
 
     // Next-chapter prefetch / stitching
     @State private var prefetchedHref: String?
     @State private var prefetchedPages: [String]?
     @State private var prefetchTask: Task<Void, Never>?
+
+    // In-chapter page prefetch: warm a sliding window of upcoming pages so they
+    // decode into cache before scrolling into view. warmedPages dedupes so each
+    // advance only kicks off the single newly-entered page (after the initial
+    // burst), giving a steady read-ahead pipeline instead of cold on-demand loads.
+    @State private var warmedPages: Set<Int> = []
+    private static let prefetchAhead = 8
+    private static let prefetchBehind = 1
+
+    // Pinch-to-zoom (vertical mode). Purely a visual magnification (scaleEffect)
+    // anchored where you pinch — the scroll position is never touched, so a
+    // pinch zooms in place and never scrolls. Clamped to ≥ 1 so pages never
+    // shrink below fit-width. pinchStartScale compounds zoom across pinches.
+    @State private var zoomScale: CGFloat = 1
+    @State private var pinching = false
+    @State private var pinchStartScale: CGFloat = 1
+    @State private var pinchAnchor: UnitPoint = .center
+    private static let maxZoom: CGFloat = 3
 
     // Debounced progress saving (a synchronous save on every page crossing
     // caused visible hitches while scrolling)
@@ -166,6 +186,7 @@ struct MangaReaderView: View {
             updateDisplayedChapter(for: page)
             scheduleSave()
             prepareUpcomingChapter()
+            warmUpcomingPages(around: page)
         }
         .onChangeOf(modeRaw) { _ in
             // Mode switch: rebuild the strip for the displayed chapter at the
@@ -233,6 +254,9 @@ struct MangaReaderView: View {
                     if verticalScrollView !== scrollView { verticalScrollView = scrollView }
                 })
             }
+            .modifier(PinchToZoom(
+                zoomScale: $zoomScale, anchor: $pinchAnchor,
+                pinching: $pinching, startScale: $pinchStartScale, maxZoom: Self.maxZoom))
             .coordinateSpace(name: "readerScroll")
             .onPreferenceChange(ReaderPageFrameKey.self) { frames in
                 geomStore.geoms = frames
@@ -265,8 +289,13 @@ struct MangaReaderView: View {
                 }
             }
             .ignoresSafeArea()
+            // Pure visual magnification anchored at the pinch point — the scroll
+            // position is never touched, so pinching zooms in place and never
+            // scrolls. Overflow past the screen edges is clipped by the window.
+            .scaleEffect(zoomScale, anchor: pinchAnchor)
         }
     }
+
 
     private var pagedReader: some View {
         // Stable tags (globalIdx) + reversed data order for RTL: appending a
@@ -297,6 +326,23 @@ struct MangaReaderView: View {
             Spacer()
             if chromeVisible, !isLoading, loadError == nil, !strip.isEmpty {
                 bottomBar.transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if isAutoScrolling, mode == .vertical {
+                // Chrome hidden but still auto-scrolling: the pause control must
+                // never disappear mid-scroll. Same right-side glass button as in
+                // the bar, snapped in with no appear/disappear animation.
+                HStack {
+                    Spacer()
+                    Button { toggleAutoScroll() } label: {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .frame(width: 46, height: 46)
+                            .readerGlass(Circle(), tint: .white)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 40)
+                .transition(.identity)
             }
         }
     }
@@ -309,10 +355,10 @@ struct MangaReaderView: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(.ultraThinMaterial))
+                    .frame(width: 46, height: 46)
+                    .readerGlass(Circle())
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -336,20 +382,12 @@ struct MangaReaderView: View {
                         Label(m.label, systemImage: m.icon).tag(m.rawValue)
                     }
                 }
-                if mode == .vertical {
-                    Picker("Auto-Scroll Speed", selection: $autoScrollSpeed) {
-                        Text("Slow").tag(20.0)
-                        Text("Normal").tag(40.0)
-                        Text("Fast").tag(80.0)
-                        Text("Turbo").tag(120.0)
-                    }
-                }
             } label: {
                 Image(systemName: "book")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(.ultraThinMaterial))
+                    .frame(width: 46, height: 46)
+                    .readerGlass(Circle())
             }
         }
         .padding(.horizontal, 16)
@@ -363,23 +401,38 @@ struct MangaReaderView: View {
 
     private var bottomBar: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 14) {
-                if mode == .vertical {
-                    Button { toggleAutoScroll() } label: {
-                        Image(systemName: isAutoScrolling ? "pause.fill" : "play.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(isAutoScrolling ? .black : .white)
-                            .frame(width: 34, height: 34)
-                            .background(Circle().fill(isAutoScrolling ? AnyShapeStyle(.white) : AnyShapeStyle(.ultraThinMaterial)))
-                    }
+            if isAutoScrolling {
+                // Full-width live speed control sitting above the whole control
+                // cluster. Dragging feeds autoScrollSpeed, which onChangeOf
+                // pushes straight into the running scroller — no stopping.
+                HStack(spacing: 10) {
+                    Image(systemName: "tortoise.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Slider(value: $autoScrollSpeed, in: Self.autoScrollSpeedRange)
+                        .tint(.white)
+                    Image(systemName: "hare.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .readerGlass(Capsule())
+                .padding(.bottom, 4)
+                .transition(
+                    .move(edge: .bottom)
+                        .combined(with: .opacity)
+                        .combined(with: .scale(scale: 0.92, anchor: .bottom))
+                )
+            }
 
+            HStack(spacing: 14) {
                 Button { goToChapter(displayedChapterIndex - 1) } label: {
                     Image(systemName: "backward.end.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white.opacity(hasPrevChapter ? 1 : 0.3))
-                        .frame(width: 34, height: 34)
-                        .background(Circle().fill(.ultraThinMaterial))
+                        .frame(width: 46, height: 46)
+                        .readerGlass(Circle())
                 }
                 .disabled(!hasPrevChapter)
 
@@ -399,12 +452,24 @@ struct MangaReaderView: View {
 
                 Button { goToChapter(displayedChapterIndex + 1) } label: {
                     Image(systemName: "forward.end.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white.opacity(hasNextChapter ? 1 : 0.3))
-                        .frame(width: 34, height: 34)
-                        .background(Circle().fill(.ultraThinMaterial))
+                        .frame(width: 46, height: 46)
+                        .readerGlass(Circle())
                 }
                 .disabled(!hasNextChapter)
+
+                // Auto-scroll toggle lives on the right, always present in the bar
+                // (vertical mode); it hides with the chrome, not on its own.
+                if mode == .vertical {
+                    Button { toggleAutoScroll() } label: {
+                        Image(systemName: isAutoScrolling ? "pause.fill" : "play.fill")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(isAutoScrolling ? .black : .white)
+                            .frame(width: 46, height: 46)
+                            .readerGlass(Circle(), tint: isAutoScrolling ? .white : nil)
+                    }
+                }
             }
 
             // Per-chapter position, never a combined-strip count.
@@ -419,6 +484,7 @@ struct MangaReaderView: View {
             LinearGradient(colors: [.clear, .black.opacity(0.7)],
                            startPoint: .top, endPoint: .bottom)
         )
+        .animation(.spring(response: 0.38, dampingFraction: 0.78), value: isAutoScrolling)
     }
 
     private var nextChapterPill: some View {
@@ -428,9 +494,9 @@ struct MangaReaderView: View {
                 Label("Next Chapter", systemImage: "arrow.right")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(.ultraThinMaterial))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .readerGlass(Capsule())
             }
             .padding(.bottom, chromeVisible ? 118 : 40)
         }
@@ -467,6 +533,7 @@ struct MangaReaderView: View {
         loadError = nil
         strip = []
         chapterPageCounts = [:]
+        warmedPages = []
         currentPage = 0
         displayedChapterIndex = clamped
         geomStore.geoms = [:]
@@ -502,6 +569,9 @@ struct MangaReaderView: View {
                 // Auto-fetch the upcoming chapter right away (vertical) so
                 // forward navigation is instant and stays scroll-back-able.
                 prepareUpcomingChapter()
+                // Warm the first window immediately — onChangeOf(currentPage)
+                // won't fire when resuming at page 0.
+                warmUpcomingPages(around: resume)
             }
         } catch {
             loadError = error.localizedDescription
@@ -622,6 +692,20 @@ struct MangaReaderView: View {
         KingfisherManager.shared.retrieveImage(
             with: Kingfisher.ImageResource(downloadURL: url, cacheKey: urlString),
             options: ReaderPageView.imageOptions(referer: referer, for: url)) { _ in }
+    }
+
+    /// Warm a sliding window of pages around `page` so upcoming pages are
+    /// already decoded in cache when they scroll into view — the biggest lever
+    /// on perceived loading speed while reading/auto-scrolling. `warmedPages`
+    /// dedupes, so steady-state each advance only warms one new page ahead.
+    private func warmUpcomingPages(around page: Int) {
+        guard !strip.isEmpty else { return }
+        let lower = max(0, page - Self.prefetchBehind)
+        let upper = min(strip.count - 1, page + Self.prefetchAhead)
+        guard lower <= upper else { return }
+        for idx in lower...upper where warmedPages.insert(idx).inserted {
+            warmImage(strip[idx].url)
+        }
     }
 
     // MARK: - Auto-scroll
@@ -873,6 +957,69 @@ private struct ScrollViewGrabber: UIViewRepresentable {
             if let scrollView = view as? UIScrollView {
                 onResolve(scrollView)
             }
+        }
+    }
+}
+
+// MARK: - Pinch-to-zoom
+
+/// Pinch magnification whose anchor is the point you pinch on. iOS 17+'s
+/// `MagnifyGesture` reports `startAnchor` (a `UnitPoint`) directly; older iOS
+/// falls back to `MagnificationGesture`, which has no location, so it anchors on
+/// the center. Only updates the zoom scale + anchor — never the scroll position.
+private struct PinchToZoom: ViewModifier {
+    @Binding var zoomScale: CGFloat
+    @Binding var anchor: UnitPoint
+    @Binding var pinching: Bool
+    @Binding var startScale: CGFloat
+    let maxZoom: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.simultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        if !pinching {
+                            pinching = true
+                            startScale = zoomScale
+                            // Only re-anchor from an unzoomed state; changing the
+                            // anchor mid-zoom would snap the content, so a pinch
+                            // while already zoomed keeps the existing anchor.
+                            if zoomScale <= 1 { anchor = value.startAnchor }
+                        }
+                        zoomScale = min(max(startScale * value.magnification, 1), maxZoom)
+                    }
+                    .onEnded { _ in pinching = false }
+            )
+        } else {
+            content.simultaneousGesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        if !pinching {
+                            pinching = true
+                            startScale = zoomScale
+                            anchor = .center
+                        }
+                        zoomScale = min(max(startScale * value, 1), maxZoom)
+                    }
+                    .onEnded { _ in pinching = false }
+            )
+        }
+    }
+}
+
+// MARK: - Liquid Glass helper
+
+private extension View {
+    /// Liquid Glass on iOS 26+, frosted `.ultraThinMaterial` fallback below.
+    /// `tint` gives the glass a colored wash (used for the active auto-scroll
+    /// button); pass `nil` for plain glass.
+    @ViewBuilder
+    func readerGlass(_ shape: some Shape, tint: Color? = nil) -> some View {
+        if #available(iOS 26.0, *) {
+            glassEffect(.regular.tint(tint).interactive(), in: shape)
+        } else {
+            background(shape.fill(tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.ultraThinMaterial)))
         }
     }
 }
