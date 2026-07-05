@@ -196,17 +196,25 @@ final class AniListLibraryService {
 
     // MARK: - Private
 
+    /// How many times to retry a rate-limited request before giving up (and letting the caller
+    /// fall back to another provider). Kept low so the UI never hangs for long.
+    private let maxRateLimitRetries = 2
+    /// Ceiling on any single backoff wait, even if the server's `Retry-After` asks for more.
+    private let maxRetryDelay: TimeInterval = 8
+
     private func post(query: String, variables: [String: Any]) async throws -> Data {
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = await AniListAuthManager.shared.accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        let body: [String: Any] = ["query": query, "variables": variables]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse {
+        var attempt = 0
+        while true {
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let token = await AniListAuthManager.shared.accessToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            let body: [String: Any] = ["query": query, "variables": variables]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return data }
             switch http.statusCode {
             case 200:
                 return data
@@ -215,17 +223,26 @@ final class AniListLibraryService {
                 Logger.shared.log("[AniList] 401 on \(operationName(in: query)) — logging out", type: "Error")
                 await AniListAuthManager.shared.logout()
                 throw AniListError.httpError(401)
-            case 429:
-                // Rate limited — transient, do NOT clear the token.
-                Logger.shared.log("[AniList] 429 rate limited on \(operationName(in: query)) — keeping session", type: "Network")
-                throw AniListError.rateLimited
+            case 429, 403:
+                // AniList rate-limits with 429; under Cloudflare/edge load it can surface as 403.
+                // Honour `Retry-After` when present (else exponential backoff), retry a bounded
+                // number of times, then give up so ProviderManager can fall back.
+                let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap { Double($0) }
+                if attempt < maxRateLimitRetries {
+                    let delay = min(retryAfter ?? pow(2, Double(attempt)), maxRetryDelay)
+                    Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited on \(operationName(in: query)) — retrying in \(delay)s (attempt \(attempt + 1)/\(maxRateLimitRetries))", type: "Network")
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    attempt += 1
+                    continue
+                }
+                Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited on \(operationName(in: query)) — giving up after \(maxRateLimitRetries) retries", type: "Network")
+                throw http.statusCode == 429 ? AniListError.rateLimited : AniListError.httpError(403)
             default:
                 // 5xx / other transient errors — do NOT clear the token.
                 Logger.shared.log("[AniList] HTTP \(http.statusCode) on \(operationName(in: query)) — keeping session", type: "Network")
                 throw AniListError.httpError(http.statusCode)
             }
         }
-        return data
     }
 
     /// Best-effort label for logs ("query"/"mutation") without dumping the whole GraphQL doc.
