@@ -10,6 +10,8 @@ struct PlayerProgressSlider: View {
     var onDragChange: ((Double) -> Void)? = nil
     var onDragEnd: (() -> Void)? = nil
 
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
+
     @State private var isDragging = false
     @State private var dragTime: Double = 0
     @State private var dragStartX: CGFloat = 0
@@ -28,7 +30,7 @@ struct PlayerProgressSlider: View {
         return min(max(bufferProgress, 0), 1)
     }
 
-    private var barHeight: CGFloat { isDragging ? 5 : 4 }
+    private var barHeight: CGFloat { isDragging ? 9 : 7 }
 
     var body: some View {
         VStack(spacing: 2) {
@@ -108,9 +110,9 @@ struct PlayerProgressSlider: View {
                 let originX = CGFloat(L) * totalBarWidth + CGFloat(i) * gapPx
 
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: r)
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: subWidth)
+                    Color.clear
+                        .frame(width: subWidth, height: barHeight)
+                        .glassChrome(RoundedRectangle(cornerRadius: r), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
                     RoundedRectangle(cornerRadius: r)
                         .fill(Color.white.opacity(0.5))
                         .frame(width: subBarFill(L: L, R: R, value: buffered, subWidth: subWidth))

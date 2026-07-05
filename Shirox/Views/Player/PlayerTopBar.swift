@@ -8,6 +8,7 @@ struct PlayerTopBar: View {
     var topPadding: CGFloat = 24
     var isLandscape: Bool = true
     var showDismiss: Bool = true
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
 
     private var isPad: Bool {
         #if os(iOS)
@@ -36,8 +37,7 @@ struct PlayerTopBar: View {
                             .font(.system(size: isPad ? 24 : 18, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: isPad ? 56 : 44, height: isPad ? 56 : 44)
-                            .background(Color.white.opacity(0.25))
-                            .clipShape(Circle())
+                            .glassChrome(Circle(), enabled: playerLiquidGlass, off: Color.white.opacity(0.25))
                             .shadow(color: .black.opacity(0.3), radius: 6)
                     }
                     .buttonStyle(.plain)
@@ -59,7 +59,7 @@ struct PlayerTopBar: View {
                             .padding(.vertical, isPad ? 12 : 8)
                     }
                 }
-                .background(Color.white.opacity(0.2), in: Capsule())
+                .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
             }
         }
         .padding(.horizontal, isPad ? 30 : 20)

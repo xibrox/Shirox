@@ -6,6 +6,7 @@ struct PlayerCenterControls: View {
     var onBackward: () -> Void
     var onPlayPause: () -> Void
     var onForward: () -> Void
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
 
     private var isPad: Bool {
         #if os(iOS)
@@ -61,8 +62,7 @@ struct PlayerCenterControls: View {
             label()
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
-                .background(Color.white.opacity(0.25))
-                .clipShape(Circle())
+                .glassChrome(Circle(), enabled: playerLiquidGlass, off: Color.white.opacity(0.25))
                 .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(.plain)

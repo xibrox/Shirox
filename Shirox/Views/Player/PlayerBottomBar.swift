@@ -37,6 +37,7 @@ struct PlayerBottomBar: View {
     var episodeNumber: Int? = nil
     var tvdbEpisodeTitle: String? = nil
     var mediaTitle: String? = nil
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
 
     private var isPad: Bool {
         #if os(iOS)
@@ -104,7 +105,7 @@ struct PlayerBottomBar: View {
             .foregroundStyle(.white)
             .padding(.horizontal, isPad ? 20 : 14)
             .frame(height: isPad ? 48 : 36)
-            .background(Color.white.opacity(0.2), in: Capsule())
+            .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
         }
         .buttonStyle(.plain)
         .opacity(hasActiveSkipSegment ? 0 : 1)
@@ -187,7 +188,7 @@ struct PlayerBottomBar: View {
         }
         .padding(.horizontal, isPad ? 6 : 4)
         .padding(.vertical, 1)
-        .background(Color.white.opacity(0.2), in: Capsule())
+        .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
     }
 
     // MARK: - Helpers

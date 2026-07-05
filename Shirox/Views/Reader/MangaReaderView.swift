@@ -89,6 +89,7 @@ struct MangaReaderView: View {
     @State private var autoScroller = ReaderAutoScroller()
     @State private var isAutoScrolling = false
     @AppStorage("mangaAutoScrollSpeed") private var autoScrollSpeed = 120.0
+    @AppStorage("readerLiquidGlass") private var readerLiquidGlass = true
     // Live speed range (pt/s): top is ~6.7× the old "Turbo" preset (120).
     private static let autoScrollSpeedRange: ClosedRange<Double> = 20...800
 
@@ -337,7 +338,7 @@ struct MangaReaderView: View {
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.black)
                             .frame(width: 46, height: 46)
-                            .readerGlass(Circle(), tint: .white)
+                            .readerGlass(Circle(), tint: .white, enabled: readerLiquidGlass)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -358,7 +359,7 @@ struct MangaReaderView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 46, height: 46)
-                    .readerGlass(Circle())
+                    .readerGlass(Circle(), enabled: readerLiquidGlass)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -387,7 +388,7 @@ struct MangaReaderView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 46, height: 46)
-                    .readerGlass(Circle())
+                    .readerGlass(Circle(), enabled: readerLiquidGlass)
             }
         }
         .padding(.horizontal, 16)
@@ -417,7 +418,7 @@ struct MangaReaderView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .readerGlass(Capsule())
+                .readerGlass(Capsule(), enabled: readerLiquidGlass)
                 .padding(.bottom, 4)
                 .transition(
                     .move(edge: .bottom)
@@ -432,7 +433,7 @@ struct MangaReaderView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white.opacity(hasPrevChapter ? 1 : 0.3))
                         .frame(width: 46, height: 46)
-                        .readerGlass(Circle())
+                        .readerGlass(Circle(), enabled: readerLiquidGlass)
                 }
                 .disabled(!hasPrevChapter)
 
@@ -455,7 +456,7 @@ struct MangaReaderView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white.opacity(hasNextChapter ? 1 : 0.3))
                         .frame(width: 46, height: 46)
-                        .readerGlass(Circle())
+                        .readerGlass(Circle(), enabled: readerLiquidGlass)
                 }
                 .disabled(!hasNextChapter)
 
@@ -467,7 +468,7 @@ struct MangaReaderView: View {
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(isAutoScrolling ? .black : .white)
                             .frame(width: 46, height: 46)
-                            .readerGlass(Circle(), tint: isAutoScrolling ? .white : nil)
+                            .readerGlass(Circle(), tint: isAutoScrolling ? .white : nil, enabled: readerLiquidGlass)
                     }
                 }
             }
@@ -496,7 +497,7 @@ struct MangaReaderView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
-                    .readerGlass(Capsule())
+                    .readerGlass(Capsule(), enabled: readerLiquidGlass)
             }
             .padding(.bottom, chromeVisible ? 118 : 40)
         }
@@ -1015,12 +1016,9 @@ private extension View {
     /// `tint` gives the glass a colored wash (used for the active auto-scroll
     /// button); pass `nil` for plain glass.
     @ViewBuilder
-    func readerGlass(_ shape: some Shape, tint: Color? = nil) -> some View {
-        if #available(iOS 26.0, *) {
-            glassEffect(.regular.tint(tint).interactive(), in: shape)
-        } else {
-            background(shape.fill(tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.ultraThinMaterial)))
-        }
+    func readerGlass(_ shape: some Shape, tint: Color? = nil, enabled: Bool) -> some View {
+        glassChrome(shape, enabled: enabled, tint: tint,
+                    off: tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.ultraThinMaterial))
     }
 }
 #endif

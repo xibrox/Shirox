@@ -463,6 +463,7 @@
 		6FD4F8EEE8EAD4A1CE0EB355 /* MangaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A709F7C9E219866F599F64D7 /* MangaDetailView.swift */; };
 		739EB48D2C876346667985D9 /* MangaTrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B5885AD320A89432B9989B /* MangaTrackingCoordinator.swift */; };
 		73A9F2622811896FA3F83259 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
+		73E4BEBD6CC5C3F828B22FEC /* View+GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */; };
 		74D4BF07951EDE2E59789F11 /* LibrarySourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */; };
 		751B583A4D8491B41B273131 /* ManageCollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE497D28BD37BD64210898B9 /* ManageCollectionsView.swift */; };
 		76F0A76964B693E1F245180E /* HostBlocklistTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98CCF0AD5072D908AB74D31A /* HostBlocklistTests.swift */; };
@@ -551,12 +552,14 @@
 		E78EF025EB954FED7A2E0EFC /* KingfisherImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */; };
 		EBFFD0DE43A34D0C95DD1E60 /* JellyfinEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF4C00BAA407FF400B069044 /* JellyfinEntryView.swift */; };
 		EC4BAEE0B282928388490315 /* JellyfinPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56C921630CAED5B7B10A681B /* JellyfinPlaybackCoordinator.swift */; };
+		EFC4842F85FB4213AD6C2F36 /* View+GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */; };
 		F347119BB1CD5612676F79B0 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		F34D4ABCD234457BEB1E186C /* ZoomableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7067BDBACB2F7A173AA486EC /* ZoomableContainer.swift */; };
 		F4B629DD0CE540A681EBF6A5 /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		F6D3663CCB6E4EECAD29EB9E /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		F8F895AB3AE54DBC2CA63B35 /* LocalCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */; };
 		F99A3139678FD27E98368ADE /* NSFWContentFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB32994B31FB72D2DAA8327A /* NSFWContentFilter.swift */; };
+		F9D85D36A807E18779423371 /* View+GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */; };
 		FA1B1A047DA983F954886DDB /* MangaModuleResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D8556737F55F2772288018 /* MangaModuleResolver.swift */; };
 		FADBA9C6AD9E3B1839E43B34 /* JellyfinPosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D4FBF1385A6C9330CBE7EAB /* JellyfinPosterCard.swift */; };
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
@@ -709,6 +712,7 @@
 		2C4A4D717CED7197DBAD4A83 /* JellyfinModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinModels.swift; sourceTree = "<group>"; };
 		340C623B04A57EE34B09333C /* LibrarySourceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySourceSwitcher.swift; sourceTree = "<group>"; };
 		3424495FC6BA30F806C576D8 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "View+GlassChrome.swift"; sourceTree = "<group>"; };
 		3606FB96412BD33F9B6B0366 /* MangaModuleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaModuleTests.swift; sourceTree = "<group>"; };
 		3CB5F43A448079ACC600D906 /* MangaProgressManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaProgressManager.swift; sourceTree = "<group>"; };
 		3D6742C550B97293CCFDC834 /* LibraryCollapsingHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryCollapsingHeader.swift; sourceTree = "<group>"; };
@@ -1039,6 +1043,7 @@
 				1279E4D52FCA397700C9BA56 /* ThumbnailEpisodeRow.swift */,
 				1279E4D62FCA397700C9BA56 /* View+AdaptiveSheet.swift */,
 				BC268A065BC5B9DB56250D4B /* WatchOrderSection.swift */,
+				35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -1553,6 +1558,7 @@
 				0A3107E133486B031DAAB01F /* MALMangaLibraryService.swift in Sources */,
 				25DE15A403279BA1824BE2E7 /* MangaTrackingCoordinator.swift in Sources */,
 				33EA776012193DAB0570A9A6 /* MangaModuleResolver.swift in Sources */,
+				73E4BEBD6CC5C3F828B22FEC /* View+GlassChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1732,6 +1738,7 @@
 				973AD5CE33B4A1B0455FADE9 /* MALMangaLibraryService.swift in Sources */,
 				455542CA728B8D33DC2DC17C /* MangaTrackingCoordinator.swift in Sources */,
 				FA1B1A047DA983F954886DDB /* MangaModuleResolver.swift in Sources */,
+				EFC4842F85FB4213AD6C2F36 /* View+GlassChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1911,6 +1918,7 @@
 				A0722750ED30A028878FF395 /* MALMangaLibraryService.swift in Sources */,
 				739EB48D2C876346667985D9 /* MangaTrackingCoordinator.swift in Sources */,
 				B861A2F0399BEB5C4AD13096 /* MangaModuleResolver.swift in Sources */,
+				F9D85D36A807E18779423371 /* View+GlassChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -10,6 +10,8 @@ struct SettingsView: View {
     @AppStorage("autoNextEpisode") private var autoNextEpisode = true
     @AppStorage("autoSkipSegments") private var autoSkipSegments = true
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
+    @AppStorage("readerLiquidGlass") private var readerLiquidGlass = true
     @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
     @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
     @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
@@ -104,6 +106,13 @@ struct SettingsView: View {
                             PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
                         }
                         #endif
+                    if #available(iOS 26.0, macOS 26.0, *) {
+                        Toggle("Liquid Glass Controls", isOn: $playerLiquidGlass)
+                            .tint(.secondary)
+                        Text("Frosted glass buttons in the video player. Turn off for solid controls.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     Picker("Skip Duration", selection: $skipShort) {
                         ForEach(shortOptions, id: \.self) { s in
                             Text("\(s)s").tag(s)
@@ -136,6 +145,18 @@ struct SettingsView: View {
                         #endif
                     }
                 }
+
+                #if os(iOS)
+                if #available(iOS 26.0, *) {
+                    Section("Reader") {
+                        Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
+                            .tint(.secondary)
+                        Text("Frosted glass buttons in the manga reader. Turn off for solid controls.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                #endif
 
                 if aniListAuth.isLoggedIn || malAuth.isLoggedIn {
                     Section("Tracking") {
