@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "0.1.2",
+          "buildVersion": "101",
+          "date": "2026-07-05",
+          "localizedDescription": "The video player controls get the iOS 26 Liquid Glass look — frosted, translucent buttons — with a thicker, easier-to-grab progress bar. New Liquid Glass Controls toggles in Settings switch the glass off for the player and reader independently. In the manga reader, auto-scroll is now a live speed slider that goes much faster, the play/pause button is always reachable, you can pinch to zoom in vertical mode, and pages load ahead of you so scrolling never stalls.",
+          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "size": 8856647,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.1",
           "buildVersion": "100",
           "date": "2026-07-04",
@@ -48,6 +57,15 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 0.1.2 - Liquid Glass player & reader",
+      "identifier": "news-0.1.2-liquid-glass",
+      "caption": "The video player controls now use iOS 26 Liquid Glass: frosted, translucent buttons that pick up the video behind them, with a thicker progress bar that's easier to scrub. Prefer the old solid look? New Liquid Glass Controls toggles in Settings switch it off for the player and the reader independently (shown only on iOS/macOS 26).\n\nThe manga reader's auto-scroll is now a live speed slider instead of a buried preset menu — drag to set exactly how fast, and it goes much faster than before, with play/pause always reachable even when the controls are hidden. Pages now load ahead of you so scrolling never stalls, you can pinch to zoom up to 3x in vertical mode, and the reader buttons are bigger and easier to tap.",
+      "tintColor": "ef4444",
+      "date": "2026-07-05",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 0.1.1 - Manga tracking",
       "identifier": "news-0.1.1-manga-tracking",
