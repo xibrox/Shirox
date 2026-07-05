@@ -32,7 +32,7 @@
           "date": "2026-07-05",
           "localizedDescription": "The video player controls get the iOS 26 Liquid Glass look — frosted, translucent buttons — with a thicker, easier-to-grab progress bar. New Liquid Glass Controls toggles in Settings switch the glass off for the player and reader independently. In the manga reader, auto-scroll is now a live speed slider that goes much faster, the play/pause button is always reachable, you can pinch to zoom in vertical mode, and pages load ahead of you so scrolling never stalls.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 8856647,
+          "size": 9132843,
           "minOSVersion": "15.0"
         },
         {
