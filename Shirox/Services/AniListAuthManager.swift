@@ -138,6 +138,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
         unreadNotificationCount = 0
         UserDefaults.standard.removeObject(forKey: "anilist_score_format")
         UserDefaults.standard.removeObject(forKey: "anilist_user_id")
+        PendingWriteQueue.shared.discardWrites(for: .anilist)
     }
 
     // MARK: - Viewer

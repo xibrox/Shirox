@@ -218,6 +218,7 @@ final class MALAuthManager: NSObject, ObservableObject {
         username = nil
         avatarURL = nil
         userId = nil
+        PendingWriteQueue.shared.discardWrites(for: .mal)
     }
 
     func authorizedRequest(url: URL, method: String = "GET") async throws -> URLRequest {
