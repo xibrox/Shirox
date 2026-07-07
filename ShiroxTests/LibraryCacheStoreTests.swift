@@ -56,4 +56,30 @@ final class LibraryCacheStoreTests: XCTestCase {
         let store = LibraryCacheStore(directory: dir)
         XCTAssertNil(store.snapshot(provider: .anilist, mediaType: .anime))
     }
+
+    func testApplyOptimisticUpdateMutatesMatchingEntry() {
+        let dir = tempDir()
+        let store = LibraryCacheStore(directory: dir)
+        store.save(entries: [makeEntry(id: 7, title: "X")], provider: .anilist, mediaType: .anime)
+
+        store.applyOptimisticUpdate(provider: .anilist, mediaType: .anime, mediaId: 7,
+                                    status: .completed, progress: 12, score: 9)
+
+        let e = store.snapshot(provider: .anilist, mediaType: .anime)?.entries.first
+        XCTAssertEqual(e?.status, .completed)
+        XCTAssertEqual(e?.progress, 12)
+        XCTAssertEqual(e?.score, 9)
+    }
+
+    func testApplyOptimisticDeleteRemovesEntryAcrossUnknownType() {
+        let dir = tempDir()
+        let store = LibraryCacheStore(directory: dir)
+        store.save(entries: [makeEntry(id: 1, title: "keep"), makeEntry(id: 2, title: "drop")],
+                   provider: .anilist, mediaType: .manga)
+
+        // entryId == LibraryEntry.id; makeEntry sets id == entry id. mediaType nil → search both.
+        store.applyOptimisticDelete(provider: .anilist, mediaType: nil, mediaId: nil, entryId: 2)
+
+        XCTAssertEqual(store.snapshot(provider: .anilist, mediaType: .manga)?.entries.map(\.id), [1])
+    }
 }

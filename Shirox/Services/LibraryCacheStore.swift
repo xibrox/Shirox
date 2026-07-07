@@ -46,6 +46,35 @@ final class LibraryCacheStore {
         try? FileManager.default.removeItem(at: fileURL)
     }
 
+    /// Optimistically reflect a queued update in the cached snapshot so it survives a
+    /// restart-before-sync. No-op if the snapshot or entry isn't present.
+    func applyOptimisticUpdate(provider: ProviderType, mediaType: MediaKind, mediaId: Int,
+                               status: MediaListStatus?, progress: Int?, score: Double?) {
+        let k = Self.key(provider, mediaType)
+        guard var snap = snapshots[k],
+              let idx = snap.entries.firstIndex(where: { $0.media.id == mediaId }) else { return }
+        if let status { snap.entries[idx].status = status }
+        if let progress { snap.entries[idx].progress = progress }
+        if let score { snap.entries[idx].score = score }
+        snapshots[k] = snap
+        persist()
+    }
+
+    /// Optimistically remove an entry for a queued delete. `mediaType == nil` searches both
+    /// (AniList delete doesn't know the type). Matches by mediaId or list-entry id.
+    func applyOptimisticDelete(provider: ProviderType, mediaType: MediaKind?, mediaId: Int?, entryId: Int?) {
+        let types: [MediaKind] = mediaType.map { [$0] } ?? [.anime, .manga]
+        for t in types {
+            let k = Self.key(provider, t)
+            guard var snap = snapshots[k] else { continue }
+            snap.entries.removeAll { e in
+                (mediaId != nil && e.media.id == mediaId) || (entryId != nil && e.id == entryId)
+            }
+            snapshots[k] = snap
+        }
+        persist()
+    }
+
     /// On-disk size in bytes (0 if the file is absent) — for CacheManager's storage view.
     func diskByteSize() -> Int {
         (try? Data(contentsOf: fileURL).count) ?? 0

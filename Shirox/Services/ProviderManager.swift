@@ -74,7 +74,7 @@ final class ProviderManager: ObservableObject {
         }
     }
 
-    static func isOfflineError(_ error: Error) -> Bool {
+    nonisolated static func isOfflineError(_ error: Error) -> Bool {
         guard let urlError = error as? URLError else { return false }
         switch urlError.code {
         case .notConnectedToInternet,

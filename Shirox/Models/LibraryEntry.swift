@@ -85,7 +85,7 @@ enum ScoreFormat: String, Codable {
 }
 
 /// Distinguishes anime vs manga for library/UI branching (progress unit, labels).
-enum MediaKind { case anime, manga }
+enum MediaKind: String, Codable { case anime, manga }
 
 enum MediaListStatus: String, Codable, CaseIterable, Identifiable {
     case current   = "CURRENT"
