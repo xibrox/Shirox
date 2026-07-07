@@ -6,6 +6,7 @@ struct CastOverlayView: View {
     let imageUrl: String?
     let deviceName: String
     let onDismiss: () -> Void
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -74,7 +75,7 @@ struct CastOverlayView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(.ultraThinMaterial, in: Capsule())
+                .glassChrome(Capsule(), enabled: playerLiquidGlass, off: .ultraThinMaterial)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 32)

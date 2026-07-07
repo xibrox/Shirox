@@ -3,6 +3,7 @@ import SwiftUI
 struct PlayerSkipButton: View {
     let segmentType: SkipSegmentType
     let onSkip: () -> Void
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
 
     private var isPad: Bool {
         #if os(iOS)
@@ -23,7 +24,7 @@ struct PlayerSkipButton: View {
             .foregroundStyle(.white)
             .padding(.horizontal, isPad ? 20 : 14)
             .frame(height: isPad ? 48 : 36)
-            .background(Color.white.opacity(0.2), in: Capsule())
+            .glassChrome(Capsule(), enabled: playerLiquidGlass, off: Color.white.opacity(0.2))
         }
         .buttonStyle(.plain)
     }

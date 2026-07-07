@@ -18,7 +18,12 @@ extension View {
         off: some ShapeStyle
     ) -> some View {
         if enabled, #available(iOS 26.0, macOS 26.0, *) {
+            // Unlike a background fill, glass is not hit-testable content: without an
+            // explicit content shape only the label's drawn pixels receive taps, and
+            // everything else falls through to the layer below (in the player, the
+            // full-screen seek view — which hides the controls instead).
             glassEffect(.regular.tint(tint).interactive(), in: shape)
+                .contentShape(shape)
         } else {
             background(shape.fill(off))
         }
