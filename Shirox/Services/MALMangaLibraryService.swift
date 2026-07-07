@@ -92,6 +92,18 @@ final class MALMangaLibraryService {
     // MARK: - Update entry
 
     func updateEntry(malId: Int, status: MediaListStatus, progress: Int, score: Double) async throws {
+        do {
+            try await rawUpdateEntry(malId: malId, status: status, progress: progress, score: score)
+        } catch {
+            guard PendingWriteQueue.isTransient(error) else { throw error }
+            await PendingWriteQueue.shared.enqueue(PendingWrite(
+                id: UUID(), provider: .mal, mediaType: .manga, kind: .update,
+                mediaId: malId, entryId: nil, status: status, progress: progress, score: score,
+                repeatCount: nil, updatedAt: Date(), attempts: 0))
+        }
+    }
+
+    func rawUpdateEntry(malId: Int, status: MediaListStatus, progress: Int, score: Double) async throws {
         let url = base.appendingPathComponent("manga/\(malId)/my_list_status")
         let body = "status=\(mapStatusToMAL(status))&num_chapters_read=\(progress)&score=\(Int(score))"
         let (_, response) = try await MALAuthManager.shared.send(
@@ -102,6 +114,18 @@ final class MALMangaLibraryService {
     }
 
     func deleteEntry(malId: Int) async throws {
+        do {
+            try await rawDeleteEntry(malId: malId)
+        } catch {
+            guard PendingWriteQueue.isTransient(error) else { throw error }
+            await PendingWriteQueue.shared.enqueue(PendingWrite(
+                id: UUID(), provider: .mal, mediaType: .manga, kind: .delete,
+                mediaId: malId, entryId: nil, status: nil, progress: nil, score: nil,
+                repeatCount: nil, updatedAt: Date(), attempts: 0))
+        }
+    }
+
+    func rawDeleteEntry(malId: Int) async throws {
         let url = base.appendingPathComponent("manga/\(malId)/my_list_status")
         let (_, response) = try await MALAuthManager.shared.send(url: url, method: "DELETE")
         try validateResponse(response)
@@ -135,6 +159,7 @@ final class MALMangaLibraryService {
         guard let http = response as? HTTPURLResponse else { return }
         if http.statusCode == 401 { throw ProviderError.unauthenticated }
         if http.statusCode == 404 { throw ProviderError.notFound }
+        if http.statusCode == 429 { throw ProviderError.serverError(429) }   // rate limited → transient
         if http.statusCode >= 500 { throw ProviderError.serverError(http.statusCode) }
     }
 }
