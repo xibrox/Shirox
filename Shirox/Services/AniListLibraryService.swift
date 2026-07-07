@@ -164,6 +164,18 @@ final class AniListLibraryService {
     // MARK: - Update entry
 
     func updateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil, type: MediaListType = .anime) async throws {
+        do {
+            try await rawUpdateEntry(mediaId: mediaId, status: status, progress: progress, score: score, repeat: repeatCount, type: type)
+        } catch {
+            guard PendingWriteQueue.isTransient(error) else { throw error }
+            await PendingWriteQueue.shared.enqueue(PendingWrite(
+                id: UUID(), provider: .anilist, mediaType: type == .manga ? .manga : .anime, kind: .update,
+                mediaId: mediaId, entryId: nil, status: status, progress: progress, score: score,
+                repeatCount: repeatCount, updatedAt: Date(), attempts: 0))
+        }
+    }
+
+    func rawUpdateEntry(mediaId: Int, status: MediaListStatus, progress: Int, score: Double? = nil, repeat repeatCount: Int? = nil, type: MediaListType = .anime) async throws {
         let mutation = """
         mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float, $repeat: Int) {
           SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score, repeat: $repeat) {
@@ -184,6 +196,18 @@ final class AniListLibraryService {
     // MARK: - Delete entry
 
     func deleteEntry(entryId: Int) async throws {
+        do {
+            try await rawDeleteEntry(entryId: entryId)
+        } catch {
+            guard PendingWriteQueue.isTransient(error) else { throw error }
+            await PendingWriteQueue.shared.enqueue(PendingWrite(
+                id: UUID(), provider: .anilist, mediaType: nil, kind: .delete,
+                mediaId: nil, entryId: entryId, status: nil, progress: nil, score: nil,
+                repeatCount: nil, updatedAt: Date(), attempts: 0))
+        }
+    }
+
+    func rawDeleteEntry(entryId: Int) async throws {
         let mutation = """
         mutation ($id: Int) {
           DeleteMediaListEntry(id: $id) {
