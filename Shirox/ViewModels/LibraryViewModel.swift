@@ -313,6 +313,7 @@ final class LibraryViewModel: ObservableObject {
             lastFetchedAt = Date()
             rebuildCustomListNames(from: result)
             applyFilter()
+            Task { await PendingWriteQueue.shared.flush() }
         } catch {
             guard generation == loadGeneration else { return }
             if !silent { self.error = error.localizedDescription }

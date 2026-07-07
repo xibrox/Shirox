@@ -89,6 +89,7 @@ struct ShiroxApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
     @StateObject private var moduleManager = ModuleManager.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         KingfisherImageCache.configure()
@@ -101,6 +102,7 @@ struct ShiroxApp: App {
             _ = CastManager.shared
         #endif
         ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
+        PendingWriteQueue.shared.register(sink: LibraryWriteSink())
         LocalLibraryManager.shared.syncFromContinueWatching()
         HostBlocklist.shared.loadIfNeeded()
     }
@@ -110,6 +112,9 @@ struct ShiroxApp: App {
             RootTabView()
                 .environmentObject(moduleManager)
                 .tint(.primary)
+                .onChange(of: scenePhase) { phase in
+                    if phase == .active { Task { await PendingWriteQueue.shared.flush() } }
+                }
         }
         #if targetEnvironment(macCatalyst) || os(macOS)
         .commands {

@@ -399,6 +399,7 @@
 		1E9C0F13D08F553EC0BF3F9E /* LocalCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A013F4638FEFB8E37C2E53A /* LocalCollection.swift */; };
 		21A14B5A00FF0B538691E91D /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		2226245532D5C4D6A3B109F1 /* HLSManifestParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434062BAE638F3D33467EBCF /* HLSManifestParser.swift */; };
+		243906CC2AB59FF9AE447BDF /* LibraryWriteSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */; };
 		24B2669799E112151390A199 /* MangaMatchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */; };
 		2590A021E9A9C37333EE5853 /* JellyfinModuleFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DFF59F54F073D10B1F45FF /* JellyfinModuleFlagTests.swift */; };
 		25DE15A403279BA1824BE2E7 /* MangaTrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B5885AD320A89432B9989B /* MangaTrackingCoordinator.swift */; };
@@ -529,6 +530,7 @@
 		BAEE9A1A2FCB000000000004 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BEE99B47439329A3F2CBC578 /* HostBlocklist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 810CED9585EB8327C0CF0AE2 /* HostBlocklist.swift */; };
 		C0CAB833B34CBD719FFAB3CF /* PendingWriteQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE39C4F1F663C90A50947045 /* PendingWriteQueue.swift */; };
+		C13FB1E62A12F62630273F79 /* LibraryWriteSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */; };
 		C19FAB5961BBA470884C5609 /* JellyfinModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4A4D717CED7197DBAD4A83 /* JellyfinModels.swift */; };
 		C3E3DDF1AFBB7BB011E7F5C4 /* LocalLibraryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */; };
 		C55314201C2A5E1363C29C30 /* LibraryCacheStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BBF394BB32529338B9F3C13 /* LibraryCacheStore.swift */; };
@@ -576,6 +578,7 @@
 		FADBA9C6AD9E3B1839E43B34 /* JellyfinPosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D4FBF1385A6C9330CBE7EAB /* JellyfinPosterCard.swift */; };
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FCE3980671F64CF38B707BFA /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
+		FE62CB6A1976842B35891D6B /* LibraryWriteSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -743,6 +746,7 @@
 		4F8C802FC011BC97C71DB79A /* JellyfinSeriesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinSeriesView.swift; sourceTree = "<group>"; };
 		56C921630CAED5B7B10A681B /* JellyfinPlaybackCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinPlaybackCoordinator.swift; sourceTree = "<group>"; };
 		5844D8774F9B1B6C5A7A3C3E /* JellyfinLibraryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinLibraryView.swift; sourceTree = "<group>"; };
+		5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryWriteSink.swift; sourceTree = "<group>"; };
 		5E23D7C4D4702884E3CDB683 /* MangaDetailViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaDetailViewModel.swift; sourceTree = "<group>"; };
 		5EA50C4A17000000000000F1 /* SeasonChainMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMath.swift; sourceTree = "<group>"; };
 		5EA50C4A17000000000000F2 /* SeasonChainMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonChainMapper.swift; sourceTree = "<group>"; };
@@ -963,6 +967,7 @@
 				78D8556737F55F2772288018 /* MangaModuleResolver.swift */,
 				2BBF394BB32529338B9F3C13 /* LibraryCacheStore.swift */,
 				BE39C4F1F663C90A50947045 /* PendingWriteQueue.swift */,
+				5CF6D00FF0F0489890FAF52D /* LibraryWriteSink.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -1588,6 +1593,7 @@
 				7E18D43593019A014AE8798A /* LibraryCacheStore.swift in Sources */,
 				D21F803B1289756FE8ECCC41 /* PendingWrite.swift in Sources */,
 				CD69B77925B488C51A0D887E /* PendingWriteQueue.swift in Sources */,
+				243906CC2AB59FF9AE447BDF /* LibraryWriteSink.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1771,6 +1777,7 @@
 				E7CC243113971DDADC926A3B /* LibraryCacheStore.swift in Sources */,
 				CF01709DB843C722DB674C72 /* PendingWrite.swift in Sources */,
 				A68F1B886076049F59CA7355 /* PendingWriteQueue.swift in Sources */,
+				C13FB1E62A12F62630273F79 /* LibraryWriteSink.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1954,6 +1961,7 @@
 				C55314201C2A5E1363C29C30 /* LibraryCacheStore.swift in Sources */,
 				A147502B402E4F1121420096 /* PendingWrite.swift in Sources */,
 				C0CAB833B34CBD719FFAB3CF /* PendingWriteQueue.swift in Sources */,
+				FE62CB6A1976842B35891D6B /* LibraryWriteSink.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
