@@ -99,7 +99,7 @@ struct MangaDetailView: View {
         #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                if vm.detail != nil { matchToolbarButton }
+                if vm.detail != nil && offlineChapters == nil { matchToolbarButton }
             }
         }
         .sheet(isPresented: $showMatchSheet) {
@@ -135,7 +135,17 @@ struct MangaDetailView: View {
                 }
             )
         }
-        .task { await vm.load(item: item) }
+        .task {
+            if let offlineChapters {
+                if vm.detail == nil {
+                    vm.detail = MangaDetail(
+                        title: item.title, image: item.image,
+                        description: "", tags: [], chapters: offlineChapters)
+                }
+            } else {
+                await vm.load(item: item)
+            }
+        }
     }
 
     // MARK: - Tracking match
