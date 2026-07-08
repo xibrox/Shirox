@@ -5,6 +5,7 @@ import SwiftUI
 
 struct DownloadsView: View {
     @ObservedObject private var dm = DownloadManager.shared
+    @ObservedObject private var mdm = MangaDownloadManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
 
     // MARK: - Grouping
@@ -62,16 +63,60 @@ struct DownloadsView: View {
         }.sorted { $0.moduleName < $1.moduleName }
     }
 
+    // MARK: - Manga grouping
+
+    private struct MangaGroup: Identifiable {
+        let id: String            // mangaHref
+        let mangaTitle: String
+        let coverImage: String
+        let moduleId: String
+        let items: [MangaDownloadItem]
+    }
+
+    private struct MangaModuleGroup: Identifiable {
+        let id: String
+        let moduleName: String
+        let iconUrl: String?
+        let iconData: String?
+        let mangaGroups: [MangaGroup]
+    }
+
+    private var mangaInProgress: [MangaDownloadItem] {
+        mdm.items.filter { $0.state == .downloading || $0.state == .pending }
+            .sorted { $0.mangaTitle < $1.mangaTitle }
+    }
+    private var mangaFailed: [MangaDownloadItem] {
+        mdm.items.filter { $0.state == .failed }.sorted { $0.mangaTitle < $1.mangaTitle }
+    }
+
+    private var mangaModuleGroups: [MangaModuleGroup] {
+        let completed = mdm.items.filter { $0.state == .completed }
+        return Dictionary(grouping: completed) { $0.moduleId }.map { moduleId, items in
+            let module = moduleManager.modules.first { $0.id == moduleId }
+            let byManga = Dictionary(grouping: items) { $0.mangaHref }
+            let groups = byManga.map { href, chs in
+                MangaGroup(
+                    id: href, mangaTitle: chs.first?.mangaTitle ?? href,
+                    coverImage: chs.first?.coverImage ?? "", moduleId: moduleId,
+                    items: chs.sorted { $0.chapterNumber < $1.chapterNumber })
+            }.sorted { $0.mangaTitle < $1.mangaTitle }
+            return MangaModuleGroup(
+                id: moduleId,
+                moduleName: module?.sourceName ?? (moduleId.isEmpty ? "Unknown Source" : moduleId),
+                iconUrl: module?.iconUrl, iconData: module?.iconData, mangaGroups: groups)
+        }.sorted { $0.moduleName < $1.moduleName }
+    }
+
     // MARK: - Body
 
     var body: some View {
         NavigationStack {
             Group {
-                if dm.items.isEmpty {
+                if dm.items.isEmpty && mdm.items.isEmpty {
                     ContentUnavailableView(
                         "No Downloads",
                         systemImage: "arrow.down.circle",
-                        description: Text("Episodes you download will appear here")
+                        description: Text("Episodes and chapters you download will appear here")
                     )
                 } else {
                     List {
@@ -153,6 +198,51 @@ struct DownloadsView: View {
                                 }
                             }
                         }
+
+                        // Manga — in progress
+                        if !mangaInProgress.isEmpty {
+                            Section("Downloading Manga") {
+                                ForEach(mangaInProgress) { item in
+                                    MangaDownloadProgressRow(item: item)
+                                        .swipeActions(edge: .trailing) {
+                                            Button(role: .destructive) { mdm.remove(item) } label: {
+                                                Label("Cancel", systemImage: "xmark")
+                                            }.tint(.red)
+                                        }
+                                }
+                            }
+                        }
+
+                        // Manga — completed (module → manga → chapters)
+                        ForEach(mangaModuleGroups) { moduleGroup in
+                            Section {
+                                ForEach(moduleGroup.mangaGroups) { g in
+                                    NavigationLink {
+                                        MangaDetailView(
+                                            item: SearchItem(title: g.mangaTitle, image: g.coverImage, href: g.id),
+                                            offlineChapters: mdm.downloadedChapters(forMangaHref: g.id))
+                                    } label: {
+                                        MediaGroupRow(mediaTitle: g.mangaTitle, imageUrl: g.coverImage, count: g.items.count, unit: "chapter")
+                                    }
+                                }
+                            } header: {
+                                ModuleSectionHeader(name: moduleGroup.moduleName, iconUrl: moduleGroup.iconUrl, iconData: moduleGroup.iconData)
+                            }
+                        }
+
+                        // Manga — failed
+                        if !mangaFailed.isEmpty {
+                            Section("Failed Manga") {
+                                ForEach(mangaFailed) { item in
+                                    MangaDownloadProgressRow(item: item)
+                                        .swipeActions(edge: .trailing) {
+                                            Button(role: .destructive) { mdm.remove(item) } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }.tint(.red)
+                                        }
+                                }
+                            }
+                        }
                     }
                     .listStyle(.insetGrouped)
                 }
@@ -185,6 +275,7 @@ private struct MediaGroupRow: View {
     let mediaTitle: String
     let imageUrl: String
     let count: Int
+    var unit: String = "episode"
 
     var body: some View {
         HStack(spacing: 12) {
@@ -199,7 +290,7 @@ private struct MediaGroupRow: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text("\(count) episode\(count == 1 ? "" : "s")")
+                Text("\(count) \(unit)\(count == 1 ? "" : "s")")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -277,6 +368,59 @@ private struct DownloadProgressRow: View {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
             default:
                 EmptyView()
+            }
+        }
+    }
+}
+
+// MARK: - Manga Progress Row (downloading / pending / failed)
+
+private struct MangaDownloadProgressRow: View {
+    let item: MangaDownloadItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            CachedAsyncImage(urlString: item.coverImage)
+                .aspectRatio(2/3, contentMode: .fit)
+                .frame(width: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.mangaTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
+                Text(item.chapterName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+
+                switch item.state {
+                case .downloading:
+                    HStack(spacing: 8) {
+                        ProgressView(value: item.progress).tint(.accentColor)
+                        Text("\(Int(item.progress * 100))%")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                case .pending:
+                    Text("Waiting…").font(.caption2).foregroundStyle(.secondary)
+                case .failed:
+                    HStack {
+                        Text(item.error ?? "Download failed").font(.caption2).foregroundStyle(.red).lineLimit(2)
+                        Spacer()
+                        Button { MangaDownloadManager.shared.retry(item) } label: {
+                            Label("Retry", systemImage: "arrow.clockwise")
+                                .font(.caption2.bold()).foregroundStyle(.blue)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                default:
+                    EmptyView()
+                }
+            }
+            Spacer()
+            switch item.state {
+            case .downloading: ProgressView().controlSize(.small)
+            case .pending: Image(systemName: "hourglass").foregroundStyle(.secondary)
+            case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+            default: EmptyView()
             }
         }
     }
