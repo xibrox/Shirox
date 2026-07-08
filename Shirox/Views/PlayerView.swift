@@ -449,6 +449,15 @@ struct PlayerView: View {
                 player.pause()
                 return
             }
+            // If we return still intending to play, another app may have taken audio focus while
+            // we were backgrounded and deactivated our session — a player without an active
+            // session wedges in .waitingToPlayAtSpecifiedRate (black frame, no audio, forever).
+            // Reclaim focus before the resume-seek below. Gated on isPlaying so returning to a
+            // player the user left PAUSED doesn't needlessly silence their music; the paused
+            // recovery paths reactivate the session themselves when they actually rebuild.
+            if isPlaying {
+                try? AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
+            }
             // How long we were actually suspended (didEnterBackground → now). A transient
             // resign-active never set backgroundedAt, so it reads 0 and we take the cheap path.
             let suspendedFor = backgroundedAt.map { Date().timeIntervalSince($0) } ?? 0
@@ -468,7 +477,7 @@ struct PlayerView: View {
                 isLocalPlayback: isLocalPlayback,
                 canRecoverStream: canRecoverStream
             ) {
-                Task { @MainActor in await recoverByRefetch() }
+                Task { @MainActor in await recoverPlayback() }
                 return
             }
             player.seek(
@@ -492,7 +501,7 @@ struct PlayerView: View {
             // (not a stall), which the watchdog never catches — the player just sits dead until
             // the user restarts the episode. Recover immediately when we come back failed.
             if canRecoverStream, player.currentItem?.status == .failed {
-                Task { @MainActor in await recoverByRefetch() }
+                Task { @MainActor in await recoverPlayback() }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification).receive(on: RunLoop.main)) { note in
@@ -1218,6 +1227,13 @@ struct PlayerView: View {
             player.pause()
             isPlaying = false
         } else {
+            #if os(iOS)
+            // A deliberate tap on play is our cue to (re)claim audio focus: if another app took
+            // the session while we sat paused (e.g. across a background), the session is inactive
+            // and player.rate alone would wedge in .waitingToPlayAtSpecifiedRate — no audio, no
+            // advance. Reactivating here is correct precisely because the user asked to play.
+            try? AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
+            #endif
             player.rate = Float(playbackSpeed)
             isPlaying = true
         }
@@ -1757,7 +1773,7 @@ struct PlayerView: View {
             guard canRecoverStream, !isRefetchingStream, player?.currentItem === item else { return }
             let err = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             Logger.shared.log("[StreamExpiry] failedToPlayToEndTime: \(err?.localizedDescription ?? "unknown") — refetching", type: "Player")
-            Task { @MainActor in await recoverByRefetch() }
+            Task { @MainActor in await recoverPlayback() }
         }
     }
 
@@ -1890,9 +1906,9 @@ struct PlayerView: View {
             startStallWatchdog() // re-arm to escalate if the nudge didn't take
         } else if attempt <= 3, canRecoverStream {
             // Step 2: the source is likely dead — re-resolve it, preserving position. For a
-            // network stream this re-runs the extractor; for a downloaded copy it restarts the
-            // local HLS proxy and re-resolves the offline file.
-            await recoverByRefetch()
+            // network stream this re-runs the extractor; for a downloaded copy it does a full
+            // clean rebuild (restart the local HLS proxy, fresh AVPlayer + reactivated session).
+            await recoverPlayback()
         } else {
             // Step 3: give up auto-recovery; let the user retry manually.
             Logger.shared.log("[StallRecovery] Exhausted automatic recovery — showing retry UI", type: "Player")
@@ -1946,13 +1962,80 @@ struct PlayerView: View {
         Logger.shared.log("[StallRecovery] Refetched item never became ready", type: "Error")
     }
 
+    /// Central recovery dispatcher for every "playback wedged" trigger (foreground return, stall
+    /// watchdog, failed-to-play-to-end, manual retry). Downloaded playback gets a full clean
+    /// rebuild; network streams keep the cheaper in-place refetch (re-extract a fresh CDN URL via
+    /// onStreamExpired).
+    ///
+    /// Why downloads rebuild instead of surgically swapping the item: across a long suspension
+    /// *something* in the live pipeline always dies — the localhost proxy's sockets, the forward
+    /// buffer, the AVPlayerLayer's render surface, or (when another app grabbed audio focus) our
+    /// AVAudioSession — and a string of past fixes each only plugged one of those holes, so the
+    /// next untested case (here: audio focus lost to other apps) wedged on a black frame again.
+    /// The user's own workaround, closing and reopening the player, works every time because it
+    /// rebuilds the whole pipeline via setupPlayer(). rebuildLocalPlayback() does exactly that in
+    /// place, so recovery no longer has to guess which subsystem died.
+    @MainActor
+    private func recoverPlayback() async {
+        if isLocalPlayback {
+            await rebuildLocalPlayback()
+        } else {
+            await recoverByRefetch()
+        }
+    }
+
+    /// Clean-slate recovery for downloaded playback returning from a long OS suspension:
+    /// re-resolve a fresh local source (restarting the localhost HLS proxy), then run the
+    /// canonical setupPlayer() path — a brand-new AVPlayer, a reactivated AVAudioSession, and a
+    /// fresh AVPlayerItem that resume-seeks back to the saved position via the normal launch
+    /// flow. Equivalent to the user closing and reopening the stream. The paused/playing intent
+    /// on return is preserved (setupPlayer force-plays, so a paused player is re-paused once ready).
+    @MainActor
+    private func rebuildLocalPlayback() async {
+        guard isLocalPlayback, !isRecoveringStall else { return }
+        isRecoveringStall = true
+        defer { isRecoveringStall = false }
+
+        let resumeAt = currentTime
+        let wasPlaying = isPlaying
+        Logger.shared.log("[Recovery] Clean rebuild of local playback, resuming at \(resumeAt)s", type: "Player")
+
+        // Fresh source: restart the localhost HLS proxy and re-resolve the offline copy.
+        guard let fresh = await resolveLocalStream() else {
+            Logger.shared.log("[Recovery] Could not re-resolve local source", type: "Error")
+            return
+        }
+        currentStream = fresh
+
+        // Seed the launch-time resume path so the rebuilt player seeks back to where we were.
+        currentContext?.resumeFrom = resumeAt
+        didSeekToResume = false
+
+        // Stop the stale player before rebuilding (setupPlayer() detaches its observers and
+        // replaces `player`, but the old instance should quiet down first). Preserve the stall
+        // attempt counter: when the watchdog drives this rebuild, resetting it would let a truly
+        // dead source rebuild forever instead of eventually surfacing the manual-retry UI.
+        cancelStallWatchdog(resetAttempts: false)
+        player?.pause()
+
+        // Full clean setup: new AVPlayer, reactivated audio session, fresh item + observers.
+        setupPlayer()
+
+        // setupPlayer() unconditionally starts playback; honor a paused return.
+        if !wasPlaying {
+            await waitForVideoReady()
+            player?.pause()
+            isPlaying = false
+        }
+    }
+
     private func manualStallRetry() {
         Logger.shared.log("[StallRecovery] Manual retry tapped", type: "Player")
         showStallRetry = false
         stallRecoveryAttempts = 0
         Task { @MainActor in
             if canRecoverStream {
-                await recoverByRefetch()
+                await recoverPlayback()
             } else {
                 nudgePlayer()
             }

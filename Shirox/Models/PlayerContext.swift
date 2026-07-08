@@ -12,7 +12,7 @@ struct PlayerContext {
     /// Number of episodes currently aired/available (may be less than totalEpisodes for ongoing shows).
     let availableEpisodes: Int?
     let isAiring: Bool?
-    let resumeFrom: Double?           // seconds to seek to on start (nil = from beginning)
+    var resumeFrom: Double?           // seconds to seek to on start (nil = from beginning)
     let detailHref: String?           // module detail page URL, used for Up Next navigation
     var episodeHref: String?          // the playing episode's own href; anchors next-episode resolution on resume
     let streamTitle: String?          // the selected stream's title (e.g., "SUB", "DUB", "pahe", "Episode 1")
