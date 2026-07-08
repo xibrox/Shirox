@@ -175,9 +175,14 @@ final class CacheManager: ObservableObject {
     private func cleanupOrphanedDownloads() {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let downloadDir = docs.appendingPathComponent("Downloads", isDirectory: true)
-        
+        // Downloads list now lives in an atomic file (see DownloadManager.persist); fall back to
+        // the legacy UserDefaults key so this stays correct if the migration hasn't run yet.
+        let manifestURL = docs.appendingPathComponent("downloads_manifest.json")
+        let manifestData = (try? Data(contentsOf: manifestURL))
+            ?? UserDefaults.standard.data(forKey: "shirox_downloads_v3")
+
         guard let contents = try? FileManager.default.contentsOfDirectory(at: downloadDir, includingPropertiesForKeys: nil),
-              let savedData = UserDefaults.standard.data(forKey: "shirox_downloads_v3"),
+              let savedData = manifestData,
               let items = try? JSONDecoder().decode([DownloadItem].self, from: savedData) else {
             return
         }

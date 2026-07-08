@@ -129,7 +129,18 @@ final class DownloadManager: NSObject, ObservableObject {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()
-    
+
+    /// The downloads list lives in an atomic file — NOT UserDefaults. UserDefaults batches
+    /// writes through cfprefsd and may not flush before the app is killed (crash / jetsam /
+    /// force-quit); a removal's list update could be lost while the files were already gone,
+    /// so on relaunch load() saw a "completed" item with no file and silently re-downloaded it.
+    /// Kept in Documents root (a sibling of Downloads/) so CacheManager's orphan sweep — which
+    /// scans Downloads/ — never treats it as a stray file.
+    private var manifestURL: URL {
+        downloadDir.deletingLastPathComponent().appendingPathComponent("downloads_manifest.json")
+    }
+    private static let legacyDefaultsKey = "shirox_downloads_v3"
+
     private let hlsDownloader = HLSDownloader()
     private var hlsTasks: [UUID: Task<Void, Never>] = [:]
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
@@ -582,13 +593,13 @@ final class DownloadManager: NSObject, ObservableObject {
         if let taskID = item.taskIdentifier {
             urlSession.getAllTasks { tasks in tasks.first { $0.taskIdentifier == taskID }?.cancel() }
         }
-        if let fileName = item.fileName {
-            let path = downloadDir.appendingPathComponent(fileName)
-            if item.isHLS {
-                try? FileManager.default.removeItem(at: path.deletingLastPathComponent())
-            } else {
-                try? FileManager.default.removeItem(at: path)
-            }
+        // Delete the per-item HLS segment folder by id unconditionally: an in-progress download
+        // has fileName == nil (it's only set on completion), so keying deletion off fileName
+        // alone leaked the partial segments in Downloads/<id>/. (retry() already cleans up this
+        // way.) For a completed MP4 this path doesn't exist and the call harmlessly no-ops.
+        try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(item.id.uuidString))
+        if let fileName = item.fileName, !item.isHLS {
+            try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(fileName))
         }
         if let subPath = item.relativeSubtitlePath {
             try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(subPath))
@@ -608,12 +619,14 @@ final class DownloadManager: NSObject, ObservableObject {
         let fileURL = downloadDir.appendingPathComponent(fileName)
         let checkPath = item.isHLS ? fileURL.deletingLastPathComponent().path : fileURL.path
         guard FileManager.default.fileExists(atPath: checkPath) else {
+            // File vanished under a completed item. Mark it failed / retryable rather than
+            // resetting to .pending + processQueue(), which would silently re-download it.
             if let idx = items.firstIndex(where: { $0.id == item.id }) {
-                items[idx].state = .pending
+                items[idx].state = .failed
+                items[idx].error = "Downloaded file is missing"
                 items[idx].fileName = nil
                 items[idx].progress = 0
                 persist()
-                processQueue()
             }
             return nil
         }
@@ -894,38 +907,60 @@ final class DownloadManager: NSObject, ObservableObject {
     }
     
     private func persist() {
-        if let data = try? JSONEncoder().encode(items) {
-            UserDefaults.standard.set(data, forKey: "shirox_downloads_v3")
+        guard let data = try? JSONEncoder().encode(items) else { return }
+        do {
+            try data.write(to: manifestURL, options: .atomic)
+        } catch {
+            Logger.shared.log("[Downloads] Failed to persist manifest: \(error.localizedDescription)", type: "Error")
         }
     }
-    
+
     private func load() {
-        if let data = UserDefaults.standard.data(forKey: "shirox_downloads_v3"),
-           let decoded = try? JSONDecoder().decode([DownloadItem].self, from: data) {
-            items = decoded.map { item in
-                // Stranded batch-queued items (state=.pending, streamURL=nil) from a
-                // previous session never got their stream extracted. Mark them failed
-                // so the user can retry — auto-resuming on app launch would surprise
-                // people with network activity.
-                if item.state == .pending && item.streamURL == nil {
-                    var reset = item
-                    reset.state = .failed
-                    reset.error = "Stream extraction was interrupted"
-                    return reset
-                }
-                guard item.state == .completed, let fileName = item.fileName else { return item }
-                let fileURL = downloadDir.appendingPathComponent(fileName)
-                let checkPath = (fileName.hasSuffix(".m3u8"))
-                    ? fileURL.deletingLastPathComponent().path
-                    : fileURL.path
-                guard FileManager.default.fileExists(atPath: checkPath) else {
-                    var reset = item
-                    reset.state = .pending
-                    reset.fileName = nil
-                    reset.progress = 0
-                    return reset
-                }
-                return item
+        // Prefer the durable file; fall back to the legacy UserDefaults store once, to migrate
+        // existing users. A present-but-empty file wins over the legacy key (that's the user
+        // having removed everything) — only a truly absent file falls back.
+        let fileData = try? Data(contentsOf: manifestURL)
+        guard let data = fileData ?? UserDefaults.standard.data(forKey: Self.legacyDefaultsKey),
+              let decoded = try? JSONDecoder().decode([DownloadItem].self, from: data) else { return }
+
+        items = decoded.map { item in
+            // Stranded batch-queued items (state=.pending, streamURL=nil) from a
+            // previous session never got their stream extracted. Mark them failed
+            // so the user can retry — auto-resuming on app launch would surprise
+            // people with network activity.
+            if item.state == .pending && item.streamURL == nil {
+                var reset = item
+                reset.state = .failed
+                reset.error = "Stream extraction was interrupted"
+                return reset
+            }
+            guard item.state == .completed, let fileName = item.fileName else { return item }
+            let fileURL = downloadDir.appendingPathComponent(fileName)
+            let checkPath = (fileName.hasSuffix(".m3u8"))
+                ? fileURL.deletingLastPathComponent().path
+                : fileURL.path
+            guard FileManager.default.fileExists(atPath: checkPath) else {
+                // Backing file is gone (deleted externally, or a pre-fix removal whose list
+                // write was lost). Surface it as .failed / retryable rather than resetting to
+                // .pending — same reasoning as the stranded-batch case above: never kick off a
+                // network download on launch without the user asking.
+                var reset = item
+                reset.state = .failed
+                reset.error = "Downloaded file is missing"
+                reset.fileName = nil
+                reset.progress = 0
+                return reset
+            }
+            return item
+        }
+
+        // First launch after the UserDefaults → file migration: write the durable manifest,
+        // then drop the legacy key so a later missing file can't fall back to a stale list and
+        // resurrect removed downloads. Only clear once the file is confirmed on disk.
+        if fileData == nil {
+            persist()
+            if FileManager.default.fileExists(atPath: manifestURL.path) {
+                UserDefaults.standard.removeObject(forKey: Self.legacyDefaultsKey)
             }
         }
     }
