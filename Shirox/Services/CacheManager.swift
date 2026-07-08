@@ -187,23 +187,18 @@ final class CacheManager: ObservableObject {
             return
         }
         
-        let validFileNames = Set(items.compactMap { $0.fileName })
-        let validIds = Set(items.map { $0.id.uuidString })
-        
+        // Every download artifact is named after its item's UUID (HLS folder "<id>", MP4
+        // "<id>.mp4", subtitle "<id>.<ext>"). Gate on that UUID so this only ever reclaims
+        // real orphans: the gate skips the `Snapshots/` folder (keyed by mediaKey) and keeps
+        // an item's subtitle sidecar, both of which the old fileName/dir checks wrongly deleted.
+        let validIds = Set(items.map { $0.id })
+
         for file in contents {
             let name = file.lastPathComponent
-            var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: file.path, isDirectory: &isDir) {
-                if isDir.boolValue {
-                    if !validIds.contains(name) {
-                        try? FileManager.default.removeItem(at: file)
-                    }
-                } else {
-                    if !validFileNames.contains(name) {
-                        try? FileManager.default.removeItem(at: file)
-                    }
-                }
-            }
+            let ownerString = String(name.prefix(while: { $0 != "." }))
+            guard let owner = UUID(uuidString: ownerString) else { continue }
+            guard !validIds.contains(owner) else { continue }
+            try? FileManager.default.removeItem(at: file)
         }
     }
 }

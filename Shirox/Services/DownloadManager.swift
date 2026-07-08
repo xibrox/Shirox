@@ -158,6 +158,7 @@ final class DownloadManager: NSObject, ObservableObject {
         super.init()
         _ = downloadDir
         load()
+        reconcileDownloadsDirectory()
         reconnectBackgroundTasks()
         processQueue()
         requestNotificationPermission()
@@ -606,12 +607,49 @@ final class DownloadManager: NSObject, ObservableObject {
         }
         items.removeAll { $0.id == item.id }
         persist()
+        // Belt-and-suspenders: if any removeItem above silently failed (e.g. a transient
+        // FS error), sweep the directory so the file can't linger in the Files app while the
+        // manifest already forgot it. Safe during batch deletes — items still queued for
+        // removal remain in `items`, so their folders are kept.
+        reconcileDownloadsDirectory()
         DownloadedMediaSnapshotStore.shared.removeIfOrphaned(
             mediaTitle: item.mediaTitle,
             moduleId: item.moduleId
         )
         ToastManager.shared.show(message: "Download removed: \(item.mediaTitle) - \(item.episodeNumber)", type: .info)
         processQueue()
+    }
+
+    /// Reconciles the on-disk `Downloads/` directory with the in-memory manifest, deleting any
+    /// download artifact that no longer belongs to a tracked item. Without this, a file could
+    /// stay on disk (visible in the Files app) while the app's Downloads list shows nothing —
+    /// e.g. an in-progress HLS segment folder leaked by a pre-fix build's `remove()`, or a
+    /// delete interrupted by an app kill before its `removeItem` ran.
+    ///
+    /// Only entries named after a `DownloadItem`'s UUID are touched — the HLS folder is
+    /// "<id>", the MP4 is "<id>.mp4", the subtitle is "<id>.<ext>". That UUID gate skips the
+    /// `Snapshots/` folder (keyed by mediaKey) and any future non-download artifact, so this
+    /// can never delete something it doesn't own.
+    private func reconcileDownloadsDirectory() {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: downloadDir, includingPropertiesForKeys: nil
+        ) else { return }
+
+        let validIds = Set(items.map { $0.id })
+
+        for entry in contents {
+            let name = entry.lastPathComponent
+            let ownerString = String(name.prefix(while: { $0 != "." }))
+            guard let owner = UUID(uuidString: ownerString) else { continue } // not a download artifact
+            guard !validIds.contains(owner) else { continue }                  // still tracked
+
+            do {
+                try FileManager.default.removeItem(at: entry)
+                Logger.shared.log("[Downloads] Reclaimed orphaned download artifact: \(name)", type: "Download")
+            } catch {
+                Logger.shared.log("[Downloads] Failed to reclaim orphan \(name): \(error.localizedDescription)", type: "Error")
+            }
+        }
     }
 
     func getStream(for item: DownloadItem) async -> StreamResult? {
