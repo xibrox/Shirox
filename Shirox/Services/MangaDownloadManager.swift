@@ -1,6 +1,7 @@
 #if os(iOS)
 import Foundation
 import Combine
+import UIKit
 
 @MainActor
 final class MangaDownloadManager: ObservableObject {
@@ -31,6 +32,7 @@ final class MangaDownloadManager: ObservableObject {
         _ = downloadDir
         load()
         reconcileDownloadsDirectory()
+        observeAppLifecycle()
     }
 
     // MARK: - Paths
@@ -91,6 +93,63 @@ final class MangaDownloadManager: ObservableObject {
             }
     }
 
+    // MARK: - Public enqueue
+
+    func download(chapter: MangaChapter, context: MangaDownloadContext) {
+        if items.contains(where: { $0.chapterHref == chapter.href }) {
+            let existing = items.first { $0.chapterHref == chapter.href }
+            let status = existing?.state == .completed ? "already downloaded" : "already in queue"
+            ToastManager.shared.show(message: "\(chapter.displayName) is \(status)", type: .warning)
+            return
+        }
+        items.append(makeItem(chapter: chapter, context: context))
+        persist()
+        ToastManager.shared.show(message: "Download added: \(context.mangaTitle) - \(chapter.displayName)", type: .info)
+        processQueue()
+    }
+
+    func batchDownload(chapters: [MangaChapter], context: MangaDownloadContext) {
+        var queued = 0
+        for chapter in chapters where !items.contains(where: { $0.chapterHref == chapter.href }) {
+            items.append(makeItem(chapter: chapter, context: context))
+            queued += 1
+        }
+        guard queued > 0 else { return }
+        persist()
+        ToastManager.shared.show(message: "Queued \(queued) chapter\(queued == 1 ? "" : "s")", type: .info)
+        processQueue()
+    }
+
+    func retry(_ item: MangaDownloadItem) {
+        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
+        chapterTasks[item.id]?.cancel()
+        chapterTasks.removeValue(forKey: item.id)
+        try? FileManager.default.removeItem(at: folderURL(for: item.id))
+        items[idx].state = .pending
+        items[idx].error = nil
+        items[idx].progress = 0
+        items[idx].pageFiles = []
+        persist()
+        processQueue()
+    }
+
+    private func makeItem(chapter: MangaChapter, context: MangaDownloadContext) -> MangaDownloadItem {
+        MangaDownloadItem(
+            id: UUID(),
+            mangaTitle: context.mangaTitle,
+            mangaHref: context.mangaHref,
+            coverImage: context.coverImage,
+            moduleId: context.moduleId,
+            chapterHref: chapter.href,
+            chapterNumber: chapter.number,
+            chapterName: chapter.displayName,
+            pageFiles: [],
+            totalPages: 0,
+            state: .pending,
+            progress: 0,
+            createdAt: Date())
+    }
+
     // MARK: - Remove
 
     func remove(_ item: MangaDownloadItem) {
@@ -117,9 +176,138 @@ final class MangaDownloadManager: ObservableObject {
         }
     }
 
-    // MARK: - Queue (real body added in Task 3)
+    // MARK: - Queue
 
-    func processQueue() { /* filled in Task 3 */ }
+    func processQueue() {
+        let active = chapterTasks.count
+        guard active < maxConcurrentChapters else { return }
+        let pending = items.filter { $0.state == .pending }
+        for item in pending.prefix(maxConcurrentChapters - active) {
+            startChapter(item.id)
+        }
+    }
+
+    private func startChapter(_ id: UUID) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].state = .downloading
+        persist()
+        let referer = MangaDownloadPlanning.refererOrigin(forMangaHref: items[idx].mangaHref)
+        let chapterHref = items[idx].chapterHref
+        let folder = folderURL(for: id)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let urls = try await JSEngine.shared.mangaImages(url: chapterHref)
+                guard !urls.isEmpty else { throw NSError(domain: "MangaDownloadManager", code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "No pages found"]) }
+                let pageFiles = try await self.downloadPages(id: id, urls: urls, referer: referer, folder: folder)
+                await self.finishChapter(id: id, pageFiles: pageFiles)
+            } catch {
+                await self.failChapter(id: id, error: error)
+            }
+            self.chapterTasks.removeValue(forKey: id)
+            self.processQueue()
+            self.refreshKeepAlive()
+        }
+        chapterTasks[id] = task
+        refreshKeepAlive()
+    }
+
+    /// Sliding-window page downloader (≤ maxPagesInFlight concurrent). Writes each
+    /// page to <folder>/<paddedIndex>.<ext> and reports progress on the main actor.
+    /// Returns the ordered page filenames on success.
+    private func downloadPages(id: UUID, urls: [String], referer: String, folder: URL) async throws -> [String] {
+        let total = urls.count
+        var names = [String?](repeating: nil, count: total)
+        var done = 0
+
+        try await withThrowingTaskGroup(of: (Int, Data).self) { group in
+            var next = 0
+            func enqueue(_ i: Int) {
+                guard let url = URL(string: urls[i]) else { return }
+                group.addTask { (i, try await Self.fetchPage(url: url, referer: referer)) }
+            }
+            while next < min(maxPagesInFlight, total) { enqueue(next); next += 1 }
+
+            while let (i, data) = try await group.next() {
+                let name = MangaDownloadPlanning.pageFileName(index: i, total: total, url: URL(string: urls[i])!)
+                try data.write(to: folder.appendingPathComponent(name), options: .atomic)
+                names[i] = name
+                done += 1
+                let progress = Double(done) / Double(total)
+                if let idx = items.firstIndex(where: { $0.id == id }) {
+                    items[idx].progress = progress
+                    items[idx].totalPages = total
+                    objectWillChange.send()
+                }
+                if next < total { enqueue(next); next += 1 }
+            }
+        }
+        return names.compactMap { $0 }
+    }
+
+    /// Off-actor image fetch with the reader's exact header policy (source-origin
+    /// Referer + Cloudflare cookie/UA). Rejects non-2xx and empty bodies.
+    private static func fetchPage(url: URL, referer: String) async throws -> Data {
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        let cookie = url.host.flatMap { CloudflareBypassManager.shared.fullCookieHeader(for: $0) }
+        let bypassUA = url.host.flatMap { CloudflareBypassManager.shared.bypassUserAgent(for: $0) }
+        KingfisherImageCache.headers(for: url, cookieHeader: cookie, bypassUserAgent: bypassUA, refererOverride: referer)
+            .forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard (200..<300).contains(status), !data.isEmpty else {
+            throw NSError(domain: "MangaDownloadManager", code: status,
+                          userInfo: [NSLocalizedDescriptionKey: "Page fetch failed (HTTP \(status))"])
+        }
+        return data
+    }
+
+    private func finishChapter(id: UUID, pageFiles: [String]) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].state = .completed
+        items[idx].progress = 1
+        items[idx].pageFiles = pageFiles
+        items[idx].totalPages = pageFiles.count
+        items[idx].completedAt = Date()
+        items[idx].error = nil
+        persist()
+        ToastManager.shared.show(message: "Download finished: \(items[idx].mangaTitle) - \(items[idx].chapterName)", type: .success)
+    }
+
+    private func failChapter(id: UUID, error: Error) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        if error is CancellationError { return }
+        items[idx].state = .failed
+        items[idx].error = error.localizedDescription
+        persist()
+        ToastManager.shared.show(message: "Download failed: \(items[idx].mangaTitle) - \(items[idx].chapterName)", type: .error)
+    }
+
+    // MARK: - Background keep-alive
+
+    private static let keepAliveReason = "manga-downloads"
+
+    private func observeAppLifecycle() {
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshKeepAlive(backgrounded: true) }
+        }
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshKeepAlive(backgrounded: false); self?.processQueue() }
+        }
+    }
+
+    private var isBackgrounded = false
+    private func refreshKeepAlive(backgrounded: Bool? = nil) {
+        if let backgrounded { isBackgrounded = backgrounded }
+        if isBackgrounded && !chapterTasks.isEmpty {
+            BackgroundKeepAlive.shared.acquire(Self.keepAliveReason)
+        } else {
+            BackgroundKeepAlive.shared.release(Self.keepAliveReason)
+        }
+    }
 
     // MARK: - Persistence
 

@@ -37,6 +37,15 @@ struct MangaDownloadItem: Identifiable, Codable {
     var completedAt: Date?
 }
 
+/// Everything the download manager needs to build a `MangaDownloadItem` for a
+/// chapter — the manga-level identity shared across its chapters.
+struct MangaDownloadContext {
+    let mangaTitle: String
+    let mangaHref: String
+    let coverImage: String
+    let moduleId: String
+}
+
 /// Pure, side-effect-free helpers for the download manager. `nonisolated static`
 /// so tests exercise them without the @MainActor manager (mirrors the
 /// `JSEngine+Manga` parser pattern).
