@@ -135,89 +135,111 @@ struct ProfileView: View {
     }
 
     private var profileHeader: some View {
-        VStack(spacing: 0) {
-            // Banner + Avatar Overlap
-            GeometryReader { geo in
-                ZStack(alignment: .bottomLeading) {
-                    if let banner = vm.user?.bannerImage {
-                        CachedAsyncImage(urlString: banner)
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: geo.size.width, height: 140)
-                            .clipped()
-                    } else {
-                        Color.accentColor.opacity(0.1)
-                            .frame(width: geo.size.width, height: 120)
-                    }
+        let avatarSize: CGFloat = 90
+        let bannerHeight: CGFloat = 150
+        let overlap = avatarSize / 2  // avatar sits half on the banner, half below it
 
-                    // Avatar
-                    if let url = vm.user?.avatarURL ?? avatarURL {
-                        CachedAsyncImage(urlString: url)
-                            .frame(width: 80, height: 80)
-                            .clipShape(Circle())
-                            #if os(iOS)
-                            .overlay(Circle().strokeBorder(Color(UIColor.systemBackground), lineWidth: 3))
-                            #elseif os(tvOS)
-                            // TODO: add back overlay
-                            #else
-                            .overlay(Circle().strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: 3))
-                            #endif
-                            .shadow(radius: 2)
-                            .offset(x: 20, y: 30)
-                    }
+        return VStack(alignment: .leading, spacing: 0) {
+            // Banner
+            Group {
+                if let banner = vm.user?.bannerImage {
+                    CachedAsyncImage(urlString: banner)
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    LinearGradient(
+                        colors: [Color.accentColor.opacity(0.35), Color.accentColor.opacity(0.10)],
+                        startPoint: .top, endPoint: .bottom
+                    )
                 }
             }
-            .frame(height: vm.user?.bannerImage != nil ? 170 : 150)
-            .padding(.bottom, 30) // Space for the offset avatar
-            
-            HStack(alignment: .center, spacing: 10) {
-                // Spacer that matches avatar overlap (20 offset + 80 width + 5 gap)
-                Spacer()
-                    .frame(width: 105)
+            .frame(maxWidth: .infinity)
+            .frame(height: bannerHeight)
+            .clipped()
+
+            // Only the avatar straddles the banner edge (half on / half below).
+            // The name + follow button stay fully below the banner line, beside
+            // the avatar's lower half. Pulling the avatar up with negative top
+            // padding makes the row exactly `overlap` tall, so nothing else can
+            // creep up into the banner.
+            HStack(spacing: 12) {
+                profileAvatar(size: avatarSize)
+                    .padding(.top, -overlap)
 
                 Text(vm.user?.name ?? username)
                     .font(.title3.weight(.bold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .minimumScaleFactor(0.75)
+
+                Spacer(minLength: 8)
 
                 // Follow Button (AniList only)
                 if !isOwnProfile && activeProviderType == .anilist && anilistAuth.isLoggedIn {
-                    Button {
-                        Task { await vm.toggleFollow(userId: userId) }
-                    } label: {
-                        Group {
-                            if vm.isTogglingFollow {
-                                ProgressView().tint(.white).scaleEffect(0.75)
-                            } else {
-                                Text(vm.user?.isFollowing == true ? "Following" : "Follow")
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .frame(minWidth: 90)
-                        .background(vm.user?.isFollowing == true ? Color.primary.opacity(0.1) : Color.accentColor)
-                        .foregroundStyle(vm.user?.isFollowing == true ? Color.primary : Color.white)
-                        .clipShape(Capsule())
-                    }
-                    .disabled(vm.isTogglingFollow)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .layoutPriority(1)
+                    followButton
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .frame(maxWidth: .infinity)
 
             if let about = vm.user?.about, !about.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 MarkdownText(text: about, font: .footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                    .padding(.top, 10)
             }
         }
+    }
+
+    @ViewBuilder
+    private func profileAvatar(size: CGFloat) -> some View {
+        Group {
+            if let url = vm.user?.avatarURL ?? avatarURL {
+                CachedAsyncImage(urlString: url)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color.secondary.opacity(0.25))
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: size * 0.45))
+                            .foregroundStyle(.secondary)
+                    )
+            }
+        }
+        #if os(iOS)
+        .overlay(Circle().strokeBorder(Color(UIColor.systemBackground), lineWidth: 4))
+        #elseif os(tvOS)
+        // TODO: add back overlay
+        #else
+        .overlay(Circle().strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: 4))
+        #endif
+        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+    }
+
+    private var followButton: some View {
+        Button {
+            Task { await vm.toggleFollow(userId: userId) }
+        } label: {
+            Group {
+                if vm.isTogglingFollow {
+                    ProgressView().tint(.white).scaleEffect(0.75)
+                } else {
+                    Text(vm.user?.isFollowing == true ? "Following" : "Follow")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(minWidth: 90)
+            .background(vm.user?.isFollowing == true ? Color.primary.opacity(0.1) : Color.accentColor)
+            .foregroundStyle(vm.user?.isFollowing == true ? Color.primary : Color.white)
+            .clipShape(Capsule())
+        }
+        .disabled(vm.isTogglingFollow)
+        .fixedSize(horizontal: true, vertical: false)
+        .layoutPriority(1)
     }
 
     private func statChip(value: String, label: String) -> some View {
