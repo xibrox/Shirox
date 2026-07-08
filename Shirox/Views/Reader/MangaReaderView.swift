@@ -543,7 +543,9 @@ struct MangaReaderView: View {
         do {
             let target = context.chapters[clamped]
             let result: [String]
-            if prefetchedHref == target.href, let cached = prefetchedPages, !cached.isEmpty {
+            if let local = MangaDownloadManager.shared.localPages(forChapterHref: target.href) {
+                result = local
+            } else if prefetchedHref == target.href, let cached = prefetchedPages, !cached.isEmpty {
                 result = cached
             } else {
                 result = try await JSEngine.shared.mangaImages(url: target.href)
@@ -657,6 +659,10 @@ struct MangaReaderView: View {
               nextIdx <= displayedChapterIndex + 1 else { return }
         let next = context.chapters[nextIdx]
 
+        if let local = MangaDownloadManager.shared.localPages(forChapterHref: next.href) {
+            appendChapter(nextIdx, pages: local)
+            return
+        }
         if prefetchedHref == next.href, let pages = prefetchedPages, !pages.isEmpty {
             appendChapter(nextIdx, pages: pages)
             return
