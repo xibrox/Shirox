@@ -29,13 +29,73 @@ final class ProfileViewModel: ObservableObject {
     @Published var isLoadingSocial = false
     @Published var error: String?
 
+    /// Showing a saved (stale) copy because a refresh was rate-limited.
+    @Published var usingCachedData = false
+    /// No cache exists and every retry failed — drives the tap-to-retry state.
+    @Published var profileLoadFailed = false
+
+    static let maxProfileRetries = 2
+
+    /// Retry any failure except a genuine offline / cancelled one — the profile query surfaces
+    /// rate-limits as a decode failure (the social service ignores the HTTP status), so we can't
+    /// classify on error type alone.
+    static func shouldRetryFetch(_ error: Error) -> Bool {
+        if error is CancellationError { return false }
+        return !ProviderManager.isOfflineError(error)
+    }
+
+    /// Exponential backoff capped at 8s: 2s, 4s, 8s…
+    static func retryDelay(forAttempt attempt: Int) -> TimeInterval {
+        min(pow(2, Double(attempt + 1)), 8)
+    }
+
+    /// The provider whose cache this profile belongs to — mirrors ProfileView.activeProviderType.
+    private var activeProvider: ProviderType {
+        let pm = ProviderManager.shared
+        return pm.fallbackActive
+            ? (pm.fallback?.providerType ?? .anilist)
+            : (pm.primary?.providerType ?? .anilist)
+    }
+
     func loadProfile(userId: Int) async {
+        let key = activeProvider
+
+        // Cache-first: paint the last-known-good copy instantly so we never start blank.
+        if user == nil, let snap = ProfileCacheStore.shared.snapshot(provider: key, userId: userId) {
+            user = snap.profile
+            if activity.isEmpty { activity = snap.activity }
+            if followers.isEmpty { followers = snap.followers }
+            if following.isEmpty { following = snap.following }
+        }
+
         isLoadingProfile = true
+        profileLoadFailed = false
         defer { isLoadingProfile = false }
-        do {
-            user = try await ProviderManager.shared.call { try await $0.fetchProfile(userId: userId) }
-        } catch {
-            self.error = error.localizedDescription
+
+        var attempt = 0
+        while true {
+            do {
+                let fetched = try await ProviderManager.shared.call { try await $0.fetchProfile(userId: userId) }
+                user = fetched
+                usingCachedData = false
+                profileLoadFailed = false
+                ProfileCacheStore.shared.saveProfile(fetched, provider: key, userId: userId)
+                return
+            } catch {
+                self.error = error.localizedDescription
+                if user != nil {
+                    // We have something to show — keep it, flag it stale, stop hammering the API.
+                    usingCachedData = true
+                    return
+                }
+                if attempt < Self.maxProfileRetries, Self.shouldRetryFetch(error) {
+                    try? await Task.sleep(nanoseconds: UInt64(Self.retryDelay(forAttempt: attempt) * 1_000_000_000))
+                    attempt += 1
+                    continue
+                }
+                profileLoadFailed = true
+                return
+            }
         }
     }
 
@@ -43,6 +103,12 @@ final class ProfileViewModel: ObservableObject {
         if let feed {
             if activityFeed != feed { activity = []; currentActivityPage = 1 }
             activityFeed = feed
+        }
+        // Cache-first hydrate on the initial page when nothing is loaded yet.
+        if !loadMore, activity.isEmpty,
+           let snap = ProfileCacheStore.shared.snapshot(provider: activeProvider, userId: userId),
+           !snap.activity.isEmpty {
+            activity = snap.activity
         }
         if loadMore { currentActivityPage += 1 } else { currentActivityPage = 1 }
         isLoadingActivity = true
@@ -53,8 +119,12 @@ final class ProfileViewModel: ObservableObject {
             }
             if loadMore { activity.append(contentsOf: result) } else { activity = result }
             hasNextActivityPage = !result.isEmpty
+            if !loadMore {
+                ProfileCacheStore.shared.saveActivity(activity, provider: activeProvider, userId: userId)
+            }
         } catch {
             self.error = error.localizedDescription
+            if !activity.isEmpty { usingCachedData = true }
         }
     }
 
@@ -93,6 +163,18 @@ final class ProfileViewModel: ObservableObject {
     func loadSocial(userId: Int, type: SocialType, loadMore: Bool = false) async {
         isLoadingSocial = true
         defer { isLoadingSocial = false }
+        // Cache-first hydrate on the initial page when the list is empty.
+        if !loadMore {
+            if type == .followers, followers.isEmpty,
+               let snap = ProfileCacheStore.shared.snapshot(provider: activeProvider, userId: userId),
+               !snap.followers.isEmpty {
+                followers = snap.followers
+            } else if type == .following, following.isEmpty,
+               let snap = ProfileCacheStore.shared.snapshot(provider: activeProvider, userId: userId),
+               !snap.following.isEmpty {
+                following = snap.following
+            }
+        }
         let page = loadMore ? (type == .followers ? currentFollowersPage + 1 : currentFollowingPage + 1) : 1
         do {
             if type == .followers {
@@ -102,6 +184,9 @@ final class ProfileViewModel: ObservableObject {
                 if loadMore { followers.append(contentsOf: result) } else { followers = result }
                 currentFollowersPage = page
                 hasNextFollowersPage = !result.isEmpty
+                if !loadMore {
+                    ProfileCacheStore.shared.saveFollowers(followers, provider: activeProvider, userId: userId)
+                }
             } else {
                 let result = try await ProviderManager.shared.call {
                     try await $0.fetchFollowing(userId: userId, page: page)
@@ -109,9 +194,13 @@ final class ProfileViewModel: ObservableObject {
                 if loadMore { following.append(contentsOf: result) } else { following = result }
                 currentFollowingPage = page
                 hasNextFollowingPage = !result.isEmpty
+                if !loadMore {
+                    ProfileCacheStore.shared.saveFollowing(following, provider: activeProvider, userId: userId)
+                }
             }
         } catch {
             self.error = error.localizedDescription
+            if !(type == .followers ? followers : following).isEmpty { usingCachedData = true }
         }
     }
 

@@ -77,11 +77,15 @@ final class CacheManager: ObservableObject {
         LibraryCacheStore.shared.diskByteSize()
     }
 
+    var profileCacheSize: Int {
+        ProfileCacheStore.shared.diskByteSize()
+    }
+
     var totalDiskUsage: Int {
         get async {
             (await imageCacheSize) + websiteDataSize + tempFilesSize + continueWatchingSize
                 + watchHistorySize + searchAliasSize + idMappingSize + episodeSortSize
-                + libraryCacheSize
+                + libraryCacheSize + profileCacheSize
         }
     }
 
@@ -134,6 +138,10 @@ final class CacheManager: ObservableObject {
         LibraryCacheStore.shared.clearAll()
     }
 
+    func clearProfileCache() {
+        ProfileCacheStore.shared.clearAll()
+    }
+
     func clearEverything() async {
         clearImageCache()
         await clearWebsiteData()
@@ -144,6 +152,7 @@ final class CacheManager: ObservableObject {
         clearIDMappingCache()
         clearEpisodeSortPreferences()
         clearLibraryCache()
+        clearProfileCache()
         cleanupOrphanedDownloads()
     }
     

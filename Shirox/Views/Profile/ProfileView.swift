@@ -30,6 +30,7 @@ struct ProfileView: View {
     @StateObject private var vm = ProfileViewModel()
     @State private var selectedTab: ProfileTab = .activity
     @State private var showLogoutConfirm = false
+    @State private var staleBannerDismissed = false
     @Environment(\.dismiss) private var dismiss
 
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
@@ -72,25 +73,21 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                switch selectedTab {
-                case .activity:
-                    ProfileActivityView(vm: vm, userId: userId, topContent: scrollableHeader)
-                case .favourites:
-                    ScrollView {
-                        scrollableHeader
-                        ProfileFavouritesView(favourites: vm.user?.favourites)
+                if vm.user == nil && vm.profileLoadFailed {
+                    retryState
+                } else if vm.user == nil && vm.isLoadingProfile {
+                    loadingState
+                } else {
+                    VStack(spacing: 0) {
+                        if vm.usingCachedData && !staleBannerDismissed {
+                            staleBanner
+                        }
+                        tabContent
                     }
-                case .stats:
-                    ScrollView {
-                        scrollableHeader
-                        ProfileStatsView(
-                            stats: vm.user?.statistics?.anime,
-                            scoreFormat: activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
-                        )
-                    }
-                case .social:
-                    ProfileSocialView(vm: vm, userId: userId, topContent: scrollableHeader)
                 }
+            }
+            .onChangeOf(vm.usingCachedData) { isStale in
+                if !isStale { staleBannerDismissed = false }
             }
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -132,6 +129,88 @@ struct ProfileView: View {
             }
             Button("Cancel", role: .cancel) { }
         }
+    }
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .activity:
+            ProfileActivityView(vm: vm, userId: userId, topContent: scrollableHeader)
+        case .favourites:
+            ScrollView {
+                scrollableHeader
+                ProfileFavouritesView(favourites: vm.user?.favourites)
+            }
+        case .stats:
+            ScrollView {
+                scrollableHeader
+                ProfileStatsView(
+                    stats: vm.user?.statistics?.anime,
+                    scoreFormat: activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
+                )
+            }
+        case .social:
+            ProfileSocialView(vm: vm, userId: userId, topContent: scrollableHeader)
+        }
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+            Text("Hang tight — loading your profile…")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var retryState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("Couldn't load right now")
+                .font(.headline)
+            Text("\(activeProviderType == .mal ? "MyAnimeList" : "AniList") may be busy. Give it a moment.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { await vm.loadProfile(userId: userId) }
+            } label: {
+                Text("Retry")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 18).padding(.vertical, 8)
+                    .background(Color.accentColor)
+                    .foregroundStyle(.white)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var staleBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.clockwise.circle")
+                .font(.footnote)
+            Text("Showing saved profile — \(activeProviderType == .mal ? "MyAnimeList" : "AniList") is rate-limited")
+                .font(.caption)
+                .lineLimit(2)
+            Spacer(minLength: 8)
+            Button {
+                withAnimation { staleBannerDismissed = true }
+            } label: {
+                Image(systemName: "xmark").font(.caption2)
+            }
+            .buttonStyle(.plain)
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(Color.secondary.opacity(0.12))
     }
 
     private var profileHeader: some View {
