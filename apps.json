@@ -32,7 +32,7 @@
           "date": "2026-07-08",
           "localizedDescription": "The player's options are native menus now — long-press for playback speed, quality, audio track, and source. Liquid Glass covers every control and the glass buttons are reliably tappable. AniList profiles are cached with a proper loading state and a graceful fallback when rate-limited, so they open fast instead of going blank, and the profile header now sits the avatar on the banner edge with your name and follow button beside it.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 9132843,
+          "size": 9212399,
           "minOSVersion": "15.0"
         },
         {
