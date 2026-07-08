@@ -17,19 +17,23 @@ struct PlayerBottomBar: View {
     var onSliderDragStart: (() -> Void)? = nil
     var onSliderDragChange: ((Double) -> Void)? = nil
     var onSliderDragEnd: (() -> Void)? = nil
-    var onSpeedTap: () -> Void
     var onFillTap: () -> Void = {}
     var isFilled: Bool = false
     var onSkip85: () -> Void
     var skipLongAmount: Int = 85
     var onSubtitleSettingsTap: () -> Void
-    var onAudioTap: () -> Void = {}
     var hasSubtitles: Bool = false
     var audioTrackCount: Int = 0
+    /// Menu rows for the audio-track chooser (native pull-down, not a sheet). Rebuilt on open.
+    var audioMenuItems: (() -> [PlayerMenuItem])? = nil
     var streamCount: Int = 1
-    var onStreamPickerTap: () -> Void = {}
+    /// Menu rows for the source/stream chooser.
+    var sourceMenuItems: (() -> [PlayerMenuItem])? = nil
     var qualityCount: Int = 0
-    var onQualityTap: () -> Void = {}
+    /// Menu rows for the HLS quality chooser.
+    var qualityMenuItems: (() -> [PlayerMenuItem])? = nil
+    /// Called when any bottom-bar menu opens, so the player can pin the controls visible.
+    var onMenuOpen: () -> Void = {}
     var bottomPadding: CGFloat = 24
     var onNextEpisodeTap: (() -> Void)? = nil
     var hasActiveSkipSegment: Bool = false
@@ -125,32 +129,35 @@ struct PlayerBottomBar: View {
         let iconSize: CGFloat = isPad ? 20 : 15
 
         HStack(spacing: 0) {
-            if streamCount > 1 {
-                Button(action: onStreamPickerTap) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: iconSize, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: buttonWidth, height: height)
-                }
-                .buttonStyle(.plain)
+            if streamCount > 1, let sourceMenuItems {
+                PlayerMenuButton(
+                    menuTitle: "Source",
+                    label: .symbol("list.bullet", size: iconSize, weight: .medium),
+                    items: sourceMenuItems,
+                    onOpen: onMenuOpen
+                )
+                .frame(width: buttonWidth, height: height)
+                .contentShape(Rectangle())
             }
-            if qualityCount >= 1 {
-                Button(action: onQualityTap) {
-                    Image(systemName: "4k.tv")
-                        .font(.system(size: iconSize, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: buttonWidth, height: height)
-                }
-                .buttonStyle(.plain)
+            if qualityCount >= 1, let qualityMenuItems {
+                PlayerMenuButton(
+                    menuTitle: "Quality",
+                    label: .symbol("4k.tv", size: iconSize, weight: .medium),
+                    items: qualityMenuItems,
+                    onOpen: onMenuOpen
+                )
+                .frame(width: buttonWidth, height: height)
+                .contentShape(Rectangle())
             }
-            if audioTrackCount > 1 {
-                Button(action: onAudioTap) {
-                    Image(systemName: "waveform")
-                        .font(.system(size: iconSize, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: buttonWidth, height: height)
-                }
-                .buttonStyle(.plain)
+            if audioTrackCount > 1, let audioMenuItems {
+                PlayerMenuButton(
+                    menuTitle: "Audio",
+                    label: .symbol("waveform", size: iconSize, weight: .medium),
+                    items: audioMenuItems,
+                    onOpen: onMenuOpen
+                )
+                .frame(width: buttonWidth, height: height)
+                .contentShape(Rectangle())
             }
             if hasSubtitles {
                 Button(action: onSubtitleSettingsTap) {
@@ -168,14 +175,15 @@ struct PlayerBottomBar: View {
                     .frame(width: buttonWidth, height: height)
             }
             .buttonStyle(.plain)
-            Button(action: onSpeedTap) {
-                Text(speedLabel)
-                    .font(isPad ? .body.weight(.semibold) : .subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, isPad ? 14 : 10)
-                    .frame(height: height)
-            }
-            .buttonStyle(.plain)
+            PlayerMenuButton(
+                menuTitle: "Playback Speed",
+                label: .text(speedLabel, size: isPad ? 17 : 15, weight: .semibold),
+                items: speedMenuItems,
+                onOpen: onMenuOpen
+            )
+            .frame(height: height)
+            .padding(.horizontal, isPad ? 14 : 10)
+            .contentShape(Rectangle())
             if let onNextEpisodeTap {
                 Button(action: onNextEpisodeTap) {
                     Image(systemName: "forward.end.fill")
@@ -193,12 +201,29 @@ struct PlayerBottomBar: View {
 
     // MARK: - Helpers
 
+    private let speeds: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+
+    /// Compact label for the speed button (e.g. "1×", "1.5×").
     private var speedLabel: String {
         let value = Double(playbackSpeed)
         let formatted = value.truncatingRemainder(dividingBy: 1) == 0
             ? String(Int(value))
             : String(format: "%.2g", value)
         return "\(formatted)×"
+    }
+
+    /// Full label for a speed menu row (e.g. "Normal (1×)", "1.5×").
+    private func speedMenuLabel(_ speed: Float) -> String {
+        speed == 1.0
+            ? "Normal (1×)"
+            : "\(speed.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(speed)) : String(format: "%.2g", speed))×"
+    }
+
+    /// Rows for the playback-speed menu (checkmark on the current rate).
+    private func speedMenuItems() -> [PlayerMenuItem] {
+        speeds.map { speed in
+            PlayerMenuItem(title: speedMenuLabel(speed), isOn: speed == playbackSpeed) { playbackSpeed = speed }
+        }
     }
 }
 
@@ -214,7 +239,6 @@ struct PlayerBottomBar_Previews: PreviewProvider {
                     duration: 1440,
                     playbackSpeed: .constant(1.0),
                     onSeek: { _ in },
-                    onSpeedTap: {},
                     onSkip85: {},
                     onSubtitleSettingsTap: {}
                 )
@@ -231,7 +255,6 @@ struct PlayerBottomBar_Previews: PreviewProvider {
                     duration: 1440,
                     playbackSpeed: .constant(1.5),
                     onSeek: { _ in },
-                    onSpeedTap: {},
                     onSkip85: {},
                     onSubtitleSettingsTap: {},
                     hasSubtitles: true

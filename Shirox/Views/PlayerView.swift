@@ -105,10 +105,8 @@ struct PlayerView: View {
     @State private var isLoadingNextEpisode = false
     @State private var isRefetchingStream = false
     @State private var showNextEpisodePicker = false
-    @State private var showInPlayerStreamPicker = false
     @State private var hlsQualities: [HLSQualityLevel] = []
     @State private var selectedQualityBandwidth: Int? = nil
-    @State private var showQualityPicker = false
     @State private var nextEpisodeStreams: [StreamResult] = []
     @State private var nextEpisodeNumber: Int = 0
     @State private var nextEpisodeHref: String?
@@ -130,9 +128,11 @@ struct PlayerView: View {
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
     @State private var playbackSpeed: Double = 1.0
     @State private var volume: Float = 1.0
-    @State private var showSpeedPicker = false
     @State private var showSubtitleSettings = false
-    @State private var showAudioPicker = false
+    /// True while a bottom-bar pull-down menu is open, so the whole controls overlay is
+    /// pinned visible (scheduleHide is gated on this). Set by onMenuOpen (the menu button's
+    /// deferred element); cleared on didBecomeKey when the menu is dismissed (see body).
+    @State private var overlayActive = false
     @State private var videoReady = false
     @State private var isBuffering = false
     @State private var audioGroup: AVMediaSelectionGroup? = nil
@@ -525,6 +525,15 @@ struct PlayerView: View {
                 break
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) { _ in
+            // A bottom-bar menu is hosted by iOS in its own window; when it closes, our window
+            // becomes key again. That's our reliable "menu dismissed" signal (open is handled
+            // by onMenuOpen). Resume the auto-hide that onMenuOpen suspended. The UIKit menu
+            // never flashes, so this fires exactly once per open/close — no oscillation.
+            guard overlayActive else { return }
+            overlayActive = false
+            scheduleHide()
+        }
         .statusBarHidden(true)
         .persistentSystemOverlaysHidden()
         .onChangeOf(videoReady) { ready in
@@ -534,12 +543,6 @@ struct PlayerView: View {
             }
         }
         #endif
-        .sheet(isPresented: $showSpeedPicker) {
-            PlayerSpeedPicker(selectedSpeed: Binding(
-                get: { Float(playbackSpeed) },
-                set: { playbackSpeed = Double($0) }
-            ))            .adaptivePresentationDetents([.height(320)])
-        }
         .sheet(isPresented: $showSubtitleSettings) {
             PlayerSubtitleSettingsView(
                 settings: subtitleSettings,
@@ -556,11 +559,6 @@ struct PlayerView: View {
             .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
         }
         .onChangeOf(selectedSubtitleTrack) { loadSubtitles() }
-        .sheet(isPresented: $showAudioPicker) {
-            let optionCount = audioGroup?.options.count ?? 0
-            let sheetHeight = CGFloat(60 + 56 * max(1, optionCount))
-            audioPickerSheet                .adaptivePresentationDetents([.height(sheetHeight)])
-        }
         .sheet(isPresented: $showNextEpisodePicker, onDismiss: {
             nextEpisodeStreams = []
             nextEpisodeNumber = 0
@@ -577,12 +575,6 @@ struct PlayerView: View {
             PlayerSequelPickerSheet(results: sequelResults) { selected in
                 advanceToSequel(selected)
             }            .adaptivePresentationDetents([.medium])
-        }
-        .sheet(isPresented: $showQualityPicker) { qualityPickerSheet }
-        .sheet(isPresented: $showInPlayerStreamPicker) {
-            PlayerNextEpisodePicker(streams: availableStreams, title: "Choose Quality") { selected in
-                switchQuality(selected)
-            }            .adaptivePresentationDetents([.height(CGFloat(60 + 56 * max(1, availableStreams.count)))])
         }
         .playerKeyboardShortcuts(
             togglePlayPause: togglePlayPause,
@@ -885,19 +877,19 @@ struct PlayerView: View {
                 }
                 scheduleHide()
             },
-            onSpeedTap: { showSpeedPicker = true },
             onFillTap: { isFilled.toggle() },
             isFilled: isFilled,
             onSkip85: { skip(by: Double(skipLong)) },
             skipLongAmount: skipLong,
             onSubtitleSettingsTap: { showSubtitleSettings = true },
-            onAudioTap: { showAudioPicker = true },
             hasSubtitles: currentStream.subtitle != nil,
             audioTrackCount: audioGroup?.options.count ?? 0,
+            audioMenuItems: audioMenuItems,
             streamCount: availableStreams.count,
-            onStreamPickerTap: { showInPlayerStreamPicker = true },
+            sourceMenuItems: sourceMenuItems,
             qualityCount: hlsQualities.count,
-            onQualityTap: { showQualityPicker = true },
+            qualityMenuItems: qualityMenuItems,
+            onMenuOpen: { overlayActive = true; hideTask?.cancel() },
             bottomPadding: bottomPad,
             onNextEpisodeTap: (onWatchNext != nil || onSequelNeeded != nil) ? { Task { @MainActor in await loadAndAdvance() } } : nil,
             hasActiveSkipSegment: activeSkipSegment != nil,
@@ -1323,15 +1315,18 @@ struct PlayerView: View {
     }
 
     private func toggleControls() {
+        // A tap on the video means no menu is open (an open menu would swallow the tap), so
+        // clear the pin here too — a self-heal in case the didBecomeKey close signal was missed.
+        overlayActive = false
         setControlsVisible(!showControls)
     }
 
     private func scheduleHide() {
         hideTask?.cancel()
-        guard isPlaying else { return }
+        guard isPlaying, !overlayActive else { return }
         hideTask = Task {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, !overlayActive else { return }
             setControlsVisible(false)
         }
     }
@@ -2223,7 +2218,6 @@ struct PlayerView: View {
                 }
             }
         }
-        showInPlayerStreamPicker = false
         if let p = player { updateNowPlaying(player: p) }
         scheduleHide()
     }
@@ -2317,37 +2311,31 @@ struct PlayerView: View {
         scheduleHide()
     }
 
-    @ViewBuilder
-    private var qualityPickerSheet: some View {
-        PlayerQualityPicker(
-            qualities: hlsQualities,
-            selectedBandwidth: $selectedQualityBandwidth,
-            onSelect: selectQuality
-        )
-        .adaptivePresentationDetents([.height(CGFloat(120 + 56 * (hlsQualities.count + 1)))])
+    // MARK: - Native menu content
+    // Each returns the rows for a bottom-bar pull-down menu (checkmark on the current value).
+    // Rebuilt on every open by PlayerMenuButton's deferred element, so state stays fresh.
+
+    private func qualityMenuItems() -> [PlayerMenuItem] {
+        var items = [PlayerMenuItem(title: "Auto", isOn: selectedQualityBandwidth == nil) { selectQuality(nil) }]
+        items += hlsQualities.map { quality in
+            PlayerMenuItem(title: quality.label, isOn: selectedQualityBandwidth == quality.bandwidth) {
+                selectQuality(quality.bandwidth)
+            }
+        }
+        return items
     }
 
-    private var audioPickerSheet: some View {
-        VStack(spacing: 0) {
-            Text("Audio Track").font(.headline).padding(.vertical, 16)
-            Divider()
-            if let group = audioGroup, let item = player?.currentItem {
-                let selected = item.currentMediaSelection.selectedMediaOption(in: group)
-                ForEach(group.options, id: \.self) { option in
-                    Button {
-                        item.select(option, in: group)
-                        showAudioPicker = false
-                    } label: {
-                        HStack {
-                            Text(option.displayName).foregroundStyle(.primary)
-                            Spacer()
-                            if option == selected { Image(systemName: "checkmark").foregroundStyle(.primary) }
-                        }
-                        .padding(.horizontal, 20).frame(height: 52)
-                    }
-                    Divider()
-                }
-            }
+    private func audioMenuItems() -> [PlayerMenuItem] {
+        guard let group = audioGroup, let item = player?.currentItem else { return [] }
+        let selected = item.currentMediaSelection.selectedMediaOption(in: group)
+        return group.options.map { option in
+            PlayerMenuItem(title: option.displayName, isOn: option == selected) { item.select(option, in: group) }
+        }
+    }
+
+    private func sourceMenuItems() -> [PlayerMenuItem] {
+        availableStreams.map { stream in
+            PlayerMenuItem(title: stream.title, isOn: stream.url == currentStream.url) { switchQuality(stream) }
         }
     }
 
