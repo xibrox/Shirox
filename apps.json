@@ -27,8 +27,26 @@
       },
       "versions": [
         {
+          "version": "0.1.4",
+          "buildVersion": "103",
+          "date": "2026-07-08",
+          "localizedDescription": "The player's options are native menus now — long-press for playback speed, quality, audio track, and source. Liquid Glass covers every control and the glass buttons are reliably tappable. AniList profiles are cached with a proper loading state and a graceful fallback when rate-limited, so they open fast instead of going blank, and the profile header now sits the avatar on the banner edge with your name and follow button beside it.",
+          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "size": 9132843,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.3",
           "buildVersion": "102",
+          "date": "2026-07-07",
+          "localizedDescription": "Your Library now loads instantly from an on-device cache and keeps working offline. Edits you make without a connection — status, score, and episode or chapter progress — are queued and sync to AniList and MyAnimeList automatically once you're back online. Rate-limited requests retry with backoff instead of failing, the Anime | Manga switch no longer shows the wrong list, and manga chapters always sort in the right order.",
+          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "size": 9132843,
+          "minOSVersion": "15.0"
+        },
+        {
+          "version": "0.1.2",
+          "buildVersion": "101",
           "date": "2026-07-05",
           "localizedDescription": "The video player controls get the iOS 26 Liquid Glass look — frosted, translucent buttons — with a thicker, easier-to-grab progress bar. New Liquid Glass Controls toggles in Settings switch the glass off for the player and reader independently. In the manga reader, auto-scroll is now a live speed slider that goes much faster, the play/pause button is always reachable, you can pinch to zoom in vertical mode, and pages load ahead of you so scrolling never stalls.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
@@ -57,6 +75,24 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 0.1.4 - Player menus & faster profiles",
+      "identifier": "news-0.1.4-player-menus-profiles",
+      "caption": "The player's options open as native menus now: long-press to pick playback speed, quality, audio track, or source without a cramped sheet in the way. Liquid Glass covers every control, and the glass buttons are reliably tappable — no more taps slipping through to the video behind them.\n\nAniList profiles are cached and show a proper loading state, with a graceful fallback when AniList rate-limits, so your profile opens fast and doesn't go blank. The profile header is cleaned up too, with the avatar sitting right on the banner edge and your name and follow button beside it.",
+      "tintColor": "ef4444",
+      "date": "2026-07-08",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
+    {
+      "title": "New in 0.1.3 - A library that works offline",
+      "identifier": "news-0.1.3-offline-library",
+      "caption": "Your Library now loads instantly from an on-device cache — open the app and your lists are already there, even with no connection. Changes you make while offline (status, score, episode or chapter progress) are queued and sync themselves to AniList and MyAnimeList the moment you're back online, so nothing gets lost.\n\nWhen a provider rate-limits you, requests now retry automatically with backoff instead of failing outright. Also fixed: the Anime | Manga switch occasionally showing the wrong list, and manga chapters now always sort in the right order.",
+      "tintColor": "ef4444",
+      "date": "2026-07-07",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 0.1.2 - Liquid Glass player & reader",
       "identifier": "news-0.1.2-liquid-glass",
