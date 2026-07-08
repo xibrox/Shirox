@@ -7,6 +7,9 @@ import SwiftUI
 /// with a hint (same pattern as other iOS-only features).
 struct MangaDetailView: View {
     let item: SearchItem
+    /// Non-nil ⇒ offline mode: render these downloaded chapters from disk, skip
+    /// the module/network load, and hide online-only controls.
+    var offlineChapters: [MangaChapter]? = nil
 
     @StateObject private var vm = MangaDetailViewModel()
     @ObservedObject private var progress = MangaProgressManager.shared
@@ -15,6 +18,12 @@ struct MangaDetailView: View {
     @State private var readerContext: ReaderContext?
     @State private var showMatchSheet = false
 
+    #if os(iOS)
+    @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
+    @State private var isSelectionMode = false
+    @State private var selectedChapterHrefs: Set<String> = []
+    #endif
+
     private var platformBackground: Color {
         #if os(iOS)
         Color(UIColor.systemBackground)
@@ -22,6 +31,32 @@ struct MangaDetailView: View {
         Color.clear
         #else
         Color(NSColor.windowBackgroundColor)
+        #endif
+    }
+
+    // Cross-platform bridges to the iOS-only selection/download state, so the
+    // (non-guarded) chapter list compiles on macOS where that state is absent.
+    private var chapterRowSelectionMode: Bool {
+        #if os(iOS)
+        return isSelectionMode
+        #else
+        return false
+        #endif
+    }
+
+    private func selectedChapterHrefsContains(_ href: String) -> Bool {
+        #if os(iOS)
+        return selectedChapterHrefs.contains(href)
+        #else
+        return false
+        #endif
+    }
+
+    private func mangaDownloadState(for chapter: MangaChapter) -> MangaDownloadState? {
+        #if os(iOS)
+        return mangaDownloads.item(forChapterHref: chapter.href)?.state
+        #else
+        return nil
         #endif
     }
 
@@ -304,22 +339,96 @@ struct MangaDetailView: View {
                 }
                 Spacer()
 
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        newestFirst.toggle()
+                HStack(spacing: 8) {
+                    #if os(iOS)
+                    if offlineChapters == nil {
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                isSelectionMode.toggle()
+                                if !isSelectionMode { selectedChapterHrefs.removeAll() }
+                            }
+                        } label: {
+                            Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
+                                .frame(width: 36, height: 36)
+                                .background(isSelectionMode ? Color.primary : Color.clear, in: Circle())
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
                     }
-                } label: {
-                    Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                    #endif
+
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            newestFirst.toggle()
+                        }
+                    } label: {
+                        Image(systemName: newestFirst ? "arrow.down" : "arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
+
+            #if os(iOS)
+            if isSelectionMode {
+                let completedHrefs = Set(mangaDownloads.items.filter { $0.state == .completed }.map { $0.chapterHref })
+                let toDownload = MangaDownloadPlanning.pendingDownloadCount(
+                    selectedHrefs: selectedChapterHrefs, completedHrefs: completedHrefs)
+                let toDelete = selectedChapterHrefs.intersection(completedHrefs).count
+                HStack {
+                    Button(selectedChapterHrefs.count == detail.chapters.count ? "Deselect All" : "Select All") {
+                        if selectedChapterHrefs.count == detail.chapters.count {
+                            selectedChapterHrefs.removeAll()
+                        } else {
+                            selectedChapterHrefs = Set(detail.chapters.map { $0.href })
+                        }
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.1), in: Capsule())
+
+                    Spacer()
+
+                    if toDelete > 0 {
+                        Button(role: .destructive) {
+                            for href in selectedChapterHrefs {
+                                if let it = mangaDownloads.item(forChapterHref: href), it.state == .completed {
+                                    mangaDownloads.remove(it)
+                                }
+                            }
+                            selectedChapterHrefs.removeAll()
+                        } label: {
+                            Label("Delete \(toDelete)", systemImage: "trash.fill").font(.subheadline.weight(.bold))
+                        }
+                        .buttonStyle(.borderedProminent).tint(.red).controlSize(.small).clipShape(Capsule())
+                    }
+                    if toDownload > 0 {
+                        Button {
+                            let chapters = detail.chapters.filter {
+                                selectedChapterHrefs.contains($0.href) && !completedHrefs.contains($0.href)
+                            }
+                            mangaDownloads.batchDownload(chapters: chapters, context: downloadContext(detail))
+                            selectedChapterHrefs.removeAll()
+                            isSelectionMode = false
+                        } label: {
+                            Label("Download \(toDownload)", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.bold)).foregroundStyle(platformBackground)
+                        }
+                        .buttonStyle(.borderedProminent).tint(.primary).controlSize(.small).clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 16).padding(.top, 4)
+            }
+            #endif
 
             if detail.chapters.isEmpty {
                 Text("No chapters found.")
@@ -341,7 +450,15 @@ struct MangaDetailView: View {
                                 : nil,
                             onTap: {
                                 #if os(iOS)
-                                openChapter(chapter, detail: detail)
+                                if isSelectionMode {
+                                    if selectedChapterHrefs.contains(chapter.href) {
+                                        selectedChapterHrefs.remove(chapter.href)
+                                    } else {
+                                        selectedChapterHrefs.insert(chapter.href)
+                                    }
+                                } else {
+                                    openChapter(chapter, detail: detail)
+                                }
                                 #endif
                             },
                             onMarkRead: {
@@ -351,6 +468,19 @@ struct MangaDetailView: View {
                             onMarkUnread: {
                                 MangaProgressManager.shared.markChapterUnread(
                                     mangaHref: item.href, chapterHref: chapter.href)
+                            },
+                            isSelectionMode: chapterRowSelectionMode,
+                            isSelected: selectedChapterHrefsContains(chapter.href),
+                            downloadState: offlineChapters == nil ? mangaDownloadState(for: chapter) : nil,
+                            onDownload: offlineChapters == nil ? {
+                                #if os(iOS)
+                                mangaDownloads.download(chapter: chapter, context: downloadContext(detail))
+                                #endif
+                            } : nil,
+                            onDeleteDownload: {
+                                #if os(iOS)
+                                if let it = mangaDownloads.item(forChapterHref: chapter.href) { mangaDownloads.remove(it) }
+                                #endif
                             }
                         )
                     }
@@ -384,6 +514,14 @@ struct MangaDetailView: View {
         }
     }
 
+    private func downloadContext(_ detail: MangaDetail) -> MangaDownloadContext {
+        MangaDownloadContext(
+            mangaTitle: detail.title,
+            mangaHref: item.href,
+            coverImage: detail.image,
+            moduleId: ModuleManager.shared.activeModule?.id ?? "")
+    }
+
     private func makeContext(detail: MangaDetail, chapterIndex: Int,
                              resumePage: Int?, resumeFraction: Double?) -> ReaderContext {
         ReaderContext(
@@ -410,6 +548,11 @@ private struct MangaChapterRowView: View {
     let onTap: () -> Void
     var onMarkRead: (() -> Void)? = nil
     var onMarkUnread: (() -> Void)? = nil
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
+    var downloadState: MangaDownloadState? = nil
+    var onDownload: (() -> Void)? = nil
+    var onDeleteDownload: (() -> Void)? = nil
 
     private var showsProgressBar: Bool {
         if let progress, progress > 0, !isRead { return true }
@@ -462,6 +605,41 @@ private struct MangaChapterRowView: View {
                         Text("\(Int((progress * 100).rounded()))%")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
+                    }
+
+                    if isSelectionMode {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.title3)
+                            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    } else if let downloadState {
+                        switch downloadState {
+                        case .completed:
+                            Menu {
+                                Button(role: .destructive) { onDeleteDownload?() } label: {
+                                    Label("Delete Download", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption).foregroundStyle(.green)
+                                    .padding(8).background(Color.primary.opacity(0.1), in: Circle())
+                            }
+                        case .downloading, .pending:
+                            ProgressView().controlSize(.small)
+                        case .failed:
+                            Button { onDownload?() } label: {
+                                Image(systemName: "exclamationmark.arrow.circlepath")
+                                    .font(.caption).foregroundStyle(.orange)
+                                    .padding(8).background(Color.primary.opacity(0.1), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else if let onDownload {
+                        Button(action: onDownload) {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.caption.weight(.semibold)).foregroundStyle(.primary)
+                                .padding(8).background(Color.primary.opacity(0.1), in: Circle())
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     Image(systemName: "book.fill")
