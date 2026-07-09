@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "0.1.5",
+          "buildVersion": "104",
+          "date": "2026-07-09",
+          "localizedDescription": "Download manga chapters for offline reading — grab a single chapter with one tap, or flip on selection mode to download a whole range in one batch, right from the manga's detail screen. Every chapter row shows live download progress and a checkmark when it's done, and downloaded chapters read completely offline with pages loading straight from your device. The Downloads tab has a new Manga section grouped by source and title, so you can open a saved manga and read it fully offline. Also fixed: deleting a download now cleans up every file it leaves behind, removed downloads no longer redownload themselves after a relaunch, and downloaded episodes recover on their own after the app's been backgrounded.",
+          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "size": 9132843,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.4",
           "buildVersion": "103",
           "date": "2026-07-08",
@@ -75,6 +84,15 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 0.1.5 - Manga downloads & offline reading",
+      "identifier": "news-0.1.5-manga-downloads",
+      "caption": "You can now download manga chapters for offline reading. Tap to download a single chapter, or flip on selection mode to grab a whole range in one batch, right from the manga's detail screen. Every chapter row shows live download progress and a checkmark when it's done, and downloaded chapters read completely offline — the reader loads pages straight from your device, so there are no loading gaps even with no connection. The Downloads tab has a new Manga section that groups everything you've saved by source and title; open a downloaded manga to browse and read it fully offline.\n\nDownloads are tidier too: deleting a download now cleans up every file it leaves behind instead of eating storage, and removed downloads stay removed rather than quietly redownloading the next time you open the app. Downloaded episodes also recover on their own if playback drops after the app's been in the background, handing audio back cleanly instead of staying silent.",
+      "tintColor": "ef4444",
+      "date": "2026-07-09",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 0.1.4 - Player menus & faster profiles",
       "identifier": "news-0.1.4-player-menus-profiles",
