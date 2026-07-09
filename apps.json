@@ -32,7 +32,7 @@
           "date": "2026-07-09",
           "localizedDescription": "Download manga chapters for offline reading — grab a single chapter with one tap, or flip on selection mode to download a whole range in one batch, right from the manga's detail screen. Every chapter row shows live download progress and a checkmark when it's done, and downloaded chapters read completely offline with pages loading straight from your device. The Downloads tab has a new Manga section grouped by source and title, so you can open a saved manga and read it fully offline. Also fixed: deleting a download now cleans up every file it leaves behind, removed downloads no longer redownload themselves after a relaunch, and downloaded episodes recover on their own after the app's been backgrounded.",
           "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
-          "size": 9132843,
+          "size": 9289241,
           "minOSVersion": "15.0"
         },
         {
