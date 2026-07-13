@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.0.0",
+          "buildVersion": "105",
+          "date": "2026-07-13",
+          "localizedDescription": "Long-press the Shirox icon on your Home Screen for instant shortcuts. Jump straight to Search, Downloads, or Library — the app opens right onto the tab you picked, whether it was already running or fully closed. The shortcut icons match the tab bar, so it's a fast way into whatever you use most.",
+          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "size": 9132843,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.5",
           "buildVersion": "104",
           "date": "2026-07-09",
@@ -84,6 +93,15 @@
     }
   ],
   "news": [
+    {
+      "title": "New in 1.0.0 - Home Screen quick actions",
+      "identifier": "news-1.0.0-quick-actions",
+      "caption": "Long-press the Shirox app icon to open quick actions right from your Home Screen. Tap Search, Downloads, or Library to jump straight there — the app launches directly onto that tab, whether it was backgrounded or fully closed. The shortcut icons match the tabs, so it's the fastest way into whatever you use most.",
+      "tintColor": "ef4444",
+      "date": "2026-07-13",
+      "notify": true,
+      "appID": "com.shirox.app"
+    },
     {
       "title": "New in 0.1.5 - Manga downloads & offline reading",
       "identifier": "news-0.1.5-manga-downloads",
