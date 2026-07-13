@@ -14,7 +14,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         #if os(iOS)
         DownloadManager.shared.reconnectPendingTasks()
         #endif
+        application.shortcutItems = QuickAction.registeredItems
         return true
+    }
+
+    func application(_ application: UIApplication,
+                     configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        if let shortcutItem = options.shortcutItem {
+            let action = QuickAction(shortcutItem)
+            MainActor.assumeIsolated {
+                QuickActionManager.shared.pending = action
+            }
+        }
+        let config = UISceneConfiguration(name: connectingSceneSession.configuration.name,
+                                          sessionRole: connectingSceneSession.role)
+        config.delegateClass = SceneDelegate.self
+        return config
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
@@ -214,10 +230,23 @@ private struct RootTabView: View {
     @ObservedObject private var cfManager = CloudflareBypassManager.shared
     #if os(iOS)
     @ObservedObject private var playerPresenter = PlayerPresenter.shared
+    @ObservedObject private var quickActions = QuickActionManager.shared
     #endif
     @State private var selectedTab = 0
     #if targetEnvironment(macCatalyst) || os(macOS)
     @State private var sidebarTab: SidebarTab = .home
+    #endif
+
+    #if os(iOS)
+    private func routePendingQuickAction() {
+        guard let action = quickActions.pending else { return }
+        switch action {
+        case .library:   selectedTab = 1
+        case .downloads: selectedTab = 2
+        case .search:    selectedTab = 4
+        }
+        quickActions.pending = nil
+    }
     #endif
 
     var body: some View {
@@ -248,22 +277,22 @@ private struct RootTabView: View {
                         }
                     }
                 #else
-                TabView {
-                    Tab("Home", systemImage: "house.fill") {
+                TabView(selection: $selectedTab) {
+                    Tab("Home", systemImage: "house.fill", value: 0) {
                         HomeView()
                     }
-                    Tab("Library", systemImage: "books.vertical.fill") {
+                    Tab("Library", systemImage: "books.vertical.fill", value: 1) {
                         LibraryView()
                     }
                     #if os(iOS)
-                    Tab("Downloads", systemImage: "arrow.down.circle.fill") {
+                    Tab("Downloads", systemImage: "arrow.down.circle.fill", value: 2) {
                         DownloadsView()
                     }
                     #endif
-                    Tab("Settings", systemImage: "gearshape.fill") {
+                    Tab("Settings", systemImage: "gearshape.fill", value: 3) {
                         SettingsView()
                     }
-                    Tab(role: .search) {
+                    Tab(value: 4, role: .search) {
                         SearchView()
                     }
                 }
@@ -311,6 +340,10 @@ private struct RootTabView: View {
             selectedTab = 3
             #endif
         }
+        #if os(iOS)
+        .onAppear { routePendingQuickAction() }
+        .onChange(of: quickActions.pending) { _ in routePendingQuickAction() }
+        #endif
         #if os(iOS)
         .sheet(isPresented: Binding(
             get: { playerPresenter.pendingRatingContext != nil },
