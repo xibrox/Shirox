@@ -47,6 +47,8 @@ struct LibraryView: View {
     @State private var pendingMangaItem: SearchItem? = nil
     @State private var mangaLinkActive = false
     @State private var resolvingMangaId: Int? = nil
+    @State private var pendingAniListMangaMedia: Media? = nil
+    @State private var aniListMangaLinkActive = false
     #if os(iOS)
     @State private var presentationWindow: UIWindow?
     #endif
@@ -394,6 +396,20 @@ struct LibraryView: View {
         .hidden()
     }
 
+    /// Hidden link for provider-synced manga rows: opens the AniList-backed detail
+    /// (which resolves a module itself) so AniList metadata + relations are kept.
+    @ViewBuilder private var aniListMangaNavLink: some View {
+        NavigationLink(
+            destination: Group {
+                if let m = pendingAniListMangaMedia {
+                    AniListMangaDetailView(mediaId: m.id, preloadedMedia: m)
+                }
+            },
+            isActive: $aniListMangaLinkActive
+        ) { EmptyView() }
+        .hidden()
+    }
+
     private func openManga(_ entry: LibraryEntry) {
         if let source = entry.localSource, source.kind == .module {
             pendingMangaItem = SearchItem(
@@ -402,18 +418,8 @@ struct LibraryView: View {
                 href: source.detailHref ?? "")
             mangaLinkActive = true
         } else {
-            resolvingMangaId = entry.media.id
-            Task {
-                defer { resolvingMangaId = nil }
-                if let item = await MangaModuleResolver.shared.resolve(title: entry.media.title.displayTitle) {
-                    pendingMangaItem = item
-                    mangaLinkActive = true
-                } else {
-                    #if os(iOS)
-                    ToastManager.shared.show(message: "Install a manga module to read this", type: .error)
-                    #endif
-                }
-            }
+            pendingAniListMangaMedia = entry.media
+            aniListMangaLinkActive = true
         }
     }
 
@@ -699,6 +705,7 @@ struct LibraryView: View {
             }
         }
         .background { mangaNavLink }
+        .background { aniListMangaNavLink }
         .toolbar { libraryToolbar }
         .task { await vm.autoRefreshIfNeeded() }
         #if os(iOS)

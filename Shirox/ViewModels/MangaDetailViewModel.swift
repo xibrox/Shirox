@@ -7,6 +7,16 @@ final class MangaDetailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var match: MangaMatch?
+    /// AniList metadata overlay (score, status, genres, relations, richer
+    /// description) for a matched or AniList-seeded manga. nil until it resolves.
+    @Published var enrichment: Media?
+
+    /// Fire-and-forget AniList metadata overlay for a matched manga. Never throws
+    /// to the UI — module content already rendered; this fills in when it arrives.
+    func enrich(aniListID: Int) async {
+        guard enrichment == nil else { return }
+        enrichment = try? await AniListProvider.shared.mangaDetail(id: aniListID)
+    }
 
     func load(item: SearchItem) async {
         // Idempotent: re-called by Retry; skip if a load is already in flight.

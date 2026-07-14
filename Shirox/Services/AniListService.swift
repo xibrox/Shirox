@@ -325,6 +325,48 @@ final class AniListService {
         return media
     }
 
+    /// AniList detail for a MANGA id. Mirrors `detail(id:)` but queries the manga
+    /// media type (chapters instead of episodes, no airing) and includes relations.
+    func mangaDetail(id: Int) async throws -> AniListMedia {
+        let query = """
+        query ($id: Int) {
+          Media(id: $id, type: MANGA, isAdult: false) {
+            id
+            idMal
+            title { romaji english native }
+            coverImage { large extraLarge }
+            bannerImage
+            description(asHtml: false)
+            chapters
+            status
+            averageScore
+            genres
+            relations {
+              edges {
+                relationType
+                node {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  status
+                  type
+                  format
+                }
+              }
+            }
+          }
+        }
+        """
+        let data = try await post(query: query, variables: ["id": id])
+        let response = try JSONDecoder().decode(GraphQLResponse<MediaData>.self, from: data)
+        if let errors = response.errors {
+            if errors.contains(where: { $0.status == 403 }) { throw AniListError.httpError(403) }
+            throw AniListError.graphQL(errors.map(\.message).joined(separator: ", "))
+        }
+        guard let media = response.data?.Media else { throw AniListError.noData }
+        return media
+    }
+
     // MARK: - Private helpers
 
     private func fetchPage(query: String, variables: [String: Any] = [:]) async throws -> [AniListMedia] {

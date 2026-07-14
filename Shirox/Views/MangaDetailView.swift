@@ -10,6 +10,9 @@ struct MangaDetailView: View {
     /// Non-nil ⇒ offline mode: render these downloaded chapters from disk, skip
     /// the module/network load, and hide online-only controls.
     var offlineChapters: [MangaChapter]? = nil
+    /// Non-nil ⇒ AniList-first entry (from AniListMangaDetailView / relations):
+    /// seed the metadata overlay directly instead of resolving a match.
+    var aniListMedia: Media? = nil
 
     @StateObject private var vm = MangaDetailViewModel()
     @ObservedObject private var progress = MangaProgressManager.shared
@@ -22,6 +25,12 @@ struct MangaDetailView: View {
     @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
     @State private var isSelectionMode = false
     @State private var selectedChapterHrefs: Set<String> = []
+    @ObservedObject private var anilistAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @State private var existingAniListEntry: LibraryEntry? = nil
+    @State private var existingMALEntry: LibraryEntry? = nil
+    @State private var showAniListEdit = false
+    @State private var showMALEdit = false
     #endif
 
     private var platformBackground: Color {
@@ -115,9 +124,14 @@ struct MangaDetailView: View {
                             confident: true)
                         MangaMatchManager.shared.saveMatch(match)
                         vm.match = match
+                        vm.enrichment = nil
+                        if let aid = match.aniListID {
+                            Task { await vm.enrich(aniListID: aid) }
+                        }
                     } else {
                         MangaMatchManager.shared.clearMatch(mangaHref: item.href)
                         vm.match = nil
+                        vm.enrichment = aniListMedia
                     }
                 },
                 searchOverride: { keyword in
@@ -136,6 +150,9 @@ struct MangaDetailView: View {
             )
         }
         .task {
+            if let aniListMedia {
+                vm.enrichment = aniListMedia
+            }
             if let offlineChapters {
                 if vm.detail == nil {
                     vm.detail = MangaDetail(
@@ -144,8 +161,72 @@ struct MangaDetailView: View {
                 }
             } else {
                 await vm.load(item: item)
+                if vm.enrichment == nil, let aid = vm.match?.aniListID {
+                    await vm.enrich(aniListID: aid)
+                }
             }
         }
+        #if os(iOS)
+        .task(id: [mangaAniListID, mangaMALID].map { $0.map(String.init) ?? "-" }.joined()) {
+            if anilistAuth.isLoggedIn, let aid = mangaAniListID {
+                if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid, type: .manga) {
+                    existingAniListEntry = AniListProvider.shared.mapEntry(raw)
+                }
+            }
+            if malAuth.isLoggedIn, let mid = mangaMALID, let detail = vm.detail,
+               let entry = try? await MALMangaLibraryService.shared.fetchEntry(malId: mid) {
+                existingMALEntry = MALMangaLibraryService.libraryEntry(
+                    from: entry, media: editorMedia(provider: .mal, id: mid, detail: detail))
+            }
+        }
+        .adaptiveSheet(isPresented: $showAniListEdit) {
+            if let aid = mangaAniListID, let detail = vm.detail {
+                LibraryEntryEditSheet(
+                    entry: existingAniListEntry,
+                    media: editorMedia(provider: .anilist, id: aid, detail: detail),
+                    progressUnit: "chapter",
+                    onSave: { status, progress, score in
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(
+                                mediaId: aid, status: status, progress: progress, score: score, type: .manga)
+                            if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid, type: .manga) {
+                                existingAniListEntry = AniListProvider.shared.mapEntry(raw)
+                            }
+                        }
+                    },
+                    onDelete: existingAniListEntry != nil ? {
+                        if let entryId = existingAniListEntry?.id {
+                            existingAniListEntry = nil
+                            Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                        }
+                    } : nil)
+                .adaptivePresentationDetents([.medium, .large])
+            }
+        }
+        .adaptiveSheet(isPresented: $showMALEdit) {
+            if let mid = mangaMALID, let detail = vm.detail {
+                LibraryEntryEditSheet(
+                    entry: existingMALEntry,
+                    media: editorMedia(provider: .mal, id: mid, detail: detail),
+                    progressUnit: "chapter",
+                    onSave: { status, progress, score in
+                        Task {
+                            try? await MALMangaLibraryService.shared.updateEntry(
+                                malId: mid, status: status, progress: progress, score: score)
+                            if let entry = try? await MALMangaLibraryService.shared.fetchEntry(malId: mid) {
+                                existingMALEntry = MALMangaLibraryService.libraryEntry(
+                                    from: entry, media: editorMedia(provider: .mal, id: mid, detail: detail))
+                            }
+                        }
+                    },
+                    onDelete: existingMALEntry != nil ? {
+                        existingMALEntry = nil
+                        Task { try? await MALMangaLibraryService.shared.deleteEntry(malId: mid) }
+                    } : nil)
+                .adaptivePresentationDetents([.medium, .large])
+            }
+        }
+        #endif
     }
 
     // MARK: - Tracking match
@@ -163,27 +244,40 @@ struct MangaDetailView: View {
     // MARK: - Layout
 
     private func detailScrollView(_ detail: MangaDetail) -> some View {
-        ScrollView(showsIndicators: false) {
+        let displayTags = vm.enrichment?.genres ?? detail.tags
+        let synopsis = detail.description.isEmpty
+            ? (vm.enrichment?.plainDescription ?? "")
+            : detail.description
+        return ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 heroSection(detail)
-                if !detail.tags.isEmpty {
-                    tagsSection(detail.tags).padding(.top, 12)
+                if !displayTags.isEmpty {
+                    tagsSection(displayTags).padding(.top, 12)
                 }
                 VStack(alignment: .leading, spacing: 16) {
-                    if !detail.description.isEmpty {
-                        synopsisSection(detail).padding(.top, 16)
+                    if !synopsis.isEmpty {
+                        synopsisSection(text: synopsis).padding(.top, 16)
                     }
                     #if os(iOS)
                     readButton(detail)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
-                        .padding(.top, detail.description.isEmpty ? 16 : 0)
+                        .padding(.top, synopsis.isEmpty ? 16 : 0)
+                    libraryControls(detail)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
                     #else
                     Text("Reading is available on iOS")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
                     #endif
+                }
+                if let edges = vm.enrichment?.relations?.edges {
+                    let mangaRelations = edges.filter { $0.node.isManga }
+                    if !mangaRelations.isEmpty {
+                        mangaRelationsSection(mangaRelations).padding(.top, 16)
+                    }
                 }
                 chaptersSection(detail)
             }
@@ -249,6 +343,27 @@ struct MangaDetailView: View {
                         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
                     }
 
+                    if let enrich = vm.enrichment {
+                        HStack(spacing: 6) {
+                            if let score = enrich.averageScore {
+                                Label("\(score)%", systemImage: "star.fill")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Color.primary.opacity(0.1), in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                            }
+                            if let status = enrich.statusDisplay {
+                                Text(status)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Color.primary.opacity(0.1), in: Capsule())
+                                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                            }
+                        }
+                    }
+
                     Text("\(detail.chapters.count) Chapters")
                         .font(.caption2).fontWeight(.semibold)
                         .foregroundStyle(.primary)
@@ -285,13 +400,13 @@ struct MangaDetailView: View {
 
     // MARK: - Synopsis
 
-    private func synopsisSection(_ detail: MangaDetail) -> some View {
+    private func synopsisSection(text: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Synopsis")
                 .font(.title3.weight(.bold))
                 .padding(.horizontal, 16)
 
-            Text(detail.description)
+            Text(text)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(isSynopsisExpanded ? nil : 4)
@@ -301,6 +416,27 @@ struct MangaDetailView: View {
                         isSynopsisExpanded.toggle()
                     }
                 }
+        }
+    }
+
+    // MARK: - Relations (AniList overlay)
+
+    private func mangaRelationsSection(_ edges: [MediaRelationEdge]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Relations").font(.title3.weight(.bold)).padding(.horizontal, 16)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(edges) { edge in
+                        NavigationLink {
+                            AniListMangaDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)
+                        } label: {
+                            MangaRelationCard(edge: edge)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
         }
     }
 
@@ -331,17 +467,76 @@ struct MangaDetailView: View {
         .buttonStyle(.plain)
         .disabled(detail.chapters.isEmpty)
     }
+
+    // MARK: - Reading-list editor (mirrors DetailView's per-service controls)
+
+    private var mangaAniListID: Int? { vm.enrichment?.isManga == true ? vm.enrichment?.id : vm.match?.aniListID }
+    private var mangaMALID: Int? { vm.enrichment?.idMal ?? vm.match?.malID }
+
+    private func editorMedia(provider: ProviderType, id: Int, detail: MangaDetail) -> Media {
+        if let e = vm.enrichment { return e }
+        return Media(
+            id: id, idMal: mangaMALID, provider: provider,
+            title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
+            coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+            bannerImage: nil, description: detail.description,
+            episodes: vm.match?.totalChapters, status: nil, averageScore: nil, genres: nil,
+            season: nil, seasonYear: nil, nextAiringEpisode: nil, relations: nil,
+            type: "MANGA", format: nil)
+    }
+
+    @ViewBuilder private func libraryControls(_ detail: MangaDetail) -> some View {
+        HStack(spacing: 10) {
+            if anilistAuth.isLoggedIn, mangaAniListID != nil {
+                listButton(
+                    title: existingAniListEntry.map { "\($0.status.displayName) \($0.progress)/\(vm.match?.totalChapters.map(String.init) ?? "?")" } ?? "Add to AniList",
+                    systemImage: "list.bullet.rectangle") { showAniListEdit = true }
+            }
+            if malAuth.isLoggedIn, mangaMALID != nil {
+                listButton(
+                    title: existingMALEntry.map { "MAL · \($0.status.displayName) \($0.progress)" } ?? "Add to MAL",
+                    systemImage: "list.bullet.rectangle") { showMALEdit = true }
+            }
+        }
+    }
+
+    private func listButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage).font(.system(size: 13, weight: .bold))
+                Text(title).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity).frame(height: 44)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+            .foregroundStyle(.primary)
+        }
+        .buttonStyle(.plain)
+    }
     #endif
 
     // MARK: - Chapters (mirrors episodesSection header)
 
+    /// Offline mode reads the downloaded chapters live from the manager (so a
+    /// delete updates in place and an emptied manga collapses); online uses the
+    /// module's list.
+    private func liveChapters(for detail: MangaDetail) -> [MangaChapter] {
+        #if os(iOS)
+        if offlineChapters != nil {
+            return mangaDownloads.downloadedChapters(forMangaHref: item.href)
+        }
+        #endif
+        return detail.chapters
+    }
+
     private func chaptersSection(_ detail: MangaDetail) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let visibleChapters = liveChapters(for: detail)
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
                     Text("Chapters")
                         .font(.title3.weight(.bold))
-                    Text("\(detail.chapters.count)")
+                    Text("\(visibleChapters.count)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(platformBackground)
                         .padding(.horizontal, 8).padding(.vertical, 3)
@@ -351,22 +546,20 @@ struct MangaDetailView: View {
 
                 HStack(spacing: 8) {
                     #if os(iOS)
-                    if offlineChapters == nil {
-                        Button {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                isSelectionMode.toggle()
-                                if !isSelectionMode { selectedChapterHrefs.removeAll() }
-                            }
-                        } label: {
-                            Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
-                                .frame(width: 36, height: 36)
-                                .background(isSelectionMode ? Color.primary : Color.clear, in: Circle())
-                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isSelectionMode.toggle()
+                            if !isSelectionMode { selectedChapterHrefs.removeAll() }
                         }
-                        .buttonStyle(.plain)
+                    } label: {
+                        Image(systemName: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(isSelectionMode ? platformBackground : .primary)
+                            .frame(width: 36, height: 36)
+                            .background(isSelectionMode ? Color.primary : Color.clear, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
+                    .buttonStyle(.plain)
                     #endif
 
                     Button {
@@ -394,11 +587,11 @@ struct MangaDetailView: View {
                     selectedHrefs: selectedChapterHrefs, completedHrefs: completedHrefs)
                 let toDelete = selectedChapterHrefs.intersection(completedHrefs).count
                 HStack {
-                    Button(selectedChapterHrefs.count == detail.chapters.count ? "Deselect All" : "Select All") {
-                        if selectedChapterHrefs.count == detail.chapters.count {
+                    Button(selectedChapterHrefs.count == visibleChapters.count ? "Deselect All" : "Select All") {
+                        if selectedChapterHrefs.count == visibleChapters.count {
                             selectedChapterHrefs.removeAll()
                         } else {
-                            selectedChapterHrefs = Set(detail.chapters.map { $0.href })
+                            selectedChapterHrefs = Set(visibleChapters.map { $0.href })
                         }
                     }
                     .font(.subheadline.weight(.bold))
@@ -421,9 +614,9 @@ struct MangaDetailView: View {
                         }
                         .buttonStyle(.borderedProminent).tint(.red).controlSize(.small).clipShape(Capsule())
                     }
-                    if toDownload > 0 {
+                    if toDownload > 0 && offlineChapters == nil {
                         Button {
-                            let chapters = detail.chapters.filter {
+                            let chapters = visibleChapters.filter {
                                 selectedChapterHrefs.contains($0.href) && !completedHrefs.contains($0.href)
                             }
                             mangaDownloads.batchDownload(chapters: chapters, context: downloadContext(detail))
@@ -440,13 +633,13 @@ struct MangaDetailView: View {
             }
             #endif
 
-            if detail.chapters.isEmpty {
-                Text("No chapters found.")
+            if visibleChapters.isEmpty {
+                Text(offlineChapters == nil ? "No chapters found." : "No downloaded chapters.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
             } else {
-                let ordered = newestFirst ? Array(detail.chapters.reversed()) : detail.chapters
+                let ordered = newestFirst ? Array(visibleChapters.reversed()) : visibleChapters
                 let lastRead = progress.lastRead(for: item.href)
                 LazyVStack(spacing: 8) {
                     ForEach(ordered) { chapter in
@@ -481,7 +674,7 @@ struct MangaDetailView: View {
                             },
                             isSelectionMode: chapterRowSelectionMode,
                             isSelected: selectedChapterHrefsContains(chapter.href),
-                            downloadState: offlineChapters == nil ? mangaDownloadState(for: chapter) : nil,
+                            downloadState: mangaDownloadState(for: chapter),
                             onDownload: offlineChapters == nil ? {
                                 #if os(iOS)
                                 mangaDownloads.download(chapter: chapter, context: downloadContext(detail))
@@ -547,6 +740,32 @@ struct MangaDetailView: View {
         )
     }
     #endif
+}
+
+// MARK: - Relation card (lightweight; RelationCard is anime/TVDB-only)
+
+private struct MangaRelationCard: View {
+    let edge: MediaRelationEdge
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            CachedAsyncImage(urlString: edge.node.coverImage.best ?? "")
+                .frame(width: 110, height: 165)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(alignment: .topLeading) {
+                    Text(edge.formattedRelation)
+                        .font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .background(Color.black.opacity(0.4), in: Capsule())
+                        .padding(8)
+                }
+            Text(edge.node.title.displayTitle)
+                .font(.caption).fontWeight(.semibold).foregroundStyle(.primary)
+                .lineLimit(2).multilineTextAlignment(.leading)
+                .frame(width: 110, alignment: .leading)
+        }
+    }
 }
 
 // MARK: - Chapter row (mirrors EpisodeRowView's card design)

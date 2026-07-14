@@ -162,6 +162,35 @@ final class AniListProvider: MediaProvider {
         )
     }
 
+    /// Manga variant of `mapMedia`: AniList returns `chapters` (not `episodes`)
+    /// for manga, so put the chapter total in the `episodes` slot the editor
+    /// stepper and hero read, and force `type = "MANGA"` so `Media.isManga` holds.
+    func mapMangaMedia(_ m: AniListMedia) -> Media {
+        Media(
+            id: m.id,
+            idMal: m.idMal,
+            provider: .anilist,
+            title: MediaTitle(romaji: m.title.romaji, english: m.title.english, native: m.title.native),
+            coverImage: MediaCoverImage(large: m.coverImage.large, extraLarge: m.coverImage.extraLarge),
+            bannerImage: m.bannerImage,
+            description: m.description,
+            episodes: m.chapters,
+            status: m.status,
+            averageScore: m.averageScore,
+            genres: m.genres,
+            season: m.season,
+            seasonYear: m.seasonYear,
+            nextAiringEpisode: nil,
+            relations: m.relations.map { mapRelations($0) },
+            type: "MANGA",
+            format: m.format
+        )
+    }
+
+    func mangaDetail(id: Int) async throws -> Media {
+        mapMangaMedia(try await AniListService.shared.mangaDetail(id: id))
+    }
+
     private func mapRelations(_ r: AniListRelations) -> MediaRelations {
         MediaRelations(edges: r.edges.map { e in
             MediaRelationEdge(relationType: e.relationType, node: mapMedia(e.node))

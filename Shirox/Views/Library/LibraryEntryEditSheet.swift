@@ -6,6 +6,7 @@ struct LibraryEntryEditSheet: View {
     let onSave: (MediaListStatus, Int, Double) -> Void
     var onDelete: (() -> Void)? = nil
     var scoreFormatOverride: ScoreFormat? = nil
+    var progressUnit: String = "episode"
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var anilistAuth = AniListAuthManager.shared
@@ -30,6 +31,7 @@ struct LibraryEntryEditSheet: View {
 
     init(entry: LibraryEntry?, media: Media,
          scoreFormatOverride: ScoreFormat? = nil,
+         progressUnit: String = "episode",
          onSave: @escaping (MediaListStatus, Int, Double) -> Void,
          onDelete: (() -> Void)? = nil) {
         self.entry = entry
@@ -37,6 +39,7 @@ struct LibraryEntryEditSheet: View {
         self.onSave = onSave
         self.onDelete = onDelete
         self.scoreFormatOverride = scoreFormatOverride
+        self.progressUnit = progressUnit
         _status = State(initialValue: entry?.status ?? .planning)
         _progress = State(initialValue: entry?.progress ?? 0)
         // Local entries convert from their canonical score into the active format;
@@ -60,7 +63,7 @@ struct LibraryEntryEditSheet: View {
                     Section("Progress") {
                         #if !os(tvOS)
                         Stepper(
-                            "\(progress) episode\(progress == 1 ? "" : "s") watched",
+                            "\(progress) \(progressUnit)\(progress == 1 ? "" : "s") \(progressUnit == "chapter" ? "read" : "watched")",
                             value: $progress,
                             in: 0...(media.episodes ?? 9999)
                         )

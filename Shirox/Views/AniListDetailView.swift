@@ -231,6 +231,12 @@ struct AniListDetailView: View {
             watchOrder = await TVDBMappingService.shared.fetchWatchOrder(id: mediaId)
         }
         .task {
+            #if os(iOS)
+            if moduleManager.activeModule?.isManga == true,
+               let anime = AnimeModulePreference.pick(active: moduleManager.activeModule, modules: moduleManager.modules) {
+                _ = await moduleManager.selectAndAwaitReady(anime)
+            }
+            #endif
             vm.resumeWatchedSeconds = resumeWatchedSeconds
             await vm.load(id: mediaId, preloaded: preloadedMedia)
             

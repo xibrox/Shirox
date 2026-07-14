@@ -1,6 +1,6 @@
 # Shirox
 
-Shirox is a free, open-source personal anime library manager for iOS 15+, designed with a focus on modern aesthetics.
+Shirox is a free, source-available personal anime library manager for iOS 15+, designed with a focus on modern aesthetics.
 
 ## Features
 
@@ -62,7 +62,7 @@ If you enjoy Shirox and want to support development, consider supporting the pro
 
 ## ⚖️ License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the PolyForm Noncommercial License 1.0.0. See `LICENSE` for more information.
 
 ---
 Built with ❤️ by [xibrox](https://github.com/xibrox)

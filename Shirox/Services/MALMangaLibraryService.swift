@@ -144,7 +144,7 @@ final class MALMangaLibraryService {
         }
     }
 
-    func mapStatusFromMAL(_ s: String?) -> MediaListStatus {
+    static func mapStatus(_ s: String?) -> MediaListStatus {
         switch s {
         case "reading":      return .current
         case "plan_to_read": return .planning
@@ -153,6 +153,23 @@ final class MALMangaLibraryService {
         case "on_hold":      return .paused
         default:             return .planning
         }
+    }
+
+    func mapStatusFromMAL(_ s: String?) -> MediaListStatus { Self.mapStatus(s) }
+
+    /// Maps a fetched MAL manga list entry to the app's provider-agnostic
+    /// `LibraryEntry` so it can drive `LibraryEntryEditSheet`.
+    static func libraryEntry(from entry: MALMangaLibraryService.MALMangaListEntry,
+                             media: Media) -> LibraryEntry {
+        LibraryEntry(
+            id: entry.node.id,
+            media: media,
+            status: mapStatus(entry.list_status.status),
+            progress: entry.list_status.num_chapters_read ?? 0,
+            score: Double(entry.list_status.score ?? 0),
+            updatedAt: nil,
+            customListName: nil,
+            timesRewatched: entry.list_status.num_times_reread)
     }
 
     private func validateResponse(_ response: URLResponse) throws {

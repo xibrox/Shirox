@@ -2,6 +2,16 @@ import Foundation
 import SwiftUI
 import Combine
 
+/// Mirror of MangaModuleResolver's preference, for the anime side: keep the active
+/// module if it's an anime (non-manga) module, else fall back to the first anime
+/// module, else nil.
+enum AnimeModulePreference {
+    static func pick(active: ModuleDefinition?, modules: [ModuleDefinition]) -> ModuleDefinition? {
+        if let active, active.isManga == false { return active }
+        return modules.first { $0.isManga == false }
+    }
+}
+
 @MainActor
 final class ModuleManager: ObservableObject {
     static let shared = ModuleManager()
