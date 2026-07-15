@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "1.0.2+108",
+          "buildVersion": "108",
+          "date": "2026-07-15",
+          "localizedDescription": "Stability improvements and bug fixes.",
+          "downloadURL": "https://github.com/xibrox/Shirox/releases/download/beta/Shirox.ipa",
+          "size": 9132843,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.0.2",
           "buildVersion": "107",
           "date": "2026-07-13",
