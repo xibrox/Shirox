@@ -27,7 +27,7 @@
       },
       "versions": [
         {
-          "version": "1.0.2+108",
+          "version": "1.0.3",
           "buildVersion": "108",
           "date": "2026-07-15",
           "localizedDescription": "Stability improvements and bug fixes.",
