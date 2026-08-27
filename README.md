@@ -1,6 +1,6 @@
 <div align="center">
 
-# 白 Shirox
+# 白 Shirox 白
 
 **Your anime and manga library, entirely yours.**
 
