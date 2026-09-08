@@ -121,7 +121,12 @@ final class ProviderManager: ObservableObject {
         }
     }
 
-    private func isFallbackEligible(_ error: Error) -> Bool {
+    /// Whether a failure is worth asking the next provider about.
+    ///
+    /// Internal rather than private so the classification can be tested directly: adding a case
+    /// to `AniListError` and forgetting this switch is precisely how AniList stopped falling
+    /// back to MyAnimeList during an outage.
+    func isFallbackEligible(_ error: Error) -> Bool {
         if error is CancellationError { return false }
         if let pe = error as? ProviderError { return pe.isFallbackEligible }
         if let urlError = error as? URLError {
@@ -130,6 +135,12 @@ final class ProviderManager: ObservableObject {
         if let aniError = error as? AniListError {
             switch aniError {
             case .httpError(let code): return code == 403 || code >= 500
+            // Classified by status, exactly as a bare `httpError` is. AniList explains an
+            // outage in its response body — "the API has been temporarily disabled" arrives
+            // as a 403 with text — and that message-carrying case landing in `default` meant
+            // the app stopped falling back to MyAnimeList for the one failure it matters most
+            // for: AniList being down.
+            case .serviceMessage(let code, _): return code == 403 || code >= 500
             case .rateLimited: return true
             default: return false
             }

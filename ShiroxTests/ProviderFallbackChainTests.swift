@@ -66,3 +66,68 @@ final class ProviderFallbackChainTests: XCTestCase {
         XCTAssertEqual(message([]), "No tracker is available.")
     }
 }
+
+/// Tests for which failures are worth asking the next provider about.
+///
+/// THE BUG: AniList explains an outage in its response body, so "the API has been temporarily
+/// disabled" arrives as a 403 carrying text. Adding a case for that message and leaving this
+/// switch alone dropped it into `default`, and the app stopped falling back to MyAnimeList for
+/// the one failure it matters most for. Reported simply as "it doesn't automatically switch".
+@MainActor
+final class ProviderFallbackEligibilityTests: XCTestCase {
+
+    private var manager: ProviderManager { ProviderManager.shared }
+
+    // MARK: - AniList outages must fall through to the other tracker
+
+    func testServiceMessageOutageIsEligible() {
+        let outage = AniListError.serviceMessage(
+            code: 403, message: "The AniList API has been temporarily disabled.")
+        XCTAssertTrue(manager.isFallbackEligible(outage))
+    }
+
+    func testServiceMessageServerErrorIsEligible() {
+        XCTAssertTrue(manager.isFallbackEligible(
+            AniListError.serviceMessage(code: 503, message: "Down for maintenance")))
+    }
+
+    /// A bare status and one carrying a message must be classified identically — the wording is
+    /// for the reader, not for the routing.
+    func testMessageAndBareStatusAgree() {
+        for code in [403, 500, 503, 400, 404] {
+            XCTAssertEqual(
+                manager.isFallbackEligible(AniListError.httpError(code)),
+                manager.isFallbackEligible(AniListError.serviceMessage(code: code, message: "x")),
+                "status \(code) classified differently with and without a message"
+            )
+        }
+    }
+
+    func testHttpOutagesAreEligible() {
+        XCTAssertTrue(manager.isFallbackEligible(AniListError.httpError(403)))
+        XCTAssertTrue(manager.isFallbackEligible(AniListError.httpError(500)))
+        XCTAssertTrue(manager.isFallbackEligible(AniListError.rateLimited))
+    }
+
+    // MARK: - Failures another provider can't fix
+
+    /// A bad request stays bad on the next tracker; retrying it only delays the message.
+    func testClientErrorsAreNotEligible() {
+        XCTAssertFalse(manager.isFallbackEligible(AniListError.httpError(400)))
+        XCTAssertFalse(manager.isFallbackEligible(AniListError.serviceMessage(code: 400, message: "Bad query")))
+    }
+
+    func testCancellationIsNotEligible() {
+        XCTAssertFalse(manager.isFallbackEligible(CancellationError()))
+        XCTAssertFalse(manager.isFallbackEligible(URLError(.cancelled)))
+    }
+
+    /// Having already exhausted every provider, there is nothing left to try.
+    func testExhaustedChainIsNotEligible() {
+        XCTAssertFalse(manager.isFallbackEligible(ProviderError.allProvidersFailed([])))
+    }
+
+    func testProviderServerErrorsAreEligible() {
+        XCTAssertTrue(manager.isFallbackEligible(ProviderError.serverError(504)))
+    }
+}
