@@ -106,6 +106,7 @@ struct ProfileSocialView: View {
                 }
             }
         }
+        .softScrollEdges()
         .listStyle(.plain)
         .refreshable { await vm.loadSocial(userId: userId, type: selectedSocial) }
         .task { await vm.loadSocial(userId: userId, type: selectedSocial) }

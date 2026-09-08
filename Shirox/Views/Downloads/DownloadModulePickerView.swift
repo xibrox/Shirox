@@ -52,6 +52,7 @@ struct DownloadModulePickerView: View {
                     }
                 }
             }
+            .softScrollEdges()
             .listStyle(.insetGrouped)
             .navigationTitle("Download Episode \(episodeNumber)")
             .navigationBarTitleDisplayMode(.inline)
@@ -469,6 +470,7 @@ private struct SearchResultsPickerSheet: View {
                 }
                 .padding(16)
             }
+            .softScrollEdges()
             .navigationTitle(module.sourceName)
             .navigationBarTitleDisplayMode(.inline)
         }

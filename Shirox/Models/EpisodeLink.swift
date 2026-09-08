@@ -82,18 +82,57 @@ enum EpisodeNavigator {
         return numberMatches.count == 1 ? numberMatches.first : nil
     }
 
+    /// Converts a module's own episode number back to the season-relative number the app tracks.
+    ///
+    /// The inverse of `ModuleStreamPickerView.matchEpisode`, which picks the module row for a
+    /// season-relative episode two different ways. Going the other way matters because the two
+    /// halves of playback disagreed otherwise: the AniList flow *launches* with the
+    /// season-relative number the user tapped, but the next-episode loaders reported the
+    /// module's own number straight back into the same field. On a sequel the display jumped
+    /// (S2 E1 → "13"), and `pushRemoteProgress` then re-applied the anchor offset to a number
+    /// that already carried it, writing progress to the wrong season entry.
+    ///
+    /// - Parameters:
+    ///   - moduleNumber: the number the module gives this episode.
+    ///   - index: its position in `episodes`.
+    ///   - episodes: the module's flat list for the resolved detail page.
+    ///   - seasonOffset: franchise episodes preceding this season (`SeasonChainMapper
+    ///     .resolveOffset`), or 0 when the chain couldn't be resolved.
+    static func seasonRelativeNumber(moduleNumber: Int,
+                                     index: Int,
+                                     in episodes: [EpisodeLink],
+                                     seasonOffset: Int) -> Int {
+        // Combined franchise list (S1+S2 in one list, numbered from 1): position is the only
+        // reliable signal, mirroring matchEpisode's `seasonOffset + target - 1`.
+        if seasonOffset > 0, index >= seasonOffset {
+            return index - seasonOffset + 1
+        }
+        // Season-specific page numbered with an absolute offset (S2 = 25…48), mirroring
+        // matchEpisode's `minEp + target - 1` branch.
+        if let minEp = episodes.map(\.number).min(), minEp > 1 {
+            return moduleNumber - Int(minEp) + 1
+        }
+        // Module already numbers this season from 1 — nothing to convert.
+        return moduleNumber
+    }
+
     /// Convenience for the resume paths: anchor on the unique `href` when one was saved,
-    /// otherwise fall back to the episode closest to `number` (legacy items predate the
-    /// stored href). Returns just the next episode, or `nil` at the end of the list.
+    /// otherwise fall back to `number` — but only when it names exactly one episode (legacy
+    /// items predate the stored href). Returns just the next episode, or `nil` at the end of
+    /// the list, when the href is unknown and the number is ambiguous or absent.
     static func next(afterHref href: String?, orNumber number: Int, in episodes: [EpisodeLink]) -> EpisodeLink? {
         if let step = next(afterHref: href, in: episodes) { return step.episode }
-        var idx = episodes.firstIndex(where: { Int($0.number) == number })
-        if idx == nil {
-            idx = episodes.enumerated().min(by: {
-                abs(Int($0.element.number) - number) < abs(Int($1.element.number) - number)
-            })?.offset
-        }
-        guard let i = idx, i + 1 < episodes.count else { return nil }
+        // No usable href — fall back to the number, but only when it identifies exactly one
+        // episode. This previously picked the *nearest* number when no exact match existed,
+        // which silently advanced into the wrong season on any list the app tracks
+        // season-relative while the module numbers it continuously (a sequel listed as 13…24):
+        // "next" after S2 E1 searched a list containing no episode 1 at all and landed wherever
+        // the arithmetic pointed, then wrote that number through to AniList/MAL. `resolve`
+        // above already declines ambiguous number matches for this exact reason; guessing here
+        // contradicted it. Returning nil lets the player fall through to its downloaded-episode
+        // and sequel paths instead of playing and syncing something wrong.
+        let matches = episodes.enumerated().filter { Int($0.element.number) == number }
+        guard matches.count == 1, let i = matches.first?.offset, i + 1 < episodes.count else { return nil }
         return episodes[i + 1]
     }
 }

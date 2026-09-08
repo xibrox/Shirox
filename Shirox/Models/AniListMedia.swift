@@ -103,6 +103,22 @@ enum AniListSeason: String {
         }
         return (season, year)
     }
+
+    /// The season immediately before `from` (defaults to now).
+    ///
+    /// Used for the "Last Season" home row: by the time a cour ends, the shows people most
+    /// want to binge are the ones that just finished, and "This Season" no longer lists them.
+    /// Winter rolls back into the previous calendar year's Fall.
+    static func previous(from reference: Date = Date()) -> (AniListSeason, Int) {
+        let month = Calendar.current.component(.month, from: reference)
+        let year = Calendar.current.component(.year, from: reference)
+        switch month {
+        case 1...3:  return (.fall, year - 1)
+        case 4...6:  return (.winter, year)
+        case 7...9:  return (.spring, year)
+        default:     return (.summer, year)
+        }
+    }
 }
 
 struct AniListRelations: Codable {

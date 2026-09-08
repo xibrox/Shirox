@@ -71,6 +71,20 @@ struct Media: Identifiable, Codable, Equatable, Hashable, Sendable {
         default: return status
         }
     }
+
+    /// Episodes released so far, falling back to the announced total when none have aired.
+    ///
+    /// `nextAiringEpisode.episode - 1` is the aired count, and callers preferred it so an
+    /// ongoing season doesn't advertise episodes nobody can watch yet. But it evaluates to 0
+    /// for a season whose *first* episode hasn't aired, and the `?? episodes` chains this
+    /// replaces treated that 0 as a real answer — the `??` never fired because the left side
+    /// was non-nil. An announced-but-unaired season therefore reported 0 episodes: the detail
+    /// page showed "Episode count not available" and the library entry synced as 0/0 even
+    /// though AniList knew the full count. Only accept the aired count once it is positive.
+    var airedOrAnnouncedEpisodes: Int? {
+        if let aired = nextAiringEpisode.map({ $0.episode - 1 }), aired > 0 { return aired }
+        return episodes
+    }
 }
 
 extension Media {
@@ -153,7 +167,20 @@ struct MediaTitle: Codable, Equatable, Hashable {
 struct MediaCoverImage: Codable, Equatable, Hashable {
     let large: String?
     let extraLarge: String?
+    /// The largest available art. For heroes and the full-screen poster viewer, where the
+    /// image fills the screen and quality is the point.
     var best: String? { extraLarge ?? large }
+
+    /// Art for a grid cell or a row thumbnail.
+    ///
+    /// Normally the same as `best`, but Data Saver flips the preference: AniList's `extraLarge`
+    /// runs to roughly 1000×1500 and was being fetched to fill a cell a tenth that size, dozens
+    /// at a time down the Home screen. `large` is a few hundred pixels across and a small
+    /// fraction of the bytes, which is the difference between browsing costing megabytes and
+    /// costing hundreds of them.
+    var thumb: String? {
+        DataSaver.isEnabled ? (large ?? extraLarge) : (extraLarge ?? large)
+    }
 }
 
 struct MediaAiringEpisode: Codable, Equatable, Hashable {

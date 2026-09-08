@@ -67,6 +67,7 @@ struct BrowseView: View {
                             .padding(.bottom, 16)
                     }
                 }
+                .softScrollEdges()
                 .refreshable { await vm.retry() }
             }
         }

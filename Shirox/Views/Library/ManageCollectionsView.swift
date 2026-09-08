@@ -98,6 +98,7 @@ struct ManageCollectionsView: View {
                             row(for: collection)
                         }
                     }
+                    .softScrollEdges()
                 }
             }
             .navigationTitle("Collections")

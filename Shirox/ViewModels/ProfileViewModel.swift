@@ -128,6 +128,10 @@ final class ProfileViewModel: ObservableObject {
         }
     }
 
+    /// No signed-in provider implements notifications (AniList signed out, MAL only). Distinct
+    /// from "loaded successfully and there were none", which the screen used to conflate.
+    @Published var notificationsUnsupported = false
+
     func loadNotifications(filter: AniListNotificationFilter? = nil) async {
         let filterOnly = filter != nil && !allNotifications.isEmpty
         if let filter { notificationFilter = filter }
@@ -137,8 +141,19 @@ final class ProfileViewModel: ObservableObject {
         }
         isLoadingNotifications = true
         defer { isLoadingNotifications = false }
+        // Ask a provider that actually implements notifications. Going through
+        // `ProviderManager.call` meant a transient AniList error fell back to MAL, which has no
+        // notifications endpoint and answered with an empty list — so a failure was displayed
+        // as a confident "No Notifications" with nothing to distinguish it from having none.
+        guard let provider = ProviderManager.shared.notificationsProvider else {
+            notificationsUnsupported = true
+            allNotifications = []
+            notifications = []
+            return
+        }
+        notificationsUnsupported = false
         do {
-            allNotifications = try await ProviderManager.shared.call { try await $0.fetchNotifications() }
+            allNotifications = try await provider.fetchNotifications()
             notifications = applyNotificationFilter(allNotifications)
         } catch {
             self.error = error.localizedDescription

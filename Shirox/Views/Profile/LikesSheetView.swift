@@ -63,6 +63,7 @@ struct LikesSheetView: View {
                             .listRowBackground(Color.clear)
                         }
                     }
+                    .softScrollEdges()
                     .listStyle(.plain)
                     .refreshable { await load() }
                 }

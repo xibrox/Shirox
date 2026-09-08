@@ -71,6 +71,7 @@ struct ActivityDetailView: View {
                         .padding(.top, 12)
                 }
             }
+            .softScrollEdges()
             
             replyComposer
                 .padding(14)

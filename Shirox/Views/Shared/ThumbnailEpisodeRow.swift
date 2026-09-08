@@ -138,6 +138,9 @@ struct ThumbnailEpisodeRow: View {
                             case .pending:
                                 Image(systemName: "hourglass")
                                     .foregroundStyle(.secondary)
+                            case .paused:
+                                Image(systemName: "pause.circle.fill")
+                                    .foregroundStyle(.secondary)
                             case .failed:
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .foregroundStyle(.red)

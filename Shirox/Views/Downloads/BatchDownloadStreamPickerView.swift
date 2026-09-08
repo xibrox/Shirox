@@ -62,6 +62,7 @@ struct BatchDownloadStreamPickerView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .softScrollEdges()
                     .listStyle(.insetGrouped)
                 }
             }

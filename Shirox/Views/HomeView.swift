@@ -8,6 +8,17 @@ struct HomeView: View {
     // NavigationLink that performs the push sits OUTSIDE the ScrollView below.
     @State private var cwNavTarget: ContinueWatchingNavTarget?
     @State private var readerContext: ReaderContext?
+    @State private var showUpcoming = false
+    @ObservedObject private var providerManager = ProviderManager.shared
+
+    /// The leading edge of the navigation bar, named differently per platform.
+    private static var leadingPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .navigationBarLeading
+        #else
+        .navigation
+        #endif
+    }
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -56,6 +67,9 @@ struct HomeView: View {
                             if !vm.seasonal.isEmpty {
                                 AnimeSection(title: "This Season",      items: vm.seasonal, category: .seasonal)
                             }
+                            if !vm.lastSeason.isEmpty {
+                                AnimeSection(title: "Last Season · Complete", items: vm.lastSeason, category: .lastSeason)
+                            }
                             if !vm.popular.isEmpty {
                                 AnimeSection(title: "All-Time Popular", items: vm.popular,  category: .popular)
                             }
@@ -65,6 +79,7 @@ struct HomeView: View {
                         }
                         Spacer().frame(height: 28)
                     }
+                    .softScrollEdges()
                     .refreshable {
                         await withTaskGroup(of: Void.self) { group in
                             group.addTask { await vm.reload() }
@@ -77,7 +92,13 @@ struct HomeView: View {
                         }
                     }
                     .coordinateSpace(name: "homeScroll")
-                    .ignoresSafeArea(edges: .top)
+                    // Only the hero is allowed under the status bar — bleeding its banner up
+                    // there is the point of it. Without one, this same modifier slid whatever
+                    // row happened to be first up under the clock, which is what a title row
+                    // overlapping the time looked like. The hero can be absent for ordinary
+                    // reasons: a provider that doesn't fill Trending, or an outage on the
+                    // endpoint behind it.
+                    .ignoresSafeArea(edges: vm.trending.isEmpty ? [] : .top)
                 }
             }
             .navigationTitle("")
@@ -86,10 +107,20 @@ struct HomeView: View {
             .toolbarBackgroundHidden()
             #endif
             .toolbar {
+                // One control per side. Sharing `.primaryAction` between two items is what
+                // pushed the provider switcher out — the platform may collapse or drop one —
+                // so the calendar takes the leading edge and the switcher keeps the trailing
+                // one it has always had, untouched.
+                ToolbarItem(placement: Self.leadingPlacement) {
+                    Button { showUpcoming = true } label: {
+                        Label("Upcoming", systemImage: "calendar")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     ProviderMenuButton()
                 }
             }
+            .sheet(isPresented: $showUpcoming) { UpcomingCalendarView() }
             // Outside the ScrollView: the hidden NavigationLink that performs the push.
             .continueWatchingNavigation($cwNavTarget)
             #if os(iOS)
@@ -320,7 +351,10 @@ private struct MacFeaturedCarousel: View {
                     ZStack(alignment: .bottomLeading) {
                         // Banner background
                         Group {
-                            if let bannerUrl = media.bannerImage {
+                            // Banners are the single heaviest asset on this screen — full
+                            // width, one per hero card — so Data Saver drops them for the
+                            // gradient the app already falls back to when a title has none.
+                            if let bannerUrl = media.bannerImage, !DataSaver.isEnabled {
                                 CachedAsyncImage(urlString: bannerUrl)
                             } else {
                                 LinearGradient(
@@ -341,7 +375,7 @@ private struct MacFeaturedCarousel: View {
 
                         // Cover + text + watch button
                         HStack(alignment: .bottom, spacing: 12) {
-                            CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                            CachedAsyncImage(urlString: media.coverImage.thumb ?? "")
                                 .frame(width: 80, height: 120)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .shadow(radius: 4)
@@ -520,7 +554,7 @@ private struct FeaturedCard: View {
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        CachedAsyncImage(urlString: media.coverImage.best ?? "")
+                        CachedAsyncImage(urlString: media.coverImage.thumb ?? "")
                             .frame(width: 80, height: 120)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .shadow(radius: 4)
@@ -541,7 +575,7 @@ private struct FeaturedCard: View {
     // MARK: - Banner Background (macOS only)
     @ViewBuilder
     private var bannerBackground: some View {
-        if let bannerUrlString = media.bannerImage {
+        if let bannerUrlString = media.bannerImage, !DataSaver.isEnabled {
             CachedAsyncImage(urlString: bannerUrlString)
         } else {
             gradientPlaceholder

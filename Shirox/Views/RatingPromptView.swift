@@ -36,6 +36,7 @@ struct RatingPromptView: View {
                     ScoreInputView(score: $score, format: scoreFormat)
                 }
             }
+            .softScrollEdges()
             .navigationTitle("Rate Anime")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

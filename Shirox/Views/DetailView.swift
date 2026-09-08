@@ -6,6 +6,35 @@ struct DetailView: View {
     var resumeEpisodeNumber: Int?
     var resumeWatchedSeconds: Double?
     var moduleId: String?
+
+    /// The module this screen is *about*: the one it was opened for (a download's own source),
+    /// falling back to whatever is currently active.
+    ///
+    /// Opening a downloaded title asks `ModuleManager` to switch to its module, but that runs
+    /// in a `Task` — so anything reading `activeModule` synchronously afterwards still sees the
+    /// previous one. A local `let moduleId = ModuleManager.shared.activeModule?.id` also
+    /// shadowed this property, so the reads below silently used the wrong module: a MangaKatana
+    /// download opened showing Anikoto, and its progress and sort order were keyed to Anikoto too.
+    private var effectiveModuleId: String? { moduleId ?? ModuleManager.shared.activeModule?.id }
+
+    #if os(iOS)
+    /// Download state for one episode of the title on screen — matched by its unique href, or
+    /// by (title, number, module) for items saved before hrefs were recorded.
+    ///
+    /// A function rather than an inline predicate: written out in the selection-bar closure the
+    /// whole expression exceeded the type-checker's budget.
+    private func downloadState(for episode: EpisodeLink, title: String) -> DownloadState? {
+        let episodeNumber = Int(episode.number)
+        let module = effectiveModuleId
+        let match = DownloadManager.shared.items.first { item -> Bool in
+            if item.episodeHref == episode.href { return true }
+            return item.mediaTitle == title
+                && item.episodeNumber == episodeNumber
+                && item.moduleId == module
+        }
+        return match?.state
+    }
+    #endif
     var aniListID: Int?
     @StateObject private var vm = DetailViewModel()
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
@@ -54,7 +83,7 @@ struct DetailView: View {
     /// tap-to-open back to this module's detail screen.
     private var bookmarkSource: LocalSource? {
         guard aniListID == nil, malID == nil else { return nil }
-        let mid = moduleId ?? ModuleManager.shared.activeModule?.id
+        let mid = effectiveModuleId
         return LocalSource(kind: .module, moduleId: mid, detailHref: vm.detailHref, localImportName: nil)
     }
 
@@ -112,6 +141,7 @@ struct DetailView: View {
             }
             .padding(.bottom, 30)
         }
+        .softScrollEdges()
         .coordinateSpace(name: "detailScroll")
         .ignoresSafeArea(edges: .top)
     }
@@ -171,7 +201,7 @@ struct DetailView: View {
                 vm.load(item: item)
             }
             
-            let moduleId = ModuleManager.shared.activeModule?.id
+            let moduleId = effectiveModuleId
             if let resumeNum = resumeEpisodeNumber {
                 selectedRangeIndex = (resumeNum - 1) / 100
             } else {
@@ -192,7 +222,7 @@ struct DetailView: View {
             guard !autoPlayOnLoad else { return }
 
             if let detail = vm.detail, !detail.episodes.isEmpty {
-                let moduleId = ModuleManager.shared.activeModule?.id
+                let moduleId = effectiveModuleId
                 ContinueWatchingManager.shared.notifyNewEpisodesAvailable(
                     aniListID: vm.aniListID ?? aniListID,
                     moduleId: moduleId,
@@ -265,7 +295,7 @@ struct DetailView: View {
                         } else if progress > 0 {
                             ContinueWatchingManager.shared.markWatched(
                                 upThrough: progress, aniListID: aid,
-                                moduleId: ModuleManager.shared.activeModule?.id,
+                                moduleId: effectiveModuleId,
                                 mediaTitle: detail.title, imageUrl: detail.image,
                                 totalEpisodes: detail.episodes.count,
                                 availableEpisodes: detail.episodes.count,
@@ -333,7 +363,7 @@ struct DetailView: View {
                     mediaTitle: item.title,
                     imageUrl: detail.image,
                     aniListID: vm.aniListID,
-                    moduleId: ModuleManager.shared.activeModule?.id,
+                    moduleId: effectiveModuleId,
                     episodes: detail.episodes,
                     episodeNumbers: Array(selectedEpisodeNumbers).sorted(),
                     onDismiss: {
@@ -361,7 +391,7 @@ struct DetailView: View {
 
     // MARK: - Continue Watching Helpers
     private func continueWatchingItem(for detail: MediaDetail) -> ContinueWatchingItem? {
-        let moduleId = ModuleManager.shared.activeModule?.id
+        let moduleId = effectiveModuleId
         return continueWatching.items
             .filter { $0.moduleId == moduleId && $0.mediaTitle == detail.title }
             .sorted { $0.lastWatchedAt > $1.lastWatchedAt }
@@ -487,7 +517,7 @@ struct DetailView: View {
         
         Button {
             // Prefer the local file when the target episode is already downloaded.
-            let activeModule = moduleId ?? ModuleManager.shared.activeModule?.id
+            let activeModule = effectiveModuleId
             let downloadedTarget = DownloadManager.shared.items.first {
                 $0.mediaTitle == detail.title
                     && $0.moduleId == activeModule
@@ -568,7 +598,7 @@ struct DetailView: View {
     }
 
     private func tapEpisode(_ episode: EpisodeLink) {
-        let moduleId = ModuleManager.shared.activeModule?.id
+        let moduleId = effectiveModuleId
         let resolvedAniListID = vm.aniListID ?? aniListID
         let currentTitle = vm.detail?.title ?? item.title
         let epNum = Int(episode.number)
@@ -781,7 +811,7 @@ struct DetailView: View {
                     } else if progress > 0 {
                         ContinueWatchingManager.shared.markWatched(
                             upThrough: progress, aniListID: aid,
-                            moduleId: ModuleManager.shared.activeModule?.id,
+                            moduleId: effectiveModuleId,
                             mediaTitle: detail.title, imageUrl: detail.image,
                             totalEpisodes: detail.episodes.count,
                             availableEpisodes: detail.episodes.count,
@@ -988,6 +1018,7 @@ struct DetailView: View {
             }
             .padding(.bottom, 30)
         }
+        .softScrollEdges()
         .coordinateSpace(name: "detailScroll")
         .ignoresSafeArea(edges: .top)
     }
@@ -1146,6 +1177,7 @@ struct DetailView: View {
                         isSynopsisExpanded.toggle()
                     }
                 }
+                .copyDescriptionContextMenu(detail.description)
         }
     }
 
@@ -1238,7 +1270,7 @@ struct DetailView: View {
 
                 #if os(iOS)
                 if !isSelectionMode {
-                    if continueWatching.hasProgress(aniListID: vm.aniListID ?? aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
+                    if continueWatching.hasProgress(aniListID: vm.aniListID ?? aniListID, moduleId: effectiveModuleId, mediaTitle: detail.title) {
                         Button {
                             showResetConfirmation = true
                         } label: {
@@ -1253,7 +1285,7 @@ struct DetailView: View {
                     }
                 }
                 #else
-                if continueWatching.hasProgress(aniListID: vm.aniListID ?? aniListID, moduleId: ModuleManager.shared.activeModule?.id, mediaTitle: detail.title) {
+                if continueWatching.hasProgress(aniListID: vm.aniListID ?? aniListID, moduleId: effectiveModuleId, mediaTitle: detail.title) {
                     Button {
                         showResetConfirmation = true
                     } label: {
@@ -1368,15 +1400,12 @@ struct DetailView: View {
             if isSelectionMode {
                 HStack {
                     let currentRangeEpisodes: [EpisodeLink] = episodesInSelectedRange(visibleEpisodes)
-                    
+                    let matchTitle: String = detail.title
+
                     let selectableEpisodes = currentRangeEpisodes.filter { ep in
-                        let epNum = Int(ep.number)
-                        let state = DownloadManager.shared.items.first {
-                            $0.episodeHref == ep.href ||
-                            ($0.mediaTitle == detail.title && $0.episodeNumber == epNum && $0.moduleId == ModuleManager.shared.activeModule?.id)
-                        }?.state
                         // In-progress items can't be batched into anything useful; skip them.
                         // Completed items are selectable so they can be batch-deleted.
+                        let state = downloadState(for: ep, title: matchTitle)
                         return state != .downloading && state != .pending
                     }
                     
@@ -1401,7 +1430,7 @@ struct DetailView: View {
                     let downloadedItems = DownloadManager.shared.items.filter { item in
                         selectedEpisodeNumbers.contains(item.episodeNumber)
                             && item.mediaTitle == detail.title
-                            && item.moduleId == ModuleManager.shared.activeModule?.id
+                            && item.moduleId == effectiveModuleId
                             && item.state == .completed
                     }
                     let downloadCount = selectedEpisodeNumbers.count - downloadedItems.count
@@ -1477,7 +1506,7 @@ struct DetailView: View {
                 let episodeNumberCounts = Dictionary(grouping: detail.episodes, by: { Int($0.number) }).mapValues(\.count)
                 let showUsesHrefTracking = continueWatching.hasAnyWatchedHref(
                     aniListID: vm.aniListID ?? aniListID,
-                    moduleId: ModuleManager.shared.activeModule?.id,
+                    moduleId: effectiveModuleId,
                     mediaTitle: detail.title)
 
                 LazyVStack(spacing: 8) {
@@ -1490,6 +1519,7 @@ struct DetailView: View {
                         ModuleEpisodeRowContainer(
                             episode: episode,
                             mediaTitle: detail.title,
+                            moduleId: effectiveModuleId,
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
@@ -1507,7 +1537,7 @@ struct DetailView: View {
                                 let state = DownloadManager.shared.downloadItem(
                                     forEpisodeHref: episode.href,
                                     aniListID: vm.aniListID ?? aniListID,
-                                    moduleId: ModuleManager.shared.activeModule?.id,
+                                    moduleId: effectiveModuleId,
                                     mediaTitle: detail.title,
                                     episodeNumber: epNum
                                 )?.state
@@ -1533,6 +1563,7 @@ struct DetailView: View {
                         ModuleEpisodeRowContainer(
                             episode: episode,
                             mediaTitle: detail.title,
+                            moduleId: effectiveModuleId,
                             itemImage: item.image,
                             totalEpisodes: detail.episodes.isEmpty ? nil : detail.episodes.count,
                             detailHref: vm.detailHref,
@@ -1553,7 +1584,7 @@ struct DetailView: View {
         }
         .alert("Reset Progress", isPresented: $showResetConfirmation) {
             Button("Reset", role: .destructive) {
-                let moduleId = ModuleManager.shared.activeModule?.id
+                let moduleId = effectiveModuleId
                 ContinueWatchingManager.shared.resetProgress(
                     aniListID: nil, moduleId: moduleId, mediaTitle: detail.title)
             }
@@ -1790,6 +1821,11 @@ struct DetailView: View {
 private struct ModuleEpisodeRowContainer: View {
     let episode: EpisodeLink
     let mediaTitle: String
+    /// The module the parent screen is showing. Passed in rather than read from
+    /// `ModuleManager.activeModule`, which is the wrong answer for a downloaded title opened
+    /// while a different source is selected — progress lookups then keyed to that other
+    /// module and the row showed no watch state.
+    let moduleId: String?
     let itemImage: String
     let totalEpisodes: Int?
     let detailHref: String?
@@ -1815,7 +1851,6 @@ private struct ModuleEpisodeRowContainer: View {
     @State private var aniMapEpisode: AniMapEpisode?
     @State private var pendingDowngrade: RemoteDowngrade? = nil
 
-    private var moduleId: String? { ModuleManager.shared.activeModule?.id }
     private var epNum: Int { Int(episode.number) }
 
     private var markContext: MarkContext {

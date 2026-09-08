@@ -68,6 +68,25 @@ struct EpisodeRowView: View {
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.primary)
 
+                    // Selection mode swaps the numbered circle for a checkbox and hides both
+                    // the progress bar and the trailing status icons — which left the batch
+                    // screens with no way to tell watched episodes from unwatched ones while
+                    // picking. Restore that cue next to the title, where it doesn't collide
+                    // with the checkbox.
+                    if isSelectionMode {
+                        if isComplete {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                                .accessibilityLabel("Watched")
+                        } else if let p = progress, p > 0 {
+                            Text("\(Int(p * 100))%")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel("\(Int(p * 100)) percent watched")
+                        }
+                    }
+
                     Spacer()
 
                     if !isSelectionMode {
@@ -82,6 +101,9 @@ struct EpisodeRowView: View {
                                         ProgressView().controlSize(.small)
                                     case .pending:
                                         Image(systemName: "hourglass")
+                                            .foregroundStyle(.secondary)
+                                    case .paused:
+                                        Image(systemName: "pause.circle.fill")
                                             .foregroundStyle(.secondary)
                                     case .failed:
                                         Image(systemName: "exclamationmark.circle.fill")

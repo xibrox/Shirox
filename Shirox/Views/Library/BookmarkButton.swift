@@ -81,6 +81,7 @@ private struct LocalCollectionPickerSheet: View {
                     }
                 }
             }
+            .softScrollEdges()
             .navigationTitle("Add to Collection")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

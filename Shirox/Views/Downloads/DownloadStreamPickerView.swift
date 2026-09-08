@@ -18,6 +18,7 @@ struct DownloadStreamPickerView: View {
                     }
                 }
             }
+            .softScrollEdges()
             .listStyle(.insetGrouped)
             .navigationTitle("Select Stream Quality")
             .navigationBarTitleDisplayMode(.inline)

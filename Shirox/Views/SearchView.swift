@@ -117,7 +117,23 @@ struct SearchView: View {
         } else if isLocalModule {
             localEntryView
         } else if !vm.hasResults && !vm.isLoading && !vm.hasSearched {
-            if vm.query.isEmpty && !history.queries.isEmpty {
+            if vm.query.isEmpty && !usingModule {
+                // Nothing typed yet: give people somewhere to go, with any recent searches
+                // carried along at the top. Recents used to be a full-height list of their own,
+                // which meant one previous search hid browsing entirely.
+                SearchBrowseView(
+                    columns: columns,
+                    recentSearches: history.queries,
+                    onSelectRecent: { query in
+                        vm.query = query
+                        history.add(query)
+                        vm.search(usingModule: usingModule)
+                    },
+                    onDeleteRecent: { history.remove($0) },
+                    onClearRecents: { history.clear() }
+                )
+            } else if vm.query.isEmpty && !history.queries.isEmpty {
+                // Module sources have no browse grid, so recents keep their own screen there.
                 historyView
             } else {
                 emptyStateView(
@@ -311,6 +327,7 @@ struct SearchView: View {
             .padding(.bottom, 16)
             .animation(.easeInOut(duration: 0.25), value: vm.resultCount)
         }
+        .softScrollEdges()
     }
 
     // MARK: - Loading View
@@ -359,6 +376,7 @@ struct SearchView: View {
                 }
             }
         }
+        .softScrollEdges()
         #if os(iOS)
         .listStyle(.insetGrouped)
         #elseif !os(tvOS)
@@ -491,7 +509,8 @@ private struct ConditionalSearchable: ViewModifier {
 }
 
 // MARK: - Card Press Style
-private struct CardPressStyle: ButtonStyle {
+/// Shared by the search results grid and the browse grid, which want identical press feedback.
+struct CardPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)

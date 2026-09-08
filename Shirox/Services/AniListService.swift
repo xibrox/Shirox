@@ -52,7 +52,7 @@ final class AniListService {
     func search(keyword: String) async throws -> [AniListMedia] {
         let query = """
         query ($search: String) {
-          Page(page: 1, perPage: 25) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(25))) {
             media(search: $search, type: ANIME, sort: SEARCH_MATCH, isAdult: false) {
               id
               title { romaji english native }
@@ -73,7 +73,7 @@ final class AniListService {
     func searchManga(keyword: String) async throws -> [AniListMedia] {
         let query = """
         query ($search: String) {
-          Page(page: 1, perPage: 25) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(25))) {
             media(search: $search, type: MANGA, sort: SEARCH_MATCH, isAdult: false) {
               id
               idMal
@@ -101,7 +101,7 @@ final class AniListService {
         }
         let query = """
         query ($search: String) {
-          Page(page: 1, perPage: 25) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(25))) {
             media(search: $search, type: ANIME, isAdult: true) {
               title { romaji english native }
               synonyms
@@ -127,7 +127,7 @@ final class AniListService {
     func trending() async throws -> [AniListMedia] {
         let query = """
         query {
-          Page(page: 1, perPage: 20) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(20))) {
             media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
               id
               title { romaji english native }
@@ -143,11 +143,127 @@ final class AniListService {
         return try await fetchPage(query: query)
     }
 
+    /// One scheduled broadcast as AniList reports it, before mapping to the app's `Media`.
+    struct AniListAiringEntry {
+        let media: AniListMedia
+        let episode: Int
+        let airingAt: Date
+    }
+
+    /// Episodes airing between two instants, earliest first.
+    ///
+    /// AniList publishes an exact airing timestamp per episode, which is what makes a real
+    /// calendar possible rather than a list of weekdays.
+    func airingSchedule(from start: Date, to end: Date) async throws -> [AniListAiringEntry] {
+        let query = """
+        query ($start: Int, $end: Int) {
+          Page(page: 1, perPage: 50) {
+            airingSchedules(airingAt_greater: $start, airingAt_lesser: $end, sort: TIME) {
+              episode
+              airingAt
+              media {
+                id
+                idMal
+                title { romaji english native }
+                coverImage { large extraLarge }
+                bannerImage
+                episodes
+                status
+                averageScore
+                genres
+                description(asHtml: false)
+              }
+            }
+          }
+        }
+        """
+        let variables: [String: Any] = [
+            "start": Int(start.timeIntervalSince1970),
+            "end": Int(end.timeIntervalSince1970)
+        ]
+        let data = try await post(query: query, variables: variables)
+
+        struct Response: Decodable {
+            struct ResponseData: Decodable {
+                struct PageData: Decodable {
+                    let airingSchedules: [Schedule]
+                }
+                let Page: PageData
+            }
+            struct Schedule: Decodable {
+                let episode: Int
+                let airingAt: Int
+                let media: AniListMedia?
+            }
+            let data: ResponseData?
+        }
+
+        let decoded = try JSONDecoder().decode(Response.self, from: data)
+        return (decoded.data?.Page.airingSchedules ?? []).compactMap { entry in
+            guard let media = entry.media else { return nil }
+            return AniListAiringEntry(
+                media: media,
+                episode: entry.episode,
+                airingAt: Date(timeIntervalSince1970: TimeInterval(entry.airingAt))
+            )
+        }
+    }
+
+    /// Browsable anime for the Search tab, optionally narrowed to one genre.
+    ///
+    /// The tab used to show nothing at all until you typed, which meant no way in for anyone
+    /// who didn't already know what they were looking for.
+    func discover(genre: String?, sort: DiscoverSort, page: Int) async throws -> [AniListMedia] {
+        let genreFilter = genre == nil ? "" : ", genre_in: $genres"
+        let genreVar = genre == nil ? "" : ", $genres: [String]"
+        let query = """
+        query ($page: Int, $sort: [MediaSort]\(genreVar)) {
+          Page(page: $page, perPage: 30) {
+            media(type: ANIME, sort: $sort, isAdult: false\(genreFilter)) {
+              id
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              averageScore
+              genres
+              description(asHtml: false)
+            }
+          }
+        }
+        """
+        var variables: [String: Any] = ["page": page, "sort": [sort.aniListValue]]
+        if let genre { variables["genres"] = [genre] }
+        return try await fetchPage(query: query, variables: variables)
+    }
+
+    /// Last season's *finished* shows — the binge row. `status: FINISHED` is the whole point:
+    /// a cour that has stopped airing is watchable end to end, which is what makes it worth
+    /// surfacing separately from "This Season".
+    func lastSeasonCompleted() async throws -> [AniListMedia] {
+        let (season, year) = AniListSeason.previous()
+        let query = """
+        query ($season: MediaSeason, $year: Int) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(20))) {
+            media(season: $season, seasonYear: $year, type: ANIME, status: FINISHED, sort: POPULARITY_DESC, isAdult: false) {
+              id
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage
+              averageScore
+              genres
+              description(asHtml: false)
+            }
+          }
+        }
+        """
+        return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year])
+    }
+
     func seasonal() async throws -> [AniListMedia] {
         let (season, year) = AniListSeason.current()
         let query = """
         query ($season: MediaSeason, $year: Int) {
-          Page(page: 1, perPage: 20) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(20))) {
             media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
               id
               title { romaji english native }
@@ -166,7 +282,7 @@ final class AniListService {
     func popular() async throws -> [AniListMedia] {
         let query = """
         query {
-          Page(page: 1, perPage: 20) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(20))) {
             media(type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
               id
               title { romaji english native }
@@ -185,7 +301,7 @@ final class AniListService {
     func topRated() async throws -> [AniListMedia] {
         let query = """
         query {
-          Page(page: 1, perPage: 20) {
+          Page(page: 1, perPage: \(DataSaver.rowLength(20))) {
             media(type: ANIME, sort: SCORE_DESC, isAdult: false) {
               id
               title { romaji english native }
@@ -227,6 +343,25 @@ final class AniListService {
             query ($season: MediaSeason, $year: Int, $page: Int) {
               Page(page: $page, perPage: 20) {
                 media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
+                  id
+                  title { romaji english native }
+                  coverImage { large extraLarge }
+                  bannerImage
+                  averageScore
+                  genres
+                  description(asHtml: false)
+                }
+              }
+            }
+            """
+            return try await fetchPage(query: query, variables: ["season": season.rawValue, "year": year, "page": page])
+
+        case .lastSeason:
+            let (season, year) = AniListSeason.previous()
+            let query = """
+            query ($season: MediaSeason, $year: Int, $page: Int) {
+              Page(page: $page, perPage: 20) {
+                media(season: $season, seasonYear: $year, type: ANIME, status: FINISHED, sort: POPULARITY_DESC, isAdult: false) {
                   id
                   title { romaji english native }
                   coverImage { large extraLarge }
@@ -402,6 +537,15 @@ final class AniListService {
             case 429:
                 throw AniListError.rateLimited
             default:
+                // AniList explains itself in the body even when the status is a plain 403 —
+                // "The AniList API has been temporarily disabled due to severe stability
+                // issues", for instance. Reporting the status code alone sent people hunting
+                // for a bug in the app over an outage it has no part in.
+                if let message = Self.graphQLErrorMessage(in: data) {
+                    // Carries the status as well as the wording: the message is for the reader,
+                    // but the code still decides whether a queued write should be retried later.
+                    throw AniListError.serviceMessage(code: http.statusCode, message: message)
+                }
                 throw AniListError.httpError(http.statusCode)
             }
         }
@@ -411,9 +555,23 @@ final class AniListService {
 
 // MARK: - Errors
 
+extension AniListService {
+    /// The first human-readable message from a GraphQL `errors` array, if the body carries one.
+    static func graphQLErrorMessage(in data: Data) -> String? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let errors = root["errors"] as? [[String: Any]] else { return nil }
+        let message = errors.compactMap { $0["message"] as? String }
+            .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return message
+    }
+}
+
 enum AniListError: LocalizedError {
     case rateLimited
     case httpError(Int)
+    /// A failure the service explained in its response body. Keeps the status so retry policy
+    /// is unchanged — an outage is still worth queueing a write against.
+    case serviceMessage(code: Int, message: String)
     case graphQL(String)
     case noData
     case decodingError(String)
@@ -424,8 +582,12 @@ enum AniListError: LocalizedError {
             return "AniList rate limit reached. Please wait a moment."
         case .httpError(let code):
             return "HTTP error \(code). Please try again."
+        case .serviceMessage(_, let message):
+            return message
         case .graphQL(let message):
-            return "AniList error: \(message)"
+            // The service's own wording, unadorned — prefixing it with "AniList error:" made
+            // sentences like "The AniList API has been temporarily disabled…" read twice.
+            return message
         case .noData:
             return "No data received from AniList."
         case .decodingError(let message):
@@ -483,15 +645,17 @@ final class AniListMappingManager {
 enum BrowseCategory: String, CaseIterable, Hashable {
     case trending
     case seasonal
+    case lastSeason
     case popular
     case topRated
 
     var title: String {
         switch self {
-        case .trending: return "Trending Now"
-        case .seasonal: return "This Season"
-        case .popular:  return "All-Time Popular"
-        case .topRated: return "Top Rated"
+        case .trending:   return "Trending Now"
+        case .seasonal:   return "This Season"
+        case .lastSeason: return "Last Season · Complete"
+        case .popular:    return "All-Time Popular"
+        case .topRated:   return "Top Rated"
         }
     }
 }

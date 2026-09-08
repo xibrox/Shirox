@@ -383,6 +383,13 @@ final class CastManager: NSObject, ObservableObject {
     /// Set when a cast ends abnormally, so the player can tell the user why the movie just
     /// came back to the phone instead of silently swapping under them.
     @Published var lastError: String?
+    /// Bumped every time the receiver reports the current media played through to its end.
+    ///
+    /// Auto-advance is driven by the *local* item's `didPlayToEndTimeNotification`, but during
+    /// a cast the local player is deliberately parked and never reaches an end — so an episode
+    /// finishing on the TV simply stopped there and the queue never moved. A counter rather
+    /// than a flag so each finish is a distinct event the player can observe.
+    @Published private(set) var finishedMediaCount = 0
 
     /// Whether the UI should present itself as casting. Stays true through a suspend —
     /// the SDK usually recovers it, and bouncing to the local player on every screen lock
@@ -571,6 +578,7 @@ final class CastManager: NSObject, ObservableObject {
         if status.playerState == .idle, status.idleReason == .finished {
             isPlaying = false
             stopProgressTimer()
+            finishedMediaCount += 1
             return
         }
 

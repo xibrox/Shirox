@@ -17,6 +17,63 @@ import XCTest
 ///    Now Playing had the same problem in reverse — it published the local player's rate and
 ///    clock, so Control Center showed "paused, 0:00" over a movie the TV was happily playing.
 final class PlaybackRoutingTests: XCTestCase {
+    // MARK: - Premature end-of-item (the interrupted-playback data loss)
+
+    /// THE BUG: a stream that died mid-episode posted `didPlayToEndTime`, the player took it
+    /// as an ending and skipped to the next episode, and the swap then wrote the abandoned
+    /// episode's progress as 0. Reported as "came back from a phone call, it had skipped to
+    /// the next episode and ep 207 shows no progress".
+    func testDeadStreamMidEpisodeIsNotAnEnding() {
+        XCTAssertFalse(PlaybackRouting.isGenuineEnd(position: 640, duration: 1463))
+    }
+
+    func testPlayheadAtTheEndIsAnEnding() {
+        XCTAssertTrue(PlaybackRouting.isGenuineEnd(position: 1463, duration: 1463))
+    }
+
+    /// HLS leaves rounding on the final segment, so an episode can "end" a beat short.
+    func testEndingWithinToleranceStillCounts() {
+        XCTAssertTrue(PlaybackRouting.isGenuineEnd(position: 1459, duration: 1463))
+    }
+
+    func testJustOutsideToleranceDoesNotCount() {
+        XCTAssertFalse(PlaybackRouting.isGenuineEnd(position: 1457, duration: 1463))
+    }
+
+    /// An unverifiable duration can't be called an ending — that is the state a freshly dead
+    /// item reports, and treating it as one is what skipped the episode.
+    func testUnknownDurationIsNeverAnEnding() {
+        XCTAssertFalse(PlaybackRouting.isGenuineEnd(position: 0, duration: 0))
+        XCTAssertFalse(PlaybackRouting.isGenuineEnd(position: 900, duration: 0))
+    }
+
+    func testNonFinitePositionIsNeverAnEnding() {
+        XCTAssertFalse(PlaybackRouting.isGenuineEnd(position: .nan, duration: 1463))
+    }
+
+    // MARK: - Collapsed clock (the progress wipe)
+
+    /// A dead item reads 0 while its duration stays real. Saving that erased the episode.
+    func testZeroPositionAfterRealProgressIsDiscarded() {
+        XCTAssertTrue(PlaybackRouting.shouldDiscardPositionWrite(position: 0, lastSaved: 1200))
+    }
+
+    /// Ordinary playback near the start still saves — the guard must not freeze progress for
+    /// someone who genuinely just began an episode.
+    func testEarlyPlaybackStillSaves() {
+        XCTAssertFalse(PlaybackRouting.shouldDiscardPositionWrite(position: 12, lastSaved: 8))
+    }
+
+    /// Rewinding a long way is a real user action and must be recorded.
+    func testLargeRewindStillSaves() {
+        XCTAssertFalse(PlaybackRouting.shouldDiscardPositionWrite(position: 60, lastSaved: 1200))
+    }
+
+    /// Nothing worth protecting yet.
+    func testZeroPositionWithNoPriorProgressSaves() {
+        XCTAssertFalse(PlaybackRouting.shouldDiscardPositionWrite(position: 0, lastSaved: 0))
+    }
+
 
     // MARK: - Where does a command go?
 

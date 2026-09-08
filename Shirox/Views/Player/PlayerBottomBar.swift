@@ -73,8 +73,11 @@ struct PlayerBottomBar: View {
                     }
                     skip85Button
                 }
+                // Without this the button group wins the width contest and the title collapses
+                // to a few characters even when most of the bar is empty.
+                .layoutPriority(1)
 
-                Spacer()
+                Spacer(minLength: 8)
 
                 rightButtonGroup
             }

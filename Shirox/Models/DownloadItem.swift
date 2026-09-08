@@ -3,6 +3,9 @@ import Foundation
 enum DownloadState: String, Codable {
     case pending
     case downloading
+    /// Stopped by the user, keeping whatever has already been fetched. Distinct from `failed`:
+    /// nothing went wrong and `processQueue` must leave it alone until it is resumed.
+    case paused
     case completed
     case failed
 }

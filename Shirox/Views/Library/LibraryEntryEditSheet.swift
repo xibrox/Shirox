@@ -14,6 +14,7 @@ struct LibraryEntryEditSheet: View {
     @State private var status: MediaListStatus
     @State private var progress: Int
     @State private var score: Double
+    @State private var isPrivate: Bool
     @State private var showDeleteConfirmation = false
     @State private var showNewCollection = false
     @State private var newCollectionName = ""
@@ -45,6 +46,13 @@ struct LibraryEntryEditSheet: View {
         // Local entries convert from their canonical score into the active format;
         // provider entries (override nil) fall back to their stored account score.
         _score = State(initialValue: entry?.displayScore(in: scoreFormatOverride ?? .point10) ?? 0)
+        _isPrivate = State(initialValue: entry?.isPrivate ?? false)
+    }
+
+    /// Privacy is an AniList feature. Local entries (`scoreFormatOverride` set) and MAL entries
+    /// have nowhere to send it.
+    private var showsPrivacyToggle: Bool {
+        media.provider == .anilist && scoreFormatOverride == nil && anilistAuth.isLoggedIn
     }
 
     var body: some View {
@@ -78,6 +86,18 @@ struct LibraryEntryEditSheet: View {
 
                 Section("Score") {
                     ScoreInputView(score: $score, format: scoreFormat)
+                }
+
+                // AniList-only: MyAnimeList has no equivalent flag, and a toggle that silently
+                // did nothing there would be worse than not offering it.
+                if showsPrivacyToggle {
+                    Section {
+                        Toggle("Private", isOn: $isPrivate)
+                            .tint(.secondary)
+                        Text("Hides this entry from your public AniList profile and activity feed. You can still see it here.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 if scoreFormatOverride != nil {
@@ -145,6 +165,7 @@ struct LibraryEntryEditSheet: View {
                     }
                 }
             }
+            .softScrollEdges()
             .navigationTitle(entry == nil ? "Add to Library" : "Edit Entry")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -157,6 +178,23 @@ struct LibraryEntryEditSheet: View {
                     Button("Save") {
                         let finalProgress = status == .completed ? (media.episodes ?? progress) : progress
                         onSave(status, finalProgress, score)
+                        // Sent separately from `onSave`, which is the shared write used by both
+                        // providers. Only fires when the toggle actually moved.
+                        if showsPrivacyToggle, isPrivate != (entry?.isPrivate ?? false) {
+                            let mediaId = media.id
+                            let makePrivate = isPrivate
+                            Task {
+                                do {
+                                    try await AniListLibraryService.shared.setPrivate(
+                                        mediaId: mediaId, isPrivate: makePrivate)
+                                } catch {
+                                    Logger.shared.log("[AniList] Could not change entry privacy: \(error)", type: "Error")
+                                    #if os(iOS)
+                                    ToastManager.shared.show(message: "Couldn't change privacy on AniList", type: .error)
+                                    #endif
+                                }
+                            }
+                        }
                         dismiss()
                     }
                 }

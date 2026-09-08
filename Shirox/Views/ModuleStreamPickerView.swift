@@ -52,6 +52,7 @@ struct ModuleStreamPickerView: View {
                     }
                 }
             }
+            .softScrollEdges()
             #if os(iOS)
             .listStyle(.insetGrouped)
             #elseif !os(tvOS)
@@ -739,6 +740,7 @@ private struct SearchResultsPickerSheet: View {
                 }
                 .padding(16)
             }
+            .softScrollEdges()
             .navigationTitle(module.sourceName)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -795,6 +797,7 @@ private struct ModuleStreamSelectionView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .softScrollEdges()
                     #if os(iOS)
                     .listStyle(.insetGrouped)
                     #elseif !os(tvOS)

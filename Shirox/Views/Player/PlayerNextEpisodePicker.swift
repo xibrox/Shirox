@@ -20,6 +20,7 @@ struct PlayerNextEpisodePicker: View {
                 }
                 .buttonStyle(.plain)
             }
+            .softScrollEdges()
             .navigationTitle(title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -141,6 +141,8 @@ struct PlayerView: View {
     @AppStorage("autoNextEpisode") private var autoNextEpisode = true
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
+    @AppStorage("speedBoostTolerance") private var speedBoostTolerance: Int = 10
+    @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
     @State private var playbackSpeed: Double = 1.0
     @State private var volume: Float = 1.0
     @State private var showSubtitleSettings = false
@@ -380,6 +382,7 @@ struct PlayerView: View {
             itemNotificationObservers.removeAll()
             player?.pause()
             saveProgress()
+            autoDeleteWatchedDownloadIfEnabled()
             tearDownNowPlaying()
             castManager.disconnect()
             if currentContext?.isLocalPlayback == true {
@@ -448,6 +451,21 @@ struct PlayerView: View {
         }
         .onChangeOf(castManager.duration) { dur in
             if castManager.isConnected && dur > 0 { duration = dur }
+        }
+        .onChangeOf(castManager.finishedMediaCount) { _ in
+            // The receiver finished the episode. The local end-of-item notification that
+            // normally drives auto-advance can't fire here — the local player is parked for
+            // the whole cast — so without this the TV just sat on a finished episode and the
+            // queue never moved. Mirror the local path so casting advances the same way.
+            guard castManager.isConnected, autoNextEpisode else { return }
+            // A swap already in flight re-casts new media, and the receiver reports the
+            // outgoing item as finished while it does; advancing again would skip an episode.
+            guard !isLoadingNextEpisode, !isRefetchingStream else { return }
+            Logger.shared.log("[Cast] Receiver finished the episode — auto-advancing", type: "Player")
+            autoAdvanceTask = Task { @MainActor in
+                setControlsVisible(true)
+                await loadAndAdvance()
+            }
         }
         #if os(iOS)
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
@@ -587,7 +605,12 @@ struct PlayerView: View {
                 settings: subtitleSettings,
                 availableTracks: subtitleTracks,
                 selectedTrack: $selectedSubtitleTrack,
-                allowLocalImport: currentContext?.isLocalPlayback == true,
+                // Two different meanings of "local" live in this file. `PlayerContext
+                // .isLocalPlayback` is narrow — a file the user picked themselves — while the
+                // player's own `isLocalPlayback` also covers a downloaded episode (file:// or
+                // the localhost HLS proxy). Gating import on the narrow one meant a downloaded
+                // episode with missing or wrong subtitles had no way to take a supplied file.
+                allowLocalImport: currentContext?.isLocalPlayback == true || isLocalPlayback,
                 onImport: { track in
                     var tracks = subtitleTracks ?? []
                     tracks.append(track)
@@ -700,7 +723,8 @@ struct PlayerView: View {
                 },
                 onSeekBackward: { skip(by: -Double(skipShort)); scheduleHide() },
                 onSeekForward: { skip(by: Double(skipShort)); scheduleHide() },
-                seekAmount: Double(skipShort)
+                seekAmount: Double(skipShort),
+                isLocked: isLocked
             )
             .ignoresSafeArea()
 
@@ -719,6 +743,7 @@ struct PlayerView: View {
 
             SpeedBoostOverlay(
                 isLocked: isLocked,
+                moveTolerance: CGFloat(speedBoostTolerance),
                 onBegan: {
                     if !castManager.isConnected {
                         isSpeedBoosted = true
@@ -1089,6 +1114,30 @@ struct PlayerView: View {
         return false
     }
 
+    /// Deletes the downloaded copy of the episode just finished, when the user has asked for
+    /// that in Settings → Downloads.
+    ///
+    /// Runs on dismiss rather than at the watched threshold: that fires around 90% of the way
+    /// through, while the file is still being played from disk, and pulling it out from under
+    /// AVPlayer would end the episode the viewer is still watching. `didTrackEpisode` is the
+    /// same signal that marked it watched, so this only ever removes something already counted.
+    private func autoDeleteWatchedDownloadIfEnabled() {
+        #if os(iOS)
+        guard didTrackEpisode,
+              UserDefaults.standard.bool(forKey: "autoDeleteWatched"),
+              let ctx = currentContext else { return }
+        guard let download = DownloadManager.shared.downloadItem(
+                forEpisodeHref: ctx.episodeHref,
+                aniListID: ctx.aniListID,
+                moduleId: ctx.moduleId,
+                mediaTitle: ctx.mediaTitle,
+                episodeNumber: ctx.episodeNumber),
+              download.state == .completed else { return }
+        Logger.shared.log("[Downloads] Auto-deleting watched episode \(ctx.episodeNumber)", type: "Download")
+        DownloadManager.shared.remove(download)
+        #endif
+    }
+
     private func trackAniListProgress() {
         guard let ctx = currentContext else {
             Logger.shared.log("[Rating] trackAniListProgress: currentContext nil — bail", type: "Debug")
@@ -1142,6 +1191,17 @@ struct PlayerView: View {
 
     private func saveProgress() {
         guard let context = currentContext, duration > 0 else { return }
+        // A dead item reports position 0 while `duration` is still the stale real value, so a
+        // save triggered on the way out of a failure (or by the swap that follows one) wrote
+        // watchedSeconds: 0 over a genuinely watched episode — the "came back and ep 207 shows
+        // no progress" report. Someone scrubbing to the very start is rare and loses nothing;
+        // silently discarding an hour of progress is not recoverable from inside the app.
+        if PlaybackRouting.shouldDiscardPositionWrite(position: currentTime, lastSaved: lastSavedSeconds) {
+            Logger.shared.log(
+                "[Player] Refusing to save position 0 over \(lastSavedSeconds)s — player clock collapsed",
+                type: "Player")
+            return
+        }
         // Derive the id from the live stream URL so progress follows a "Next Up" swap to the new
         // episode; fall back to the launch context for the first episode.
         if let jellyfinItemId = JellyfinPlaybackCoordinator.itemId(forStreamURL: currentStream.url)
@@ -1390,7 +1450,7 @@ struct PlayerView: View {
         player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 300_000_000)
-            isScrubbing = false
+            endSeekWindow()
         }
     }
 
@@ -1405,9 +1465,25 @@ struct PlayerView: View {
         player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 500_000_000)
-            isScrubbing = false
+            endSeekWindow()
         }
         if isPlaying { scheduleHide() }
+    }
+
+    /// Closes the post-seek scrubbing window, re-arming stall recovery if the seek left the
+    /// player waiting on the network.
+    ///
+    /// `startStallWatchdog()` refuses to arm while `isScrubbing` is set, and a seek into an
+    /// unbuffered region drives `timeControlStatus` to `.waitingToPlayAtSpecifiedRate` well
+    /// within that window — so the arm request the rate observer makes is dropped on the floor.
+    /// The player then *stays* in `.waiting`, which emits no further KVO, so nothing ever
+    /// re-triggers recovery: playback hangs at the new position until the user seeks again by
+    /// hand. Re-checking here is the only point where the window is known to be closing.
+    private func endSeekWindow() {
+        isScrubbing = false
+        guard player?.timeControlStatus == .waitingToPlayAtSpecifiedRate else { return }
+        Logger.shared.log("[StallRecovery] Seek left player waiting — arming watchdog", type: "Player")
+        startStallWatchdog()
     }
 
     private func beginScrubbing() {
@@ -1416,7 +1492,9 @@ struct PlayerView: View {
 
     private func endScrubbing() {
         isChasing = false
-        player?.automaticallyWaitsToMinimizeStalling = true
+        // Restore whatever this source should be using — not unconditionally true, which
+        // silently re-armed network buffering on a local file after the first scrub.
+        player?.automaticallyWaitsToMinimizeStalling = !isLocalPlayback
     }
 
     private func seekSmoothly(to time: Double) {
@@ -1534,7 +1612,10 @@ struct PlayerView: View {
             }
         }
         let p = AVPlayer(playerItem: item)
-        p.automaticallyWaitsToMinimizeStalling = true
+        // Stall-minimisation is for streams: it holds playback until AVPlayer has built a
+        // network-sized buffer. A downloaded episode is already on disk (or a hop away over
+        // loopback), so applying it there is what produced "buffering even after download".
+        p.automaticallyWaitsToMinimizeStalling = !isLocalPlayback
         p.volume = volume
         #if os(iOS)
         p.usesExternalPlaybackWhileExternalScreenIsActive = true
@@ -1550,7 +1631,10 @@ struct PlayerView: View {
         let qualityHeaders = currentStream.headers
         Task {
             let qualities = await HLSQualityParser.parse(url: qualityURL, headers: qualityHeaders)
-            await MainActor.run { hlsQualities = qualities }
+            await MainActor.run {
+                hlsQualities = qualities
+                applyPreferredQuality()
+            }
         }
 
         rateObserver = p.observe(\.timeControlStatus, options: [.new]) { player, _ in
@@ -1628,6 +1712,11 @@ struct PlayerView: View {
             if let resumeFrom = currentContext?.resumeFrom, !didSeekToResume, duration > 0 {
                 didSeekToResume = true
                 pendingResumeTarget = resumeFrom
+                // Seed the last-saved marker with where we're resuming to. It otherwise stays
+                // at 0 until ten seconds of playback have elapsed, and a stream that dies
+                // inside that window would slip past the collapsed-clock guard in
+                // `saveProgress()` and write 0 over the position we just resumed from.
+                lastSavedSeconds = resumeFrom
                 Logger.shared.log("[Player] Resuming from \(resumeFrom)s", type: "Debug")
                 // Efficient (tolerant) seek: snaps to a nearby keyframe instead of forcing an
                 // exact frame. A zero-tolerance seek to a deep position on an HLS stream has to
@@ -1900,6 +1989,20 @@ struct PlayerView: View {
                 // Only the item actually on screen may auto-advance; a stale item reaching its end
                 // would otherwise skip the user forward an episode.
                 guard player?.currentItem === item else { return }
+                // AVPlayer also posts this when a stream *dies* mid-episode — a CDN connection
+                // dropped while the app sat behind a phone call, or a seek into a region the
+                // server no longer serves. Taken at face value that jumped the viewer to the
+                // next episode from the middle of one, and the swap's `saveProgress()` then
+                // recorded the abandoned episode at the dead item's clock (0), erasing a real
+                // position. A genuine end has the playhead at the end; anything else is a
+                // failure to recover from in place.
+                guard reachedGenuineEnd else {
+                    Logger.shared.log(
+                        "[Player] didPlayToEndTime at \(currentTime)s of \(duration)s — treating as a dead stream, not an ending",
+                        type: "Player")
+                    Task { @MainActor in await recoverPlayback() }
+                    return
+                }
                 autoAdvanceTask = Task { @MainActor in
                     isPlaying = false
                     setControlsVisible(true)
@@ -1920,6 +2023,13 @@ struct PlayerView: View {
                 Task { @MainActor in await recoverPlayback() }
             }
         )
+    }
+
+    /// Whether the item genuinely ran to its end, rather than AVPlayer reporting an end because
+    /// the stream died. The tolerance absorbs the rounding HLS leaves on a final segment.
+    @MainActor
+    private var reachedGenuineEnd: Bool {
+        PlaybackRouting.isGenuineEnd(position: currentTime, duration: duration)
     }
 
     @MainActor
@@ -2429,6 +2539,20 @@ struct PlayerView: View {
         }
     }
 
+    /// Applies the saved quality preference once the ladder for this stream is known.
+    ///
+    /// Only ever runs while the selection is still automatic, so a manual pick from the
+    /// in-player menu stays put for the rest of the episode. This drives the local player's
+    /// `preferredPeakBitRate`, which also governs AirPlay (the device is still the one
+    /// decoding); a Chromecast picks its own rendition from the manifest and is unaffected.
+    @MainActor
+    private func applyPreferredQuality() {
+        guard selectedQualityBandwidth == nil else { return }
+        guard let pick = HLSQualityParser.select(from: hlsQualities, preference: preferredQuality) else { return }
+        Logger.shared.log("[HLSQuality] Applying preferred quality \(preferredQuality) -> \(pick.label)", type: "Player")
+        selectQuality(pick.bandwidth)
+    }
+
     @MainActor
     private func selectQuality(_ bandwidth: Int?) {
         selectedQualityBandwidth = bandwidth
@@ -2463,6 +2587,7 @@ struct PlayerView: View {
         player?.replaceCurrentItem(with: newItem)
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
+        player?.automaticallyWaitsToMinimizeStalling = !isLocalPlayback
         if let ctx = currentContext {
             currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: ctx.episodeNumber, episodeTitle: ctx.episodeTitle, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: ctx.availableEpisodes, isAiring: ctx.isAiring, resumeFrom: ctx.resumeFrom, detailHref: ctx.detailHref, episodeHref: ctx.episodeHref, streamTitle: next.title, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: ctx.thumbnailUrl)
         }
@@ -2548,6 +2673,10 @@ struct PlayerView: View {
         didSeekToResume = true
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
+        // The AVPlayer object is reused across a swap, so this carries over from the previous
+        // episode unless re-derived: advancing from a stream into a downloaded episode would
+        // otherwise keep network buffering armed on a file already sitting on disk.
+        player?.automaticallyWaitsToMinimizeStalling = !isLocalPlayback
         if !allStreams.isEmpty { availableStreams = allStreams }
         if let ctx = currentContext {
             // Don't carry the bumped availableEpisodes into the new episode's context — it makes
@@ -2572,7 +2701,10 @@ struct PlayerView: View {
         let qualityHeaders = next.headers
         Task {
             let qualities = await HLSQualityParser.parse(url: qualityURL, headers: qualityHeaders)
-            await MainActor.run { hlsQualities = qualities }
+            await MainActor.run {
+                hlsQualities = qualities
+                applyPreferredQuality()
+            }
         }
         subtitleCues = []
         selectedSubtitleTrack = nil
@@ -2799,6 +2931,22 @@ class PlayerLayerUIView: UIView {
 // MARK: - Two-Finger Tap Overlay (UIKit tap, two touches required)
 
 #if os(iOS)
+/// Whether `touch` landed inside the same top-level hierarchy as `host`.
+///
+/// Both player overlays attach their recognizer to the *window* so the gesture keeps working
+/// over the video surface no matter how SwiftUI hit-tests the layers above it. The cost is that
+/// the recognizer also sees touches in anything presented *over* the player — the subtitle,
+/// next-episode and sequel sheets — where a long press silently kicked playback to 2x and a
+/// two-finger tap toggled play/pause behind the sheet. Scope every touch back to the player's
+/// own hierarchy: a presented sheet lives in its own container beneath the window, so its
+/// touches are not descendants of the player's top-level ancestor.
+private func touchIsInsidePlayer(_ touch: UITouch, host: UIView?) -> Bool {
+    guard let host, let touched = touch.view else { return true }
+    var top: UIView = host
+    while let parent = top.superview, !(parent is UIWindow) { top = parent }
+    return touched.isDescendant(of: top)
+}
+
 private struct TwoFingerTapOverlay: UIViewRepresentable {
     var isLocked: Bool
     var onTap: () -> Void
@@ -2815,6 +2963,7 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
     func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.isLocked = isLocked
         context.coordinator.onTap = onTap
+        context.coordinator.hostView = uiView
 
         guard !context.coordinator.attached, let window = uiView.window else { return }
         let gr = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
@@ -2836,6 +2985,7 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
         var onTap: () -> Void
         var recognizer: UITapGestureRecognizer?
         var attached = false
+        weak var hostView: UIView?
 
         init(onTap: @escaping () -> Void) { self.onTap = onTap }
 
@@ -2848,6 +2998,10 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
                                shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
             return true
         }
+
+        func gestureRecognizer(_ gr: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            touchIsInsidePlayer(touch, host: hostView)
+        }
     }
 }
 
@@ -2855,6 +3009,11 @@ private struct TwoFingerTapOverlay: UIViewRepresentable {
 
 private final class SingleTouchLongPress: UILongPressGestureRecognizer {
     private var startLocation: CGPoint = .zero
+    /// How far the finger may drift before the press is recognised, in points. Fixed at 10
+    /// previously, which is a small target to hold on a handheld device — people holding to
+    /// speed up kept drifting past it and never got the boost, or read the miss as the boost
+    /// "dropping back to normal". Configurable from Settings → Player.
+    var moveTolerance: CGFloat = 10
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         guard (event.allTouches?.count ?? 0) == 1 else {
@@ -2872,7 +3031,7 @@ private final class SingleTouchLongPress: UILongPressGestureRecognizer {
         if state == .possible, let location = touches.first?.location(in: view) {
             let dx = abs(location.x - startLocation.x)
             let dy = abs(location.y - startLocation.y)
-            if dx > 10 || dy > 10 {
+            if dx > moveTolerance || dy > moveTolerance {
                 state = .failed
                 return
             }
@@ -2883,6 +3042,7 @@ private final class SingleTouchLongPress: UILongPressGestureRecognizer {
 
 private struct SpeedBoostOverlay: UIViewRepresentable {
     var isLocked: Bool
+    var moveTolerance: CGFloat
     var onBegan: () -> Void
     var onEnded: () -> Void
 
@@ -2899,9 +3059,15 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
         context.coordinator.isLocked = isLocked
         context.coordinator.onBegan = onBegan
         context.coordinator.onEnded = onEnded
+        context.coordinator.hostView = uiView
+        // Applies live: changing the setting mid-playback retunes the active recogniser.
+        (context.coordinator.recognizer as? SingleTouchLongPress)?.moveTolerance = moveTolerance
+        context.coordinator.recognizer?.allowableMovement = moveTolerance
 
         guard !context.coordinator.attached, let window = uiView.window else { return }
         let gr = SingleTouchLongPress(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
+        gr.moveTolerance = moveTolerance
+        gr.allowableMovement = moveTolerance
         gr.minimumPressDuration = 0.7
         gr.cancelsTouchesInView = false
         gr.delaysTouchesEnded = false
@@ -2921,6 +3087,7 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
         var onEnded: () -> Void
         var recognizer: UILongPressGestureRecognizer?
         var attached = false
+        weak var hostView: UIView?
 
         init(onBegan: @escaping () -> Void, onEnded: @escaping () -> Void) {
             self.onBegan = onBegan
@@ -2936,6 +3103,10 @@ private struct SpeedBoostOverlay: UIViewRepresentable {
         func gestureRecognizer(_ gr: UIGestureRecognizer,
                                shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
             return true
+        }
+
+        func gestureRecognizer(_ gr: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            touchIsInsidePlayer(touch, host: hostView)
         }
     }
 }

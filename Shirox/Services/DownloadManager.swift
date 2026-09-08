@@ -45,12 +45,20 @@ final class ToastManager: ObservableObject {
     
     private init() {}
     
+    /// Most toasts that can ever be on screen at once. Beyond this the oldest are dropped:
+    /// a burst (a failing provider, a batch finishing) should read as a stack with a count,
+    /// never as a column tall enough to bury the app.
+    private static let maxRetained = 4
+
     func show(message: String, type: ToastType = .info, duration: Double = 3.0) {
         let toast = Toast(message: message, type: type, duration: duration)
         withAnimation(.spring()) {
             toasts.append(toast)
+            if toasts.count > Self.maxRetained {
+                toasts.removeFirst(toasts.count - Self.maxRetained)
+            }
         }
-        
+
         Task {
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
             self.remove(toast)
@@ -64,33 +72,110 @@ final class ToastManager: ObservableObject {
     }
 }
 
+/// Bottom-anchored toast overlay.
+///
+/// Several toasts can land at once — a batch download resolving, a provider failing episode
+/// after episode — and rendering each as its own full-width card walled off the bottom of the
+/// screen. They now collapse into a stack: the newest is in front at full size, the ones behind
+/// peek out above it, and a count says how many there are. Tapping expands the stack into the
+/// full list; tapping a toast dismisses it.
 struct ToastView: View {
     @ObservedObject var manager = ToastManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isExpanded = false
+
+    /// Newest first — the front of the stack is the most recent toast.
+    private var stack: [Toast] { manager.toasts.reversed() }
+    /// Cards drawn while collapsed. More than three reads as clutter, not depth.
+    private static let peekLimit = 3
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(manager.toasts) { toast in
-                HStack(spacing: 10) {
-                    Image(systemName: toast.type.icon)
-                        .foregroundStyle(toast.type.color)
-                        .font(.system(size: 15, weight: .semibold))
-                    Text(toast.message)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .onTapGesture { manager.remove(toast) }
+        Group {
+            if manager.toasts.isEmpty {
+                EmptyView()
+            } else if isExpanded || manager.toasts.count == 1 {
+                expandedList
+            } else {
+                collapsedStack
             }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 88)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: manager.toasts.map(\.id))
+        .animation(motion, value: manager.toasts.map(\.id))
+        .animation(motion, value: isExpanded)
+        .onChangeOf(manager.toasts.count) { count in
+            // Nothing left to expand into — fold back so the next burst starts collapsed.
+            if count <= 1 { isExpanded = false }
+        }
+    }
+
+    private var motion: Animation? {
+        reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.82)
+    }
+
+    // MARK: - Layouts
+
+    private var expandedList: some View {
+        VStack(spacing: 8) {
+            ForEach(stack) { toast in
+                card(toast)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onTapGesture { manager.remove(toast) }
+            }
+        }
+    }
+
+    private var collapsedStack: some View {
+        ZStack(alignment: .bottom) {
+            ForEach(Array(stack.prefix(Self.peekLimit).enumerated()), id: \.element.id) { depth, toast in
+                card(toast, badge: depth == 0 ? manager.toasts.count : nil)
+                    // Each card behind the front one sits slightly higher and slightly
+                    // narrower, so the stack reads as depth rather than as a list.
+                    .scaleEffect(1 - CGFloat(depth) * 0.05, anchor: .bottom)
+                    .offset(y: -CGFloat(depth) * 9)
+                    .opacity(1 - Double(depth) * 0.25)
+                    .zIndex(Double(Self.peekLimit - depth))
+                    .allowsHitTesting(depth == 0)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { isExpanded = true }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(manager.toasts.count) notifications")
+        .accessibilityHint("Double tap to show all")
+    }
+
+    // MARK: - Card
+
+    private func card(_ toast: Toast, badge: Int? = nil) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: toast.type.icon)
+                .foregroundStyle(toast.type.color)
+                .font(.system(size: 15, weight: .semibold))
+            Text(toast.message)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            if let badge, badge > 1 {
+                Text("\(badge)")
+                    .font(.caption2.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.primary.opacity(0.08), in: Capsule())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .glassChrome(
+            RoundedRectangle(cornerRadius: 16, style: .continuous),
+            enabled: true,
+            off: .regularMaterial
+        )
+        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
     }
 }
 
@@ -121,6 +206,22 @@ final class DownloadManager: NSObject, ObservableObject {
 
     @AppStorage("backgroundDownloadsEnabled") var backgroundDownloadsEnabled: Bool = true {
         didSet { refreshDownloadKeepAlive() }
+    }
+
+    /// Bytes the finished and in-flight video downloads occupy on disk.
+    var bytesOnDisk: Int { Self.sizeOfDirectory(at: downloadDir) }
+
+    /// Recursive byte total for a directory, ignoring anything unreadable.
+    static func sizeOfDirectory(at url: URL) -> Int {
+        let keys: [URLResourceKey] = [.fileSizeKey, .isDirectoryKey]
+        guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: keys) else { return 0 }
+        var total = 0
+        for case let fileURL as URL in enumerator {
+            guard let values = try? fileURL.resourceValues(forKeys: Set(keys)),
+                  values.isDirectory == false else { continue }
+            total += values.fileSize ?? 0
+        }
+        return total
     }
 
     private let downloadDir: URL = {
@@ -160,14 +261,42 @@ final class DownloadManager: NSObject, ObservableObject {
         load()
         reconcileDownloadsDirectory()
         reconnectBackgroundTasks()
+        resumeInterruptedIfEnabled()
         processQueue()
-        requestNotificationPermission()
         observeAppLifecycle()
     }
 
-    private func requestNotificationPermission() {
+    /// Retries downloads a previous session left interrupted, when the user has opted in.
+    ///
+    /// `load()` deliberately parks interrupted items in `.failed` instead of resuming them —
+    /// kicking off a large transfer the moment the app opens, possibly on cellular, is not
+    /// something to do unasked, and both reset paths there say so. But a batch killed by a
+    /// flaky provider then has to be restarted by hand, episode by episode. "Auto-Resume
+    /// Interrupted" in Settings → Downloads opts into that, and this honours it once per
+    /// launch; it stays off by default so the original reasoning still holds for everyone else.
+    private func resumeInterruptedIfEnabled() {
+        guard UserDefaults.standard.bool(forKey: "autoResumeDownloads") else { return }
+        let interrupted = items.filter { $0.state == .failed }
+        guard !interrupted.isEmpty else { return }
+        Logger.shared.log("[Downloads] Auto-resuming \(interrupted.count) interrupted download(s)", type: "Download")
+        retryAll(interrupted)
+    }
+
+    /// Asks for notification permission the first time a download actually starts.
+    ///
+    /// This used to run from `init`, which the app touches at launch — so a brand-new install
+    /// showed the system prompt over onboarding, before the user had added a source or asked
+    /// for anything. That is the prompt people dismiss reflexively, and a denial there kills
+    /// download-finished alerts for the life of the install. Asking when someone starts their
+    /// first download makes the request self-explanatory.
+    private func requestNotificationPermissionIfNeeded() {
+        guard !hasRequestedNotificationPermission else { return }
+        hasRequestedNotificationPermission = true
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
+
+    @AppStorage("hasRequestedDownloadNotifications")
+    private var hasRequestedNotificationPermission = false
 
     private func observeAppLifecycle() {
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
@@ -240,6 +369,7 @@ final class DownloadManager: NSObject, ObservableObject {
     // MARK: - Public API
     
     func download(stream: StreamResult, episodeHref: String, context: DownloadContext, enrichSnapshot: Bool = true) {
+        requestNotificationPermissionIfNeeded()
         // Prevent duplicates
         if let existing = items.first(where: { $0.episodeNumber == context.episodeNumber && $0.episodeHref == episodeHref && $0.streamTitle == context.streamTitle }) {
             let status = existing.state == .completed ? "already downloaded" : "already in queue"
@@ -373,6 +503,7 @@ final class DownloadManager: NSObject, ObservableObject {
         streamTitle: String,
         preFetchedFirstEpisode: (episodeHref: String, streams: [StreamResult])? = nil
     ) {
+        requestNotificationPermissionIfNeeded()
         // Pre-enqueue every selected episode as a placeholder DownloadItem with no stream
         // URL yet. They show up in the Downloads tab immediately as "Waiting…", and a
         // background task fills in the stream URL one at a time (animepahe and similar
@@ -453,10 +584,28 @@ final class DownloadManager: NSObject, ObservableObject {
                     await self.runBatchExtraction(queued: queued, streamTitle: streamTitle)
                 }
             } else {
-                await withTaskGroup(of: Void.self) { group in
-                    for queued in queuedIDs {
-                        group.addTask {
-                            await self.runBatchExtraction(queued: queued, streamTitle: streamTitle)
+                // Extract in parallel for speed, but hand the results to processQueue in the
+                // order the episodes were queued. Filling them in completion order let the
+                // fastest extraction start first, so a batch began downloading in whatever
+                // sequence the network happened to resolve — the "mass download is pretty
+                // random" report. On a weak connection that ordering is what decides which
+                // episodes you actually end up with, so it needs to be by episode number.
+                await withTaskGroup(of: (Int, [StreamResult]).self) { group in
+                    for (idx, queued) in queuedIDs.enumerated() {
+                        group.addTask { (idx, await self.resolveBatchStreams(queued: queued)) }
+                    }
+                    var ready: [Int: [StreamResult]] = [:]
+                    var nextToRelease = 0
+                    for await (idx, streams) in group {
+                        ready[idx] = streams
+                        // Release every prefix that has now arrived, keeping queue order.
+                        while let streamsInOrder = ready.removeValue(forKey: nextToRelease) {
+                            await self.applyBatchExtraction(
+                                queued: queuedIDs[nextToRelease],
+                                streams: streamsInOrder,
+                                streamTitle: streamTitle
+                            )
+                            nextToRelease += 1
                         }
                     }
                 }
@@ -484,19 +633,30 @@ final class DownloadManager: NSObject, ObservableObject {
         queued: (href: String, id: UUID, reuseable: [StreamResult]?),
         streamTitle: String
     ) async {
-        let fetchedStreams: [StreamResult]
-        if let reuseable = queued.reuseable {
-            fetchedStreams = reuseable
-        } else {
-            fetchedStreams = await Self.fetchStreamsWithRetry(episodeUrl: queued.href, epNum: 0)
-        }
+        let streams = await resolveBatchStreams(queued: queued)
+        await applyBatchExtraction(queued: queued, streams: streams, streamTitle: streamTitle)
+    }
 
-        guard !fetchedStreams.isEmpty else {
+    /// The network half of a batch extraction — safe to run concurrently for many episodes.
+    private func resolveBatchStreams(
+        queued: (href: String, id: UUID, reuseable: [StreamResult]?)
+    ) async -> [StreamResult] {
+        if let reuseable = queued.reuseable { return reuseable }
+        return await Self.fetchStreamsWithRetry(episodeUrl: queued.href, epNum: 0)
+    }
+
+    /// The state half — records the resolved stream (or the failure) for one queued episode.
+    /// Called in queue order so downloads start by episode number.
+    private func applyBatchExtraction(
+        queued: (href: String, id: UUID, reuseable: [StreamResult]?),
+        streams: [StreamResult],
+        streamTitle: String
+    ) async {
+        guard !streams.isEmpty else {
             await MainActor.run { self.markPendingItemFailed(id: queued.id, reason: "No streams found") }
             return
         }
-
-        let stream = fetchedStreams.first(where: { $0.title == streamTitle }) ?? fetchedStreams[0]
+        let stream = streams.first(where: { $0.title == streamTitle }) ?? streams[0]
         await MainActor.run { self.fillPendingItemStream(id: queued.id, stream: stream) }
     }
 
@@ -587,10 +747,12 @@ final class DownloadManager: NSObject, ObservableObject {
         }
     }
 
-    func remove(_ item: DownloadItem) {
+    /// Cancels the transfer and deletes the on-disk artifacts for one item, without touching
+    /// `items`, persisting, or notifying. Shared by `remove` and `removeAll` so a bulk delete
+    /// does the bookkeeping once instead of per episode.
+    private func purgeArtifacts(_ item: DownloadItem) {
         hlsTasks[item.id]?.cancel()
         hlsTasks.removeValue(forKey: item.id)
-        refreshDownloadKeepAlive()
         if let taskID = item.taskIdentifier {
             urlSession.getAllTasks { tasks in tasks.first { $0.taskIdentifier == taskID }?.cancel() }
         }
@@ -605,6 +767,125 @@ final class DownloadManager: NSObject, ObservableObject {
         if let subPath = item.relativeSubtitlePath {
             try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(subPath))
         }
+        try? FileManager.default.removeItem(at: resumeDataURL(for: item.id))
+    }
+
+    /// Removes several downloads in one pass.
+    ///
+    /// Looping `remove` over a failed batch fired a toast per episode and re-walked the
+    /// downloads directory each time — unusable for clearing the 20-odd failures a dead
+    /// provider leaves behind. This persists, sweeps and notifies once.
+    func removeAll(_ toRemove: [DownloadItem]) {
+        guard toRemove.count > 1 else {
+            if let only = toRemove.first { remove(only) }
+            return
+        }
+        let ids = Set(toRemove.map(\.id))
+        for item in toRemove { purgeArtifacts(item) }
+        refreshDownloadKeepAlive()
+        items.removeAll { ids.contains($0.id) }
+        persist()
+        reconcileDownloadsDirectory()
+        var seen = Set<String>()
+        for item in toRemove where seen.insert("\(item.mediaTitle)|\(item.moduleId ?? "")").inserted {
+            DownloadedMediaSnapshotStore.shared.removeIfOrphaned(
+                mediaTitle: item.mediaTitle, moduleId: item.moduleId)
+        }
+        ToastManager.shared.show(message: "Removed \(toRemove.count) downloads", type: .info)
+        processQueue()
+    }
+
+    // MARK: - Pause / resume
+
+    /// Where a paused MP4 download's resume data lives. Kept beside the media rather than in
+    /// the manifest: it can run to megabytes, and the manifest is rewritten on every progress
+    /// tick.
+    private func resumeDataURL(for id: UUID) -> URL {
+        downloadDir.appendingPathComponent("\(id.uuidString).resume")
+    }
+
+    /// Stops a download without discarding what it has already fetched.
+    ///
+    /// Previously the only way out of a running download was `remove`, which threw the partial
+    /// away — so pausing to free the network meant starting over. HLS needs nothing special:
+    /// its downloader skips segments already on disk, so cancelling the task and running it
+    /// again resumes. An MP4 transfer hands back resume data instead, which is written next to
+    /// the media and fed back to URLSession on resume.
+    func pause(_ item: DownloadItem) {
+        guard item.state == .downloading || item.state == .pending else { return }
+
+        if item.isHLS {
+            hlsTasks[item.id]?.cancel()
+            hlsTasks.removeValue(forKey: item.id)
+            updateState(item.id, .paused)
+            refreshDownloadKeepAlive()
+            processQueue()
+            return
+        }
+
+        let id = item.id
+        let target = resumeDataURL(for: id)
+        guard let taskID = item.taskIdentifier else {
+            updateState(id, .paused)
+            processQueue()
+            return
+        }
+        urlSession.getAllTasks { tasks in
+            guard let task = tasks.first(where: { $0.taskIdentifier == taskID }) as? URLSessionDownloadTask else {
+                Task { @MainActor in
+                    self.updateState(id, .paused)
+                    self.refreshDownloadKeepAlive()
+                    self.processQueue()
+                }
+                return
+            }
+            // The delegate ignores NSURLErrorCancelled, so this doesn't register as a failure.
+            task.cancel(byProducingResumeData: { data in
+                if let data { try? data.write(to: target, options: .atomic) }
+                Task { @MainActor in
+                    self.updateState(id, .paused)
+                    self.refreshDownloadKeepAlive()
+                    self.processQueue()
+                }
+            })
+        }
+    }
+
+    /// Restarts a paused download, continuing from where it stopped where possible.
+    func resumeDownload(_ item: DownloadItem) {
+        guard item.state == .paused else { return }
+        let id = item.id
+
+        // MP4 with resume data: hand it straight back to URLSession.
+        let resumeURL = resumeDataURL(for: id)
+        if !item.isHLS, let data = try? Data(contentsOf: resumeURL) {
+            try? FileManager.default.removeItem(at: resumeURL)
+            let task = urlSession.downloadTask(withResumeData: data)
+            task.taskDescription = id.uuidString
+            if let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx].taskIdentifier = task.taskIdentifier
+                items[idx].state = .downloading
+            }
+            task.resume()
+            persist()
+            refreshDownloadKeepAlive()
+            return
+        }
+
+        // Otherwise re-enter the queue: an HLS download picks up from the segments already on
+        // disk, and an MP4 with no usable resume data starts over.
+        updateState(id, .pending)
+        processQueue()
+    }
+
+    /// Retries several failed downloads, lowest episode first so the queue refills in order.
+    func retryAll(_ toRetry: [DownloadItem]) {
+        for item in toRetry.sorted(by: { $0.episodeNumber < $1.episodeNumber }) { retry(item) }
+    }
+
+    func remove(_ item: DownloadItem) {
+        purgeArtifacts(item)
+        refreshDownloadKeepAlive()
         items.removeAll { $0.id == item.id }
         persist()
         // Belt-and-suspenders: if any removeItem above silently failed (e.g. a transient

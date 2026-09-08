@@ -65,6 +65,28 @@ enum PlaybackRouting {
         return playbackSpeed
     }
 
+    /// Whether a `didPlayToEndTime` notification describes an episode that actually finished.
+    ///
+    /// AVPlayer posts that notification when a stream *dies* mid-episode as well as when one
+    /// ends — a CDN connection dropped behind a phone call, or a seek into a region the server
+    /// no longer serves. Trusting it skipped viewers to the next episode from the middle of
+    /// one. A real ending has the playhead at the end; the tolerance absorbs the rounding HLS
+    /// leaves on a final segment. An unknown duration can't be verified, so it isn't an ending.
+    static func isGenuineEnd(position: Double, duration: Double, tolerance: Double = 5) -> Bool {
+        guard duration > 0, position.isFinite else { return false }
+        return position >= duration - tolerance
+    }
+
+    /// Whether a progress write should be dropped because the player's clock has collapsed.
+    ///
+    /// A dead item reports position 0 while its duration stays at the real value, so a save on
+    /// the way out of a failure recorded 0 over a genuinely watched episode. Someone scrubbing
+    /// to the very start loses nothing by being ignored here; silently discarding an hour of
+    /// progress can't be undone from inside the app.
+    static func shouldDiscardPositionWrite(position: Double, lastSaved: Double) -> Bool {
+        position <= 0.5 && lastSaved > 30
+    }
+
     /// The elapsed time to publish to `MPNowPlayingInfoCenter`.
     ///
     /// During a cast this must be the receiver's position: the local player's clock is frozen

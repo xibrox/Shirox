@@ -68,6 +68,8 @@ struct DownloadRowView: View {
             Image(systemName: "hourglass").foregroundStyle(.secondary)
         case .downloading:
             ProgressView().controlSize(.small)
+        case .paused:
+            Image(systemName: "pause.circle.fill").foregroundStyle(.secondary)
         case .completed:
             Image(systemName: "play.fill")
                 .foregroundStyle(Color.primary)

@@ -5,6 +5,10 @@ struct PlayerDoubleTapSeek: View {
     var onSeekBackward: () -> Void
     var onSeekForward: () -> Void
     let seekAmount: Double
+    /// Screen lock is on. Double-tap seeking used to ignore it entirely, so a locked player
+    /// still jumped when a pocket or a passing hand caught the screen twice — the one thing
+    /// locking is for. The single tap stays live: it's what reveals the unlock button.
+    var isLocked: Bool = false
 
     @State private var showLeftFeedback = false
     @State private var showRightFeedback = false
@@ -19,8 +23,8 @@ struct PlayerDoubleTapSeek: View {
             // allowing SingleTouchTapGR to correctly fail on any multi-finger touch.
             FullScreenSeekView(
                 onSingleTap: onSingleTap,
-                onSeekLeft:  { showFeedback(left: true);  onSeekBackward() },
-                onSeekRight: { showFeedback(left: false); onSeekForward()  }
+                onSeekLeft:  { guard !isLocked else { return }; showFeedback(left: true);  onSeekBackward() },
+                onSeekRight: { guard !isLocked else { return }; showFeedback(left: false); onSeekForward()  }
             )
             #else
             HStack(spacing: 0) {
@@ -68,6 +72,7 @@ struct PlayerDoubleTapSeek: View {
                 SimultaneousGesture(
                     TapGesture(count: 2).onEnded {
                         didDoubleTap = true
+                        guard !isLocked else { return }
                         if isLeft { onSeekBackward(); showFeedback(left: true) }
                         else      { onSeekForward();  showFeedback(left: false) }
                         Task {

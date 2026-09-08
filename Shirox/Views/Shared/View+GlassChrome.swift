@@ -29,3 +29,38 @@ extension View {
         }
     }
 }
+
+extension View {
+    /// The soft scroll-edge effect on iOS/macOS/tvOS 26+; a no-op on older systems.
+    ///
+    /// `.soft` fades scrolling content out gradually as it passes under a bar,
+    /// where the default `.hard` style cuts it off at a crisp line. Availability
+    /// gated the same way as `glassChrome` above: Shirox still deploys to
+    /// iOS 15 / macOS 14, where `scrollEdgeEffectStyle` doesn't exist.
+    @ViewBuilder
+    func softScrollEdges(_ edges: Edge.Set = .all) -> some View {
+        if #available(iOS 26.0, macOS 26.0, tvOS 26.0, *) {
+            scrollEdgeEffectStyle(.soft, for: edges)
+        } else {
+            self
+        }
+    }
+}
+
+extension View {
+    /// `fullScreenCover` on iOS, a plain `sheet` elsewhere.
+    ///
+    /// macOS has no full-screen cover and tvOS's behaves differently; a sheet is the closest
+    /// equivalent on both, so callers don't need their own `#if` around every presentation.
+    @ViewBuilder
+    func fullScreenCoverCompat<Content: View>(
+        isPresented: Binding<Bool>,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        #if os(iOS) || os(tvOS)
+        fullScreenCover(isPresented: isPresented, content: content)
+        #else
+        sheet(isPresented: isPresented, content: content)
+        #endif
+    }
+}

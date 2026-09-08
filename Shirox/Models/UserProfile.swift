@@ -60,3 +60,26 @@ struct ProfileScoreStat: Codable {
     let score: Int
     let count: Int
 }
+
+/// Axis marks for the profile score-distribution chart.
+///
+/// These used to come from the app's local score-format setting, which describes how *this
+/// device* displays scores — not the format the account's stats actually arrive in. When the
+/// two disagreed (a 1–10 setting against a 0–100 account) the chart drew marks at 1…10 while
+/// the data spanned to 100, crushing every label into the left edge over an empty plot.
+/// Reading the marks off the data itself can't drift out of sync with it.
+enum ScoreChartAxis {
+    /// At most this many labels before they start colliding on a phone-width chart.
+    static let maxLabels = 10
+
+    static func values(for scores: [Int]) -> [Int] {
+        let sorted = scores.sorted()
+        guard sorted.count > maxLabels else { return sorted }
+        // Too many buckets to label individually — keep an evenly spaced subset, always
+        // including the last so the axis reaches the end of the data.
+        let step = Int((Double(sorted.count) / Double(maxLabels)).rounded(.up))
+        var picked = stride(from: 0, to: sorted.count, by: step).map { sorted[$0] }
+        if let last = sorted.last, picked.last != last { picked.append(last) }
+        return picked
+    }
+}

@@ -4,9 +4,20 @@ import Combine
 struct SettingsView: View {
     @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
     @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
+    @AppStorage("autoResumeDownloads") private var autoResumeDownloads = false
+    @AppStorage("autoDeleteWatched") private var autoDeleteWatched = false
+    @AppStorage(DataSaver.key) private var dataSaverEnabled = false
+    #if os(iOS)
+    @State private var showDeleteDownloadsConfirmation = false
+    @State private var downloadsSize = 0
+    #endif
     @AppStorage("forceLandscape") private var forceLandscape = false
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
+    @AppStorage("speedBoostTolerance") private var speedBoostTolerance: Int = 10
+    @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
+    @StateObject private var librarySync = LibrarySyncService.shared
+    @State private var pendingSyncDirection: LibrarySyncService.Direction?
     @AppStorage("autoNextEpisode") private var autoNextEpisode = true
     @AppStorage("autoSkipSegments") private var autoSkipSegments = true
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
@@ -113,6 +124,25 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    Picker("Preferred Quality", selection: $preferredQuality) {
+                        Text("Auto").tag("auto")
+                        Text("Highest").tag("highest")
+                        Text("1080p").tag("1080")
+                        Text("720p").tag("720")
+                        Text("480p").tag("480")
+                        Text("Lowest").tag("lowest")
+                    }
+                    Text("Which rendition to start on when a stream offers several. Auto lets the player adapt to your connection; a fixed choice falls back to the closest available.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Picker("Hold-to-Speed Tolerance", selection: $speedBoostTolerance) {
+                        Text("Strict").tag(10)
+                        Text("Relaxed").tag(30)
+                        Text("Very Relaxed").tag(60)
+                    }
+                    Text("How far your finger may drift while pressing and holding before the 2x speed boost is cancelled. Raise it if holding to speed up keeps dropping back to normal.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Picker("Skip Duration", selection: $skipShort) {
                         ForEach(shortOptions, id: \.self) { s in
                             Text("\(s)s").tag(s)
@@ -181,6 +211,30 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
+                    Section("Copy Library") {
+                        ForEach(LibrarySyncService.Direction.allCases) { direction in
+                            Button {
+                                pendingSyncDirection = direction
+                            } label: {
+                                HStack {
+                                    Text(direction.title)
+                                    Spacer()
+                                    if librarySync.isRunning {
+                                        Text(librarySync.statusText)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .disabled(librarySync.isRunning)
+                        }
+                        Text("Brings one account up to date with the other — a one-time backfill for everything you tracked before signing in here. It only adds missing titles and moves progress forward, so anything further along on the destination is left as it is.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 
                 Section("Library") {
                     NavigationLink {
@@ -225,6 +279,13 @@ struct SettingsView: View {
                     }
                     Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
                         .tint(.secondary)
+                    Toggle("Auto-Resume Interrupted", isOn: $autoResumeDownloads)
+                        .tint(.secondary)
+                    Toggle("Delete After Watching", isOn: $autoDeleteWatched)
+                        .tint(.secondary)
+                    Text("Delete After Watching removes a downloaded episode once you finish it and close the player. Retry downloads that were interrupted or failed when the app next opens — off by default so reopening the app never starts a large transfer on cellular without you asking.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Matching") {
@@ -250,7 +311,31 @@ struct SettingsView: View {
                 #endif
 
                 #if os(iOS)
+                Section("Data") {
+                    Toggle("Data Saver", isOn: $dataSaverEnabled)
+                        .tint(.secondary)
+                    Text("Loads smaller artwork and skips the large banner images on Home. Posters look softer; everything still works, and downloads and playback are unaffected.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Storage & Cache") {
+                    #if os(iOS)
+                    Button(role: .destructive) {
+                        showDeleteDownloadsConfirmation = true
+                    } label: {
+                        LabeledContent("Delete All Downloads") {
+                            Text(Self.formattedBytes(downloadsSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.red)
+                    .disabled(downloadsSize == 0)
+                    Text("Removes every downloaded episode and chapter. Kept out of Clear Everything below — these are files you saved for offline use, not a cache the app can rebuild.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    #endif
+
                     Button(role: .destructive) {
                         guard !isClearing else { return }
                         isClearing = true
@@ -407,6 +492,7 @@ struct SettingsView: View {
                     }
                 }
             }
+            .softScrollEdges()
             .navigationTitle("Settings")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -422,6 +508,20 @@ struct SettingsView: View {
             } message: {
                 Text("This will clear all in-progress playback cards from the Home screen.")
             }
+            #if os(iOS)
+            .alert("Delete All Downloads?", isPresented: $showDeleteDownloadsConfirmation) {
+                Button("Delete", role: .destructive) {
+                    // Through the managers rather than the filesystem, so the manifests don't
+                    // keep listing episodes whose files are gone.
+                    DownloadManager.shared.removeAll(DownloadManager.shared.items)
+                    MangaDownloadManager.shared.removeAll(MangaDownloadManager.shared.items)
+                    updateCacheSizes()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Every downloaded episode and chapter will be removed from this device. You can download them again later.")
+            }
+            #endif
             .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
                 Button("Reset", role: .destructive) {
                     CacheManager.shared.clearWatchHistory()
@@ -432,6 +532,22 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will clear all 'Watched' checkmarks from episode lists.")
+            }
+            .alert(
+                pendingSyncDirection?.title ?? "Copy Library",
+                isPresented: Binding(
+                    get: { pendingSyncDirection != nil },
+                    set: { if !$0 { pendingSyncDirection = nil } }
+                ),
+                presenting: pendingSyncDirection
+            ) { direction in
+                Button("Copy") {
+                    pendingSyncDirection = nil
+                    Task { await librarySync.sync(direction) }
+                }
+                Button("Cancel", role: .cancel) { pendingSyncDirection = nil }
+            } message: { direction in
+                Text("Adds anything missing from \(direction.targetName) and moves its progress forward to match \(direction.sourceName). Titles already further along on \(direction.targetName) are left untouched.")
             }
             .onAppear {
                 #if os(iOS)
@@ -451,6 +567,9 @@ struct SettingsView: View {
         searchAliasSize = CacheManager.shared.searchAliasSize
         idMappingSize = CacheManager.shared.idMappingSize
         episodeSortSize = CacheManager.shared.episodeSortSize
+        #if os(iOS)
+        downloadsSize = DownloadManager.shared.bytesOnDisk + MangaDownloadManager.shared.bytesOnDisk
+        #endif
         // Image cache + total are computed asynchronously (Kingfisher disk size).
         Task {
             imageCacheSize = await CacheManager.shared.imageCacheSize
@@ -511,6 +630,7 @@ struct LibrarySettingsView: View {
                 }
             }
         }
+        .softScrollEdges()
         .navigationTitle("Library")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -628,6 +748,7 @@ struct SettingsViewLogger: View {
                     }
                     .padding()
                 }
+                .softScrollEdges()
             }
         }
         .searchable(text: $searchText, prompt: "Search logs")
@@ -696,6 +817,7 @@ struct SettingsViewLoggerFilter: View {
                 }
             }
         }
+        .softScrollEdges()
         .navigationTitle("Log Filters")
     }
 }

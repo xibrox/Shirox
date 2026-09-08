@@ -104,6 +104,7 @@ struct PlayerSubtitleSettingsView: View {
                     #endif
                 }
             }
+            .softScrollEdges()
             .navigationTitle("Subtitle Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

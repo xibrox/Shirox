@@ -105,19 +105,76 @@ final class EpisodeNavigatorTests: XCTestCase {
         XCTAssertEqual(next?.href, "s2/ep2")
     }
 
-    /// Legacy items (no saved href) fall back to number — the known limitation that the first
-    /// hop on a flat list lands in season 1, kept for items saved before hrefs existed.
-    func testNextAfterHrefOrNumberFallsBackToNumber() {
+    /// Legacy items (no saved href) on a flat multi-season list: number 1 occurs in both
+    /// seasons, so it cannot say which one is playing. Declining beats silently hopping to
+    /// season 1 and syncing that episode to AniList.
+    func testNextAfterHrefOrNumberDeclinesAmbiguousNumber() {
         let eps = twoSeasonChain()
-        let next = EpisodeNavigator.next(afterHref: nil, orNumber: 1, in: eps)
-        XCTAssertEqual(next?.href, "s1/ep2")
+        XCTAssertNil(EpisodeNavigator.next(afterHref: nil, orNumber: 1, in: eps),
+                     "number 1 is ambiguous across seasons — must not guess season 1")
     }
 
-    /// Fallback uses nearest-number when there's no exact match (offset numbering).
-    func testNextAfterHrefOrNumberNearestNumberFallback() {
+    /// THE SEQUEL-SYNC BUG: the module numbers a sequel continuously (25…28) while the app
+    /// tracks it season-relative, so "next after S2 E1" looks up a number the list doesn't
+    /// contain. The old nearest-number guess advanced into an unrelated episode and wrote
+    /// that number to AniList/MAL. With no href to disambiguate, the only safe answer is nil.
+    func testNextAfterHrefOrNumberDeclinesWhenNumberIsAbsent() {
         let eps = (25...28).map { EpisodeLink(number: Double($0), href: "ep\($0)") }
-        let next = EpisodeNavigator.next(afterHref: nil, orNumber: 1, in: eps)
-        XCTAssertEqual(next?.href, "ep26", "nearest to 1 is ep25, so next is ep26")
+        XCTAssertNil(EpisodeNavigator.next(afterHref: nil, orNumber: 1, in: eps),
+                     "no episode 1 exists — must decline rather than guess the nearest")
+    }
+
+    /// The fallback still works where it is unambiguous: a single-season list with no saved
+    /// href advances by number exactly as before. This is the case the fallback exists for.
+    func testNextAfterHrefOrNumberAdvancesOnUnambiguousNumber() {
+        let eps = (1...6).map { EpisodeLink(number: Double($0), href: "ep\($0)") }
+        let next = EpisodeNavigator.next(afterHref: nil, orNumber: 3, in: eps)
+        XCTAssertEqual(next?.href, "ep4")
+    }
+
+    // MARK: - seasonRelativeNumber (module number -> season-relative, the sync fix)
+
+    /// Combined franchise list, S1 1–12 then S2 1–4 renumbered continuously by the app's
+    /// offset. Advancing from S2 E1 (index 12) to index 13 must report 2, not the module's
+    /// own number — this is the reported "ep 1 then ep 13" jump.
+    func testSeasonRelativeUsesPositionOnCombinedList() {
+        let eps = twoSeasonChain()
+        let n = EpisodeNavigator.seasonRelativeNumber(
+            moduleNumber: 2, index: 13, in: eps, seasonOffset: 12)
+        XCTAssertEqual(n, 2)
+    }
+
+    /// First episode of the offset season maps back to 1.
+    func testSeasonRelativeFirstEpisodeOfSeasonTwo() {
+        let eps = twoSeasonChain()
+        let n = EpisodeNavigator.seasonRelativeNumber(
+            moduleNumber: 1, index: 12, in: eps, seasonOffset: 12)
+        XCTAssertEqual(n, 1)
+    }
+
+    /// Season-specific page numbered absolutely (S2 = 25…28) with no resolvable chain:
+    /// subtract the list's own base so ep 26 reports as season-relative 2.
+    func testSeasonRelativeUsesListBaseWhenNoOffset() {
+        let eps = (25...28).map { EpisodeLink(number: Double($0), href: "ep\($0)") }
+        let n = EpisodeNavigator.seasonRelativeNumber(
+            moduleNumber: 26, index: 1, in: eps, seasonOffset: 0)
+        XCTAssertEqual(n, 2)
+    }
+
+    /// A module that already numbers the season from 1 is passed through untouched.
+    func testSeasonRelativePassesThroughWhenAlreadyRelative() {
+        let eps = (1...12).map { EpisodeLink(number: Double($0), href: "ep\($0)") }
+        let n = EpisodeNavigator.seasonRelativeNumber(
+            moduleNumber: 4, index: 3, in: eps, seasonOffset: 0)
+        XCTAssertEqual(n, 4)
+    }
+
+    /// A season-1 anchor (offset 0) on a combined list is also a pass-through.
+    func testSeasonRelativeSeasonOneOnCombinedList() {
+        let eps = twoSeasonChain()
+        let n = EpisodeNavigator.seasonRelativeNumber(
+            moduleNumber: 3, index: 2, in: eps, seasonOffset: 0)
+        XCTAssertEqual(n, 3)
     }
 
     // MARK: - resolve (stream refetch / recovery of the current episode)

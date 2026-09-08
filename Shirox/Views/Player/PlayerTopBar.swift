@@ -26,7 +26,10 @@ struct PlayerTopBar: View {
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, isPad ? 140 : 100)
+                // Enough to clear the dismiss button and the right capsule, and no more. This
+                // was 100/140, which reserved more than twice the buttons' width and left so
+                // little room that ordinary titles truncated after a couple of words.
+                .padding(.horizontal, isPad ? 84 : 64)
                 .frame(height: isPad ? 56 : 44) // match dismiss button height
 
             HStack(alignment: .top) {

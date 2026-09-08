@@ -105,6 +105,11 @@ struct ShiroxApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
     @StateObject private var moduleManager = ModuleManager.shared
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    /// Shown on every cold start, not just the first — the system launch screen is blank, so
+    /// without this the app opens on nothing and then snaps to content.
+    @State private var showSplash = true
+    @State private var showOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -118,6 +123,12 @@ struct ShiroxApp: App {
             _ = CastManager.shared
         #endif
         ProviderManager.shared.setup(providers: [AniListProvider.shared, MALProvider.shared])
+        // Anyone who already has the app set up has effectively finished onboarding; don't
+        // interrupt an existing install to tell it how to do what it is already doing.
+        if !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding"),
+           !ModuleManager.shared.modules.isEmpty {
+            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+        }
         PendingWriteQueue.shared.register(sink: LibraryWriteSink())
         LocalLibraryManager.shared.syncFromContinueWatching()
         HostBlocklist.shared.loadIfNeeded()
@@ -128,6 +139,26 @@ struct ShiroxApp: App {
             RootTabView()
                 .environmentObject(moduleManager)
                 .tint(.primary)
+                // First run: the app ships with no sources, so every tab is empty until one is
+                // connected. Onboarding says so and wires up the two things that fix it.
+                //
+                // Driven by plain state rather than a binding computed from the stored flag.
+                // SwiftUI calls a presentation binding's setter with `false` whenever the cover
+                // isn't showing, and a setter that wrote "finished" on that marked onboarding
+                // complete before it had ever been seen.
+                .fullScreenCoverCompat(isPresented: $showOnboarding) {
+                    OnboardingView()
+                        .environmentObject(moduleManager)
+                }
+                .overlay {
+                    if showSplash { SplashView(isPresented: $showSplash) }
+                }
+                .onChangeOf(showSplash) { stillShowing in
+                    // Decide once, after the splash hands over: presenting a cover underneath
+                    // it would just be revealed by the fade instead of arriving on its own.
+                    guard !stillShowing else { return }
+                    showOnboarding = !hasCompletedOnboarding
+                }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active { Task { await PendingWriteQueue.shared.flush() } }
                 }

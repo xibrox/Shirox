@@ -9,6 +9,9 @@ final class MangaDownloadManager: ObservableObject {
 
     @Published private(set) var items: [MangaDownloadItem] = []
 
+    /// Bytes the downloaded chapter pages occupy on disk.
+    var bytesOnDisk: Int { DownloadManager.sizeOfDirectory(at: downloadDir) }
+
     let downloadDir: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let url = docs.appendingPathComponent("MangaDownloads", isDirectory: true)
@@ -151,6 +154,31 @@ final class MangaDownloadManager: ObservableObject {
     }
 
     // MARK: - Remove
+
+    /// Removes several chapter downloads in one pass — one persist, one sweep, one toast.
+    /// See `DownloadManager.removeAll` for why the per-item loop wasn't good enough.
+    func removeAll(_ toRemove: [MangaDownloadItem]) {
+        guard toRemove.count > 1 else {
+            if let only = toRemove.first { remove(only) }
+            return
+        }
+        let ids = Set(toRemove.map(\.id))
+        for item in toRemove {
+            chapterTasks[item.id]?.cancel()
+            chapterTasks.removeValue(forKey: item.id)
+            try? FileManager.default.removeItem(at: folderURL(for: item.id))
+        }
+        items.removeAll { ids.contains($0.id) }
+        persist()
+        reconcileDownloadsDirectory()
+        ToastManager.shared.show(message: "Removed \(toRemove.count) downloads", type: .info)
+        processQueue()
+    }
+
+    /// Retries several failed chapter downloads, lowest chapter first.
+    func retryAll(_ toRetry: [MangaDownloadItem]) {
+        for item in toRetry.sorted(by: { $0.chapterNumber < $1.chapterNumber }) { retry(item) }
+    }
 
     func remove(_ item: MangaDownloadItem) {
         chapterTasks[item.id]?.cancel()

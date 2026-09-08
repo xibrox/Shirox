@@ -136,16 +136,7 @@ struct MarkdownText: View {
                 Spacer()
             }
         case .media(let type, let source):
-            HStack(spacing: 8) {
-                Image(systemName: type == "youtube" ? "play.rectangle.fill" : "video.fill")
-                    .foregroundStyle(type == "youtube" ? .red : .accentColor)
-                Text("\(type.capitalized) embed: \(source)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(8)
-            .background(Color.secondary.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            MarkdownMediaEmbed(type: type, source: source)
 
         case .spacer:
             Color.clear.frame(height: 2)
@@ -524,29 +515,7 @@ struct MarkdownText: View {
     private func inlineMarkdown(_ raw: String, revealed: Set<String>) -> AttributedString {
         var s = raw
         // AniList-specific
-        // Spoilers: ~!content!~ -> [Spoiler](spoiler://content)
-        let spoilerPattern = #"~!([\s\S]*?)!~"#
-        if let regex = try? NSRegularExpression(pattern: spoilerPattern) {
-            let nsString = s as NSString
-            let matches = regex.matches(in: s, range: NSRange(location: 0, length: nsString.length))
-            
-            var offset = 0
-            for match in matches {
-                let fullRange = NSRange(location: match.range.location + offset, length: match.range.length)
-                let content = nsString.substring(with: match.range(at: 1))
-                
-                let replacement: String
-                if revealed.contains(content) {
-                    replacement = content
-                } else {
-                    let encoded = content.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? ""
-                    replacement = "[⬛ spoiler](spoiler://\(encoded))"
-                }
-                
-                s = (s as NSString).replacingCharacters(in: fullRange, with: replacement)
-                offset += (replacement.count - match.range.length)
-            }
-        }
+        s = AniListSpoilerMarkup.apply(to: s, revealed: revealed)
         
         s = s.replacingOccurrences(of: #"img\([^)]*\)"#, with: "", options: .regularExpression)
         // HTML spoiler div → ~!...!~
@@ -601,5 +570,151 @@ struct MarkdownText: View {
         case 5: return .subheadline
         default: return .footnote
         }
+    }
+}
+
+// MARK: - Media embeds
+
+/// A `youtube(…)`, `webm(…)` or `mp4(…)` embed from an AniList bio or activity post.
+///
+/// These used to render as a grey box containing the words "Youtube embed:" and the raw URL —
+/// not a thumbnail, not tappable, and no way to reach the video at all. A profile that leans on
+/// embeds (plenty do) was just a wall of dead links.
+///
+/// YouTube gets its real thumbnail, since the id is enough to address it. Direct video files
+/// get a card naming the host. Both open the source, which is the honest thing an in-app bio
+/// can offer: iOS has no WebM decoder, so promising inline playback would fail on exactly the
+/// format AniList users post most.
+struct MarkdownMediaEmbed: View {
+    let type: String
+    let source: String
+
+    @Environment(\.openURL) private var openURL
+
+    private var isYouTube: Bool { type == "youtube" }
+
+    /// The video id, whether the author wrote a bare id or a full URL of any YouTube shape.
+    private var youTubeID: String? {
+        guard isYouTube else { return nil }
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), url.host != nil else {
+            // A bare id: 11 chars of the YouTube alphabet.
+            let ok = trimmed.count == 11 && trimmed.allSatisfy {
+                $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_"
+            }
+            return ok ? trimmed : nil
+        }
+        if url.host?.contains("youtu.be") == true {
+            return url.lastPathComponent.isEmpty ? nil : url.lastPathComponent
+        }
+        if let v = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "v" })?.value {
+            return v
+        }
+        // /embed/<id> and /shorts/<id>
+        let parts = url.pathComponents.filter { $0 != "/" }
+        if let idx = parts.firstIndex(where: { $0 == "embed" || $0 == "shorts" }),
+           idx + 1 < parts.count {
+            return parts[idx + 1]
+        }
+        return nil
+    }
+
+    private var destination: URL? {
+        if let youTubeID { return URL(string: "https://www.youtube.com/watch?v=\(youTubeID)") }
+        return URL(string: source.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private var caption: String {
+        if isYouTube { return "Watch on YouTube" }
+        return destination?.host.map { "Video on \($0)" } ?? "Open video"
+    }
+
+    var body: some View {
+        Button {
+            if let destination { openURL(destination) }
+        } label: {
+            if let youTubeID {
+                thumbnail(id: youTubeID)
+            } else {
+                fileCard
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(destination == nil)
+        .accessibilityLabel(caption)
+    }
+
+    private func thumbnail(id: String) -> some View {
+        ZStack {
+            CachedAsyncImage(urlString: "https://img.youtube.com/vi/\(id)/hqdefault.jpg")
+                .aspectRatio(16 / 9, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.45), radius: 8)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var fileCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "play.rectangle.fill")
+                .font(.title3)
+                .foregroundStyle(.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(caption)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                Text(type.uppercased())
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "arrow.up.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+// MARK: - Spoilers
+
+/// Rewrites AniList's `~!spoiler!~` runs into tappable links, or into plain text once revealed.
+///
+/// Pulled out of `inlineMarkdown` and made pure so the position arithmetic can be tested. The
+/// previous version replaced each match in turn and tracked a running `offset` computed as
+/// `replacement.count - match.range.length` — Swift's *Character* count against NSString's
+/// *UTF-16* length. Those agree only while every character is one UTF-16 unit, so a single
+/// emoji anywhere in a revealed spoiler shifted every later replacement and shredded the rest
+/// of the text. AniList bios are full of emoji.
+///
+/// This builds the result in one forward pass instead, so there is no offset to drift.
+enum AniListSpoilerMarkup {
+    static func apply(to raw: String, revealed: Set<String>) -> String {
+        guard let regex = try? NSRegularExpression(pattern: #"~!([\s\S]*?)!~"#) else { return raw }
+        let ns = raw as NSString
+        let matches = regex.matches(in: raw, range: NSRange(location: 0, length: ns.length))
+        guard !matches.isEmpty else { return raw }
+
+        var out = ""
+        var cursor = 0
+        for match in matches {
+            out += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            let content = ns.substring(with: match.range(at: 1))
+            if revealed.contains(content) {
+                out += content
+            } else {
+                let encoded = content.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? ""
+                out += "[⬛ spoiler](spoiler://\(encoded))"
+            }
+            cursor = match.range.location + match.range.length
+        }
+        out += ns.substring(from: cursor)
+        return out
     }
 }

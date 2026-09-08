@@ -49,6 +49,7 @@ struct JellyfinSeriesView: View {
             }
             .padding(16)
         }
+        .softScrollEdges()
         .navigationTitle(series.name)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

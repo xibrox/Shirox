@@ -5,6 +5,7 @@ import Combine
 final class HomeViewModel: ObservableObject {
     @Published var trending: [Media] = []
     @Published var seasonal: [Media] = []
+    @Published var lastSeason: [Media] = []
     @Published var popular: [Media] = []
     @Published var topRated: [Media] = []
     @Published var isLoading = false
@@ -40,6 +41,8 @@ final class HomeViewModel: ObservableObject {
                 try await Task.sleep(nanoseconds: 400_000_000)
                 seasonal = try await ProviderManager.shared.call { try await $0.seasonal() }
                 try await Task.sleep(nanoseconds: 400_000_000)
+                lastSeason = try await ProviderManager.shared.call { try await $0.lastSeasonCompleted() }
+                try await Task.sleep(nanoseconds: 400_000_000)
                 popular = try await ProviderManager.shared.call { try await $0.popular() }
                 try await Task.sleep(nanoseconds: 400_000_000)
                 topRated = try await ProviderManager.shared.call { try await $0.topRated() }
@@ -48,11 +51,13 @@ final class HomeViewModel: ObservableObject {
                 async let s = ProviderManager.shared.call { try await $0.seasonal() }
                 async let p = ProviderManager.shared.call { try await $0.popular() }
                 async let r = ProviderManager.shared.call { try await $0.topRated() }
-                let (tResult, sResult, pResult, rResult) = try await (t, s, p, r)
+                async let l = ProviderManager.shared.call { try await $0.lastSeasonCompleted() }
+                let (tResult, sResult, pResult, rResult, lResult) = try await (t, s, p, r, l)
                 trending = tResult
                 seasonal = sResult
                 popular = pResult
                 topRated = rResult
+                lastSeason = lResult
             }
             loaded = true
         } catch {

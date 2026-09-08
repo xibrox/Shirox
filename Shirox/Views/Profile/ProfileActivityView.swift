@@ -187,6 +187,7 @@ struct ProfileActivityView: View {
                     .listRowBackground(Color.clear)
                 }
             }
+            .softScrollEdges()
             .listStyle(.plain)
             .refreshable { await vm.loadActivity(userId: userId) }
         }

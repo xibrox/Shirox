@@ -101,6 +101,10 @@ final class PendingWriteQueue {
             switch e {
             case .rateLimited: return true
             case .httpError(let code): return code == 429 || code == 403 || code >= 500
+            // Same rule by status — a service that explains itself in the body deserves the
+            // same second chance as one that only sends a code. AniList's "temporarily
+            // disabled" is a 403, and a write made during it must survive to be retried.
+            case .serviceMessage(let code, _): return code == 429 || code == 403 || code >= 500
             default: return false
             }
         }

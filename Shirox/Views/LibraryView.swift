@@ -414,7 +414,7 @@ struct LibraryView: View {
         if let source = entry.localSource, source.kind == .module {
             pendingMangaItem = SearchItem(
                 title: entry.media.title.displayTitle,
-                image: entry.media.coverImage.best ?? "",
+                image: entry.media.coverImage.thumb ?? "",
                 href: source.detailHref ?? "")
             mangaLinkActive = true
         } else {
@@ -592,7 +592,7 @@ struct LibraryView: View {
             DetailView(
                 item: SearchItem(
                     title: entry.media.title.displayTitle,
-                    image: entry.media.coverImage.best ?? "",
+                    image: entry.media.coverImage.thumb ?? "",
                     href: source.detailHref ?? ""
                 ),
                 moduleId: source.moduleId
@@ -643,6 +643,7 @@ struct LibraryView: View {
                 entryRow(entry)
             }
         }
+        .softScrollEdges()
         .listStyle(.plain)
         .refreshable {
             async let count: Void = refreshUnreadCountIfNeeded()
@@ -892,7 +893,7 @@ private struct LibraryRowView: View {
                 .frame(width: 70)
                 .overlay(
                     ZStack {
-                        CachedAsyncImage(urlString: entry.media.coverImage.best ?? "")
+                        CachedAsyncImage(urlString: entry.media.coverImage.thumb ?? "")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
 

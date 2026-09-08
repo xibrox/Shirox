@@ -32,6 +32,14 @@ final class AniListProvider: MediaProvider {
         try await AniListService.shared.seasonal().map { mapMedia($0) }
     }
 
+    func lastSeasonCompleted() async throws -> [Media] {
+        try await AniListService.shared.lastSeasonCompleted().map { mapMedia($0) }
+    }
+
+    func discover(genre: String?, sort: DiscoverSort, page: Int) async throws -> [Media] {
+        try await AniListService.shared.discover(genre: genre, sort: sort, page: page).map { mapMedia($0) }
+    }
+
     func popular() async throws -> [Media] {
         try await AniListService.shared.popular().map { mapMedia($0) }
     }
@@ -200,7 +208,8 @@ final class AniListProvider: MediaProvider {
     func mapEntry(_ e: AniListRawEntry) -> LibraryEntry {
         LibraryEntry(id: e.id, media: mapMedia(e.media), status: e.status,
                      progress: e.progress, score: e.score, updatedAt: e.updatedAt,
-                     customListName: e.customListName, timesRewatched: e.repeat)
+                     customListName: e.customListName, timesRewatched: e.repeat,
+                     isPrivate: e.isPrivate)
     }
 
     func mapUser(_ u: AniListUser) -> UserProfile {

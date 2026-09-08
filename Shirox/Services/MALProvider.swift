@@ -23,24 +23,68 @@ final class MALProvider: MediaProvider {
 
     // MARK: - Discovery
 
+    // Discovery goes through MyAnimeList's own API. Jikan served these historically and still
+    // stands in if the official one fails, but it is no longer the only route: when Jikan went
+    // down, the rankings behind three Home rows had nothing to fall back to.
+
     func trending() async throws -> [Media] {
-        try await MALDiscoveryService.shared.trending().map { MALDiscoveryService.shared.mapToMedia($0) }
+        try await officialOrJikan(
+            official: { try await MALOfficialDiscoveryService.shared.ranking(.airing, limit: DataSaver.rowLength(20)) },
+            jikan: { try await MALDiscoveryService.shared.trending() }
+        )
     }
 
     func seasonal() async throws -> [Media] {
-        try await MALDiscoveryService.shared.seasonal().map { MALDiscoveryService.shared.mapToMedia($0) }
+        let current = MALOfficialDiscoveryService.currentSeason()
+        return try await officialOrJikan(
+            official: {
+                try await MALOfficialDiscoveryService.shared.season(
+                    year: current.year, season: current.season, limit: DataSaver.rowLength(20))
+            },
+            jikan: { try await MALDiscoveryService.shared.seasonal() }
+        )
     }
 
     func popular() async throws -> [Media] {
-        try await MALDiscoveryService.shared.popular().map { MALDiscoveryService.shared.mapToMedia($0) }
+        try await officialOrJikan(
+            official: { try await MALOfficialDiscoveryService.shared.ranking(.byPopularity, limit: DataSaver.rowLength(20)) },
+            jikan: { try await MALDiscoveryService.shared.popular() }
+        )
     }
 
     func topRated() async throws -> [Media] {
-        try await MALDiscoveryService.shared.topRated().map { MALDiscoveryService.shared.mapToMedia($0) }
+        try await officialOrJikan(
+            official: { try await MALOfficialDiscoveryService.shared.ranking(.all, limit: DataSaver.rowLength(20)) },
+            jikan: { try await MALDiscoveryService.shared.topRated() }
+        )
     }
 
     func search(_ query: String) async throws -> [Media] {
-        try await MALDiscoveryService.shared.search(query).map { MALDiscoveryService.shared.mapToMedia($0) }
+        try await officialOrJikan(
+            official: { try await MALOfficialDiscoveryService.shared.search(query, limit: 25) },
+            jikan: { try await MALDiscoveryService.shared.search(query) }
+        )
+    }
+
+    /// Prefers MyAnimeList's own API, standing Jikan in if it fails or answers emptily.
+    ///
+    /// An empty ranking or season is never a real answer, so it is treated as a failure here for
+    /// the same reason it is inside the Jikan client — one of its hosts returns `200` with an
+    /// empty array rather than an error, which rendered as simply having no content.
+    private func officialOrJikan(
+        official: () async throws -> [MALOfficialDiscoveryService.Node],
+        jikan: () async throws -> [MALDiscoveryService.JikanAnime]
+    ) async throws -> [Media] {
+        do {
+            let nodes = try await official()
+            if !nodes.isEmpty {
+                return nodes.map { MALOfficialDiscoveryService.shared.mapToMedia($0) }
+            }
+            Logger.shared.log("[MAL] Official API returned nothing — trying Jikan", type: "Provider")
+        } catch {
+            Logger.shared.log("[MAL] Official API failed (\(error)) — trying Jikan", type: "Provider")
+        }
+        return try await jikan().map { MALDiscoveryService.shared.mapToMedia($0) }
     }
 
     func detail(id: Int) async throws -> Media {
@@ -92,6 +136,16 @@ final class MALProvider: MediaProvider {
         return try await MALSocialService.shared.fetchHistory(username: username, page: page)
     }
 
+    func discover(genre: String?, sort: DiscoverSort, page: Int) async throws -> [Media] {
+        // Genre names go through as-is: matching happens against the names MyAnimeList returns,
+        // which are the same ones the picker offers.
+        try await MALDiscoveryService.shared.discover(genre: genre, sort: sort, page: page)
+            .map { MALDiscoveryService.shared.mapToMedia($0) }
+    }
+
+    /// MyAnimeList has no notifications API. Declaring that lets callers route around MAL
+    /// instead of reading its empty answer as "no notifications".
+    var supportsNotifications: Bool { false }
     func fetchNotifications() async throws -> [ProviderNotification] { [] }
 
     func postStatus(_ text: String) async throws { throw ProviderError.unsupported }

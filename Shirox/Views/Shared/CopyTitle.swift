@@ -49,4 +49,61 @@ extension View {
         }
         #endif
     }
+
+    /// Long-press (right-click on macOS) to copy a failure message.
+    ///
+    /// Download errors carry the detail that makes them actionable — which segment 404'd, which
+    /// host refused — and that is exactly the part a two-line row truncates away.
+    @ViewBuilder
+    func copyErrorContextMenu(_ message: String?) -> some View {
+        #if os(tvOS)
+        self
+        #else
+        if let message, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            self.contextMenu {
+                Button {
+                    Clipboard.copy(message)
+                    #if os(iOS)
+                    ToastManager.shared.show(message: "Error copied", type: .success, duration: 1.6)
+                    #endif
+                } label: {
+                    Label("Copy Error", systemImage: "doc.on.doc")
+                }
+            }
+        } else {
+            self
+        }
+        #endif
+    }
+
+    /// Long-press (right-click on macOS) to copy a synopsis.
+    ///
+    /// Asked for so a description can be pasted somewhere else to check it matches the season
+    /// you think you're starting — some modules label seasons wrongly but describe them
+    /// correctly, and the synopsis is the thing worth comparing.
+    ///
+    /// Attaches nothing when there's no description, and nothing on tvOS, which has no
+    /// clipboard UI.
+    @ViewBuilder
+    func copyDescriptionContextMenu(_ description: String?) -> some View {
+        #if os(tvOS)
+        self
+        #else
+        if let description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            self.contextMenu {
+                Button {
+                    Clipboard.copy(description)
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    ToastManager.shared.show(message: "Description copied", type: .success, duration: 1.6)
+                    #endif
+                } label: {
+                    Label("Copy Description", systemImage: "doc.on.doc")
+                }
+            }
+        } else {
+            self
+        }
+        #endif
+    }
 }

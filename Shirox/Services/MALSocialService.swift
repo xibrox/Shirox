@@ -2,7 +2,7 @@ import Foundation
 
 final class MALSocialService {
     nonisolated(unsafe) static let shared = MALSocialService()
-    private let jikanBase = URL(string: "https://api.jikan.moe/v4")!
+    private let jikanBase = JikanAPI.base
     private let malBase = URL(string: "https://api.myanimelist.net/v2")!
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default

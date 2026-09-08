@@ -38,6 +38,7 @@ struct JellyfinLibraryView: View {
             }
             .padding(16)
         }
+        .softScrollEdges()
         .searchable(text: $query, prompt: "Search your Jellyfin library")
         .onChangeOf(query) { _ in scheduleSearch() }
         .task { await loadInitial() }

@@ -72,6 +72,7 @@ struct ModuleListView: View {
                                 .listRowInsets(EdgeInsets())
                                 .listRowBackground(Color.clear)
                                 .contextMenu {
+                                    shareModuleActions(module)
                                     Button(role: .destructive) {
                                         removeModule(module)
                                     } label: {
@@ -88,6 +89,7 @@ struct ModuleListView: View {
                         .textCase(.uppercase)
                 }
             }
+            .softScrollEdges()
             #if os(iOS)
             .listStyle(.insetGrouped)
             #elseif !os(tvOS)
@@ -486,6 +488,35 @@ struct ModuleListView: View {
     }
 
     // MARK: - Actions
+    /// Copy / share actions for an installed module, so a source can be passed to someone else
+    /// without them hunting down the original link.
+    ///
+    /// Shares `jsonUrl` — the manifest URL `ModuleManager.addModule(from:)` records at install
+    /// time, and the one the recipient can paste straight back into "Add from URL". `scriptUrl`
+    /// is the raw JS and is not installable, so it is deliberately not offered.
+    @ViewBuilder
+    private func shareModuleActions(_ module: ModuleDefinition) -> some View {
+        #if os(tvOS)
+        EmptyView()
+        #else
+        if let link = module.jsonUrl, !link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Button {
+                Clipboard.copy(link)
+                #if os(iOS)
+                ToastManager.shared.show(message: "Module link copied", type: .info)
+                #endif
+            } label: {
+                Label("Copy Link", systemImage: "link")
+            }
+            if #available(iOS 16.0, macOS 13.0, *), let url = URL(string: link) {
+                ShareLink(item: url) {
+                    Label("Share Module", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        #endif
+    }
+
     private func addModule() {
         let trimmedURL = moduleURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty, let url = URL(string: trimmedURL) else {

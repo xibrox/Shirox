@@ -167,19 +167,13 @@ struct ProfileStatsView: View {
         }
     }
 
-    private var scoreChartAxisValues: [Int] {
-        switch scoreFormat {
-        case .point100: return [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-        case .point10Decimal, .point10: return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        case .point5: return [1, 2, 3, 4, 5]
-        case .point3: return [1, 2, 3]
-        }
-    }
-
     @available(iOS 16, *)
     @ViewBuilder
     private func scoreChart(_ data: [ProfileScoreStat]?) -> some View {
-        if let data = data?.sorted(by: { $0.score < $1.score }) {
+        // `if let` alone passed for an empty array, so an account with no rated titles fell
+        // through to Chart with nothing to plot: axis marks over a blank 0–1 plot instead of
+        // the "No score data" message.
+        if let data = data?.sorted(by: { $0.score < $1.score }), !data.isEmpty {
             Chart(data, id: \.score) { item in
                 AreaMark(
                     x: .value("Score", item.score),
@@ -196,7 +190,7 @@ struct ProfileStatsView: View {
                 .interpolationMethod(.catmullRom)
             }
             .chartXAxis {
-                AxisMarks(values: scoreChartAxisValues)
+                AxisMarks(values: ScoreChartAxis.values(for: data.map(\.score)))
             }
         } else {
             Text("No score data").foregroundStyle(.secondary)

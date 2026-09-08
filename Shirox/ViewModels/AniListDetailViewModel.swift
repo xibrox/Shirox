@@ -110,7 +110,9 @@ final class AniListDetailViewModel: ObservableObject {
         // 1. AniList's nextAiringEpisode (fallback airing count)
         // 2. The count passed from the module (best for accurate "caught up" tracking on a specific provider)
         // 3. AniList's total episodes (general fallback)
-        let anilistAiring = media.nextAiringEpisode != nil ? (media.nextAiringEpisode!.episode - 1) : nil
+        // Only treat the aired count as an answer once it is positive — it is 0 for a season
+        // whose first episode hasn't aired, which used to short-circuit the rest of this chain.
+        let anilistAiring = media.nextAiringEpisode.flatMap { $0.episode - 1 > 0 ? $0.episode - 1 : nil }
         let availEps: Int? = anilistAiring ?? availableEpisodes ?? media.episodes
         // totalEpisodes = full series count (nil if unknown)
         let totalEpisodes: Int? = media.episodes
@@ -153,6 +155,10 @@ final class AniListDetailViewModel: ObservableObject {
             // position rather than `currentEpNum + 1` (which would jump to season 1).
             var currentHref = episodeActualHref
             var fallbackNumber = currentEpNum  // last resort if the href isn't in the list
+            // The launched context carries the AniList season-relative number, so every
+            // number this loader reports back must be in the same units.
+            let anchorAniListID = media.id
+            let anchorMALID = media.idMal
             return { _ in
                 do {
                     let runner = ModuleJSRunner()
@@ -174,8 +180,18 @@ final class AniListDetailViewModel: ObservableObject {
 
                     guard !streams.isEmpty else { return nil }
                     currentHref = step.episode.href
+                    // fallbackNumber feeds a number-based lookup against this same module
+                    // list, so it stays in the module's own units.
                     fallbackNumber = Int(step.episode.number)
-                    return (streams: streams, episodeNumber: Int(step.episode.number), episodeHref: step.episode.href)
+                    let seasonOffset = await SeasonChainMapper.shared.resolveOffset(
+                        anchorAniListID: anchorAniListID, anchorMALID: anchorMALID) ?? 0
+                    let relative = EpisodeNavigator.seasonRelativeNumber(
+                        moduleNumber: Int(step.episode.number),
+                        index: step.current + 1,
+                        in: episodes,
+                        seasonOffset: seasonOffset)
+                    Logger.shared.log("[AniListDetailVM] Next episode module #\(Int(step.episode.number)) -> season-relative \(relative) (offset \(seasonOffset))", type: "Debug")
+                    return (streams: streams, episodeNumber: relative, episodeHref: step.episode.href)
                 } catch {
                     Logger.shared.log("[AniListDetailVM] Error loading next episode: \(error)", type: "Error")
                     return nil

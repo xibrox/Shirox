@@ -104,6 +104,18 @@ struct NotificationsView: View {
     private var content: some View {
         if vm.isLoadingNotifications && vm.notifications.isEmpty {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if vm.notificationsUnsupported {
+            ContentUnavailableView(
+                "Notifications Need AniList",
+                systemImage: "bell.slash",
+                description: Text("Sign in with AniList to see notifications. MyAnimeList doesn't provide them.")
+            )
+        } else if let error = vm.error, vm.notifications.isEmpty {
+            ContentUnavailableView(
+                "Couldn't Load Notifications",
+                systemImage: "exclamationmark.triangle",
+                description: Text(error)
+            )
         } else if vm.notifications.isEmpty {
             ContentUnavailableView("No Notifications", systemImage: "bell.slash")
         } else {
@@ -132,6 +144,7 @@ struct NotificationsView: View {
                 }
                 .padding(.vertical, 10)
             }
+            .softScrollEdges()
             .refreshable { await vm.loadNotifications() }
         }
     }

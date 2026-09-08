@@ -623,6 +623,7 @@ struct AniListDetailView: View {
             .padding(.bottom, 30)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .softScrollEdges()
         .ignoresSafeArea(edges: .top)
         .frame(maxWidth: .infinity)
     }
@@ -732,6 +733,7 @@ struct AniListDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .softScrollEdges()
         .coordinateSpace(name: "heroScroll")
         .frame(maxWidth: .infinity)
     }
@@ -757,7 +759,7 @@ struct AniListDetailView: View {
     @ViewBuilder
     private func watchButton(media: Media) -> some View {
         let item = continueWatchingItem(for: media)
-        let total = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
+        let total = media.airedOrAnnouncedEpisodes ?? 0
         let rawNext = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
         let nextEp = rawNext > total && total > 0 ? 1 : rawNext
         let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
@@ -846,7 +848,17 @@ struct AniListDetailView: View {
             let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
             guard !streams.isEmpty else { return nil }
             currentHref = nextEp.href
-            return (streams: streams, episodeNumber: Int(nextEp.number), episodeHref: nextEp.href)
+            // The context launched with a season-relative number; report back in the same
+            // units so the display and the AniList/MAL write both stay on this season.
+            let seasonOffset = await SeasonChainMapper.shared.resolveOffset(
+                anchorAniListID: item.aniListID, anchorMALID: vm.media?.idMal) ?? 0
+            let nextIndex = episodes.firstIndex { $0.href == nextEp.href } ?? 0
+            let relative = EpisodeNavigator.seasonRelativeNumber(
+                moduleNumber: Int(nextEp.number),
+                index: nextIndex,
+                in: episodes,
+                seasonOffset: seasonOffset)
+            return (streams: streams, episodeNumber: relative, episodeHref: nextEp.href)
         }
 
         let onExpired: StreamRefetchLoader? = { episodeNumber, episodeHref in
@@ -998,7 +1010,7 @@ struct AniListDetailView: View {
     // MARK: - Episodes
     @ViewBuilder
     private func episodesSection(media: Media) -> some View {
-        let metadataTotal = (media.nextAiringEpisode != nil ? media.nextAiringEpisode!.episode - 1 : nil) ?? media.episodes ?? 0
+        let metadataTotal = media.airedOrAnnouncedEpisodes ?? 0
         let historyEp = continueWatching.items.first(where: { CW in
             CW.aniListID == media.id || CW.mediaTitle == media.title.searchTitle || CW.mediaTitle == media.title.displayTitle
         })?.episodeNumber ?? 0
@@ -1210,7 +1222,7 @@ struct AniListDetailView: View {
                                 mediaId: media.id,
                                 provider: media.provider,
                                 mediaTitle: media.title.searchTitle,
-                                coverImage: media.coverImage.best,
+                                coverImage: media.coverImage.thumb,
                                 totalEpisodes: totalEpisodes,
                                 aniListProgress: existingEntry?.progress,
                                 aniListStatus: existingEntry?.status,
@@ -1244,7 +1256,7 @@ struct AniListDetailView: View {
                                 mediaId: media.id,
                                 provider: media.provider,
                                 mediaTitle: media.title.searchTitle,
-                                coverImage: media.coverImage.best,
+                                coverImage: media.coverImage.thumb,
                                 totalEpisodes: totalEpisodes,
                                 aniListProgress: existingEntry?.progress,
                                 aniListStatus: existingEntry?.status,
@@ -1364,6 +1376,7 @@ struct SynopsisSection: View {
                         expanded.toggle()
                     }
                 }
+                .copyDescriptionContextMenu(text)
         }
     }
 }
@@ -1535,6 +1548,7 @@ struct AniListStreamResultSheet: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .softScrollEdges()
                 }
             }
             .navigationTitle("Episode \(episodeNumber)")
@@ -1732,6 +1746,7 @@ struct AniListMatchingSearchView: View {
                         .listRowBackground(Color.clear)
                         .padding(.vertical, 4)
                     }
+                    .softScrollEdges()
                     .listStyle(.plain)
                 }
             }

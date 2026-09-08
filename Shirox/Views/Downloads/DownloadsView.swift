@@ -25,8 +25,53 @@ struct DownloadsView: View {
         let mediaGroups: [MediaGroup]
     }
 
+    /// A whole downloaded title queued for deletion, pending confirmation. Deleting every
+    /// episode or chapter of a show is not something to do on an accidental swipe.
+    private struct PendingGroupDelete: Identifiable {
+        let id = UUID()
+        let title: String
+        let count: Int
+        let unit: String
+        let delete: () -> Void
+    }
+
+    /// One bulk action in a section header.
+    private struct SectionAction: Identifiable {
+        let id = UUID()
+        let title: String
+        var isDestructive = false
+        let run: () -> Void
+
+        init(title: String, isDestructive: Bool = false, run: @escaping () -> Void) {
+            self.title = title
+            self.isDestructive = isDestructive
+            self.run = run
+        }
+    }
+
+    /// A section header with trailing bulk actions. A dead provider can fail twenty episodes
+    /// at once, and clearing those one swipe at a time was the single most-reported annoyance
+    /// in this tab — these act on the whole section.
+    @ViewBuilder
+    private func sectionHeader(_ title: String, actions: [SectionAction]) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            ForEach(actions) { action in
+                Button(action.title, role: action.isDestructive ? .destructive : nil, action: action.run)
+                    .font(.caption.weight(.semibold))
+                    .textCase(nil)
+                    .buttonStyle(.borderless)
+            }
+        }
+    }
+
+    @State private var pendingGroupDelete: PendingGroupDelete?
+
     private var inProgress: [DownloadItem] {
-        dm.items.filter { $0.state == .downloading || $0.state == .pending }
+        // `.paused` belongs here: it's a download the user still wants, just stopped. Left out,
+        // pausing one made it vanish from the tab with no way to resume it.
+        dm.items.filter { $0.state == .downloading || $0.state == .pending || $0.state == .paused }
             .sorted { $0.mediaTitle < $1.mediaTitle }
     }
 
@@ -122,7 +167,7 @@ struct DownloadsView: View {
                     List {
                         // Downloading / Pending
                         if !inProgress.isEmpty {
-                            Section("Downloading") {
+                            Section {
                                 ForEach(inProgress) { item in
                                     DownloadProgressRow(item: item)
                                         .swipeActions(edge: .trailing) {
@@ -131,7 +176,26 @@ struct DownloadsView: View {
                                             }
                                             .tint(.red)
                                         }
+                                        .swipeActions(edge: .leading) {
+                                            if item.state == .paused {
+                                                Button { dm.resumeDownload(item) } label: {
+                                                    Label("Resume", systemImage: "play.fill")
+                                                }
+                                                .tint(.blue)
+                                            } else {
+                                                Button { dm.pause(item) } label: {
+                                                    Label("Pause", systemImage: "pause.fill")
+                                                }
+                                                .tint(.orange)
+                                            }
+                                        }
                                 }
+                            } header: {
+                                sectionHeader("Downloading", actions: [
+                                    .init(title: "Cancel All", isDestructive: true) {
+                                        dm.removeAll(inProgress)
+                                    }
+                                ])
                             }
                         }
 
@@ -174,6 +238,19 @@ struct DownloadsView: View {
                                             count: mediaGroup.items.count
                                         )
                                     }
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            pendingGroupDelete = PendingGroupDelete(
+                                                title: mediaGroup.mediaTitle,
+                                                count: mediaGroup.items.count,
+                                                unit: "episode",
+                                                delete: { dm.removeAll(mediaGroup.items) }
+                                            )
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                        .tint(.red)
+                                    }
                                 }
                             } header: {
                                 ModuleSectionHeader(
@@ -186,7 +263,7 @@ struct DownloadsView: View {
 
                         // Failed
                         if !failed.isEmpty {
-                            Section("Failed") {
+                            Section {
                                 ForEach(failed) { item in
                                     DownloadProgressRow(item: item)
                                         .swipeActions(edge: .trailing) {
@@ -196,12 +273,17 @@ struct DownloadsView: View {
                                             .tint(.red)
                                         }
                                 }
+                            } header: {
+                                sectionHeader("Failed", actions: [
+                                    .init(title: "Retry All") { dm.retryAll(failed) },
+                                    .init(title: "Clear All", isDestructive: true) { dm.removeAll(failed) }
+                                ])
                             }
                         }
 
                         // Manga — in progress
                         if !mangaInProgress.isEmpty {
-                            Section("Downloading Manga") {
+                            Section {
                                 ForEach(mangaInProgress) { item in
                                     MangaDownloadProgressRow(item: item)
                                         .swipeActions(edge: .trailing) {
@@ -210,6 +292,12 @@ struct DownloadsView: View {
                                             }.tint(.red)
                                         }
                                 }
+                            } header: {
+                                sectionHeader("Downloading Manga", actions: [
+                                    .init(title: "Cancel All", isDestructive: true) {
+                                        mdm.removeAll(mangaInProgress)
+                                    }
+                                ])
                             }
                         }
 
@@ -224,6 +312,19 @@ struct DownloadsView: View {
                                     } label: {
                                         MediaGroupRow(mediaTitle: g.mangaTitle, imageUrl: g.coverImage, count: g.items.count, unit: "chapter")
                                     }
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            pendingGroupDelete = PendingGroupDelete(
+                                                title: g.mangaTitle,
+                                                count: g.items.count,
+                                                unit: "chapter",
+                                                delete: { mdm.removeAll(g.items) }
+                                            )
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                        .tint(.red)
+                                    }
                                 }
                             } header: {
                                 ModuleSectionHeader(name: moduleGroup.moduleName, iconUrl: moduleGroup.iconUrl, iconData: moduleGroup.iconData)
@@ -232,7 +333,7 @@ struct DownloadsView: View {
 
                         // Manga — failed
                         if !mangaFailed.isEmpty {
-                            Section("Failed Manga") {
+                            Section {
                                 ForEach(mangaFailed) { item in
                                     MangaDownloadProgressRow(item: item)
                                         .swipeActions(edge: .trailing) {
@@ -241,13 +342,37 @@ struct DownloadsView: View {
                                             }.tint(.red)
                                         }
                                 }
+                            } header: {
+                                sectionHeader("Failed Manga", actions: [
+                                    .init(title: "Retry All") { mdm.retryAll(mangaFailed) },
+                                    .init(title: "Clear All", isDestructive: true) {
+                                        mdm.removeAll(mangaFailed)
+                                    }
+                                ])
                             }
                         }
                     }
+                    .softScrollEdges()
                     .listStyle(.insetGrouped)
                 }
             }
             .navigationTitle("Downloads")
+            .alert(
+                pendingGroupDelete.map { "Delete \($0.title)?" } ?? "Delete",
+                isPresented: Binding(
+                    get: { pendingGroupDelete != nil },
+                    set: { if !$0 { pendingGroupDelete = nil } }
+                ),
+                presenting: pendingGroupDelete
+            ) { pending in
+                Button("Delete", role: .destructive) {
+                    pending.delete()
+                    pendingGroupDelete = nil
+                }
+                Button("Cancel", role: .cancel) { pendingGroupDelete = nil }
+            } message: { pending in
+                Text("Removes \(pending.count) downloaded \(pending.unit)\(pending.count == 1 ? "" : "s") from this device.")
+            }
         }
     }
 }
@@ -302,6 +427,7 @@ private struct MediaGroupRow: View {
 // MARK: - Progress Row (downloading / pending / failed)
 
 private struct DownloadProgressRow: View {
+    @State private var errorExpanded = false
     let item: DownloadItem
 
     var body: some View {
@@ -333,12 +459,28 @@ private struct DownloadProgressRow: View {
                     Text("Waiting…")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                case .paused:
+                    HStack(spacing: 8) {
+                        ProgressView(value: item.progress)
+                            .tint(.secondary)
+                        Text("Paused · \(Int(item.progress * 100))%")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
                 case .failed:
                     HStack {
+                        // Two lines truncates the part that identifies the failure — the URL or
+                        // the segment that 404'd. Tap to read it in full, long-press to copy it
+                        // somewhere useful.
                         Text(item.error ?? "Download failed")
                             .font(.caption2)
                             .foregroundStyle(.red)
-                            .lineLimit(2)
+                            .lineLimit(errorExpanded ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: errorExpanded)
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.15)) { errorExpanded.toggle() }
+                            }
+                            .copyErrorContextMenu(item.error)
                         Spacer()
                         Button {
                             DownloadManager.shared.retry(item)
@@ -376,6 +518,7 @@ private struct DownloadProgressRow: View {
 // MARK: - Manga Progress Row (downloading / pending / failed)
 
 private struct MangaDownloadProgressRow: View {
+    @State private var errorExpanded = false
     let item: MangaDownloadItem
 
     var body: some View {
@@ -401,7 +544,15 @@ private struct MangaDownloadProgressRow: View {
                     Text("Waiting…").font(.caption2).foregroundStyle(.secondary)
                 case .failed:
                     HStack {
-                        Text(item.error ?? "Download failed").font(.caption2).foregroundStyle(.red).lineLimit(2)
+                        Text(item.error ?? "Download failed")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                            .lineLimit(errorExpanded ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: errorExpanded)
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.15)) { errorExpanded.toggle() }
+                            }
+                            .copyErrorContextMenu(item.error)
                         Spacer()
                         Button { MangaDownloadManager.shared.retry(item) } label: {
                             Label("Retry", systemImage: "arrow.clockwise")

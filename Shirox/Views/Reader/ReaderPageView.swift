@@ -9,6 +9,10 @@ struct ReaderPageView: View {
     let urlString: String
     let referer: String
     let pageNumber: Int
+    /// The height this page occupied last time it was laid out, when known. Reserving it keeps
+    /// a re-created page from briefly claiming the 2:3 placeholder size and shoving everything
+    /// below it — the jump that made scrolling back up teleport between pages.
+    var knownHeight: CGFloat? = nil
 
     @State private var image: UIImage?
     @State private var failed = false
@@ -61,7 +65,7 @@ struct ReaderPageView: View {
                         .foregroundStyle(.white.opacity(0.45))
                 }
                 .frame(maxWidth: .infinity)
-                .aspectRatio(2/3, contentMode: .fit)
+                .modifier(ReaderPagePlaceholderSize(knownHeight: knownHeight))
                 .contentShape(Rectangle())
                 .onTapGesture {
                     failed = false
@@ -73,7 +77,7 @@ struct ReaderPageView: View {
                     ProgressView()
                         .tint(.white.opacity(0.6))
                 }
-                .aspectRatio(2/3, contentMode: .fit)
+                .modifier(ReaderPagePlaceholderSize(knownHeight: knownHeight))
             }
         }
         .task(id: "\(urlString)#\(attempt)") { await load() }
@@ -101,6 +105,20 @@ struct ReaderPageView: View {
             image = result
         } else {
             failed = true
+        }
+    }
+}
+
+
+/// Sizes a not-yet-decoded page: its remembered height when we have one, else the 2:3 guess.
+private struct ReaderPagePlaceholderSize: ViewModifier {
+    let knownHeight: CGFloat?
+
+    func body(content: Content) -> some View {
+        if let knownHeight, knownHeight > 1 {
+            content.frame(height: knownHeight)
+        } else {
+            content.aspectRatio(2/3, contentMode: .fit)
         }
     }
 }

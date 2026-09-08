@@ -37,6 +37,7 @@ struct BatchDownloadModulePickerView: View {
                     }
                 }
             }
+            .softScrollEdges()
             .listStyle(.insetGrouped)
             .navigationTitle("Download \(episodeNumbers.count) Episode\(episodeNumbers.count == 1 ? "" : "s")")
             .navigationBarTitleDisplayMode(.inline)
@@ -468,6 +469,7 @@ private struct BatchSearchResultsPickerSheet: View {
                 }
                 .padding(16)
             }
+            .softScrollEdges()
             .navigationTitle(module.sourceName)
             .navigationBarTitleDisplayMode(.inline)
         }

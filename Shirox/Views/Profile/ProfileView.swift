@@ -141,6 +141,7 @@ struct ProfileView: View {
                 scrollableHeader
                 ProfileFavouritesView(favourites: vm.user?.favourites)
             }
+            .softScrollEdges()
         case .stats:
             ScrollView {
                 scrollableHeader
@@ -149,6 +150,7 @@ struct ProfileView: View {
                     scoreFormat: activeProviderType == .anilist ? anilistAuth.scoreFormat : .point10
                 )
             }
+            .softScrollEdges()
         case .social:
             ProfileSocialView(vm: vm, userId: userId, topContent: scrollableHeader)
         }

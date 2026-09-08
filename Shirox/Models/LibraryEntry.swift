@@ -134,6 +134,9 @@ struct LibraryEntry: Identifiable, Codable, Sendable {
     /// Non-nil for on-device-only titles (module-scraped / imported file); routes tap-to-open.
     /// nil for AniList/MAL-matched entries — existing persisted JSON decodes unchanged.
     var localSource: LocalSource? = nil
+    /// Hidden from your public AniList profile and activity feed. AniList-only; MyAnimeList has
+    /// no equivalent, so it stays false there. Defaulted so existing persisted JSON still decodes.
+    var isPrivate: Bool = false
 
     /// The score to show/edit in `format`. Local entries convert from their
     /// canonical value; provider entries fall back to `score` (their account

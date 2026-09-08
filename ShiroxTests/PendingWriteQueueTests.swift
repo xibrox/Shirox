@@ -69,6 +69,26 @@ final class PendingWriteQueueTests: XCTestCase {
         XCTAssertFalse(PendingWriteQueue.isTransient(ProviderError.notFound))
     }
 
+    /// An error the service explained in its body must be classified by its status, exactly as
+    /// a bare one is. AniList reports "the API has been temporarily disabled" as a 403; treating
+    /// that as permanent would discard a write made during the outage instead of retrying it.
+    func testServiceMessagesAreClassifiedByStatus() {
+        XCTAssertTrue(PendingWriteQueue.isTransient(
+            AniListError.serviceMessage(code: 403, message: "The AniList API has been temporarily disabled.")))
+        XCTAssertTrue(PendingWriteQueue.isTransient(
+            AniListError.serviceMessage(code: 503, message: "Down for maintenance")))
+        XCTAssertTrue(PendingWriteQueue.isTransient(
+            AniListError.serviceMessage(code: 429, message: "Too many requests")))
+        XCTAssertFalse(PendingWriteQueue.isTransient(
+            AniListError.serviceMessage(code: 400, message: "Bad query")))
+    }
+
+    /// The message is what the reader sees — not a status code they can't act on.
+    func testServiceMessageIsSurfacedVerbatim() {
+        let text = "The AniList API has been temporarily disabled due to severe stability issues."
+        XCTAssertEqual(AniListError.serviceMessage(code: 403, message: text).errorDescription, text)
+    }
+
     func testFlushSuccessRemovesItems() async {
         let sink = FakePendingWriteSink(); sink.behavior = .succeed
         let q = makeQueue(tempDir(), sink: sink)

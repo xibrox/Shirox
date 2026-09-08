@@ -46,6 +46,7 @@ struct StreamPickerView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .softScrollEdges()
                     #if os(iOS)
                     .listStyle(.insetGrouped)
                     #elseif !os(tvOS)

@@ -11,6 +11,8 @@ struct AniListRawEntry {
     let updatedAt: Int?
     let customListName: String?
     let `repeat`: Int
+    /// Hidden from your public profile and activity feed on AniList.
+    var isPrivate: Bool = false
 }
 
 final class AniListLibraryService {
@@ -33,6 +35,7 @@ final class AniListLibraryService {
                 progress
                 score
                 updatedAt
+                private
                 media {
                   id
                   title { romaji english native }
@@ -75,6 +78,9 @@ final class AniListLibraryService {
                 let score: Double
                 let updatedAt: Int?
                 let media: AniListMedia
+                /// `private` is a Swift keyword, so it needs backticks. Optional because
+                /// responses cached before this field was requested simply won't carry it.
+                let `private`: Bool?
             }
             let data: ResponseData?
         }
@@ -94,7 +100,8 @@ final class AniListLibraryService {
                     score: raw.score,
                     updatedAt: raw.updatedAt,
                     customListName: customName,
-                    repeat: 0
+                    repeat: 0,
+                    isPrivate: raw.private ?? false
                 ))
             }
         }
@@ -114,6 +121,7 @@ final class AniListLibraryService {
             score
             repeat
             updatedAt
+            private
             media {
               id
               title { romaji english native }
@@ -146,12 +154,13 @@ final class AniListLibraryService {
                 let `repeat`: Int
                 let updatedAt: Int?
                 let media: AniListMedia
+                let `private`: Bool?
             }
             let data: ResponseData?
         }
 
         guard let raw = try JSONDecoder().decode(Response.self, from: data).data?.MediaList else { return nil }
-        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil, repeat: raw.repeat)
+        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil, repeat: raw.repeat, isPrivate: raw.private ?? false)
     }
 
     // MARK: - Fetch list (by status, kept for compatibility)
@@ -191,6 +200,25 @@ final class AniListLibraryService {
         if let score { variables["score"] = score }
         if let repeatCount { variables["repeat"] = repeatCount }
         _ = try await post(query: mutation, variables: variables)
+    }
+
+    // MARK: - Privacy
+
+    /// Hides or unhides a list entry on AniList.
+    ///
+    /// Kept separate from `updateEntry` rather than added to its signature: that one is the
+    /// shared `MediaProvider` write used by tracking, the library editor and the library sync,
+    /// and MyAnimeList has no equivalent flag to pass through it. This is an AniList-only
+    /// capability, so it stays an AniList-only call.
+    func setPrivate(mediaId: Int, isPrivate: Bool) async throws {
+        let mutation = """
+        mutation ($mediaId: Int, $private: Boolean) {
+          SaveMediaListEntry(mediaId: $mediaId, private: $private) {
+            id
+          }
+        }
+        """
+        _ = try await post(query: mutation, variables: ["mediaId": mediaId, "private": isPrivate])
     }
 
     // MARK: - Delete entry

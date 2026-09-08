@@ -82,6 +82,20 @@ struct MangaReaderView: View {
         var geoms: [Int: ReaderPageGeom] = [:]
         var topPage = 0
         var topFraction: Double = 0
+        /// Real laid-out height per page, keyed by "<url>@<width>".
+        ///
+        /// A page that hasn't decoded yet falls back to a fixed 2:3 placeholder, but real
+        /// pages vary and webtoon strips run far taller. Scrolling *down* that mismatch is
+        /// invisible — the correction happens below the viewport. Scrolling back *up*,
+        /// LazyVStack re-creates the pages above you, each briefly claiming 2:3 before
+        /// snapping to its true height, and every one of those corrections moves the content
+        /// you're anchored to: the reader appears to teleport between pages. Remembering the
+        /// measured height lets a re-created page reserve the right space immediately.
+        var heights: [String: CGFloat] = [:]
+
+        static func heightKey(_ url: String, width: CGFloat) -> String {
+            "\(url)@\(Int(width.rounded()))"
+        }
     }
     @State private var geomStore = GeomStore()
 
@@ -114,6 +128,11 @@ struct MangaReaderView: View {
     @State private var pinching = false
     @State private var pinchStartScale: CGFloat = 1
     @State private var pinchAnchor: UnitPoint = .center
+    /// Sideways offset while zoomed, in points. Zero at fit-to-width.
+    @State private var horizontalPan: CGFloat = 0
+    /// Pan at the moment the current drag began, so a drag is applied as a delta.
+    @State private var panStart: CGFloat = 0
+    @State private var isPanning = false
     private static let maxZoom: CGFloat = 3
 
     // Debounced progress saving (a synchronous save on every page crossing
@@ -247,7 +266,13 @@ struct MangaReaderView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(strip) { item in
-                        ReaderPageView(urlString: item.url, referer: referer, pageNumber: item.pageIdx + 1)
+                        ReaderPageView(
+                            urlString: item.url,
+                            referer: referer,
+                            pageNumber: item.pageIdx + 1,
+                            knownHeight: geomStore.heights[
+                                GeomStore.heightKey(item.url, width: UIScreen.main.bounds.width)]
+                        )
                             .id(item.globalIdx)
                             .background(
                                 GeometryReader { geo in
@@ -255,7 +280,8 @@ struct MangaReaderView: View {
                                         key: ReaderPageFrameKey.self,
                                         value: [item.globalIdx: ReaderPageGeom(
                                             minY: geo.frame(in: .named("readerScroll")).minY,
-                                            height: geo.size.height)]
+                                            height: geo.size.height,
+                                            width: geo.size.width)]
                                     )
                                 }
                             )
@@ -265,12 +291,17 @@ struct MangaReaderView: View {
                     if verticalScrollView !== scrollView { verticalScrollView = scrollView }
                 })
             }
+            .softScrollEdges()
             .modifier(PinchToZoom(
                 zoomScale: $zoomScale, anchor: $pinchAnchor,
                 pinching: $pinching, startScale: $pinchStartScale, maxZoom: Self.maxZoom))
             .coordinateSpace(name: "readerScroll")
             .onPreferenceChange(ReaderPageFrameKey.self) { frames in
                 geomStore.geoms = frames
+                for (idx, geom) in frames where geom.height > 1 && geom.width > 1 {
+                    guard let url = strip[safe: idx]?.url else { continue }
+                    geomStore.heights[GeomStore.heightKey(url, width: geom.width)] = geom.height
+                }
                 // Pixel-exact save anchor: the page under the viewport's TOP
                 // edge and how far into it the top sits. (The display page
                 // below uses a mid-screen rule, which can be one panel ahead
@@ -304,6 +335,18 @@ struct MangaReaderView: View {
             // position is never touched, so pinching zooms in place and never
             // scrolls. Overflow past the screen edges is clipped by the window.
             .scaleEffect(zoomScale, anchor: pinchAnchor)
+            // Zoomed in, the parts of a page that overflow the screen sideways were
+            // unreachable: the ScrollView moves vertically and nothing moved horizontally,
+            // so magnifying a wide panel just cropped it. Drag to pan across it. Vertical
+            // movement stays with the ScrollView, which already does it well.
+            .offset(x: horizontalPan)
+            .simultaneousGesture(horizontalPanGesture, including: zoomScale > 1 ? .all : .subviews)
+            .onChangeOf(zoomScale) { scale in
+                // Back to fit — recentre, and clamp if the new scale exposes less slack.
+                withAnimation(.easeOut(duration: 0.2)) {
+                    horizontalPan = scale <= 1 ? 0 : clampedPan(horizontalPan, at: scale)
+                }
+            }
         }
     }
 
@@ -457,6 +500,11 @@ struct MangaReaderView: View {
                         step: 1
                     )
                     .tint(.white)
+                    // In right-to-left mode page 1 is on the right, so a slider that fills
+                    // left-to-right runs backwards against the pages it controls. Scoped to
+                    // the slider: flipping the whole row would also mirror the chapter
+                    // buttons' arrows, which point the way they already should.
+                    .environment(\.layoutDirection, isRTL ? .rightToLeft : .leftToRight)
                 } else {
                     Spacer()
                 }
@@ -733,6 +781,40 @@ struct MangaReaderView: View {
         }
     }
 
+    // MARK: - Zoom panning
+
+    /// How far the content may slide sideways at `scale` before its edge comes past the
+    /// screen edge. Half the overflow in each direction, so the page can be walked from one
+    /// margin to the other and no further.
+    private func panLimit(at scale: CGFloat) -> CGFloat {
+        guard scale > 1 else { return 0 }
+        #if os(iOS)
+        let width = UIScreen.main.bounds.width
+        #else
+        let width: CGFloat = 1024
+        #endif
+        return width * (scale - 1) / 2
+    }
+
+    private func clampedPan(_ value: CGFloat, at scale: CGFloat) -> CGFloat {
+        let limit = panLimit(at: scale)
+        return min(max(value, -limit), limit)
+    }
+
+    /// Horizontal drag, live only while zoomed so an ordinary read is untouched.
+    private var horizontalPanGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard zoomScale > 1 else { return }
+                if !isPanning {
+                    isPanning = true
+                    panStart = horizontalPan
+                }
+                horizontalPan = clampedPan(panStart + value.translation.width, at: zoomScale)
+            }
+            .onEnded { _ in isPanning = false }
+    }
+
     // MARK: - Auto-scroll
 
     private func toggleAutoScroll() {
@@ -940,6 +1022,10 @@ final class ReaderAutoScroller {
 struct ReaderPageGeom: Equatable {
     let minY: CGFloat
     let height: CGFloat
+    /// Layout width the height was measured at. A cached height is only valid for the width
+    /// it was measured at, so rotation or an iPad split-view resize misses rather than
+    /// restoring a stale height.
+    var width: CGFloat = 0
 }
 
 private struct ReaderPageFrameKey: PreferenceKey {

@@ -25,6 +25,7 @@ struct PlayerSequelPickerSheet: View {
                 }
                 .buttonStyle(.plain)
             }
+            .softScrollEdges()
             .navigationTitle("Choose Sequel")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
