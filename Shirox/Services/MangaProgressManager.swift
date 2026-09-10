@@ -82,6 +82,17 @@ import Combine
         UserDefaults.standard.removeObject(forKey: Keys.readChapters)
     }
 
+    // MARK: - Backup Restore
+
+    /// Replaces all reading progress from a backup — storage plus published state, since
+    /// this singleton loads from storage only once, in `init`.
+    func restore(items newItems: [MangaReadingItem],
+                 readChapters newReadChapters: [String: Set<String>]) {
+        items = newItems
+        readChapters = newReadChapters
+        persist()
+    }
+
     // MARK: - Persistence
 
     private func persist() {

@@ -26,7 +26,9 @@ import Combine
     // MARK: - Private Properties
 
     private let maxItems = 20
-    private static let currentDataVersion = 2
+    /// Internal rather than private so the backup section can stamp it into an export and
+    /// refuse a file written under a different one.
+    static let currentDataVersion = 2
 
     // MARK: - Init
 
@@ -1153,6 +1155,22 @@ import Combine
         } catch {
             assertionFailure("ContinueWatchingManager: encode failed — \(error)")
         }
+    }
+
+    // MARK: - Backup Restore
+
+    /// Replaces all Continue Watching state from a backup: writes storage *and* refreshes
+    /// the published properties, because this singleton only ever reads storage once, from
+    /// `init`. Stamps the current data version so a later `load()` doesn't treat the
+    /// restored data as a stale schema and wipe it.
+    func restore(items newItems: [ContinueWatchingItem],
+                 watchedKeys newWatchedKeys: Set<String>,
+                 watchedHrefKeys newWatchedHrefKeys: Set<String>) {
+        items = newItems
+        watchedKeys = newWatchedKeys
+        watchedHrefKeys = newWatchedHrefKeys
+        UserDefaults.standard.set(Self.currentDataVersion, forKey: Keys.dataVersion)
+        persist()
     }
 
     private func load() {
