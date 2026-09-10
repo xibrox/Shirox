@@ -134,7 +134,7 @@ struct AniListDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()
         #endif
-        .navigationTitle(vm.media?.title.displayTitle ?? ""))
+        .scrollAwareNavTitle(vm.media?.title.displayTitle ?? ""))
     }
 
     #if os(iOS)
@@ -939,6 +939,7 @@ struct AniListDetailView: View {
                     Text(media.title.displayTitle)
                         .font(.title3.weight(.bold))
                         .lineLimit(3)
+                        .heroTitleAnchor(in: "heroScroll")
                         .copyTitleContextMenu(media.title.displayTitle)
 
                     HStack(spacing: 8) {

@@ -101,6 +101,7 @@ struct MangaDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()
+        .scrollAwareNavTitle(vm.detail?.title ?? item.title)
         .tint(.primary)
         .fullScreenCover(item: $readerContext) { ctx in
             MangaReaderView(context: ctx)
@@ -332,6 +333,7 @@ struct MangaDetailView: View {
                     Text(detail.title)
                         .font(.title3.weight(.bold))
                         .lineLimit(3)
+                        .heroTitleAnchor(in: "mangaDetailScroll")
                         .copyTitleContextMenu(detail.title)
 
                     if let module = ModuleManager.shared.activeModule {
