@@ -348,6 +348,16 @@ import Combine
         }
     }
 
+    // MARK: - Backup Restore
+
+    /// Replaces the local library from a backup — writes the JSON file *and* refreshes the
+    /// published arrays, since this singleton reads the file only once, from `init`.
+    func restore(entries newEntries: [LibraryEntry], collections newCollections: [LocalCollection]) {
+        entries = newEntries
+        collections = newCollections
+        persist()
+    }
+
     private func load() {
         guard let data = try? Data(contentsOf: Self.fileURL),
               let store = try? JSONDecoder().decode(Store.self, from: data) else { return }
