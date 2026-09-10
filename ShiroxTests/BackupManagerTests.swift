@@ -221,6 +221,36 @@ final class BackupManagerTests: XCTestCase {
         XCTAssertEqual(report.warnings, [.init(section: BackupSectionID.modules, detail: "1 module failed")])
     }
 
+    // MARK: - Exclusions (real sections)
+
+    /// The spec excludes downloaded media, rebuildable caches and the pending-write queue.
+    /// Asserted against a real export rather than left to a manual check: media would make
+    /// the file unshareable, and replaying queued AniList/MAL writes from a second device
+    /// risks double-writes.
+    func testRealExportExcludesDownloadsCachesAndPendingWrites() throws {
+        let manager = BackupManager(sections: BackupManager.defaultSections,
+                                    directory: FileManager.default.temporaryDirectory)
+        let data = try BackupCoding.encoder.encode(manager.makeEnvelope(includeAccounts: true,
+                                                                        date: Date()))
+        let json = String(decoding: data, as: UTF8.self)
+
+        for needle in ["shirox_downloads_v3", "downloads_manifest",
+                       "manga_downloads_manifest", "MangaDownloads", "LocalImports",
+                       "id_mappings_cache", "library-cache", "profile-cache",
+                       "pending-writes"] {
+            XCTAssertFalse(json.contains(needle), "\(needle) must not be in a backup")
+        }
+    }
+
+    /// Every section the manager ships must be one the summary and the import know by id.
+    func testRealSectionIdsAreTheDeclaredOnes() {
+        let ids = BackupManager.defaultSections.map(\.id)
+        XCTAssertEqual(Set(ids), Set([BackupSectionID.settings, BackupSectionID.modules,
+                                      BackupSectionID.localLibrary, BackupSectionID.progress,
+                                      BackupSectionID.accounts]))
+        XCTAssertEqual(ids.count, Set(ids).count, "A section must be registered once")
+    }
+
     func testImportRefusesANewerFormatVersionBeforeApplyingAnything() async throws {
         let recorder = Recorder()
         let manager = makeManager([recordingSection(id: BackupSectionID.settings, into: recorder)])
