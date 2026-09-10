@@ -410,6 +410,7 @@
 		2590A021E9A9C37333EE5853 /* JellyfinModuleFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DFF59F54F073D10B1F45FF /* JellyfinModuleFlagTests.swift */; };
 		2598E67FBDB5C850FBED3166 /* MALOfficialDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB699100F232CDB1648C513F /* MALOfficialDiscoveryService.swift */; };
 		25DE15A403279BA1824BE2E7 /* MangaTrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B5885AD320A89432B9989B /* MangaTrackingCoordinator.swift */; };
+		2679E618DA7E84DB2A8AD71D /* CloudflareBypassClearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4055BF10088887224F97E64 /* CloudflareBypassClearanceTests.swift */; };
 		269BF42A2BD9270EB60582E7 /* QuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4071A0ACA228C759CA67D5A0 /* QuickActions.swift */; };
 		272508BF7DC792C2F5394306 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3726264F1BB3C79BD4B966 /* PlayerMenuButton.swift */; };
 		29AEA9ECF2AA67DA60ACDF3D /* QuickActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4071A0ACA228C759CA67D5A0 /* QuickActions.swift */; };
@@ -928,6 +929,7 @@
 		DF8A01C923F20C2A10CDDC33 /* ReaderPageView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReaderPageView.swift; sourceTree = "<group>"; };
 		E1C750867F19DF886AA2D7E8 /* adult_hosts.txt */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = adult_hosts.txt; sourceTree = "<group>"; };
 		E291C27758B26EC8AB9B812B /* PendingWriteQueueTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingWriteQueueTests.swift; sourceTree = "<group>"; };
+		E4055BF10088887224F97E64 /* CloudflareBypassClearanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudflareBypassClearanceTests.swift; sourceTree = "<group>"; };
 		E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPlaybackCoordinator.swift; sourceTree = "<group>"; };
 		E8D91E43B99205901655CDF0 /* Shirox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shirox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EBAF45C71B3785D9592EA63E /* JellyfinAuthManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinAuthManagerTests.swift; sourceTree = "<group>"; };
@@ -1346,6 +1348,7 @@
 				BF82534266F27EB783B12E03 /* DataSaverTests.swift */,
 				C33E435703AA1308538E7D59 /* MALOfficialDiscoveryTests.swift */,
 				92928753257FE3CDF1DBEB3D /* ProviderFallbackChainTests.swift */,
+				E4055BF10088887224F97E64 /* CloudflareBypassClearanceTests.swift */,
 			);
 			path = ShiroxTests;
 			sourceTree = SOURCE_ROOT;
@@ -1620,6 +1623,7 @@
 				C328A64E218D4179DB1FFC48 /* DataSaverTests.swift in Sources */,
 				2A442ADBDBF00A760BDB4365 /* MALOfficialDiscoveryTests.swift in Sources */,
 				456591F6899FB1E2DF6FE33D /* ProviderFallbackChainTests.swift in Sources */,
+				2679E618DA7E84DB2A8AD71D /* CloudflareBypassClearanceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

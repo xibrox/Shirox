@@ -86,6 +86,16 @@ final class CloudflareBypassManager: ObservableObject {
         return entry.userAgent
     }
 
+    /// Drops the cached bypass for `host` without arming the user-facing "Verify Cloudflare"
+    /// affordance. For callers that proved the cookie is dead (a request that still came back
+    /// walled) but shouldn't hijack the stream picker's verification UI — a poster load is not
+    /// a stream load. Also drops the live bypass WebView, whose jar holds the same dead cookie.
+    func invalidateCookie(for host: String) {
+        let hadEntry = cache.removeValue(forKey: host) != nil
+        bypassWebViews.removeValue(forKey: host)
+        if hadEntry { persistCache() }
+    }
+
     func store(cookie: String, cookieHeader: String, userAgent: String = "", for host: String) {
         cache[host] = CachedBypass(
             value: cookie,
@@ -190,8 +200,67 @@ final class CloudflareBypassManager: ObservableObject {
         return (data, http)
     }
 
+    // MARK: - Clearance verification
+
+    /// What the bypass WebView saw when it re-requested the walled URL.
+    struct ClearanceProbe {
+        let status: Int
+        let cfMitigated: String?
+    }
+
+    /// Whether a probe response means we're genuinely past the wall.
+    ///
+    /// Cloudflare puts a `cf_clearance` cookie in the jar the moment it *serves* a managed
+    /// challenge — roughly a second in, long before the user has touched the Turnstile widget.
+    /// (Verified against i.animepahe.pw: cookie present at t=1 s while every request still
+    /// returns 403 `cf-mitigated: challenge` and the page reads "Performing security
+    /// verification".) So the cookie's presence proves nothing; only a request that comes back
+    /// unmitigated does. A non-2xx origin status is fine — a cleared host that 404s the exact
+    /// poster path is still past Cloudflare.
+    nonisolated static func probeIndicatesClearance(_ probe: ClearanceProbe) -> Bool {
+        if let mitigated = probe.cfMitigated, !mitigated.isEmpty { return false }
+        return probe.status != 403 && probe.status != 503
+    }
+
+    /// Re-requests `url` from inside the bypass WebView (same jar, same session) to find out
+    /// whether the `cf_clearance` sitting in the jar is a real clearance or the placeholder CF
+    /// sets alongside the challenge. Returns true when we can't probe at all — an unverifiable
+    /// cookie is still worth trying, and blocking on it would break hosts that work today.
+    private func clearanceIsUsable(for url: URL, in webView: WKWebView) async -> Bool {
+        #if os(tvOS)
+        return true
+        #else
+        let js = """
+        const response = await fetch(target, { credentials: "include", cache: "no-store" });
+        return JSON.stringify({
+            status: response.status,
+            mitigated: response.headers.get("cf-mitigated") || ""
+        });
+        """
+        let raw: String?
+        do {
+            raw = try await webView.callAsyncJavaScript(
+                js,
+                arguments: ["target": url.absoluteString],
+                contentWorld: .defaultClient
+            ) as? String
+        } catch {
+            return true
+        }
+        guard let raw,
+              let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = json["status"] as? Int else { return true }
+        return Self.probeIndicatesClearance(
+            ClearanceProbe(status: status, cfMitigated: json["mitigated"] as? String)
+        )
+        #endif
+    }
+
     /// Presents a WKWebView sheet so the user can complete the Turnstile challenge.
-    /// Polls up to 30 s for `cf_clearance` to appear, then throws `.timeout`.
+    /// Polls up to 90 s for a `cf_clearance` that a probe request confirms actually works,
+    /// then throws `.timeout`. The window has to be long enough for a human to find and tap
+    /// the Turnstile checkbox, since CF's cookie no longer tells us when they have.
     func triggerBypass(for url: URL) async throws {
         guard let host = url.host else { return }
         if HostBlocklist.shared.isBlocked(url) { return }
@@ -217,11 +286,29 @@ final class CloudflareBypassManager: ObservableObject {
         activeBypassWebView = webView
         defer { activeBypassWebView = nil }
 
-        // 60 polls × 500 ms = 30 s
-        for i in 0..<60 {
+        // Throttles the probe below — it's a real network request against the walled host,
+        // and the cookie shows up within a second, so an unthrottled probe would fire on
+        // every one of the 500 ms polls.
+        var lastProbe = Date.distantPast
+        var loggedUnsolved = false
+
+        // 180 polls × 500 ms = 90 s
+        for i in 0..<180 {
             try await Task.sleep(nanoseconds: 500_000_000)
             guard activeBypassWebView != nil else { return }  // user cancelled
             if let value = await cfClearanceCookie(for: host, in: webView) {
+                guard Date().timeIntervalSince(lastProbe) >= 2 else { continue }
+                lastProbe = Date()
+                guard await clearanceIsUsable(for: url, in: webView) else {
+                    if !loggedUnsolved {
+                        loggedUnsolved = true
+                        Logger.shared.log(
+                            "[CFBypass] \(host) has a cf_clearance but requests are still walled — challenge not solved yet",
+                            type: "Debug"
+                        )
+                    }
+                    continue
+                }
                 let fullHeader = await allCookiesHeader(for: host, in: webView)
                 let ua = (try? await webView.evaluateJavaScript("navigator.userAgent") as? String) ?? ""
                 // Log the cookie *names* only. The header's values include the live cf_clearance

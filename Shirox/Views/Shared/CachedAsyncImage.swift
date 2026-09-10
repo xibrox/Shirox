@@ -238,9 +238,14 @@ struct CachedAsyncImage: View {
             let cfTarget = finalURL
             let cfHostStr = cfTarget.host ?? ""
 
-            if CloudflareBypassManager.shared.fullCookieHeader(for: cfHostStr) == nil {
-                try? await CloudflareBypassManager.shared.triggerBypass(for: cfTarget)
+            // We already sent whatever cookie was cached for this host and Cloudflare walled
+            // us anyway, so that cookie is dead. Drop it before asking for a new one —
+            // otherwise `triggerBypass` early-returns on the stale entry and every image on
+            // this host 403s until the hour-long cache expires.
+            if cookieHeader != nil {
+                CloudflareBypassManager.shared.invalidateCookie(for: cfHostStr)
             }
+            try? await CloudflareBypassManager.shared.triggerBypass(for: cfTarget)
 
             var retryRequest = Self.makeImageRequest(for: cfTarget)
             // cf_clearance is bound to the UA that solved the challenge — use the
@@ -260,10 +265,23 @@ struct CachedAsyncImage: View {
                 Logger.shared.log("[Image] CF retry network error host=\(cfHostStr)", type: "Error")
                 return nil
             }
+            let retryStatus = (retryResponse as? HTTPURLResponse)?.statusCode ?? -1
+            let retryIsImage = ((retryResponse as? HTTPURLResponse)?
+                .value(forHTTPHeaderField: "Content-Type") ?? "")
+                .lowercased().hasPrefix("image/")
+            let retryText = retryIsImage ? "" : (String(data: retryData, encoding: .utf8) ?? "")
+
+            // Still walled with a cookie we just solved for: it doesn't work for this host, so
+            // evict it rather than caching a dud that suppresses every later solve attempt.
+            if JSEngine.isTurnstileResponse(status: retryStatus, body: retryText) {
+                CloudflareBypassManager.shared.invalidateCookie(for: cfHostStr)
+                Logger.shared.log("[Image] CF retry still walled host=\(cfHostStr) status=\(retryStatus)", type: "Error")
+                return nil
+            }
+
             guard let loaded = PlatformImage(data: retryData) else {
-                let st = (retryResponse as? HTTPURLResponse)?.statusCode ?? -1
-                let snippet = (String(data: retryData, encoding: .utf8) ?? "").prefix(120)
-                Logger.shared.log("[Image] CF retry decode failed host=\(cfHostStr) status=\(st) body=\(snippet)", type: "Error")
+                let snippet = retryText.prefix(120).replacingOccurrences(of: "\n", with: " ")
+                Logger.shared.log("[Image] CF retry decode failed host=\(cfHostStr) status=\(retryStatus) body=\(snippet)", type: "Error")
                 return nil
             }
             KingfisherManager.shared.cache.store(loaded, original: retryData, forKey: urlString, toDisk: true) { _ in }
