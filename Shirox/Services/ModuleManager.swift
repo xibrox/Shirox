@@ -121,6 +121,36 @@ final class ModuleManager: ObservableObject {
         selectModule(module)
     }
 
+    // MARK: - Backup Restore
+
+    /// Replaces the installed module list from a backup by re-fetching each manifest.
+    /// Returns the `jsonUrl`s that could not be installed, so the import can report them.
+    ///
+    /// Re-fetching rather than restoring stored definitions keeps the backup file small:
+    /// a `ModuleDefinition` carries the module's whole script in `scriptContent` and its
+    /// icon as base64 in `iconData`.
+    func restoreModules(jsonUrls: [String], activeId: String?) async -> [String] {
+        modules = []
+        activeModule = nil
+        saveToStorage()
+
+        var failed: [String] = []
+        for urlString in jsonUrls {
+            guard let url = URL(string: urlString) else {
+                failed.append(urlString)
+                continue
+            }
+            let before = modules.count
+            await addModule(from: url)
+            if modules.count == before { failed.append(urlString) }
+        }
+
+        if let activeId, let module = modules.first(where: { $0.id == activeId }) {
+            selectModule(module)
+        }
+        return failed
+    }
+
     // MARK: - Auto-Update
 
     func checkForUpdates() async {

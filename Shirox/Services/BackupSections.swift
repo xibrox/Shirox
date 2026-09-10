@@ -226,3 +226,62 @@ struct SettingsBackupSection: BackupSection {
         return []
     }
 }
+
+// MARK: - Modules
+
+struct ModulesBackupPayload: Codable {
+    struct Entry: Codable {
+        /// The manifest URL a restore re-fetches. Modules without one can't be reinstalled
+        /// and are never exported.
+        var jsonUrl: String
+        /// Recorded so a failed restore can name the module rather than just its URL.
+        var sourceName: String
+        /// `ModuleDefinition.id` is its `scriptUrl`; kept so `activeModuleId` can be matched.
+        var scriptUrl: String
+    }
+
+    var modules: [Entry]
+    var activeModuleId: String?
+    var lastUsedModuleId: String?
+}
+
+/// Installed modules, recorded by manifest URL and reinstalled by re-fetching.
+struct ModulesBackupSection: BackupSection {
+    typealias Payload = ModulesBackupPayload
+    static var id: String { BackupSectionID.modules }
+
+    private enum Keys {
+        static let active = "activeModuleId"
+        static let lastUsed = "lastUsedModuleId"
+    }
+
+    @MainActor func export() throws -> ModulesBackupPayload? {
+        let d = UserDefaults.standard
+        let entries = ModuleManager.shared.modules.compactMap { module -> ModulesBackupPayload.Entry? in
+            guard let jsonUrl = module.jsonUrl, !jsonUrl.isEmpty else { return nil }
+            return .init(jsonUrl: jsonUrl,
+                         sourceName: module.sourceName,
+                         scriptUrl: module.scriptUrl)
+        }
+        return ModulesBackupPayload(modules: entries,
+                                    activeModuleId: d.string(forKey: Keys.active),
+                                    lastUsedModuleId: d.string(forKey: Keys.lastUsed))
+    }
+
+    @MainActor func apply(_ payload: ModulesBackupPayload) async throws -> [String] {
+        let failedUrls = await ModuleManager.shared.restoreModules(
+            jsonUrls: payload.modules.map(\.jsonUrl),
+            activeId: payload.activeModuleId)
+
+        if let lastUsed = payload.lastUsedModuleId {
+            UserDefaults.standard.set(lastUsed, forKey: Keys.lastUsed)
+        }
+
+        // A module whose manifest is unreachable is a warning, not a section failure: the
+        // rest of the modules did install, and the user can add the missing one by URL.
+        return failedUrls.map { url in
+            let name = payload.modules.first { $0.jsonUrl == url }?.sourceName ?? url
+            return "Couldn't reinstall \(name) — \(url)"
+        }
+    }
+}
