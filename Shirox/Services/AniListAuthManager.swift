@@ -76,6 +76,28 @@ final class AniListAuthManager: NSObject, ObservableObject {
         SecItemDelete(query as CFDictionary)
     }
 
+    // MARK: - Backup Restore
+
+    /// Writes a backed-up AniList session into the Keychain and refreshes the published
+    /// login state. A restored token may already be expired or revoked; that surfaces
+    /// through the normal auth-failure handling on the next request, so nothing is
+    /// validated against the network here.
+    func restoreAccount(token: String?, userId restoredUserId: Int?, scoreFormat: String?) {
+        if let token, !token.isEmpty {
+            saveToken(token)
+            isLoggedIn = true
+        }
+        if let restoredUserId {
+            userId = restoredUserId
+            UserDefaults.standard.set(restoredUserId, forKey: "anilist_user_id")
+        }
+        if let scoreFormat, let format = ScoreFormat(rawValue: scoreFormat) {
+            self.scoreFormat = format
+            UserDefaults.standard.set(scoreFormat, forKey: "anilist_score_format")
+        }
+        if isLoggedIn { Task { await fetchViewer() } }
+    }
+
     // MARK: - OAuth
 
     func login(presentationAnchor: ASPresentationAnchor) {

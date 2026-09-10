@@ -93,11 +93,11 @@ final class BackupManager {
     /// items reference module ids, and accounts come last so a credential write can never
     /// be the thing that half-finishes a data restore.
     static var defaultSections: [AnyBackupSection] {
-        // Filled in by Task 7.
         [SettingsBackupSection().erased(),
          ModulesBackupSection().erased(),
          LocalLibraryBackupSection().erased(),
-         ProgressBackupSection().erased()]
+         ProgressBackupSection().erased(),
+         AccountsBackupSection().erased()]
     }
 
     private let sections: [AnyBackupSection]

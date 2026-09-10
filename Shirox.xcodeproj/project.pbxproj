@@ -607,6 +607,9 @@
 		BA0000000000000000000E22 /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E21 /* BackupSections.swift */; };
 		BA0000000000000000000E23 /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E21 /* BackupSections.swift */; };
 		BA0000000000000000000E24 /* BackupSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E21 /* BackupSections.swift */; };
+		BA0000000000000000000E32 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E31 /* BackupAccountsSection.swift */; };
+		BA0000000000000000000E33 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E31 /* BackupAccountsSection.swift */; };
+		BA0000000000000000000E34 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E31 /* BackupAccountsSection.swift */; };
 		BAEE9A1A2FCB000000000002 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000003 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000004 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
@@ -674,6 +677,7 @@
 		F99A3139678FD27E98368ADE /* NSFWContentFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB32994B31FB72D2DAA8327A /* NSFWContentFilter.swift */; };
 		F9D85D36A807E18779423371 /* View+GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CD557D45FF0C6287F6783D /* View+GlassChrome.swift */; };
 		FA1B1A047DA983F954886DDB /* MangaModuleResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D8556737F55F2772288018 /* MangaModuleResolver.swift */; };
+		FAC46AC419B62B7E58A162DA /* BackupAccountsSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C25C93B56EBA2E868ADE43 /* BackupAccountsSectionTests.swift */; };
 		FADBA9C6AD9E3B1839E43B34 /* JellyfinPosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D4FBF1385A6C9330CBE7EAB /* JellyfinPosterCard.swift */; };
 		FAFF9AA00DEB80103E5C7F76 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B3B8F080E9AF4E269AEC3DA /* WebKit.framework */; };
 		FB157A299403D6BF6BC1D083 /* LibrarySyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */; };
@@ -930,6 +934,7 @@
 		BA0000000000000000000E01 /* BackupEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEnvelope.swift; sourceTree = "<group>"; };
 		BA0000000000000000000E11 /* BackupManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupManager.swift; sourceTree = "<group>"; };
 		BA0000000000000000000E21 /* BackupSections.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSections.swift; sourceTree = "<group>"; };
+		BA0000000000000000000E31 /* BackupAccountsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupAccountsSection.swift; sourceTree = "<group>"; };
 		BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAlive.swift; sourceTree = "<group>"; };
 		BC268A065BC5B9DB56250D4B /* WatchOrderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchOrderSection.swift; sourceTree = "<group>"; };
 		BCA808C7CD73B2C87D9F989B /* LoggerRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoggerRedactionTests.swift; sourceTree = "<group>"; };
@@ -947,6 +952,7 @@
 		D1A2B3C4E5F60718293A4B5D /* SeasonChainMathTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeasonChainMathTests.swift; sourceTree = "<group>"; };
 		D1A2B3C4E5F60718293A4B61 /* EpisodeNavigatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EpisodeNavigatorTests.swift; sourceTree = "<group>"; };
 		D1A2B3C4E5F60718293A4B65 /* ContinueWatchingSeasonMatchTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContinueWatchingSeasonMatchTests.swift; sourceTree = "<group>"; };
+		D6C25C93B56EBA2E868ADE43 /* BackupAccountsSectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupAccountsSectionTests.swift; sourceTree = "<group>"; };
 		DE497D28BD37BD64210898B9 /* ManageCollectionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ManageCollectionsView.swift; sourceTree = "<group>"; };
 		DED767F1E614FFA030840F80 /* MangaTrackingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaTrackingTests.swift; sourceTree = "<group>"; };
 		DF8A01C923F20C2A10CDDC33 /* ReaderPageView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReaderPageView.swift; sourceTree = "<group>"; };
@@ -1140,6 +1146,7 @@
 				A304B304C482A8AAA10DB209 /* DataSaver.swift */,
 				BA0000000000000000000E11 /* BackupManager.swift */,
 				BA0000000000000000000E21 /* BackupSections.swift */,
+				BA0000000000000000000E31 /* BackupAccountsSection.swift */,
 				AB699100F232CDB1648C513F /* MALOfficialDiscoveryService.swift */,
 			);
 			path = Services;
@@ -1379,6 +1386,7 @@
 				0262667FE814DCD14467C158 /* BackupLocalLibrarySectionTests.swift */,
 				6CD7DB6AB4D4669A5E102076 /* BackupSettingsSectionTests.swift */,
 				5D37334B52C658E81172738C /* BackupModulesSectionTests.swift */,
+				D6C25C93B56EBA2E868ADE43 /* BackupAccountsSectionTests.swift */,
 			);
 			path = ShiroxTests;
 			sourceTree = SOURCE_ROOT;
@@ -1659,6 +1667,7 @@
 				F0B1EA450356B12A59C031F5 /* BackupLocalLibrarySectionTests.swift in Sources */,
 				75659C3C4FADC1208EF20304 /* BackupSettingsSectionTests.swift in Sources */,
 				7E46A00FFA290C345E3E9919 /* BackupModulesSectionTests.swift in Sources */,
+				FAC46AC419B62B7E58A162DA /* BackupAccountsSectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1863,6 +1872,7 @@
 				2299421510297E604395E24E /* DataSaver.swift in Sources */,
 				BA0000000000000000000E13 /* BackupManager.swift in Sources */,
 				BA0000000000000000000E23 /* BackupSections.swift in Sources */,
+				BA0000000000000000000E33 /* BackupAccountsSection.swift in Sources */,
 				3CE162200A0486DC83B5FCDE /* UpcomingCalendarView.swift in Sources */,
 				3B13C3604F0998907BC0F5A0 /* MALOfficialDiscoveryService.swift in Sources */,
 			);
@@ -2070,6 +2080,7 @@
 				0902679A7C53895A3E536DB3 /* DataSaver.swift in Sources */,
 				BA0000000000000000000E12 /* BackupManager.swift in Sources */,
 				BA0000000000000000000E22 /* BackupSections.swift in Sources */,
+				BA0000000000000000000E32 /* BackupAccountsSection.swift in Sources */,
 				3F46CC7939744F8822DF8259 /* UpcomingCalendarView.swift in Sources */,
 				5698B6E7343AF58F4C6E7C77 /* MALOfficialDiscoveryService.swift in Sources */,
 			);
@@ -2277,6 +2288,7 @@
 				679FE96834BF8972AF0AE19B /* DataSaver.swift in Sources */,
 				BA0000000000000000000E14 /* BackupManager.swift in Sources */,
 				BA0000000000000000000E24 /* BackupSections.swift in Sources */,
+				BA0000000000000000000E34 /* BackupAccountsSection.swift in Sources */,
 				4405364F748FFD176A906E38 /* UpcomingCalendarView.swift in Sources */,
 				2598E67FBDB5C850FBED3166 /* MALOfficialDiscoveryService.swift in Sources */,
 			);
