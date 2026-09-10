@@ -86,6 +86,28 @@
     <key>GithubRepo</key>
     <string>$(GITHUB_REPO)</string>
 
+    <!-- Backup files created by Settings → Backup -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.shirox.backup</string>
+            <key>UTTypeDescription</key>
+            <string>Shirox Backup</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.json</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>shiroxbackup</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+
     <!-- Appstore Release -->
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>

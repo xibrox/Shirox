@@ -610,6 +610,9 @@
 		BA0000000000000000000E32 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E31 /* BackupAccountsSection.swift */; };
 		BA0000000000000000000E33 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E31 /* BackupAccountsSection.swift */; };
 		BA0000000000000000000E34 /* BackupAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E31 /* BackupAccountsSection.swift */; };
+		BA0000000000000000000E42 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E41 /* BackupSettingsView.swift */; };
+		BA0000000000000000000E43 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E41 /* BackupSettingsView.swift */; };
+		BA0000000000000000000E44 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E41 /* BackupSettingsView.swift */; };
 		BAEE9A1A2FCB000000000002 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000003 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
 		BAEE9A1A2FCB000000000004 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */; };
@@ -643,6 +646,7 @@
 		D35A711A9A3A9DF150C7DD04 /* JellyfinPosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D4FBF1385A6C9330CBE7EAB /* JellyfinPosterCard.swift */; };
 		D4C8B24F733A507E93ACB3D2 /* MangaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44010E61F429972277F10D2F /* MangaModels.swift */; };
 		D5719ABC7329114D5B9843B3 /* JellyfinAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA13A2F15016892850F349E /* JellyfinAuthManager.swift */; };
+		DA8196F9D5AB407A0E586AA3 /* BackupSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4737DA623BC62737787AD6FB /* BackupSummaryTests.swift */; };
 		DBAA14AE4BA5D9BE47380BF0 /* MangaDownloadItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172B561567C6F7EEECFD31D4 /* MangaDownloadItem.swift */; };
 		DBEA849AD136FC93CB36241C /* ReaderPageMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2630DB71CDC98D422B49EC1A /* ReaderPageMapping.swift */; };
 		DC96B735178C288BFF58E50B /* MangaMatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB2881F54EC6780744D288A /* MangaMatch.swift */; };
@@ -853,6 +857,7 @@
 		434062BAE638F3D33467EBCF /* HLSManifestParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HLSManifestParser.swift; sourceTree = "<group>"; };
 		44010E61F429972277F10D2F /* MangaModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaModels.swift; sourceTree = "<group>"; };
 		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
+		4737DA623BC62737787AD6FB /* BackupSummaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSummaryTests.swift; sourceTree = "<group>"; };
 		49B5885AD320A89432B9989B /* MangaTrackingCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaTrackingCoordinator.swift; sourceTree = "<group>"; };
 		49DFA57CE44ED5570821789D /* PendingWriteTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingWriteTests.swift; sourceTree = "<group>"; };
 		4A5A6BA34DDCEF8AFDF2E059 /* PendingWrite.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingWrite.swift; sourceTree = "<group>"; };
@@ -935,6 +940,7 @@
 		BA0000000000000000000E11 /* BackupManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupManager.swift; sourceTree = "<group>"; };
 		BA0000000000000000000E21 /* BackupSections.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSections.swift; sourceTree = "<group>"; };
 		BA0000000000000000000E31 /* BackupAccountsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupAccountsSection.swift; sourceTree = "<group>"; };
+		BA0000000000000000000E41 /* BackupSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSettingsView.swift; sourceTree = "<group>"; };
 		BAEE9A1A2FCB000000000001 /* BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAlive.swift; sourceTree = "<group>"; };
 		BC268A065BC5B9DB56250D4B /* WatchOrderSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchOrderSection.swift; sourceTree = "<group>"; };
 		BCA808C7CD73B2C87D9F989B /* LoggerRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoggerRedactionTests.swift; sourceTree = "<group>"; };
@@ -1277,6 +1283,7 @@
 				1279E4E22FCA397700C9BA56 /* PlayerView.swift */,
 				1279E4E32FCA397700C9BA56 /* SearchView.swift */,
 				1279E4E42FCA397700C9BA56 /* SettingsView.swift */,
+				BA0000000000000000000E41 /* BackupSettingsView.swift */,
 				1279E4E52FCA397700C9BA56 /* StreamPickerView.swift */,
 				1279E4E62FCA397700C9BA56 /* ViewTracker.swift */,
 				FF4C00BAA407FF400B069044 /* JellyfinEntryView.swift */,
@@ -1387,6 +1394,7 @@
 				6CD7DB6AB4D4669A5E102076 /* BackupSettingsSectionTests.swift */,
 				5D37334B52C658E81172738C /* BackupModulesSectionTests.swift */,
 				D6C25C93B56EBA2E868ADE43 /* BackupAccountsSectionTests.swift */,
+				4737DA623BC62737787AD6FB /* BackupSummaryTests.swift */,
 			);
 			path = ShiroxTests;
 			sourceTree = SOURCE_ROOT;
@@ -1668,6 +1676,7 @@
 				75659C3C4FADC1208EF20304 /* BackupSettingsSectionTests.swift in Sources */,
 				7E46A00FFA290C345E3E9919 /* BackupModulesSectionTests.swift in Sources */,
 				FAC46AC419B62B7E58A162DA /* BackupAccountsSectionTests.swift in Sources */,
+				DA8196F9D5AB407A0E586AA3 /* BackupSummaryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1792,6 +1801,7 @@
 				8BD8E901FE5D4CF199886175 /* ScoreInputView.swift in Sources */,
 				121D9BAC2FCA563E000FF9B4 /* DetailView.swift in Sources */,
 				121D9BAD2FCA563E000FF9B4 /* SettingsView.swift in Sources */,
+				BA0000000000000000000E42 /* BackupSettingsView.swift in Sources */,
 				121D9BAE2FCA563E000FF9B4 /* ViewTracker.swift in Sources */,
 				121D9BAF2FCA563E000FF9B4 /* NavigationStack.swift in Sources */,
 				121D9BB02FCA563E000FF9B4 /* ContinueWatchingCard.swift in Sources */,
@@ -2004,6 +2014,7 @@
 				1279E5462FCA397700C9BA56 /* Media.swift in Sources */,
 				BA0000000000000000000E03 /* BackupEnvelope.swift in Sources */,
 				1279E5472FCA397700C9BA56 /* SettingsView.swift in Sources */,
+				BA0000000000000000000E43 /* BackupSettingsView.swift in Sources */,
 				1279E5482FCA397700C9BA56 /* ProfileActivityView.swift in Sources */,
 				1279E5492FCA397700C9BA56 /* UserActivity.swift in Sources */,
 				1279E54A2FCA397700C9BA56 /* DownloadItem.swift in Sources */,
@@ -2212,6 +2223,7 @@
 				1279E5BF2FCA397700C9BA56 /* Media.swift in Sources */,
 				BA0000000000000000000E04 /* BackupEnvelope.swift in Sources */,
 				1279E5C02FCA397700C9BA56 /* SettingsView.swift in Sources */,
+				BA0000000000000000000E44 /* BackupSettingsView.swift in Sources */,
 				1279E5C12FCA397700C9BA56 /* ProfileActivityView.swift in Sources */,
 				1279E5C22FCA397700C9BA56 /* UserActivity.swift in Sources */,
 				1279E5C32FCA397700C9BA56 /* DownloadItem.swift in Sources */,

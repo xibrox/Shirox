@@ -141,6 +141,54 @@ final class BackupManager {
         return "Shirox-Backup-\(f.string(from: date)).shiroxbackup"
     }
 
+    // MARK: Summary
+
+    /// Reads a backup well enough to describe it, without applying anything — the import
+    /// confirmation names what it is about to replace, taken from the file itself.
+    /// A section that can't be decoded contributes no line rather than failing the summary.
+    func summarize(_ data: Data) throws -> (envelope: BackupEnvelope, summary: BackupSummary) {
+        let envelope = try BackupEnvelope.decode(from: data)
+        var lines: [String] = []
+
+        if let value = envelope.sections[BackupSectionID.progress],
+           let progress = try? value.decoded(as: ProgressBackupPayload.self,
+                                             using: BackupCoding.decoder) {
+            let watched = progress.watchedKeys.count + progress.watchedHrefKeys.count
+            if watched > 0 { lines.append("\(watched) watched episodes") }
+            if !progress.continueWatching.isEmpty {
+                lines.append("\(progress.continueWatching.count) in Continue Watching")
+            }
+            if !progress.continueReading.isEmpty {
+                lines.append("\(progress.continueReading.count) in Continue Reading")
+            }
+        }
+
+        if let value = envelope.sections[BackupSectionID.localLibrary],
+           let library = try? value.decoded(as: LocalLibraryBackupPayload.self,
+                                            using: BackupCoding.decoder),
+           !library.entries.isEmpty {
+            lines.append("\(library.entries.count) library entries")
+        }
+
+        if let value = envelope.sections[BackupSectionID.modules],
+           let modules = try? value.decoded(as: ModulesBackupPayload.self,
+                                            using: BackupCoding.decoder),
+           !modules.modules.isEmpty {
+            lines.append(modules.modules.count == 1 ? "1 module" : "\(modules.modules.count) modules")
+        }
+
+        if let value = envelope.sections[BackupSectionID.settings],
+           (try? value.decoded(as: SettingsBackupPayload.self, using: BackupCoding.decoder)) != nil {
+            lines.append("Settings")
+        }
+
+        return (envelope, BackupSummary(createdAt: envelope.createdAt,
+                                        appVersion: envelope.app.version,
+                                        platform: envelope.app.platform,
+                                        includesAccounts: envelope.includesAccounts,
+                                        lines: lines))
+    }
+
     // MARK: Import
 
     /// Sections are the atomic unit: each applies on its own, and one that fails is
