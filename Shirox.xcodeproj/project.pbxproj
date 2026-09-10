@@ -35,6 +35,7 @@
 		121D9B4A2FCA5603000FF9B4 /* AniListActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4652FCA397700C9BA56 /* AniListActivity.swift */; };
 		121D9B4B2FCA5603000FF9B4 /* UserNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4762FCA397700C9BA56 /* UserNotification.swift */; };
 		121D9B4C2FCA5603000FF9B4 /* Media.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46E2FCA397700C9BA56 /* Media.swift */; };
+		BA0000000000000000000E02 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E01 /* BackupEnvelope.swift */; };
 		121D9B4D2FCA5603000FF9B4 /* StreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4742FCA397700C9BA56 /* StreamResult.swift */; };
 		121D9B4E2FCA5603000FF9B4 /* SkipSegments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4732FCA397700C9BA56 /* SkipSegments.swift */; };
 		121D9B4F2FCA5603000FF9B4 /* MarkContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46D2FCA397700C9BA56 /* MarkContext.swift */; };
@@ -248,6 +249,7 @@
 		1279E5442FCA397700C9BA56 /* PlayerSkipButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4BA2FCA397700C9BA56 /* PlayerSkipButton.swift */; };
 		1279E5452FCA397700C9BA56 /* WatchHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */; };
 		1279E5462FCA397700C9BA56 /* Media.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46E2FCA397700C9BA56 /* Media.swift */; };
+		BA0000000000000000000E03 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E01 /* BackupEnvelope.swift */; };
 		1279E5472FCA397700C9BA56 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E42FCA397700C9BA56 /* SettingsView.swift */; };
 		1279E5482FCA397700C9BA56 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4C62FCA397700C9BA56 /* ProfileActivityView.swift */; };
 		1279E5492FCA397700C9BA56 /* UserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4752FCA397700C9BA56 /* UserActivity.swift */; };
@@ -367,6 +369,7 @@
 		1279E5BD2FCA397700C9BA56 /* PlayerSkipButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4BA2FCA397700C9BA56 /* PlayerSkipButton.swift */; };
 		1279E5BE2FCA397700C9BA56 /* WatchHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E49E2FCA397700C9BA56 /* WatchHistoryService.swift */; };
 		1279E5BF2FCA397700C9BA56 /* Media.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E46E2FCA397700C9BA56 /* Media.swift */; };
+		BA0000000000000000000E04 /* BackupEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000E01 /* BackupEnvelope.swift */; };
 		1279E5C02FCA397700C9BA56 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4E42FCA397700C9BA56 /* SettingsView.swift */; };
 		1279E5C12FCA397700C9BA56 /* ProfileActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4C62FCA397700C9BA56 /* ProfileActivityView.swift */; };
 		1279E5C22FCA397700C9BA56 /* UserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1279E4752FCA397700C9BA56 /* UserActivity.swift */; };
@@ -511,6 +514,7 @@
 		63C7FC95D8E1088039C96983 /* ZoomableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7067BDBACB2F7A173AA486EC /* ZoomableContainer.swift */; };
 		657A527154EC1A2F79D914A4 /* ProfileCacheStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5167EDD4F7D833A5721B0FB /* ProfileCacheStoreTests.swift */; };
 		664E94102B33B60BB64953FB /* UserActivityCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64D936FD5217C795DA8427FB /* UserActivityCodableTests.swift */; };
+		66A51993B1A46D643866BA83 /* BackupEnvelopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C80D0B3C80A6C74E9CB5DE /* BackupEnvelopeTests.swift */; };
 		679FE96834BF8972AF0AE19B /* DataSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A304B304C482A8AAA10DB209 /* DataSaver.swift */; };
 		6A1ED47ADD71B1FAC528545F /* HLSManifestParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434062BAE638F3D33467EBCF /* HLSManifestParser.swift */; };
 		6AC7539852434F95B190C831 /* ScoreInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21201D48C8E94395977F4564 /* ScoreInputView.swift */; };
@@ -694,6 +698,7 @@
 		1279E46B2FCA397700C9BA56 /* EpisodeLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeLink.swift; sourceTree = "<group>"; };
 		1279E46C2FCA397700C9BA56 /* LibraryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEntry.swift; sourceTree = "<group>"; };
 		1279E46D2FCA397700C9BA56 /* MarkContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkContext.swift; sourceTree = "<group>"; };
+		BA0000000000000000000E01 /* BackupEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEnvelope.swift; sourceTree = "<group>"; };
 		1279E46E2FCA397700C9BA56 /* Media.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Media.swift; sourceTree = "<group>"; };
 		1279E46F2FCA397700C9BA56 /* MediaDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetail.swift; sourceTree = "<group>"; };
 		1279E4702FCA397700C9BA56 /* ModuleDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleDefinition.swift; sourceTree = "<group>"; };
@@ -915,6 +920,7 @@
 		C33E435703AA1308538E7D59 /* MALOfficialDiscoveryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MALOfficialDiscoveryTests.swift; sourceTree = "<group>"; };
 		C372736CDF3DAFB6621F4326 /* JellyfinCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinCore.swift; sourceTree = "<group>"; };
 		C581970F3C23C369DD7CA074 /* SearchBrowseView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchBrowseView.swift; sourceTree = "<group>"; };
+		C9C80D0B3C80A6C74E9CB5DE /* BackupEnvelopeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupEnvelopeTests.swift; sourceTree = "<group>"; };
 		C9DF617989E51E2EB07B0134 /* LocalLibraryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLibraryManager.swift; sourceTree = "<group>"; };
 		CF6B7E2E4A3D9F1B8C0E5A33 /* Shirox.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shirox.xcconfig; sourceTree = "<group>"; };
 		CF6B7E2E4A3D9F1B8C0E5A44 /* Shirox.local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shirox.local.xcconfig; sourceTree = "<group>"; };
@@ -997,6 +1003,7 @@
 		1279E4782FCA397700C9BA56 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				BA0000000000000000000E01 /* BackupEnvelope.swift */,
 				1279E4652FCA397700C9BA56 /* AniListActivity.swift */,
 				1279E4662FCA397700C9BA56 /* AniListMedia.swift */,
 				1279E4672FCA397700C9BA56 /* AniListNotification.swift */,
@@ -1346,6 +1353,7 @@
 				BF82534266F27EB783B12E03 /* DataSaverTests.swift */,
 				C33E435703AA1308538E7D59 /* MALOfficialDiscoveryTests.swift */,
 				92928753257FE3CDF1DBEB3D /* ProviderFallbackChainTests.swift */,
+				C9C80D0B3C80A6C74E9CB5DE /* BackupEnvelopeTests.swift */,
 			);
 			path = ShiroxTests;
 			sourceTree = SOURCE_ROOT;
@@ -1620,6 +1628,7 @@
 				C328A64E218D4179DB1FFC48 /* DataSaverTests.swift in Sources */,
 				2A442ADBDBF00A760BDB4365 /* MALOfficialDiscoveryTests.swift in Sources */,
 				456591F6899FB1E2DF6FE33D /* ProviderFallbackChainTests.swift in Sources */,
+				66A51993B1A46D643866BA83 /* BackupEnvelopeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1728,6 +1737,7 @@
 				121D9B4A2FCA5603000FF9B4 /* AniListActivity.swift in Sources */,
 				121D9B4B2FCA5603000FF9B4 /* UserNotification.swift in Sources */,
 				121D9B4C2FCA5603000FF9B4 /* Media.swift in Sources */,
+				BA0000000000000000000E02 /* BackupEnvelope.swift in Sources */,
 				121D9B4D2FCA5603000FF9B4 /* StreamResult.swift in Sources */,
 				121D9BC02FCA564F000FF9B4 /* ShiroxApp.swift in Sources */,
 				1251C45A2FCAE1AA002AD0B2 /* LegalWebView.swift in Sources */,
@@ -1950,6 +1960,7 @@
 				1279E5442FCA397700C9BA56 /* PlayerSkipButton.swift in Sources */,
 				1279E5452FCA397700C9BA56 /* WatchHistoryService.swift in Sources */,
 				1279E5462FCA397700C9BA56 /* Media.swift in Sources */,
+				BA0000000000000000000E03 /* BackupEnvelope.swift in Sources */,
 				1279E5472FCA397700C9BA56 /* SettingsView.swift in Sources */,
 				1279E5482FCA397700C9BA56 /* ProfileActivityView.swift in Sources */,
 				1279E5492FCA397700C9BA56 /* UserActivity.swift in Sources */,
@@ -2154,6 +2165,7 @@
 				1279E5BD2FCA397700C9BA56 /* PlayerSkipButton.swift in Sources */,
 				1279E5BE2FCA397700C9BA56 /* WatchHistoryService.swift in Sources */,
 				1279E5BF2FCA397700C9BA56 /* Media.swift in Sources */,
+				BA0000000000000000000E04 /* BackupEnvelope.swift in Sources */,
 				1279E5C02FCA397700C9BA56 /* SettingsView.swift in Sources */,
 				1279E5C12FCA397700C9BA56 /* ProfileActivityView.swift in Sources */,
 				1279E5C22FCA397700C9BA56 /* UserActivity.swift in Sources */,
