@@ -83,6 +83,33 @@ final class MALAuthManager: NSObject, ObservableObject {
         SecItemDelete(q as CFDictionary)
     }
 
+    // MARK: - Backup Restore
+
+    /// Writes a backed-up MAL session into the Keychain and refreshes the published login
+    /// state. Not validated against the network — an expired token refreshes or fails on
+    /// the next request as usual.
+    func restoreAccount(accessToken: String?, refreshToken: String?,
+                        expiry: Double?, profile: Data?) {
+        if let accessToken, !accessToken.isEmpty {
+            keychainWrite(key: accessTokenKey, value: accessToken)
+            isLoggedIn = true
+        }
+        if let refreshToken, !refreshToken.isEmpty {
+            keychainWrite(key: refreshTokenKey, value: refreshToken)
+        }
+        if let expiry {
+            UserDefaults.standard.set(expiry, forKey: tokenExpiryKey)
+        }
+        if let profile {
+            UserDefaults.standard.set(profile, forKey: profileKey)
+            if let cached = try? JSONDecoder().decode(CachedProfile.self, from: profile) {
+                userId = cached.id
+                username = cached.name
+                avatarURL = cached.avatarURL
+            }
+        }
+    }
+
     // MARK: - Token expiry
 
     /// Absolute expiry of the current access token, if known.

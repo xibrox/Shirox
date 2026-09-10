@@ -36,6 +36,13 @@ final class WatchHistoryService: ObservableObject {
         history.first { $0.mediaId == mediaId }
     }
 
+    /// Replaces watch history from a backup — storage plus published state, since this
+    /// singleton loads from storage only once, in `init`.
+    func restore(history newHistory: [WatchProgress]) {
+        history = newHistory
+        saveToStorage()
+    }
+
     private func saveToStorage() {
         if let data = try? JSONEncoder().encode(history) {
             UserDefaults.standard.set(data, forKey: storageKey)

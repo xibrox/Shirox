@@ -319,6 +319,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Backup") {
+                    NavigationLink {
+                        BackupSettingsView()
+                    } label: {
+                        Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
+                    }
+                    Text("Save your progress, library, settings and modules to a file, or restore them from one.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Storage & Cache") {
                     #if os(iOS)
                     Button(role: .destructive) {
