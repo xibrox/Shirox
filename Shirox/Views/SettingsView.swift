@@ -18,6 +18,8 @@ struct SettingsView: View {
     @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
     @StateObject private var librarySync = LibrarySyncService.shared
     @State private var pendingSyncDirection: LibrarySyncService.Direction?
+    @State private var previewDirection: LibrarySyncService.Direction?
+    @State private var replacePlan: LibraryReplacePlan?
     @AppStorage("autoNextEpisode") private var autoNextEpisode = true
     @AppStorage("autoSkipSegments") private var autoSkipSegments = true
     @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
@@ -214,23 +216,28 @@ struct SettingsView: View {
 
                 if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
                     Section("Sync Library") {
-                        ForEach(LibrarySyncService.Direction.allCases) { direction in
-                            Button {
-                                pendingSyncDirection = direction
-                            } label: {
-                                HStack {
-                                    Text(direction.title)
-                                    Spacer()
-                                    if librarySync.isRunning {
-                                        Text(librarySync.statusText)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .disabled(librarySync.isRunning)
+                        ForEach(LibrarySyncService.Direction.syncCases) { direction in
+                            syncRow(direction)
                         }
                         Text("Brings your two accounts into line — a one-time backfill for everything you tracked before signing in here. Syncing both ways reconciles them in a single pass; the one-way copies only ever write to the destination. Either way progress is only ever moved forward, so anything further along is left as it is.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Section("Replace Library") {
+                        ForEach(LibrarySyncService.Direction.replaceCases) { direction in
+                            syncRow(direction)
+                        }
+                        Text("Use when one account is simply the one you want to keep. Overwrites the other with it — progress, status, score and rewatch count — even where that means going backwards. Titles only the overwritten account has are left in place. This can't be undone.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Section("Mirror Library") {
+                        ForEach(LibrarySyncService.Direction.mirrorCases) { direction in
+                            syncRow(direction)
+                        }
+                        Text("Everything Replace does, and the overwritten account also loses any entry the other doesn't have, ending up an exact copy. Entries whose match can't be confirmed are kept rather than deleted. This can't be undone.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -552,13 +559,28 @@ struct SettingsView: View {
                 ),
                 presenting: pendingSyncDirection
             ) { direction in
-                Button(direction.confirmButtonTitle) {
+                Button(direction.confirmButtonTitle, role: direction.isDestructive ? .destructive : nil) {
                     pendingSyncDirection = nil
                     Task { await librarySync.sync(direction) }
                 }
                 Button("Cancel", role: .cancel) { pendingSyncDirection = nil }
             } message: { direction in
                 Text(direction.confirmationMessage)
+            }
+            .sheet(isPresented: Binding(
+                get: { replacePlan != nil && previewDirection != nil },
+                set: { if !$0 { replacePlan = nil; previewDirection = nil } }
+            )) {
+                if let plan = replacePlan, let direction = previewDirection {
+                    ReplacePreviewSheet(direction: direction, plan: plan) {
+                        replacePlan = nil
+                        previewDirection = nil
+                        Task { await librarySync.apply(plan, for: direction) }
+                    } onCancel: {
+                        replacePlan = nil
+                        previewDirection = nil
+                    }
+                }
             }
             .onAppear {
                 #if os(iOS)
@@ -567,6 +589,39 @@ struct SettingsView: View {
                 #endif
             }
         }
+    }
+
+    /// One row in the Sync / Replace / Mirror sections. Safe runs get a confirmation dialog;
+    /// destructive ones get a full preview of what they would change.
+    @ViewBuilder
+    private func syncRow(_ direction: LibrarySyncService.Direction) -> some View {
+        Button {
+            if direction.isDestructive {
+                // Destructive runs are never launched straight from a tap — they go through a
+                // preview of exactly what they would change.
+                previewDirection = direction
+                Task { replacePlan = await librarySync.preview(direction) }
+            } else {
+                pendingSyncDirection = direction
+            }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(direction.title)
+                        .foregroundStyle(direction.isDestructive ? Color.red : Color.accentColor)
+                    Text(direction.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if librarySync.isRunning {
+                    Text(librarySync.statusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .disabled(librarySync.isRunning)
     }
 
     #if os(iOS)
@@ -1190,6 +1245,96 @@ private struct ProvidersSettingsSection: View {
         case .anilist: return AniListAuthManager.shared.isLoggedIn ? "Signed in" : "Not signed in"
         case .mal: return malAuth.isLoggedIn ? "Signed in" : "Not signed in"
         case .local: return "Not signed in"
+        }
+    }
+}
+
+
+/// Shows exactly what a replace or mirror would do before it does any of it. These runs can't be
+/// undone, so the deletions are listed by name rather than just counted — a number is easy to
+/// wave through, a list of titles you recognise is not.
+private struct ReplacePreviewSheet: View {
+    let direction: LibrarySyncService.Direction
+    let plan: LibraryReplacePlan
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var additions: Int { plan.writes.filter(\.isNew).count }
+    private var overwrites: Int { plan.writes.filter { !$0.isNew }.count }
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    Text(direction.title)
+                        .font(.headline)
+                    Text(direction.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("What this will do") {
+                    if plan.isEmpty {
+                        Text("Nothing — \(direction.targetName) already matches.")
+                            .foregroundStyle(.secondary)
+                    }
+                    if additions > 0 { row("Add to \(direction.targetName)", additions) }
+                    if overwrites > 0 { row("Overwrite on \(direction.targetName)", overwrites) }
+                    if !plan.deletions.isEmpty {
+                        row("Delete from \(direction.targetName)", plan.deletions.count, tint: .red)
+                    }
+                    if plan.unchanged > 0 { row("Leave unchanged", plan.unchanged, tint: .secondary) }
+                }
+
+                if !plan.deletions.isEmpty {
+                    Section("Will be deleted") {
+                        ForEach(plan.deletions, id: \.id) { deletion in
+                            Text(deletion.title)
+                                .font(.callout)
+                        }
+                    }
+                }
+
+                if plan.keptUnverified > 0 || !plan.unmatched.isEmpty {
+                    Section("Left alone") {
+                        if plan.keptUnverified > 0 {
+                            Text("\(plan.keptUnverified) on \(direction.targetName) couldn't be matched against \(direction.sourceName), so they're kept rather than deleted.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if !plan.unmatched.isEmpty {
+                            Text("\(plan.unmatched.count) on \(direction.sourceName) have no \(direction.targetName) entry to write to.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Button(direction.confirmButtonTitle, role: .destructive, action: onConfirm)
+                        .disabled(plan.isEmpty)
+                } footer: {
+                    Text("This can't be undone.")
+                }
+            }
+            .navigationTitle(direction.confirmationTitle)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                }
+            }
+        }
+    }
+
+    private func row(_ label: String, _ count: Int, tint: Color = .primary) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text("\(count)")
+                .foregroundStyle(tint)
         }
     }
 }

@@ -15,6 +15,60 @@ enum LibrarySyncDecision: Equatable {
     case skipLeftDiffering(source: MediaListStatus, target: MediaListStatus)
 }
 
+/// Which of the two accounts a decision applies to.
+enum LibrarySide {
+    case anilist, mal
+    var name: String { self == .anilist ? "AniList" : "MyAnimeList" }
+}
+
+/// What a *replace* run should do with a single title. Unlike ``LibrarySyncDecision`` this
+/// carries no notion of "ahead": the destination is made to match the source, full stop.
+enum LibraryReplaceDecision: Equatable {
+    case create(status: MediaListStatus, progress: Int, score: Double, timesRewatched: Int?)
+    case overwrite(status: MediaListStatus, progress: Int, score: Double, timesRewatched: Int?)
+    /// Already identical. Not a safety check — it keeps a re-run from spending hundreds of
+    /// writes against a rate-limited API setting values that are already correct.
+    case skipIdentical
+}
+
+/// One write a replace or mirror run intends to make, resolved down to what the API needs.
+struct PlannedWrite: Equatable {
+    let side: LibrarySide
+    /// Media id on `side` — what both services' update calls take.
+    let id: Int
+    let title: String
+    /// True when the destination has no entry yet, so the run will add rather than overwrite.
+    let isNew: Bool
+    let status: MediaListStatus
+    let progress: Int
+    let score: Double
+    let timesRewatched: Int?
+}
+
+/// One entry a mirror run intends to remove.
+struct PlannedDeletion: Equatable {
+    let side: LibrarySide
+    /// AniList deletes by *list entry* id, MyAnimeList by media id. Resolved here so the caller
+    /// can't pass the wrong one.
+    let id: Int
+    let title: String
+}
+
+/// Everything a replace or mirror run would do, worked out before anything is written, so it can
+/// be shown to somebody before they commit to it.
+struct LibraryReplacePlan {
+    var writes: [PlannedWrite] = []
+    var deletions: [PlannedDeletion] = []
+    /// Entries already identical, which the run will skip.
+    var unchanged = 0
+    /// Source titles with no id on the destination, so there is nothing to write to.
+    var unmatched: [String] = []
+    /// Destination entries a mirror keeps because it can't confirm the source lacks them.
+    var keptUnverified = 0
+
+    var isEmpty: Bool { writes.isEmpty && deletions.isEmpty }
+}
+
 /// One title as it stands on both services, ready to be merged. Either side may be nil when
 /// only one service knows the title; the ids are always present, because without somewhere to
 /// write to there is nothing to merge.
@@ -194,6 +248,102 @@ enum LibrarySyncPlanner {
 
         return pairing
     }
+
+    // MARK: - Replacing one library with the other
+
+    /// Makes the destination match the source exactly, backwards steps included.
+    ///
+    /// Every safeguard in ``decide(source:target:)`` is deliberately absent here: progress moves
+    /// down as readily as up, and an unrated source clears a rating. That is what the caller
+    /// asked for, and it cannot be undone from inside the app.
+    static func replace(source: LibraryEntry, target: LibraryEntry?) -> LibraryReplaceDecision {
+        guard let target else {
+            return .create(
+                status: source.status, progress: source.progress,
+                score: source.score, timesRewatched: source.timesRewatched)
+        }
+
+        let identical = source.status == target.status
+            && source.progress == target.progress
+            && source.score == target.score
+            && (source.timesRewatched ?? 0) == (target.timesRewatched ?? 0)
+        guard !identical else { return .skipIdentical }
+
+        return .overwrite(
+            status: source.status, progress: source.progress,
+            score: source.score, timesRewatched: source.timesRewatched)
+    }
+
+    /// Everything a replace or mirror run would do, without doing any of it.
+    ///
+    /// Working the whole plan out up front is what lets the app show somebody the damage before
+    /// they authorise it — these runs can't be undone, so "N entries will be deleted, here they
+    /// are" is the last point at which a mistake is still cheap.
+    static func replacePlan(
+        from pairing: LibraryPairing,
+        replacing target: LibrarySide,
+        sourceMediaIds: Set<Int>,
+        deletingExtras: Bool
+    ) -> LibraryReplacePlan {
+        let intoMAL = target == .mal
+        var plan = LibraryReplacePlan()
+        plan.unmatched = intoMAL ? pairing.unmatchedAniList : pairing.unmatchedMAL
+
+        for pair in pairing.pairs {
+            guard let source = intoMAL ? pair.anilist : pair.mal else { continue }
+            let existing = intoMAL ? pair.mal : pair.anilist
+
+            switch replace(source: source, target: existing) {
+            case .skipIdentical:
+                plan.unchanged += 1
+            case .create(let status, let progress, let score, let timesRewatched),
+                 .overwrite(let status, let progress, let score, let timesRewatched):
+                plan.writes.append(PlannedWrite(
+                    side: target,
+                    id: intoMAL ? pair.malId : pair.anilistId,
+                    title: source.media.title.displayTitle,
+                    isNew: existing == nil,
+                    status: status, progress: progress,
+                    score: score, timesRewatched: timesRewatched))
+            }
+        }
+
+        guard deletingExtras else { return plan }
+
+        plan.keptUnverified = intoMAL ? pairing.unmatchedMAL.count : pairing.unmatchedAniList.count
+        plan.deletions = deletions(from: pairing, replacing: target, sourceMediaIds: sourceMediaIds)
+            .compactMap { pair in
+                guard let doomed = intoMAL ? pair.mal : pair.anilist else { return nil }
+                return PlannedDeletion(
+                    side: target,
+                    // MyAnimeList deletes by media id; AniList needs the list entry's own id.
+                    id: intoMAL ? pair.malId : doomed.id,
+                    title: doomed.media.title.displayTitle)
+            }
+        return plan
+    }
+
+    /// The destination entries a mirror run should delete.
+    ///
+    /// Absence is not proof: a destination entry looks orphaned both when the source genuinely
+    /// lacks it *and* when the source has it under an id that failed to resolve. Treating those
+    /// alike would turn one failed lookup into deleted watch history. So deletion needs positive
+    /// proof — the entry resolves to a source-side id, and `sourceMediaIds` shows that id really
+    /// is absent. Anything unverifiable is kept.
+    static func deletions(
+        from pairing: LibraryPairing,
+        replacing target: LibrarySide,
+        sourceMediaIds: Set<Int>
+    ) -> [LibraryPair] {
+        pairing.pairs.filter { pair in
+            switch target {
+            case .mal:
+                return pair.mal != nil && pair.anilist == nil && !sourceMediaIds.contains(pair.anilistId)
+            case .anilist:
+                return pair.anilist != nil && pair.mal == nil && !sourceMediaIds.contains(pair.malId)
+            }
+        }
+    }
 }
 
 /// Tally of one sync run, for the summary shown when it finishes.
@@ -205,6 +355,10 @@ struct LibrarySyncSummary: Equatable {
     var keptAhead = 0
     /// Entries where the two services disagree and nothing in the data can settle it.
     var leftDiffering = 0
+    /// Entries removed by a mirror run.
+    var deleted = 0
+    /// Entries a mirror run kept because it could not confirm the source lacks them.
+    var keptUnverified = 0
     /// Titles with no id on the other service, so there was nothing to write to.
     var unmatched: [String] = []
     var failed = 0
@@ -213,14 +367,17 @@ struct LibrarySyncSummary: Equatable {
 
     /// Plain-language result, in the same voice as the rest of the app.
     var sentence: String {
-        if changed == 0 && leftDiffering == 0 && unmatched.isEmpty && failed == 0 {
+        if changed == 0 && leftDiffering == 0 && deleted == 0
+            && keptUnverified == 0 && unmatched.isEmpty && failed == 0 {
             return "Everything was already up to date."
         }
         var parts: [String] = []
         if created > 0 { parts.append("\(created) added") }
         if advanced > 0 { parts.append("\(advanced) updated") }
+        if deleted > 0 { parts.append("\(deleted) deleted") }
         if keptAhead > 0 { parts.append("\(keptAhead) left ahead") }
         if leftDiffering > 0 { parts.append("\(leftDiffering) left differing") }
+        if keptUnverified > 0 { parts.append("\(keptUnverified) kept unverified") }
         if !unmatched.isEmpty { parts.append("\(unmatched.count) not found") }
         if failed > 0 { parts.append("\(failed) failed") }
         return parts.joined(separator: ", ")

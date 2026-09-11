@@ -10,13 +10,14 @@ final class LibrarySyncPlannerTests: XCTestCase {
 
     private func entry(
         id: Int = 1,
+        entryId: Int? = nil,
         status: MediaListStatus = .current,
         progress: Int,
         score: Double = 0,
         timesRewatched: Int? = nil
     ) -> LibraryEntry {
         LibraryEntry(
-            id: id,
+            id: entryId ?? id,
             media: Media(
                 id: id, idMal: id, provider: .anilist,
                 title: MediaTitle(romaji: "Title \(id)", english: "Title \(id)", native: nil),
@@ -326,5 +327,227 @@ final class LibrarySyncPlannerTests: XCTestCase {
         var s = LibrarySyncSummary()
         s.leftDiffering = 2
         XCTAssertEqual(s.sentence, "2 left differing")
+    }
+
+    // MARK: - Replacing (destructive)
+    //
+    // These runs deliberately break the forward-only rule: the destination is made to match the
+    // source exactly, backwards steps included. The tests below pin down that it really does
+    // overwrite — and, for mirrors, that it deletes only what it can *prove* the source lacks.
+
+    func testReplaceCreatesWhatTheDestinationIsMissing() {
+        let decision = LibrarySyncPlanner.replace(
+            source: entry(status: .completed, progress: 12, score: 8, timesRewatched: 1), target: nil)
+        XCTAssertEqual(decision, .create(status: .completed, progress: 12, score: 8, timesRewatched: 1))
+    }
+
+    /// The whole point of a replace: progress goes backwards when the source is behind.
+    func testReplaceForcesProgressBackwards() {
+        let decision = LibrarySyncPlanner.replace(
+            source: entry(status: .current, progress: 3),
+            target: entry(status: .completed, progress: 24))
+        XCTAssertEqual(decision, .overwrite(status: .current, progress: 3, score: 0, timesRewatched: nil))
+    }
+
+    /// An unrated source clears a rating the destination had. `decide` protects it; `replace`
+    /// must not.
+    func testReplaceClearsAScoreTheSourceDoesNotHave() {
+        let decision = LibrarySyncPlanner.replace(
+            source: entry(status: .completed, progress: 12, score: 0),
+            target: entry(status: .completed, progress: 12, score: 9))
+        XCTAssertEqual(decision, .overwrite(status: .completed, progress: 12, score: 0, timesRewatched: nil))
+    }
+
+    func testReplaceOverwritesTheRewatchCountRatherThanMergingIt() {
+        let decision = LibrarySyncPlanner.replace(
+            source: entry(status: .completed, progress: 12, timesRewatched: 1),
+            target: entry(status: .completed, progress: 12, timesRewatched: 5))
+        XCTAssertEqual(decision, .overwrite(status: .completed, progress: 12, score: 0, timesRewatched: 1))
+    }
+
+    /// Not a safety check — it keeps a re-run from spending hundreds of writes against a
+    /// rate-limited API to set values that are already correct.
+    func testReplaceSkipsEntriesThatAlreadyMatch() {
+        let decision = LibrarySyncPlanner.replace(
+            source: entry(status: .completed, progress: 12, score: 8, timesRewatched: 2),
+            target: entry(status: .completed, progress: 12, score: 8, timesRewatched: 2))
+        XCTAssertEqual(decision, .skipIdentical)
+    }
+
+    /// A missing repeat count and a zero one are the same thing, and must not force a write.
+    func testReplaceTreatsNoRewatchCountAsZero() {
+        let decision = LibrarySyncPlanner.replace(
+            source: entry(status: .completed, progress: 12, timesRewatched: nil),
+            target: entry(status: .completed, progress: 12, timesRewatched: 0))
+        XCTAssertEqual(decision, .skipIdentical)
+    }
+
+    // MARK: - Mirror deletions
+
+    func testMirrorDeletesEntriesTheSourceProvablyLacks() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5)],
+            mal: [entry(id: 900, progress: 5), entry(id: 901, progress: 3)],
+            malIdForAniListId: [100: 900],
+            anilistIdForMALId: [901: 101])
+
+        let deletions = LibrarySyncPlanner.deletions(
+            from: pairing, replacing: .mal, sourceMediaIds: [100])
+
+        XCTAssertEqual(deletions.map(\.malId), [901])
+    }
+
+    func testMirrorKeepsEntriesTheSourceStillHas() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5)],
+            mal: [entry(id: 900, progress: 5)],
+            malIdForAniListId: [100: 900],
+            anilistIdForMALId: [900: 100])
+
+        let deletions = LibrarySyncPlanner.deletions(
+            from: pairing, replacing: .mal, sourceMediaIds: [100])
+
+        XCTAssertTrue(deletions.isEmpty)
+    }
+
+    /// A destination entry with no id on the source side is unverifiable, not absent. Deleting it
+    /// would turn a failed lookup into lost watch history.
+    func testMirrorNeverDeletesAnEntryItCouldNotLookUp() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5)],
+            mal: [entry(id: 900, progress: 5), entry(id: 902, progress: 3)],
+            malIdForAniListId: [100: 900],
+            anilistIdForMALId: [:])
+
+        let deletions = LibrarySyncPlanner.deletions(
+            from: pairing, replacing: .mal, sourceMediaIds: [100])
+
+        XCTAssertTrue(deletions.isEmpty)
+        XCTAssertEqual(pairing.unmatchedMAL, ["Title 902"])
+    }
+
+    /// THE ONE THAT MATTERS: the source *does* have this title, but its own id lookup failed, so
+    /// the destination copy looks orphaned. Checking against the source's real ids catches it.
+    func testMirrorKeepsAnEntryWhoseCounterpartFailedToMap() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5), entry(id: 101, progress: 4)],
+            mal: [entry(id: 900, progress: 5), entry(id: 901, progress: 4)],
+            malIdForAniListId: [100: 900],          // 101's MyAnimeList id could not be resolved
+            anilistIdForMALId: [901: 101])
+
+        let deletions = LibrarySyncPlanner.deletions(
+            from: pairing, replacing: .mal, sourceMediaIds: [100, 101])
+
+        XCTAssertTrue(deletions.isEmpty)
+    }
+
+    func testMirrorDeletesFromAniListWhenMyAnimeListIsTheSource() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5), entry(id: 101, progress: 4)],
+            mal: [entry(id: 900, progress: 5)],
+            malIdForAniListId: [100: 900, 101: 901],
+            anilistIdForMALId: [900: 100])
+
+        let deletions = LibrarySyncPlanner.deletions(
+            from: pairing, replacing: .anilist, sourceMediaIds: [900])
+
+        XCTAssertEqual(deletions.map(\.anilistId), [101])
+    }
+
+    func testSummarySentenceReportsDeletionsAndUnverifiedEntries() {
+        var s = LibrarySyncSummary()
+        s.advanced = 4
+        s.deleted = 2
+        s.keptUnverified = 1
+        XCTAssertEqual(s.sentence, "4 updated, 2 deleted, 1 kept unverified")
+    }
+
+    // MARK: - Previewing a replace before it runs
+
+    func testPlanWritesEverySourceTitleAndMarksWhichAreNew() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5), entry(id: 101, progress: 3)],
+            mal: [entry(id: 900, progress: 1)],
+            malIdForAniListId: [100: 900, 101: 901],
+            anilistIdForMALId: [:])
+
+        let plan = LibrarySyncPlanner.replacePlan(
+            from: pairing, replacing: .mal, sourceMediaIds: [100, 101], deletingExtras: false)
+
+        XCTAssertEqual(plan.writes.count, 2)
+        XCTAssertEqual(plan.writes.first { $0.id == 900 }?.isNew, false)
+        XCTAssertEqual(plan.writes.first { $0.id == 901 }?.isNew, true)
+        XCTAssertTrue(plan.deletions.isEmpty)
+    }
+
+    func testPlanCountsAlreadyMatchingEntriesAsUnchanged() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5, score: 8)],
+            mal: [entry(id: 900, progress: 5, score: 8)],
+            malIdForAniListId: [100: 900],
+            anilistIdForMALId: [900: 100])
+
+        let plan = LibrarySyncPlanner.replacePlan(
+            from: pairing, replacing: .mal, sourceMediaIds: [100], deletingExtras: false)
+
+        XCTAssertTrue(plan.writes.isEmpty)
+        XCTAssertEqual(plan.unchanged, 1)
+    }
+
+    /// A replace never removes anything, however many extras the destination has.
+    func testPlanForAReplaceNeverDeletes() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5)],
+            mal: [entry(id: 900, progress: 5), entry(id: 901, progress: 2)],
+            malIdForAniListId: [100: 900],
+            anilistIdForMALId: [901: 101])
+
+        let plan = LibrarySyncPlanner.replacePlan(
+            from: pairing, replacing: .mal, sourceMediaIds: [100], deletingExtras: false)
+
+        XCTAssertTrue(plan.deletions.isEmpty)
+    }
+
+    func testPlanForAMirrorListsWhatWouldBeDeletedByName() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5)],
+            mal: [entry(id: 900, progress: 5), entry(id: 901, progress: 2)],
+            malIdForAniListId: [100: 900],
+            anilistIdForMALId: [901: 101])
+
+        let plan = LibrarySyncPlanner.replacePlan(
+            from: pairing, replacing: .mal, sourceMediaIds: [100], deletingExtras: true)
+
+        XCTAssertEqual(plan.deletions.map(\.title), ["Title 901"])
+        XCTAssertEqual(plan.deletions.map(\.id), [901])
+    }
+
+    /// AniList deletes by *list entry* id, not media id. Sending the wrong one would either fail
+    /// or, worse, remove a different entry.
+    func testPlanDeletesFromAniListByListEntryId() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 101, entryId: 5000, progress: 3)],
+            mal: [],
+            malIdForAniListId: [101: 901],
+            anilistIdForMALId: [:])
+
+        let plan = LibrarySyncPlanner.replacePlan(
+            from: pairing, replacing: .anilist, sourceMediaIds: [], deletingExtras: true)
+
+        XCTAssertEqual(plan.deletions.map(\.id), [5000])
+    }
+
+    func testPlanCarriesForwardWhatCouldNotBeMatched() {
+        let pairing = LibrarySyncPlanner.pair(
+            anilist: [entry(id: 100, progress: 5)],
+            mal: [entry(id: 902, progress: 2)],
+            malIdForAniListId: [:],
+            anilistIdForMALId: [:])
+
+        let plan = LibrarySyncPlanner.replacePlan(
+            from: pairing, replacing: .mal, sourceMediaIds: [100], deletingExtras: true)
+
+        XCTAssertEqual(plan.unmatched, ["Title 100"])
+        XCTAssertEqual(plan.keptUnverified, 1)
     }
 }
