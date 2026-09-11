@@ -1161,7 +1161,9 @@ struct AniListDetailView: View {
                         
                         let allInCurrentRangeSelected = !selectableEpisodes.isEmpty && selectableEpisodes.allSatisfy { selectedEpisodeNumbers.contains($0) }
 
-                        Button(allInCurrentRangeSelected ? "Deselect Range" : "Select Range") {
+                        // "All", not "Range", to match the identical control on DetailView and
+                        // MangaDetailView — every one of them acts on the visible range.
+                        Button(allInCurrentRangeSelected ? "Deselect All" : "Select All") {
                             if allInCurrentRangeSelected {
                                 selectableEpisodes.forEach { selectedEpisodeNumbers.remove($0) }
                             } else {
