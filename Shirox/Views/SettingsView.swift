@@ -213,7 +213,7 @@ struct SettingsView: View {
                 }
 
                 if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
-                    Section("Copy Library") {
+                    Section("Sync Library") {
                         ForEach(LibrarySyncService.Direction.allCases) { direction in
                             Button {
                                 pendingSyncDirection = direction
@@ -230,7 +230,7 @@ struct SettingsView: View {
                             }
                             .disabled(librarySync.isRunning)
                         }
-                        Text("Brings one account up to date with the other — a one-time backfill for everything you tracked before signing in here. It only adds missing titles and moves progress forward, so anything further along on the destination is left as it is.")
+                        Text("Brings your two accounts into line — a one-time backfill for everything you tracked before signing in here. Syncing both ways reconciles them in a single pass; the one-way copies only ever write to the destination. Either way progress is only ever moved forward, so anything further along is left as it is.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -545,20 +545,20 @@ struct SettingsView: View {
                 Text("This will clear all 'Watched' checkmarks from episode lists.")
             }
             .alert(
-                pendingSyncDirection?.title ?? "Copy Library",
+                pendingSyncDirection?.title ?? "Sync Library",
                 isPresented: Binding(
                     get: { pendingSyncDirection != nil },
                     set: { if !$0 { pendingSyncDirection = nil } }
                 ),
                 presenting: pendingSyncDirection
             ) { direction in
-                Button("Copy") {
+                Button(direction.confirmButtonTitle) {
                     pendingSyncDirection = nil
                     Task { await librarySync.sync(direction) }
                 }
                 Button("Cancel", role: .cancel) { pendingSyncDirection = nil }
             } message: { direction in
-                Text("Adds anything missing from \(direction.targetName) and moves its progress forward to match \(direction.sourceName). Titles already further along on \(direction.targetName) are left untouched.")
+                Text(direction.confirmationMessage)
             }
             .onAppear {
                 #if os(iOS)
