@@ -66,7 +66,12 @@ final class MALOfficialDiscoveryService {
 
     // MARK: - Requests
 
-    private func get(_ path: String, query: [URLQueryItem]) async throws -> [Node] {
+    /// This is the endpoint behind four of the five Home rows plus season/search, so a burst —
+    /// Home alone fires it concurrently on every load — hits the same 429s AniList's discovery
+    /// traffic does. `isRetryable`/`backoffNanos` are the pattern already proven for Jikan (see
+    /// `MALDiscoveryService`); reused here rather than duplicated so both hosts back off the
+    /// same way instead of one of them failing hard on the first rate limit.
+    private func get(_ path: String, query: [URLQueryItem], attempt: Int = 1) async throws -> [Node] {
         var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
         components.queryItems = query + [URLQueryItem(name: "fields", value: Self.fields)]
         var request = URLRequest(url: components.url!)
@@ -76,7 +81,13 @@ final class MALOfficialDiscoveryService {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw ProviderError.serverError(http.statusCode)
+            let status = http.statusCode
+            if MALDiscoveryService.isRetryable(status), attempt < MALDiscoveryService.maxAttempts {
+                Logger.shared.log("[MAL] \(status) on \(path) — retrying (attempt \(attempt + 1))", type: "Provider")
+                try await Task.sleep(nanoseconds: MALDiscoveryService.backoffNanos(status: status, attempt: attempt))
+                return try await get(path, query: query, attempt: attempt + 1)
+            }
+            throw ProviderError.serverError(status)
         }
         return try JSONDecoder().decode(Page.self, from: data).data.map(\.node)
     }

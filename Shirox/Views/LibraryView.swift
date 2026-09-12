@@ -55,14 +55,32 @@ struct LibraryView: View {
 
     @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
 
-    /// The provider type that should drive the library UI right now.
-    /// Normally the primary provider; falls back to secondary when primary is down.
+    /// The account the library UI should present right now: the provider whose list is on
+    /// screen, or — when that one isn't signed in — whichever one is.
     private var activeProviderType: ProviderType {
-        let primary = providerManager.primary?.providerType ?? .anilist
-        if providerManager.fallbackActive, let fallback = providerManager.fallback {
-            return fallback.providerType
+        // Follows the library actually on screen, which is `vm.source` — deliberately fetched
+        // provider-direct, so it never falls back to the other service the way content
+        // elsewhere does.
+        //
+        // It used to switch to `fallback` whenever `ProviderManager.fallbackActive` was set,
+        // which is a global flag any *other* call can raise — Home falling back during an
+        // AniList outage, for instance. The Library's list stayed on the provider you picked
+        // while its toolbar flipped to the other account, so selecting AniList showed the
+        // AniList library under a MyAnimeList avatar and username.
+        let nominal: ProviderType = {
+            if case .provider(let source) = vm.source { return source }
+            return providerManager.primary?.providerType ?? .anilist
+        }()
+
+        // A provider you aren't signed into can't drive the account UI — the username, the
+        // avatar, the notifications bell, the Sign In button. Being signed into AniList while
+        // MyAnimeList was the active provider made the toolbar offer a sign-in for an account
+        // that *was* already connected, just not the one this happened to be pointed at.
+        if !isSignedIn(nominal),
+           let signedIn = ProviderType.userProviders.first(where: { isSignedIn($0) }) {
+            return signedIn
         }
-        return primary
+        return nominal
     }
 
     private var isActiveProviderAuthenticated: Bool {
@@ -177,6 +195,75 @@ struct LibraryView: View {
         }
     }
 
+    // MARK: - Profile unavailable
+
+    /// Shown when an account is signed in but its profile never arrived.
+    ///
+    /// The name, avatar and user id come only from `fetchViewer`, which needs the API — so
+    /// signing in while AniList has its API switched off leaves a session with no identity
+    /// attached to it. The toolbar then reads "Profile" with no picture, and this sheet used to
+    /// have no branch for the case at all, so it opened completely empty and looked broken.
+    private var profileUnavailable: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text("Profile unavailable")
+                .font(.headline)
+            Text("You're signed in, but \(activeProviderType.displayName) hasn't sent your profile yet. This usually means its API is down — your account is fine, and it'll fill in once the service is reachable.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button("Try Again") {
+                Task { await AniListAuthManager.shared.fetchViewer() }
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+        .padding()
+    }
+
+    // MARK: - Sign in
+
+    /// Both trackers, offered explicitly.
+    ///
+    /// Signing in used to go to whichever provider the library happened to be pointed at, with
+    /// no way to say you meant the other one — so someone who wanted MyAnimeList while AniList
+    /// was active had nowhere to say so. Signing in already re-points the library at that
+    /// provider (see the `isLoggedIn` handlers below), so picking one here is the whole action.
+    @ViewBuilder
+    private var signInMenuItems: some View {
+        ForEach(ProviderType.userProviders, id: \.self) { type in
+            Button {
+                signIn(to: type)
+            } label: {
+                // An account that's already connected stays listed, so the menu always shows
+                // both — but says so, rather than offering a sign-in that would do nothing.
+                if isSignedIn(type) {
+                    Label("\(type.displayName) — signed in", systemImage: "checkmark")
+                } else {
+                    Text(type.displayName)
+                }
+            }
+            .disabled(isSignedIn(type))
+        }
+    }
+
+    private func isSignedIn(_ type: ProviderType) -> Bool {
+        type == .mal ? malAuth.isLoggedIn : anilistAuth.isLoggedIn
+    }
+
+    private func signIn(to type: ProviderType) {
+        #if os(iOS)
+        guard let window = presentationWindow else { return }
+        if type == .mal {
+            MALAuthManager.shared.login(presentationAnchor: window)
+        } else {
+            AniListAuthManager.shared.login(presentationAnchor: window)
+        }
+        #endif
+    }
+
     // MARK: - Login prompt
 
     private var loginPrompt: some View {
@@ -185,9 +272,9 @@ struct LibraryView: View {
             Image(systemName: "books.vertical.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.primary)
-            Text(activeProviderType == .mal
-                 ? "Track your anime with MyAnimeList"
-                 : "Track your anime with AniList")
+            // Neutral wording now that the button below offers both: naming one service here
+            // while the menu lists two read as though the choice had already been made.
+            Text("Track your anime")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
             Text("Sign in to view and manage your anime library.")
@@ -195,28 +282,24 @@ struct LibraryView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
-            Button {
-                #if os(iOS)
-                guard let window = presentationWindow else { return }
-                if activeProviderType == .mal {
-                    MALAuthManager.shared.login(presentationAnchor: window)
-                } else {
-                    AniListAuthManager.shared.login(presentationAnchor: window)
-                }
-                #endif
+            Menu {
+                signInMenuItems
             } label: {
-                Text(activeProviderType == .mal ? "Sign in with MyAnimeList" : "Sign in with AniList")
-                    .font(.headline)
-                    #if os(iOS)
-                        .foregroundStyle(Color(.systemBackground))
-                    #else
-                        // TODO: fix missing color ( XCAssets )
-                        .foregroundStyle(Color.secondary)
-                    #endif
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.primary, in: Capsule())
-                    .padding(.horizontal, 40)
+                HStack(spacing: 6) {
+                    Text("Sign In")
+                    Image(systemName: "chevron.down").font(.subheadline)
+                }
+                .font(.headline)
+                #if os(iOS)
+                    .foregroundStyle(Color(.systemBackground))
+                #else
+                    // TODO: fix missing color ( XCAssets )
+                    .foregroundStyle(Color.secondary)
+                #endif
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Color.primary, in: Capsule())
+                .padding(.horizontal, 40)
             }
             .buttonStyle(.plain)
             Spacer()
@@ -486,17 +569,12 @@ struct LibraryView: View {
                 }
                 .padding(.horizontal, 8)
             } else {
-                Button("Sign In") {
-                    #if os(iOS)
-                    guard let window = presentationWindow else { return }
-                    if activeProviderType == .mal {
-                        MALAuthManager.shared.login(presentationAnchor: window)
-                    } else {
-                        AniListAuthManager.shared.login(presentationAnchor: window)
-                    }
-                    #endif
+                Menu {
+                    signInMenuItems
+                } label: {
+                    Text("Sign In")
+                        .font(.subheadline.weight(.semibold))
                 }
-                .font(.subheadline.weight(.semibold))
             }
         }
     }
@@ -867,6 +945,8 @@ struct LibraryView: View {
                 ProfileView(userId: uid, username: malAuth.username ?? "Profile", avatarURL: malAuth.avatarURL)
             } else if let uid = anilistAuth.userId, let username = anilistAuth.username {
                 ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL)
+            } else {
+                profileUnavailable
             }
         }
         .adaptiveSheet(isPresented: $showNotifications) {

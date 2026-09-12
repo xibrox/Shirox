@@ -59,6 +59,23 @@ final class MALProvider: MediaProvider {
         )
     }
 
+    /// Sequenced rather than concurrent: unlike AniList's single combined request, MyAnimeList
+    /// still needs one call per row, and Jikan — which these can still fall back to — enforces
+    /// ~3 req/s. Firing them at once risked a 429 on exactly the rows that have nowhere else to
+    /// go. Moved here unchanged from `HomeViewModel`, which used to special-case MAL inline.
+    func homeFeed() async throws -> HomeFeed {
+        let t = try await trending()
+        try await Task.sleep(nanoseconds: 400_000_000)
+        let s = try await seasonal()
+        try await Task.sleep(nanoseconds: 400_000_000)
+        let l = try await lastSeasonCompleted()
+        try await Task.sleep(nanoseconds: 400_000_000)
+        let p = try await popular()
+        try await Task.sleep(nanoseconds: 400_000_000)
+        let r = try await topRated()
+        return HomeFeed(trending: t, seasonal: s, lastSeason: l, popular: p, topRated: r)
+    }
+
     func search(_ query: String) async throws -> [Media] {
         try await officialOrJikan(
             official: { try await MALOfficialDiscoveryService.shared.search(query, limit: 25) },

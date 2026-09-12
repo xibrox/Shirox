@@ -13,9 +13,13 @@ final class HomeViewModel: ObservableObject {
 
     private var loaded = false
     private var cancellables = Set<AnyCancellable>()
-    private var currentPrimaryType: ProviderType?
 
     init() {
+        // Cold start: show the last-saved feed for whichever provider is primary right now,
+        // before any network request — the same cache-then-refresh shape `LibraryViewModel`
+        // already uses. The view's `.task` calls `load()` immediately after and refreshes it.
+        seedFromCache()
+
         ProviderManager.shared.$orderedProviders
             .map { $0.first?.providerType }
             .removeDuplicates { $0 == $1 }
@@ -33,35 +37,31 @@ final class HomeViewModel: ObservableObject {
         error = nil
 
         do {
-            // Jikan (MAL) enforces ~3 req/s; load sequentially to avoid 429s.
-            // AniList supports concurrent requests, so detect provider type first.
-            let isMAL = ProviderManager.shared.primary?.providerType == .mal
-            if isMAL {
-                trending = try await ProviderManager.shared.call { try await $0.trending() }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                seasonal = try await ProviderManager.shared.call { try await $0.seasonal() }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                lastSeason = try await ProviderManager.shared.call { try await $0.lastSeasonCompleted() }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                popular = try await ProviderManager.shared.call { try await $0.popular() }
-                try await Task.sleep(nanoseconds: 400_000_000)
-                topRated = try await ProviderManager.shared.call { try await $0.topRated() }
-            } else {
-                async let t = ProviderManager.shared.call { try await $0.trending() }
-                async let s = ProviderManager.shared.call { try await $0.seasonal() }
-                async let p = ProviderManager.shared.call { try await $0.popular() }
-                async let r = ProviderManager.shared.call { try await $0.topRated() }
-                async let l = ProviderManager.shared.call { try await $0.lastSeasonCompleted() }
-                let (tResult, sResult, pResult, rResult, lResult) = try await (t, s, p, r, l)
-                trending = tResult
-                seasonal = sResult
-                popular = pResult
-                topRated = rResult
-                lastSeason = lResult
+            // One call, not five. Each provider decides how few requests that actually takes
+            // (AniList: a single aliased GraphQL query; MAL: five, paced). Going through
+            // `call` once also means the whole screen comes from one provider — five separate
+            // calls could each fall back independently and leave Home showing a mix.
+            let feed = try await ProviderManager.shared.call { try await $0.homeFeed() }
+            apply(feed)
+            if let type = ProviderManager.shared.primary?.providerType {
+                HomeCacheStore.shared.save(feed: feed, provider: type)
             }
             loaded = true
         } catch {
             self.error = error.localizedDescription
+            // A reload that fails (e.g. right after switching providers) leaves whatever is on
+            // screen untouched — nothing above clears it on failure, by design, so a background
+            // refresh doesn't flash the screen empty. But with `trending` non-empty, HomeView's
+            // own error view never shows either (it only appears when `trending.isEmpty`), so
+            // the failure was completely silent: switching to a provider that's down looked
+            // exactly like the switch did nothing at all.
+            #if os(iOS)
+            if !trending.isEmpty {
+                let name = ProviderManager.shared.primary?.providerType.displayName ?? "provider"
+                ToastManager.shared.show(message: "Couldn't load \(name). Showing previous results.",
+                                          type: .error, duration: 4)
+            }
+            #endif
         }
 
         isLoading = false
@@ -69,6 +69,26 @@ final class HomeViewModel: ObservableObject {
 
     func reload() async {
         loaded = false
+        // Switching providers swaps to that provider's last-known feed straight away, rather
+        // than leaving the old provider's rows up while the new request is in flight — which
+        // read as the switch having done nothing.
+        seedFromCache()
         await load()
+    }
+
+    // MARK: - Private
+
+    private func seedFromCache() {
+        guard let type = ProviderManager.shared.primary?.providerType,
+              let cached = HomeCacheStore.shared.snapshot(provider: type) else { return }
+        apply(cached.feed)
+    }
+
+    private func apply(_ feed: HomeFeed) {
+        trending = feed.trending
+        seasonal = feed.seasonal
+        lastSeason = feed.lastSeason
+        popular = feed.popular
+        topRated = feed.topRated
     }
 }

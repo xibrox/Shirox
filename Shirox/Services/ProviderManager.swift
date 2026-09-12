@@ -8,6 +8,13 @@ final class ProviderManager: ObservableObject {
 
     @Published var orderedProviders: [any MediaProvider] = []
     @Published var fallbackActive = false
+    /// Why the chosen provider was skipped, in its own words where it gave any — shown by
+    /// `ProviderStatusBanner` alongside the fact that a fallback is in use.
+    @Published var fallbackReason: String?
+    /// Which provider actually served the results while `fallbackActive`. Distinct from
+    /// `primary`, which stays the provider the user chose — naming that one would tell the
+    /// reader the opposite of what happened.
+    @Published var fallbackServedBy: ProviderType?
 
     private let orderKey = "providerOrder"
 
@@ -44,6 +51,8 @@ final class ProviderManager: ObservableObject {
         guard let idx = orderedProviders.firstIndex(where: { $0.providerType == type }), idx != 0 else { return }
         orderedProviders.move(fromOffsets: IndexSet(integer: idx), toOffset: 0)
         fallbackActive = false
+        fallbackReason = nil
+        fallbackServedBy = nil
         saveOrder()
     }
 
@@ -77,9 +86,19 @@ final class ProviderManager: ObservableObject {
                 let result = try await operation(provider)
                 if index == 0 {
                     if fallbackActive { fallbackActive = false }
+                    fallbackReason = nil
+                    fallbackServedBy = nil
                 } else {
                     Logger.shared.log("ProviderManager served by fallback: \(provider.providerType.rawValue)", type: "Provider")
                     fallbackActive = true
+                    // Carry *why* the chosen provider was skipped, in its own words where it
+                    // gave any. "Using fallback provider" alone left people thinking the app
+                    // had ignored their choice — during an AniList outage it reads as a bug in
+                    // the app rather than the service saying it's switched off.
+                    fallbackReason = failures.first.map { failure in
+                        "\(failure.provider.displayName): \(failure.error.localizedDescription)"
+                    }
+                    fallbackServedBy = provider.providerType
                     scheduleFallbackReset()
                 }
                 return result
@@ -104,6 +123,8 @@ final class ProviderManager: ObservableObject {
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             self?.fallbackActive = false
+            self?.fallbackReason = nil
+            self?.fallbackServedBy = nil
         }
     }
 

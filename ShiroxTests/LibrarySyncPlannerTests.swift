@@ -550,4 +550,42 @@ final class LibrarySyncPlannerTests: XCTestCase {
         XCTAssertEqual(plan.unmatched, ["Title 100"])
         XCTAssertEqual(plan.keptUnverified, 1)
     }
+
+    // MARK: - Reporting a failed read
+    //
+    // The old message asserted one cause for every failure: "check you're signed in to both".
+    // A rate limit or an outage is not a sign-in problem, and sending somebody to re-authenticate
+    // over one is a wild goose chase — so each failure has to describe itself.
+
+    private struct StubError: LocalizedError {
+        var errorDescription: String? { "AniList didn't respond" }
+    }
+
+    func testReadFailureNamesWhichServiceFailed() {
+        let message = LibrarySyncService.readFailureMessage(
+            side: .mal, error: ProviderError.unauthenticated)
+        XCTAssertTrue(message.contains("MyAnimeList"), message)
+        XCTAssertFalse(message.contains("AniList"), message)
+    }
+
+    func testReadFailureOnlyBlamesTheSignInWhenTheSignInWasRejected() {
+        let message = LibrarySyncService.readFailureMessage(
+            side: .anilist, error: ProviderError.unauthenticated)
+        XCTAssertTrue(message.lowercased().contains("sign"), message)
+    }
+
+    /// A transient failure must not tell somebody to sign in again.
+    func testReadFailureDoesNotBlameTheSignInForAnUnreachableService() {
+        let message = LibrarySyncService.readFailureMessage(
+            side: .anilist, error: ProviderError.networkError(StubError()))
+        XCTAssertTrue(message.contains("AniList didn't respond"), message)
+        XCTAssertFalse(message.lowercased().contains("sign in"), message)
+    }
+
+    func testReadFailureReportsTheServerStatusWhenThereIsOne() {
+        let message = LibrarySyncService.readFailureMessage(
+            side: .mal, error: ProviderError.serverError(503))
+        XCTAssertTrue(message.contains("503"), message)
+        XCTAssertFalse(message.lowercased().contains("sign in"), message)
+    }
 }

@@ -15,6 +15,7 @@ struct LibraryEntryEditSheet: View {
     @State private var progress: Int
     @State private var score: Double
     @State private var isPrivate: Bool
+    @State private var notes: String
     @State private var showDeleteConfirmation = false
     @State private var showNewCollection = false
     @State private var newCollectionName = ""
@@ -47,12 +48,65 @@ struct LibraryEntryEditSheet: View {
         // provider entries (override nil) fall back to their stored account score.
         _score = State(initialValue: entry?.displayScore(in: scoreFormatOverride ?? .point10) ?? 0)
         _isPrivate = State(initialValue: entry?.isPrivate ?? false)
+        _notes = State(initialValue: entry?.notes ?? "")
     }
 
     /// Privacy is an AniList feature. Local entries (`scoreFormatOverride` set) and MAL entries
     /// have nowhere to send it.
     private var showsPrivacyToggle: Bool {
         media.provider == .anilist && scoreFormatOverride == nil && anilistAuth.isLoggedIn
+    }
+
+    /// Notes go to the same place, and under the same conditions — see `setNotes`. Offering the
+    /// field where it can't be saved would lose whatever someone typed into it.
+    private var showsNotes: Bool { showsPrivacyToggle }
+
+    /// Only send a note when it actually changed, so opening and saving an entry doesn't write
+    /// a note nobody touched. Whitespace-trimmed, so a stray newline isn't a "change".
+    private var trimmedNotes: String {
+        notes.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var notesChanged: Bool {
+        trimmedNotes != (entry?.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// AniList-only: MyAnimeList has no equivalent flag, and a toggle that silently did
+    /// nothing there would be worse than not offering it.
+    @ViewBuilder
+    private var privacySection: some View {
+        if showsPrivacyToggle {
+            Section {
+                Toggle("Private", isOn: $isPrivate)
+                    .tint(.secondary)
+                Text("Hides this entry from your public AniList profile and activity feed. You can still see it here.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var notesSection: some View {
+        if showsNotes {
+            Section("Notes") {
+                // The growing multi-line field is iOS 16 / macOS 13; this still ships to
+                // iOS 15, where a plain single-line field takes the same text perfectly well.
+                #if os(tvOS)
+                TextField("Add a note", text: $notes)
+                #else
+                if #available(iOS 16.0, macOS 13.0, *) {
+                    TextField("Add a note", text: $notes, axis: .vertical)
+                        .lineLimit(3...8)
+                } else {
+                    TextField("Add a note", text: $notes)
+                }
+                #endif
+                Text("Saved to this entry on AniList, visible only to you.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     var body: some View {
@@ -88,17 +142,8 @@ struct LibraryEntryEditSheet: View {
                     ScoreInputView(score: $score, format: scoreFormat)
                 }
 
-                // AniList-only: MyAnimeList has no equivalent flag, and a toggle that silently
-                // did nothing there would be worse than not offering it.
-                if showsPrivacyToggle {
-                    Section {
-                        Toggle("Private", isOn: $isPrivate)
-                            .tint(.secondary)
-                        Text("Hides this entry from your public AniList profile and activity feed. You can still see it here.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                privacySection
+                notesSection
 
                 if scoreFormatOverride != nil {
                     Section("Collections") {
@@ -180,6 +225,22 @@ struct LibraryEntryEditSheet: View {
                         onSave(status, finalProgress, score)
                         // Sent separately from `onSave`, which is the shared write used by both
                         // providers. Only fires when the toggle actually moved.
+                        if showsNotes, notesChanged {
+                            let mediaId = media.id
+                            let newNotes = trimmedNotes
+                            let listType: MediaListType = progressUnit == "chapter" ? .manga : .anime
+                            Task {
+                                do {
+                                    try await AniListLibraryService.shared.setNotes(
+                                        mediaId: mediaId, notes: newNotes, type: listType)
+                                } catch {
+                                    Logger.shared.log("[AniList] Could not save entry notes: \(error)", type: "Error")
+                                    #if os(iOS)
+                                    ToastManager.shared.show(message: "Couldn't save note on AniList", type: .error)
+                                    #endif
+                                }
+                            }
+                        }
                         if showsPrivacyToggle, isPrivate != (entry?.isPrivate ?? false) {
                             let mediaId = media.id
                             let makePrivate = isPrivate

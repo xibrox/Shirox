@@ -137,6 +137,11 @@ struct LibraryEntry: Identifiable, Codable, Sendable {
     /// Hidden from your public AniList profile and activity feed. AniList-only; MyAnimeList has
     /// no equivalent, so it stays false there. Defaulted so existing persisted JSON still decodes.
     var isPrivate: Bool = false
+    /// Your private note on this entry. AniList-only for now: MyAnimeList stores the same thing
+    /// as `comments`, but reading it back needs its list `fields` parameter extended, which is
+    /// not worth risking the whole library fetch on untested. Defaulted so existing persisted
+    /// JSON still decodes.
+    var notes: String? = nil
 
     /// The score to show/edit in `format`. Local entries convert from their
     /// canonical value; provider entries fall back to `score` (their account

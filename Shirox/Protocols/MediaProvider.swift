@@ -175,6 +175,22 @@ enum DiscoverGenre {
     }
 }
 
+// MARK: - Home feed
+
+/// Every row the Home screen shows, fetched together.
+///
+/// Exists so a provider that can answer all five in one round trip (AniList, via aliased
+/// GraphQL fields) gets to — Home used to fire five independent requests on every load, which
+/// was most of what made AniList's tightened rate limit so easy to trip. `Codable` so the last
+/// successful feed can be cached to disk and shown instantly on the next cold start.
+struct HomeFeed: Codable {
+    let trending: [Media]
+    let seasonal: [Media]
+    let lastSeason: [Media]
+    let popular: [Media]
+    let topRated: [Media]
+}
+
 // MARK: - Protocol
 
 @MainActor
@@ -188,6 +204,8 @@ protocol MediaProvider: AnyObject {
     func logout()
 
     // Discovery
+    /// Every Home row, in as few requests as this provider can manage. See `HomeFeed`.
+    func homeFeed() async throws -> HomeFeed
     func trending() async throws -> [Media]
     func seasonal() async throws -> [Media]
     /// Browsable anime for the Search tab, optionally narrowed to one genre.
@@ -235,6 +253,20 @@ protocol MediaProvider: AnyObject {
 extension MediaProvider {
     /// Providers serve notifications unless they opt out.
     var supportsNotifications: Bool { true }
+
+    /// Naive fallback for a provider that hasn't implemented a combined fetch: the five rows,
+    /// concurrently. Both real providers override this with something better — AniList with a
+    /// single aliased GraphQL request, MyAnimeList with a sequenced fetch that respects Jikan's
+    /// rate limit — so this only runs for a provider that implements neither.
+    func homeFeed() async throws -> HomeFeed {
+        async let t = trending()
+        async let s = seasonal()
+        async let l = lastSeasonCompleted()
+        async let p = popular()
+        async let r = topRated()
+        let (tR, sR, lR, pR, rR) = try await (t, s, l, p, r)
+        return HomeFeed(trending: tR, seasonal: sR, lastSeason: lR, popular: pR, topRated: rR)
+    }
 
     /// No last-season row unless a provider can actually answer the query.
     func lastSeasonCompleted() async throws -> [Media] { [] }

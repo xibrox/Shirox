@@ -131,3 +131,46 @@ final class ProviderFallbackEligibilityTests: XCTestCase {
         XCTAssertTrue(manager.isFallbackEligible(ProviderError.serverError(504)))
     }
 }
+
+/// Tells an announced AniList outage apart from a rate limit.
+///
+/// AniList switches its whole API off during stability incidents and says so in the body —
+/// every request, down to `{ Media(id: 1) { id } }`, comes back 403 with "The AniList API has
+/// been temporarily disabled due to severe stability issues." Treating that as a rate limit
+/// meant three requests at a service that had just said it was down, and each one widened the
+/// shared throttle's gap, so an outage made every other AniList call progressively slower.
+final class AniListOutageClassificationTests: XCTestCase {
+
+    func testAniListsOwnOutageWordingIsRecognised() {
+        XCTAssertTrue(AniListService.isAnnouncedOutage(
+            "The AniList API has been temporarily disabled due to severe stability issues."))
+    }
+
+    func testWordingIsMatchedRegardlessOfCase() {
+        XCTAssertTrue(AniListService.isAnnouncedOutage(
+            "THE ANILIST API HAS BEEN TEMPORARILY DISABLED"))
+    }
+
+    func testTemporarilyUnavailableAlsoCounts() {
+        XCTAssertTrue(AniListService.isAnnouncedOutage("The API is temporarily unavailable."))
+    }
+
+    /// A real rate limit must stay on the retry-and-back-off path.
+    func testRateLimitWordingIsNotAnOutage() {
+        XCTAssertFalse(AniListService.isAnnouncedOutage("Too Many Requests"))
+        XCTAssertFalse(AniListService.isAnnouncedOutage("Rate limit exceeded"))
+    }
+
+    /// Ordinary GraphQL complaints are not outages either.
+    func testUnrelatedMessagesAreNotOutages() {
+        XCTAssertFalse(AniListService.isAnnouncedOutage("Not Found"))
+        XCTAssertFalse(AniListService.isAnnouncedOutage("Invalid token"))
+        XCTAssertFalse(AniListService.isAnnouncedOutage(""))
+    }
+
+    /// "Disabled" on its own isn't enough — a disabled *account* or list entry is not the API
+    /// being switched off, and must not skip the retry path.
+    func testDisabledWithoutTheAPIIsNotAnOutage() {
+        XCTAssertFalse(AniListService.isAnnouncedOutage("This account has been disabled."))
+    }
+}

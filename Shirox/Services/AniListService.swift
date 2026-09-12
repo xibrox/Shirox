@@ -49,6 +49,92 @@ final class AniListService {
 
     // MARK: - Public API
 
+    /// The raw per-row results behind `HomeFeed`, before `AniListProvider` maps them to `Media`.
+    struct HomeFeedRaw {
+        let trending: [AniListMedia]
+        let seasonal: [AniListMedia]
+        let lastSeason: [AniListMedia]
+        let popular: [AniListMedia]
+        let topRated: [AniListMedia]
+    }
+
+    /// Every Home row in one request, via GraphQL field aliasing, instead of the five separate
+    /// round trips this used to take — the single biggest thing this app could do to stop
+    /// tripping AniList's tightened rate limit, since Home fires this on every load and on
+    /// every provider switch.
+    ///
+    /// Tolerant of a partially-failed response: GraphQL can answer with `data` where some
+    /// aliased fields are populated and others null, alongside an `errors` array naming which
+    /// failed. Each row falls back to empty rather than the whole feed failing over one bad
+    /// row — matching how `lastSeasonCompleted()` was always allowed to come back empty. The
+    /// five separate calls this replaces were all-or-nothing, since one `async let` throwing
+    /// took the whole tuple with it.
+    func homeFeed() async throws -> HomeFeedRaw {
+        let (season, year) = AniListSeason.current()
+        let (pSeason, pYear) = AniListSeason.previous()
+        let perPage = DataSaver.rowLength(20)
+        let query = """
+        query ($season: MediaSeason, $year: Int, $pSeason: MediaSeason, $pYear: Int) {
+          trending: Page(page: 1, perPage: \(perPage)) {
+            media(type: ANIME, sort: TRENDING_DESC, isAdult: false) { ...MediaFields }
+          }
+          seasonal: Page(page: 1, perPage: \(perPage)) {
+            media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC, isAdult: false) { ...MediaFields }
+          }
+          lastSeason: Page(page: 1, perPage: \(perPage)) {
+            media(season: $pSeason, seasonYear: $pYear, type: ANIME, status: FINISHED, sort: POPULARITY_DESC, isAdult: false) { ...MediaFields }
+          }
+          popular: Page(page: 1, perPage: \(perPage)) {
+            media(type: ANIME, sort: POPULARITY_DESC, isAdult: false) { ...MediaFields }
+          }
+          topRated: Page(page: 1, perPage: \(perPage)) {
+            media(type: ANIME, sort: SCORE_DESC, isAdult: false) { ...MediaFields }
+          }
+        }
+        fragment MediaFields on Media {
+          id
+          title { romaji english native }
+          coverImage { large extraLarge }
+          bannerImage
+          averageScore
+          genres
+          description(asHtml: false)
+        }
+        """
+        let variables: [String: Any] = [
+            "season": season.rawValue, "year": year,
+            "pSeason": pSeason.rawValue, "pYear": pYear
+        ]
+        let data = try await post(query: query, variables: variables)
+
+        struct Response: Decodable {
+            struct Feed: Decodable {
+                let trending: PageContent?
+                let seasonal: PageContent?
+                let lastSeason: PageContent?
+                let popular: PageContent?
+                let topRated: PageContent?
+            }
+            let data: Feed?
+            let errors: [GraphQLError]?
+        }
+        let response = try JSONDecoder().decode(Response.self, from: data)
+        guard let feed = response.data else {
+            if let errors = response.errors {
+                if errors.contains(where: { $0.status == 403 }) { throw AniListError.httpError(403) }
+                throw AniListError.graphQL(errors.map(\.message).joined(separator: ", "))
+            }
+            throw AniListError.noData
+        }
+        return HomeFeedRaw(
+            trending: feed.trending?.media ?? [],
+            seasonal: feed.seasonal?.media ?? [],
+            lastSeason: feed.lastSeason?.media ?? [],
+            popular: feed.popular?.media ?? [],
+            topRated: feed.topRated?.media ?? []
+        )
+    }
+
     func search(keyword: String) async throws -> [AniListMedia] {
         let query = """
         query ($search: String) {
@@ -514,6 +600,10 @@ final class AniListService {
         return response.data?.Page.media ?? []
     }
 
+    /// How many times to retry a rate-limited request before giving up and letting the error
+    /// surface. Kept low so the UI never hangs for long on what is effectively the home screen.
+    private let maxRateLimitRetries = 2
+
     private func post(query: String, variables: [String: Any]) async throws -> Data {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -524,23 +614,53 @@ final class AniListService {
 
         Logger.shared.log("AniList Request: \(bodyDict)", type: "Network")
 
-        let (data, response) = try await session.data(for: request)
+        var attempt = 0
+        while true {
+            await AniListThrottle.shared.waitForTurn()
+            let (data, response) = try await session.data(for: request)
 
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            Logger.shared.log("AniList Response: \(json)", type: "Network")
-        }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                Logger.shared.log("AniList Response: \(json)", type: "Network")
+            }
 
-        if let http = response as? HTTPURLResponse {
+            guard let http = response as? HTTPURLResponse else { return data }
             switch http.statusCode {
             case 200:
+                await AniListThrottle.shared.reportSuccess()
                 return data
-            case 429:
-                throw AniListError.rateLimited
-            default:
+            case 429, 403:
                 // AniList explains itself in the body even when the status is a plain 403 —
                 // "The AniList API has been temporarily disabled due to severe stability
                 // issues", for instance. Reporting the status code alone sent people hunting
                 // for a bug in the app over an outage it has no part in.
+                let message = Self.graphQLErrorMessage(in: data)
+
+                // An announced outage is not a rate limit, and must not be treated as one.
+                // AniList switches the whole API off during its stability incidents and says so
+                // in the body; every request gets the same 403 instantly. Retrying means three
+                // requests at a service that is telling us it is down, and reporting it to the
+                // throttle widens the gap for *every* AniList call afterwards — so an outage
+                // used to make the rest of the app progressively slower for no benefit.
+                if http.statusCode == 403, let message, Self.isAnnouncedOutage(message) {
+                    Logger.shared.log("[AniList] API reports itself disabled — not retrying: \(message)", type: "Network")
+                    throw AniListError.serviceMessage(code: 403, message: message)
+                }
+
+                // A real rate limit (429), or a bare 403 with no explanation — which is what
+                // edge/Cloudflare throttling looks like. Back off collectively and retry.
+                let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap { Double($0) }
+                await AniListThrottle.shared.reportRateLimited(retryAfter: retryAfter)
+                if attempt < maxRateLimitRetries {
+                    Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited — retrying (attempt \(attempt + 1)/\(maxRateLimitRetries))", type: "Network")
+                    attempt += 1
+                    continue
+                }
+                Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited — giving up after \(maxRateLimitRetries) retries", type: "Network")
+                if let message {
+                    throw AniListError.serviceMessage(code: http.statusCode, message: message)
+                }
+                throw http.statusCode == 429 ? AniListError.rateLimited : AniListError.httpError(403)
+            default:
                 if let message = Self.graphQLErrorMessage(in: data) {
                     // Carries the status as well as the wording: the message is for the reader,
                     // but the code still decides whether a queued write should be retried later.
@@ -549,13 +669,26 @@ final class AniListService {
                 throw AniListError.httpError(http.statusCode)
             }
         }
-        return data
     }
 }
 
 // MARK: - Errors
 
 extension AniListService {
+    /// Whether AniList's own error wording says the API is deliberately switched off, rather
+    /// than that this app asked for too much.
+    ///
+    /// During its stability incidents AniList disables the whole API and answers every request —
+    /// down to `{ Media(id: 1) { id } }` — with a 403 and "The AniList API has been temporarily
+    /// disabled due to severe stability issues." That is an outage to wait out, not a rate limit
+    /// to back off from: retrying can't help, and feeding it to the throttle only slows down
+    /// everything else the app does with AniList afterwards.
+    static func isAnnouncedOutage(_ message: String) -> Bool {
+        let m = message.lowercased()
+        guard m.contains("api") else { return false }
+        return m.contains("disabled") || m.contains("temporarily unavailable")
+    }
+
     /// The first human-readable message from a GraphQL `errors` array, if the body carries one.
     static func graphQLErrorMessage(in data: Data) -> String? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

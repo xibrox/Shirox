@@ -34,6 +34,10 @@ final class JellyfinAuthManager: ObservableObject {
     let deviceId: String
 
     private init() {
+        // See `FreshInstallKeychainPurge`. This one already needed a UserDefaults-backed server
+        // URL alongside the token, so a reinstall didn't show it as signed in — but the dead
+        // token was still sitting in the Keychain, and dropping it costs nothing.
+        FreshInstallKeychainPurge.runIfNeeded()
         if let existing = UserDefaults.standard.string(forKey: Keys.deviceId) {
             deviceId = existing
         } else {

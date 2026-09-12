@@ -20,6 +20,14 @@ final class AniListAuthManager: NSObject, ObservableObject {
     }()
     @Published var unreadNotificationCount: Int = 0
 
+    /// `userId` alone isn't proof of a live session: it's persisted in UserDefaults while the
+    /// token lives in Keychain, and the two can desync — a token revoked, cleared, or lost
+    /// without going through `logout()` leaves `userId` still set. Every call site that uses
+    /// the id to fire an authenticated request should read this instead of `userId` directly,
+    /// so a stale id already on disk can't fire a request with no token to back it, which is
+    /// what turned into a bare "AniList 400" for a signed-out user.
+    var authenticatedUserId: Int? { accessToken != nil ? userId : nil }
+
     // From https://anilist.co/settings/developer — Redirect URI: shirox://auth
     private let clientId = "38624"
     private let keychainKey = "anilist_access_token"
@@ -28,6 +36,9 @@ final class AniListAuthManager: NSObject, ObservableObject {
 
     private override init() {
         super.init()
+        // Before `accessToken` is read for the first time: a token left in the Keychain by a
+        // previous install would otherwise be taken for a live session nobody signed into.
+        FreshInstallKeychainPurge.runIfNeeded()
         isLoggedIn = accessToken != nil
         if accessToken != nil {
             Task { await fetchViewer() }
@@ -165,8 +176,12 @@ final class AniListAuthManager: NSObject, ObservableObject {
 
     // MARK: - Viewer
 
-    func fetchViewer() async {
-        guard let token = accessToken else { return }
+    /// Resolves the signed-in user. Returns whether `authenticatedUserId` is now set — callers
+    /// that need the id have to tell a real auth failure apart from AniList simply being
+    /// unreachable, and this never throws either way (a blip must not drop the session).
+    @discardableResult
+    func fetchViewer() async -> Bool {
+        guard let token = accessToken else { return false }
         let query = """
         query {
           Viewer {
@@ -178,7 +193,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
           }
         }
         """
-        guard let url = URL(string: "https://graphql.anilist.co") else { return }
+        guard let url = URL(string: "https://graphql.anilist.co") else { return false }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -186,24 +201,30 @@ final class AniListAuthManager: NSObject, ObservableObject {
         let body: [String: Any] = ["query": query]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
+        // Shared with the content, library and social call sites — see AniListThrottle.
+        await AniListThrottle.shared.waitForTurn()
         guard let (data, response) = try? await URLSession.shared.data(for: request) else {
             // Network error (no response) — transient, keep the session.
             Logger.shared.log("[AniList] fetchViewer network error — keeping session", type: "Network")
-            return
+            return false
         }
         if let http = response as? HTTPURLResponse {
             switch http.statusCode {
             case 200:
-                break
+                await AniListThrottle.shared.reportSuccess()
             case 401:
                 // Genuine auth failure — token rejected.
                 Logger.shared.log("[AniList] fetchViewer 401 — logging out", type: "Error")
                 logout()
-                return
+                return false
             default:
                 // 429 / 5xx / anything else — transient. Do NOT clear the token.
+                if http.statusCode == 429 || http.statusCode == 403 {
+                    let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap { Double($0) }
+                    await AniListThrottle.shared.reportRateLimited(retryAfter: retryAfter)
+                }
                 Logger.shared.log("[AniList] fetchViewer HTTP \(http.statusCode) — keeping session", type: "Network")
-                return
+                return false
             }
         }
 
@@ -244,6 +265,7 @@ final class AniListAuthManager: NSObject, ObservableObject {
             // invalid — only a real 401 is. Keep the session and try again next launch.
             Logger.shared.log("[AniList] fetchViewer: 200 but no Viewer in response — keeping session", type: "Network")
         }
+        return authenticatedUserId != nil
     }
 
     /// Lightweight refresh of just the unread-notification count. Keeps the existing value
@@ -258,8 +280,16 @@ final class AniListAuthManager: NSObject, ObservableObject {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["query": query])
 
+        await AniListThrottle.shared.waitForTurn()
         guard let (data, response) = try? await URLSession.shared.data(for: request) else { return }
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 { return }
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            if http.statusCode == 429 || http.statusCode == 403 {
+                let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap { Double($0) }
+                await AniListThrottle.shared.reportRateLimited(retryAfter: retryAfter)
+            }
+            return
+        }
+        await AniListThrottle.shared.reportSuccess()
 
         struct CountResponse: Decodable {
             struct ResponseData: Decodable { let Viewer: Viewer }

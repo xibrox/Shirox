@@ -42,6 +42,9 @@ final class MALAuthManager: NSObject, ObservableObject {
 
     private override init() {
         super.init()
+        // See `FreshInstallKeychainPurge`: Keychain tokens outlive the app, so this has to
+        // happen before `accessToken` is consulted for the login state.
+        FreshInstallKeychainPurge.runIfNeeded()
         isLoggedIn = accessToken != nil
         if isLoggedIn, let data = UserDefaults.standard.data(forKey: profileKey),
            let cached = try? JSONDecoder().decode(CachedProfile.self, from: data) {

@@ -363,17 +363,54 @@ final class LibrarySyncService: ObservableObject {
     // MARK: - Reading and reporting
 
     private func readLibraries() async -> ([LibraryEntry], [LibraryEntry])? {
+        // Read each side under its own catch. Collapsing both into one message was what made a
+        // failure impossible to act on — it named neither the service nor the reason.
+        let anilist: [LibraryEntry]
+        let mal: [LibraryEntry]
         do {
-            return (try await AniListProvider.shared.fetchLibrary(),
-                    try await MALProvider.shared.fetchLibrary())
+            anilist = try await AniListProvider.shared.fetchLibrary()
         } catch {
-            Logger.shared.log("[LibrarySync] Could not read libraries: \(error)", type: "Error")
-            // `ToastManager` lives in an iOS-only file; elsewhere the log and `statusText`
-            // are the report, same as the app's other cross-platform surfaces.
-            #if os(iOS)
-            ToastManager.shared.show(message: "Couldn't read your libraries. Check you're signed in to both.", type: .error, duration: 5)
-            #endif
+            reportReadFailure(side: .anilist, error: error)
             return nil
+        }
+        do {
+            mal = try await MALProvider.shared.fetchLibrary()
+        } catch {
+            reportReadFailure(side: .mal, error: error)
+            return nil
+        }
+        return (anilist, mal)
+    }
+
+    private func reportReadFailure(side: LibrarySide, error: Error) {
+        let message = Self.readFailureMessage(side: side, error: error)
+        Logger.shared.log("[LibrarySync] \(message) — \(error)", type: "Error")
+        // `ToastManager` lives in an iOS-only file; elsewhere the log is the report, same as the
+        // app's other cross-platform surfaces.
+        #if os(iOS)
+        ToastManager.shared.show(message: message, type: .error, duration: 6)
+        #endif
+    }
+
+    /// Describes a failed library read in terms of what actually went wrong.
+    ///
+    /// The previous wording — "check you're signed in to both" — asserted one cause for every
+    /// failure. A rate limit, an outage or a dropped connection are not sign-in problems, and
+    /// sending somebody to re-authenticate over one wastes their time and doesn't fix it.
+    nonisolated static func readFailureMessage(side: LibrarySide, error: Error) -> String {
+        let prefix = "Couldn't read your \(side.name) library"
+        guard let providerError = error as? ProviderError else {
+            return "\(prefix): \(error.localizedDescription)"
+        }
+        switch providerError {
+        case .unauthenticated:
+            return "\(prefix) — \(side.name) rejected your sign-in. Sign out of \(side.name) and back in."
+        case .networkError(let underlying):
+            return "\(prefix) — \(underlying.localizedDescription)"
+        case .serverError(let code):
+            return "\(prefix) — \(side.name) returned an error (\(code)). Try again in a minute."
+        default:
+            return "\(prefix): \(providerError.localizedDescription)"
         }
     }
 

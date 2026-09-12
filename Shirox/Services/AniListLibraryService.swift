@@ -13,6 +13,8 @@ struct AniListRawEntry {
     let `repeat`: Int
     /// Hidden from your public profile and activity feed on AniList.
     var isPrivate: Bool = false
+    /// Your private note on this entry, as shown in AniList's own edit dialog.
+    var notes: String?
 }
 
 final class AniListLibraryService {
@@ -36,6 +38,7 @@ final class AniListLibraryService {
                 score
                 updatedAt
                 private
+                notes
                 media {
                   id
                   title { romaji english native }
@@ -81,6 +84,7 @@ final class AniListLibraryService {
                 /// `private` is a Swift keyword, so it needs backticks. Optional because
                 /// responses cached before this field was requested simply won't carry it.
                 let `private`: Bool?
+                let notes: String?
             }
             let data: ResponseData?
         }
@@ -101,7 +105,8 @@ final class AniListLibraryService {
                     updatedAt: raw.updatedAt,
                     customListName: customName,
                     repeat: 0,
-                    isPrivate: raw.private ?? false
+                    isPrivate: raw.private ?? false,
+                    notes: raw.notes
                 ))
             }
         }
@@ -111,7 +116,7 @@ final class AniListLibraryService {
     // MARK: - Fetch single entry for a media id
 
     func fetchEntry(mediaId: Int, type: MediaListType = .anime) async throws -> AniListRawEntry? {
-        guard let userId = await AniListAuthManager.shared.userId else { return nil }
+        guard let userId = await AniListAuthManager.shared.authenticatedUserId else { return nil }
         let query = """
         query ($userId: Int, $mediaId: Int) {
           MediaList(userId: $userId, mediaId: $mediaId, type: \(type.rawValue)) {
@@ -122,6 +127,7 @@ final class AniListLibraryService {
             repeat
             updatedAt
             private
+            notes
             media {
               id
               title { romaji english native }
@@ -155,12 +161,13 @@ final class AniListLibraryService {
                 let updatedAt: Int?
                 let media: AniListMedia
                 let `private`: Bool?
+                let notes: String?
             }
             let data: ResponseData?
         }
 
         guard let raw = try JSONDecoder().decode(Response.self, from: data).data?.MediaList else { return nil }
-        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil, repeat: raw.repeat, isPrivate: raw.private ?? false)
+        return AniListRawEntry(id: raw.id, media: raw.media, status: raw.status, progress: raw.progress, score: raw.score, updatedAt: raw.updatedAt, customListName: nil, repeat: raw.repeat, isPrivate: raw.private ?? false, notes: raw.notes)
     }
 
     // MARK: - Fetch list (by status, kept for compatibility)
@@ -210,6 +217,26 @@ final class AniListLibraryService {
     /// shared `MediaProvider` write used by tracking, the library editor and the library sync,
     /// and MyAnimeList has no equivalent flag to pass through it. This is an AniList-only
     /// capability, so it stays an AniList-only call.
+    /// Saves the entry's note on AniList.
+    ///
+    /// Kept out of `updateEntry` for the same reason `setPrivate` is: that one is the shared
+    /// `MediaProvider` write used by tracking, the library editor and the library sync, and it
+    /// has no note to pass through. MyAnimeList does store the equivalent (`comments`), but
+    /// reading it back needs its list `fields` parameter extended, so this stays AniList-only
+    /// until that can be verified against a real account.
+    ///
+    /// An empty note is sent as `""` rather than skipped — that is how a note gets cleared.
+    func setNotes(mediaId: Int, notes: String, type: MediaListType = .anime) async throws {
+        let mutation = """
+        mutation ($mediaId: Int, $notes: String) {
+          SaveMediaListEntry(mediaId: $mediaId, notes: $notes) {
+            id
+          }
+        }
+        """
+        _ = try await post(query: mutation, variables: ["mediaId": mediaId, "notes": notes])
+    }
+
     func setPrivate(mediaId: Int, isPrivate: Bool) async throws {
         let mutation = """
         mutation ($mediaId: Int, $private: Boolean) {
@@ -251,12 +278,14 @@ final class AniListLibraryService {
     /// How many times to retry a rate-limited request before giving up (and letting the caller
     /// fall back to another provider). Kept low so the UI never hangs for long.
     private let maxRateLimitRetries = 2
-    /// Ceiling on any single backoff wait, even if the server's `Retry-After` asks for more.
-    private let maxRetryDelay: TimeInterval = 8
 
     private func post(query: String, variables: [String: Any]) async throws -> Data {
         var attempt = 0
         while true {
+            // Shared across every AniList call site (content, library, social, auth), so a
+            // burst here is paced against — and backs off in step with — everything else this
+            // app is asking AniList for at the same time. See AniListThrottle.
+            await AniListThrottle.shared.waitForTurn()
             var request = URLRequest(url: endpoint)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -269,6 +298,7 @@ final class AniListLibraryService {
             guard let http = response as? HTTPURLResponse else { return data }
             switch http.statusCode {
             case 200:
+                await AniListThrottle.shared.reportSuccess()
                 return data
             case 401:
                 // Genuine auth failure — the token is no longer accepted.
@@ -277,13 +307,13 @@ final class AniListLibraryService {
                 throw AniListError.httpError(401)
             case 429, 403:
                 // AniList rate-limits with 429; under Cloudflare/edge load it can surface as 403.
-                // Honour `Retry-After` when present (else exponential backoff), retry a bounded
-                // number of times, then give up so ProviderManager can fall back.
+                // Reporting to the shared throttle honours `Retry-After` (else widens the gap)
+                // for every AniList caller, not just this retry. Bounded, then give up so
+                // ProviderManager can fall back.
                 let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap { Double($0) }
+                await AniListThrottle.shared.reportRateLimited(retryAfter: retryAfter)
                 if attempt < maxRateLimitRetries {
-                    let delay = min(retryAfter ?? pow(2, Double(attempt)), maxRetryDelay)
-                    Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited on \(operationName(in: query)) — retrying in \(delay)s (attempt \(attempt + 1)/\(maxRateLimitRetries))", type: "Network")
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited on \(operationName(in: query)) — retrying (attempt \(attempt + 1)/\(maxRateLimitRetries))", type: "Network")
                     attempt += 1
                     continue
                 }

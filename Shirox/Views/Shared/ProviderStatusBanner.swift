@@ -6,18 +6,37 @@ struct ProviderStatusBanner: View {
 
     var body: some View {
         if manager.fallbackActive {
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.yellow)
-                Text("Using fallback provider")
-                    .font(.footnote.weight(.semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(headline)
+                        .font(.footnote.weight(.semibold))
+                    // The service's own explanation, where it gave one. During an AniList
+                    // outage this is the difference between "the app ignored which tracker I
+                    // picked" and "AniList says it has switched its API off".
+                    if let reason = manager.fallbackReason {
+                        Text(reason)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(.ultraThinMaterial)
             .transition(.move(edge: .top).combined(with: .opacity))
         }
+    }
+
+    /// Names the provider actually serving results — `fallbackServedBy`, not `primary`, which
+    /// stays whichever provider the user chose and would name the one that *didn't* answer.
+    private var headline: String {
+        guard let served = manager.fallbackServedBy else { return "Using fallback provider" }
+        return "Showing \(served.displayName) instead"
     }
 }
 
@@ -71,11 +90,14 @@ struct ProviderSwitcher: View {
 }
 
 /// Toolbar menu button that switches the global primary provider (used on Home).
-/// Shows the active provider; tap to pick the other. Hidden unless both are signed in.
+/// Shows the active provider; tap to pick the other.
+///
+/// Always visible, not gated on both providers being signed in: it only chooses which
+/// service's *discovery* endpoints power Home (trending, seasonal, browse, search), and
+/// those work signed out on both AniList and MyAnimeList. Being signed into the one you pick
+/// only matters once you touch your library — this button never does.
 struct ProviderMenuButton: View {
     @ObservedObject private var manager = ProviderManager.shared
-    @ObservedObject private var anilistAuth = AniListAuthManager.shared
-    @ObservedObject private var malAuth = MALAuthManager.shared
 
     /// A concrete, preloaded provider icon for use inside a Menu. Native menu items
     /// don't render remote async images, but they do render a ready `Image`, so we
@@ -104,31 +126,29 @@ struct ProviderMenuButton: View {
     }
 
     var body: some View {
-        if bothProvidersSignedIn {
-            Menu {
-                ForEach(ProviderType.userProviders, id: \.self) { type in
-                    Button {
-                        manager.selectProvider(type)
-                    } label: {
-                        if let icon = cachedIcon(type) {
-                            Label { Text(type.displayName) } icon: { icon }
-                        } else {
-                            Text(type.displayName)
-                        }
+        Menu {
+            ForEach(ProviderType.userProviders, id: \.self) { type in
+                Button {
+                    manager.selectProvider(type)
+                } label: {
+                    if let icon = cachedIcon(type) {
+                        Label { Text(type.displayName) } icon: { icon }
+                    } else {
+                        Text(type.displayName)
                     }
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    CachedAsyncImage(urlString: (manager.primary?.providerType ?? .anilist).iconURL)
-                        .frame(width: 20, height: 20)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                    Text(manager.primary?.providerType.displayName ?? "")
-                        .font(.subheadline.weight(.semibold))
-                    Image(systemName: "chevron.down").font(.caption2)
-                }
-                .foregroundStyle(.primary)
             }
-            .background(iconWarmer)
+        } label: {
+            HStack(spacing: 6) {
+                CachedAsyncImage(urlString: (manager.primary?.providerType ?? .anilist).iconURL)
+                    .frame(width: 20, height: 20)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                Text(manager.primary?.providerType.displayName ?? "")
+                    .font(.subheadline.weight(.semibold))
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+            .foregroundStyle(.primary)
         }
+        .background(iconWarmer)
     }
 }

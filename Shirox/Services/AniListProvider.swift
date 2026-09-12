@@ -1,6 +1,16 @@
 import Foundation
 import AuthenticationServices
 
+/// AniList answered in a way that leaves the signed-in user unknown, without ever rejecting the
+/// token. Distinct from `ProviderError.unauthenticated` so callers don't tell somebody to sign in
+/// again over a rate limit.
+enum AniListUnreachable: LocalizedError {
+    case viewerUnresolved
+    var errorDescription: String? {
+        "AniList didn't respond. It may be rate-limiting — try again in a minute."
+    }
+}
+
 @MainActor
 final class AniListProvider: MediaProvider {
     static let shared = AniListProvider()
@@ -23,6 +33,18 @@ final class AniListProvider: MediaProvider {
     }
 
     // MARK: - Discovery
+
+    /// One request for all five Home rows. See `AniListService.homeFeed()`.
+    func homeFeed() async throws -> HomeFeed {
+        let raw = try await AniListService.shared.homeFeed()
+        return HomeFeed(
+            trending: raw.trending.map { mapMedia($0) },
+            seasonal: raw.seasonal.map { mapMedia($0) },
+            lastSeason: raw.lastSeason.map { mapMedia($0) },
+            popular: raw.popular.map { mapMedia($0) },
+            topRated: raw.topRated.map { mapMedia($0) }
+        )
+    }
 
     func trending() async throws -> [Media] {
         try await AniListService.shared.trending().map { mapMedia($0) }
@@ -63,11 +85,19 @@ final class AniListProvider: MediaProvider {
     // MARK: - Library
 
     func fetchLibrary() async throws -> [LibraryEntry] {
-        if AniListAuthManager.shared.userId == nil {
-            await AniListAuthManager.shared.fetchViewer()
+        if AniListAuthManager.shared.authenticatedUserId == nil,
+           await AniListAuthManager.shared.fetchViewer() == false {
+            // One retry: `AniListThrottle` widens the gap after a 429, so a second attempt
+            // usually lands where the first was turned away.
+            _ = await AniListAuthManager.shared.fetchViewer()
         }
-        guard let userId = AniListAuthManager.shared.userId else {
-            throw ProviderError.unauthenticated
+        guard let userId = AniListAuthManager.shared.authenticatedUserId else {
+            // Still holding a token means the session is intact and AniList simply couldn't be
+            // reached — a rate limit or an outage. Reporting that as "you're not signed in"
+            // sends people off to re-authenticate over a problem that isn't theirs.
+            throw AniListAuthManager.shared.accessToken == nil
+                ? ProviderError.unauthenticated
+                : ProviderError.networkError(AniListUnreachable.viewerUnresolved)
         }
         return try await AniListLibraryService.shared.fetchAllLists(userId: userId).map { mapEntry($0) }
     }
@@ -90,7 +120,7 @@ final class AniListProvider: MediaProvider {
 
     func fetchCurrentUser() async throws -> UserProfile {
         await AniListAuthManager.shared.fetchViewer()
-        guard let userId = AniListAuthManager.shared.userId else { throw ProviderError.unauthenticated }
+        guard let userId = AniListAuthManager.shared.authenticatedUserId else { throw ProviderError.unauthenticated }
         return try await fetchProfile(userId: userId)
     }
 
@@ -209,7 +239,7 @@ final class AniListProvider: MediaProvider {
         LibraryEntry(id: e.id, media: mapMedia(e.media), status: e.status,
                      progress: e.progress, score: e.score, updatedAt: e.updatedAt,
                      customListName: e.customListName, timesRewatched: e.repeat,
-                     isPrivate: e.isPrivate)
+                     isPrivate: e.isPrivate, notes: e.notes)
     }
 
     func mapUser(_ u: AniListUser) -> UserProfile {

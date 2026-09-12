@@ -101,6 +101,13 @@ struct HomeView: View {
                     .ignoresSafeArea(edges: vm.trending.isEmpty ? [] : .top)
                 }
             }
+            // `ProviderStatusBanner` existed but was never placed in any view — a provider
+            // switch that quietly falls back (AniList failing in a way ProviderManager treats
+            // as transient, like a rate limit) served the other provider's rows successfully,
+            // so nothing ever threw and the toast above never fired either. Selecting AniList
+            // looked like it did nothing at all instead of showing why MAL's rows were still
+            // the ones on screen.
+            .safeAreaInset(edge: .top, spacing: 0) { ProviderStatusBanner() }
             .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -10,22 +10,45 @@ final class AniListSocialService {
         return URLSession(configuration: cfg)
     }()
 
+    /// How many times to retry a rate-limited request before giving up.
+    private let maxRateLimitRetries = 2
+
     private func performQuery<T: Decodable>(query: String, variables: [String: Any] = [:], auth: Bool = false) async throws -> T {
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if auth, let token = AniListAuthManager.shared.accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        var attempt = 0
+        while true {
+            // Shared with the content, library and auth call sites — see AniListThrottle.
+            await AniListThrottle.shared.waitForTurn()
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if auth, let token = AniListAuthManager.shared.accessToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            let body: [String: Any] = ["query": query, "variables": variables]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await session.data(for: request)
+
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                Logger.shared.log("--- GraphQL Response ---\n\(json)", type: "Network")
+            }
+
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                if http.statusCode == 429 || http.statusCode == 403 {
+                    let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap { Double($0) }
+                    await AniListThrottle.shared.reportRateLimited(retryAfter: retryAfter)
+                    if attempt < maxRateLimitRetries {
+                        Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited — retrying (attempt \(attempt + 1)/\(maxRateLimitRetries))", type: "Network")
+                        attempt += 1
+                        continue
+                    }
+                    throw http.statusCode == 429 ? AniListError.rateLimited : AniListError.httpError(403)
+                }
+                throw AniListError.httpError(http.statusCode)
+            }
+
+            await AniListThrottle.shared.reportSuccess()
+            return try JSONDecoder().decode(T.self, from: data)
         }
-        let body: [String: Any] = ["query": query, "variables": variables]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await session.data(for: request)
-        
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            Logger.shared.log("--- GraphQL Response ---\n\(json)", type: "Network")
-        }
-        
-        return try JSONDecoder().decode(T.self, from: data)
     }
 
     // MARK: - Profile
