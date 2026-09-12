@@ -43,10 +43,25 @@ final class AniListSocialService {
                     }
                     throw http.statusCode == 429 ? AniListError.rateLimited : AniListError.httpError(403)
                 }
+                let message = AniListService.graphQLErrorMessage(in: data)
+
+                // AniList refusing the token — a 400, not a 401. The same token can't succeed
+                // on a retry, so report the remedy rather than the status code.
+                if AniListService.isTokenRejection(status: http.statusCode, message: message) {
+                    Logger.shared.log("[AniList] token refused — keeping session, prompting re-auth", type: "Error")
+                    AniListAuthManager.shared.noteTokenRejected()
+                    throw AniListError.tokenRejected
+                }
+
+                // Prefer AniList's own wording where it gave any, as the content call site does.
+                if let message {
+                    throw AniListError.serviceMessage(code: http.statusCode, message: message)
+                }
                 throw AniListError.httpError(http.statusCode)
             }
 
             await AniListThrottle.shared.reportSuccess()
+            AniListAuthManager.shared.noteTokenAccepted()
             return try JSONDecoder().decode(T.self, from: data)
         }
     }

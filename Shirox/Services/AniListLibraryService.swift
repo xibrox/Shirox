@@ -299,9 +299,11 @@ final class AniListLibraryService {
             switch http.statusCode {
             case 200:
                 await AniListThrottle.shared.reportSuccess()
+                await AniListAuthManager.shared.noteTokenAccepted()
                 return data
             case 401:
-                // Genuine auth failure — the token is no longer accepted.
+                // Genuine auth failure — the token is no longer accepted. Kept for
+                // completeness; AniList refuses tokens with a 400, handled in `default`.
                 Logger.shared.log("[AniList] 401 on \(operationName(in: query)) — logging out", type: "Error")
                 await AniListAuthManager.shared.logout()
                 throw AniListError.httpError(401)
@@ -320,8 +322,24 @@ final class AniListLibraryService {
                 Logger.shared.log("[AniList] HTTP \(http.statusCode) rate limited on \(operationName(in: query)) — giving up after \(maxRateLimitRetries) retries", type: "Network")
                 throw http.statusCode == 429 ? AniListError.rateLimited : AniListError.httpError(403)
             default:
-                // 5xx / other transient errors — do NOT clear the token.
+                let message = AniListService.graphQLErrorMessage(in: data)
+
+                // AniList refusing the token — a 400, not a 401. Retrying with the same token
+                // cannot succeed, so stop here and point the user at signing in again instead
+                // of reporting the status code and letting every other screen repeat it.
+                if AniListService.isTokenRejection(status: http.statusCode, message: message) {
+                    Logger.shared.log("[AniList] token refused on \(operationName(in: query)) — keeping session, prompting re-auth", type: "Error")
+                    await AniListAuthManager.shared.noteTokenRejected()
+                    throw AniListError.tokenRejected
+                }
+
+                // 5xx / other transient errors — do NOT clear the token. Prefer AniList's own
+                // wording where it gave any; a bare status sent people hunting for a bug in
+                // the app over something it has no part in.
                 Logger.shared.log("[AniList] HTTP \(http.statusCode) on \(operationName(in: query)) — keeping session", type: "Network")
+                if let message {
+                    throw AniListError.serviceMessage(code: http.statusCode, message: message)
+                }
                 throw AniListError.httpError(http.statusCode)
             }
         }

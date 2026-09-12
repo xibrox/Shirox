@@ -1242,7 +1242,13 @@ private struct ProvidersSettingsSection: View {
 
     private func providerStatus(_ provider: any MediaProvider) -> String {
         switch provider.providerType {
-        case .anilist: return AniListAuthManager.shared.isLoggedIn ? "Signed in" : "Not signed in"
+        case .anilist:
+            guard aniListAuth.isLoggedIn else { return "Not signed in" }
+            // A token AniList has started refusing still has `isLoggedIn` true — the token is
+            // kept on purpose, since a revoked one and a failing auth backend are
+            // indistinguishable from here. Saying "Signed in" while every sync fails is the
+            // part that left people with no idea what to do about it.
+            return aniListAuth.needsReauthentication ? "Sign in again" : "Signed in"
         case .mal: return malAuth.isLoggedIn ? "Signed in" : "Not signed in"
         case .local: return "Not signed in"
         }

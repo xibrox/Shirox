@@ -468,6 +468,7 @@
 		577D15AB98AFB5CE8F633563 /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
 		57CE3FD2616FFDF1BF15BBA4 /* AnimeModulePreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970524A22BA3A16D27DFD973 /* AnimeModulePreferenceTests.swift */; };
 		591DC9EC0B115E36C3C1CC27 /* AniraDetailFeaturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96EBB0C251BF7BA4CC2FFD80 /* AniraDetailFeaturesTests.swift */; };
+		597BEEE58CF27420F12B519E /* AniListTokenRejectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B74DE2D005663AAA00B24AE9 /* AniListTokenRejectionTests.swift */; };
 		5A0429134E9EE5812B06C894 /* MangaTrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED767F1E614FFA030840F80 /* MangaTrackingTests.swift */; };
 		5C5B78EFA2A189F5865F491D /* JellyfinAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA13A2F15016892850F349E /* JellyfinAuthManager.swift */; };
 		5DAFAF546B855F625D90343A /* JellyfinModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4A4D717CED7197DBAD4A83 /* JellyfinModels.swift */; };
@@ -953,6 +954,7 @@
 		AE72458EFA629F4C7C996AA9 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		B1DFF59F54F073D10B1F45FF /* JellyfinModuleFlagTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinModuleFlagTests.swift; sourceTree = "<group>"; };
 		B461E257ABDE206C5F8A5EE5 /* MangaMatchManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaMatchManager.swift; sourceTree = "<group>"; };
+		B74DE2D005663AAA00B24AE9 /* AniListTokenRejectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AniListTokenRejectionTests.swift; sourceTree = "<group>"; };
 		B7E87688CB577983F43E550D /* OnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		BA0000000000000000000E01 /* BackupEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupEnvelope.swift; sourceTree = "<group>"; };
 		BA0000000000000000000E11 /* BackupManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupManager.swift; sourceTree = "<group>"; };
@@ -1438,6 +1440,7 @@
 				5D37334B52C658E81172738C /* BackupModulesSectionTests.swift */,
 				D6C25C93B56EBA2E868ADE43 /* BackupAccountsSectionTests.swift */,
 				4737DA623BC62737787AD6FB /* BackupSummaryTests.swift */,
+				B74DE2D005663AAA00B24AE9 /* AniListTokenRejectionTests.swift */,
 			);
 			path = ShiroxTests;
 			sourceTree = SOURCE_ROOT;
@@ -1735,6 +1738,7 @@
 				EF6FB86624DAB639218DD80C /* AniListThrottleTests.swift in Sources */,
 				D40AC9F8DA221DE6E8FB835F /* HomeCacheStoreTests.swift in Sources */,
 				01B98E834D51E54F3EEB9C99 /* FreshInstallKeychainPurgeTests.swift in Sources */,
+				597BEEE58CF27420F12B519E /* AniListTokenRejectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

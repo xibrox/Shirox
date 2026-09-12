@@ -689,6 +689,29 @@ extension AniListService {
         return m.contains("disabled") || m.contains("temporarily unavailable")
     }
 
+    /// Whether AniList's response says it refused the access token itself.
+    ///
+    /// AniList rejects a token with **400 and "Invalid token"**, never 401 — any
+    /// `Authorization` header it won't accept answers
+    /// `{"errors":[{"message":"Invalid token","status":400}]}` for *any* query, public ones
+    /// included, and it answers that ahead of every other gate (unauthenticated traffic during
+    /// an announced outage gets the 403, a bad token gets the 400). So the `case 401` branches
+    /// the authenticated call sites hung "genuine auth failure" on never fire, and a refused
+    /// token fell through to the transient bucket: the token was kept, `isLoggedIn` stayed
+    /// true, and every authenticated screen re-sent it, turning one bad token into a bare
+    /// "HTTP error 400" on the library, profile, social feed and notifications at once with no
+    /// route back to a sign-in prompt.
+    ///
+    /// Narrow on purpose — 400 *and* the token wording. A 400 AniList explains some other way
+    /// stays transient, and 403/5xx are left to the outage and rate-limit paths that already
+    /// own them. This app cannot tell a genuinely revoked token from AniList's auth layer
+    /// failing valid ones during one of its own stability incidents, so a match points the user
+    /// at signing in again rather than clearing the session out from under them.
+    static func isTokenRejection(status: Int, message: String?) -> Bool {
+        guard status == 400, let message else { return false }
+        return message.lowercased().contains("invalid token")
+    }
+
     /// The first human-readable message from a GraphQL `errors` array, if the body carries one.
     static func graphQLErrorMessage(in data: Data) -> String? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -705,6 +728,11 @@ enum AniListError: LocalizedError {
     /// A failure the service explained in its response body. Keeps the status so retry policy
     /// is unchanged — an outage is still worth queueing a write against.
     case serviceMessage(code: Int, message: String)
+    /// AniList refused the access token (400 + "Invalid token" — see `isTokenRejection`).
+    /// Distinct from a transient failure: the same token cannot succeed on a retry, so callers
+    /// stop instead of spending their retry budget, and the user is pointed at signing in
+    /// again. Deliberately does not clear the session — see `isTokenRejection`.
+    case tokenRejected
     case graphQL(String)
     case noData
     case decodingError(String)
@@ -717,6 +745,11 @@ enum AniListError: LocalizedError {
             return "HTTP error \(code). Please try again."
         case .serviceMessage(_, let message):
             return message
+        case .tokenRejected:
+            // Names the remedy, not the status. A bare "HTTP error 400" on every authenticated
+            // screen was the original complaint.
+            return "AniList didn't accept your sign-in. Sign in to AniList again to keep syncing."
+
         case .graphQL(let message):
             // The service's own wording, unadorned — prefixing it with "AniList error:" made
             // sentences like "The AniList API has been temporarily disabled…" read twice.

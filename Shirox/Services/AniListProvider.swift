@@ -86,12 +86,19 @@ final class AniListProvider: MediaProvider {
 
     func fetchLibrary() async throws -> [LibraryEntry] {
         if AniListAuthManager.shared.authenticatedUserId == nil,
-           await AniListAuthManager.shared.fetchViewer() == false {
+           await AniListAuthManager.shared.fetchViewer() == false,
+           !AniListAuthManager.shared.needsReauthentication {
             // One retry: `AniListThrottle` widens the gap after a 429, so a second attempt
-            // usually lands where the first was turned away.
+            // usually lands where the first was turned away. Skipped when AniList refused the
+            // token outright — the same token can't be accepted on a second ask.
             _ = await AniListAuthManager.shared.fetchViewer()
         }
         guard let userId = AniListAuthManager.shared.authenticatedUserId else {
+            // AniList refused the token: it answered, so neither "not signed in" (the token is
+            // still there, and may yet be good) nor "didn't respond" fits. Say what it said.
+            if AniListAuthManager.shared.needsReauthentication {
+                throw AniListError.tokenRejected
+            }
             // Still holding a token means the session is intact and AniList simply couldn't be
             // reached — a rate limit or an outage. Reporting that as "you're not signed in"
             // sends people off to re-authenticate over a problem that isn't theirs.
