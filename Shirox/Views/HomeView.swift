@@ -128,38 +128,18 @@ struct HomeView: View {
             .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarHiddenCompat()
             .toolbarBackgroundHidden()
             #endif
-            #if os(iOS)
-            .overlay(alignment: .topLeading) {
-                Button { showUpcoming = true } label: {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                .padding(.top, UIDevice.current.userInterfaceIdiom == .pad ? 20 : 54)
-                .padding(.leading, leadingInset + 20)
-            }
-            .overlay(alignment: .topTrailing) {
-                ProviderMenuButton()
-                    .padding(.top, UIDevice.current.userInterfaceIdiom == .pad ? 20 : 54)
-                    .padding(.trailing, 20)
-            }
-            #else
             .toolbar {
                 ToolbarItem(placement: Self.leadingPlacement) {
                     Button { showUpcoming = true } label: {
-                        Label("Upcoming", systemImage: "calendar")
+                        Image(systemName: "calendar")
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     ProviderMenuButton()
                 }
             }
-            #endif
             .sheet(isPresented: $showUpcoming) { UpcomingCalendarView() }
             // Outside the ScrollView: the hidden NavigationLink that performs the push.
             .continueWatchingNavigation($cwNavTarget)
@@ -763,24 +743,5 @@ private struct HomePressStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
             .opacity(configuration.isPressed ? 0.88 : 1.0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Navigation Bar Compatibility
-
-private extension View {
-    @ViewBuilder
-    func navigationBarHiddenCompat() -> some View {
-        #if os(iOS)
-        if #available(iOS 16, *) {
-            self
-                .toolbar(.hidden, for: .navigationBar)
-                .navigationBarHidden(true)
-        } else {
-            self.navigationBarHidden(true)
-        }
-        #else
-        self
-        #endif
     }
 }
