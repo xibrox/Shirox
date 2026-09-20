@@ -12,6 +12,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         configureURLSession()
         IDMappingService.shared.prefetchAllMappingsIfNeeded()
         #if os(iOS)
+        configureGlobalBarAppearances()
         DownloadManager.shared.reconnectPendingTasks()
         #endif
         application.shortcutItems = QuickAction.registeredItems
@@ -132,6 +133,9 @@ struct ShiroxApp: App {
         PendingWriteQueue.shared.register(sink: LibraryWriteSink())
         LocalLibraryManager.shared.syncFromContinueWatching()
         HostBlocklist.shared.loadIfNeeded()
+        #if os(iOS)
+        configureGlobalBarAppearances()
+        #endif
     }
 
     var body: some Scene {
@@ -328,6 +332,7 @@ private struct RootTabView: View {
                     }
                 }
                 .tabViewStyle(.sidebarAdaptable)
+                .toolbarBackgroundHidden()
                 .tint(.primary)
                 #endif
             } else {
@@ -422,3 +427,22 @@ private struct RootTabView: View {
 extension Notification.Name {
     static let openSettingsTab = Notification.Name("OpenSettingsTab")
 }
+
+#if os(iOS)
+func configureGlobalBarAppearances() {
+    let navAppearance = UINavigationBarAppearance()
+    navAppearance.configureWithTransparentBackground()
+    navAppearance.shadowColor = .clear
+    navAppearance.shadowImage = UIImage()
+    UINavigationBar.appearance().standardAppearance = navAppearance
+    UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+    UINavigationBar.appearance().compactAppearance = navAppearance
+
+    let tabAppearance = UITabBarAppearance()
+    tabAppearance.configureWithTransparentBackground()
+    tabAppearance.shadowColor = .clear
+    tabAppearance.shadowImage = UIImage()
+    UITabBar.appearance().standardAppearance = tabAppearance
+    UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+}
+#endif

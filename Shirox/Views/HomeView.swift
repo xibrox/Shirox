@@ -30,6 +30,25 @@ struct HomeView: View {
         #endif
     }
 
+    @State private var isRefreshing = false
+    @State private var leadingInset: CGFloat = 0
+
+    private func performRefresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await vm.reload() }
+            group.addTask {
+                await ContinueWatchingManager.shared.syncWithAniList()
+                await ContinueWatchingManager.shared.syncWithMAL()
+            }
+        }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        withAnimation(.easeOut(duration: 0.25)) {
+            isRefreshing = false
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -51,46 +70,44 @@ struct HomeView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             if !vm.trending.isEmpty {
-                                FeaturedCarousel(items: vm.trending)
+                                FeaturedCarousel(
+                                    items: vm.trending,
+                                    isRefreshing: isRefreshing,
+                                    onRefresh: performRefresh,
+                                    leadingInset: leadingInset
+                                )
                             }
-                            #if os(iOS)
-                            if !continueWatching.items.isEmpty {
-                                ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
+                            Group {
+                                #if os(iOS)
+                                if !continueWatching.items.isEmpty {
+                                    ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
+                                }
+                                if !mangaProgress.items.isEmpty {
+                                    ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
+                                }
+                                #endif
+                                if !vm.trending.isEmpty {
+                                    AnimeSection(title: "Trending Now",     items: vm.trending, category: .trending)
+                                }
+                                if !vm.seasonal.isEmpty {
+                                    AnimeSection(title: "This Season",      items: vm.seasonal, category: .seasonal)
+                                }
+                                if !vm.lastSeason.isEmpty {
+                                    AnimeSection(title: "Last Season · Complete", items: vm.lastSeason, category: .lastSeason)
+                                }
+                                if !vm.popular.isEmpty {
+                                    AnimeSection(title: "All-Time Popular", items: vm.popular,  category: .popular)
+                                }
+                                if !vm.topRated.isEmpty {
+                                    AnimeSection(title: "Top Rated",        items: vm.topRated, category: .topRated)
+                                }
                             }
-                            if !mangaProgress.items.isEmpty {
-                                ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext)
-                            }
-                            #endif
-                            if !vm.trending.isEmpty {
-                                AnimeSection(title: "Trending Now",     items: vm.trending, category: .trending)
-                            }
-                            if !vm.seasonal.isEmpty {
-                                AnimeSection(title: "This Season",      items: vm.seasonal, category: .seasonal)
-                            }
-                            if !vm.lastSeason.isEmpty {
-                                AnimeSection(title: "Last Season · Complete", items: vm.lastSeason, category: .lastSeason)
-                            }
-                            if !vm.popular.isEmpty {
-                                AnimeSection(title: "All-Time Popular", items: vm.popular,  category: .popular)
-                            }
-                            if !vm.topRated.isEmpty {
-                                AnimeSection(title: "Top Rated",        items: vm.topRated, category: .topRated)
-                            }
+                            .padding(.leading, leadingInset)
                         }
                         Spacer().frame(height: 28)
                     }
-                    .softScrollEdges()
-                    .refreshable {
-                        await withTaskGroup(of: Void.self) { group in
-                            group.addTask { await vm.reload() }
-                            group.addTask {
-                                // Sequential: both sync funcs mutate the same CW store across
-                                // await points, so running them concurrently could clobber items.
-                                await ContinueWatchingManager.shared.syncWithAniList()
-                                await ContinueWatchingManager.shared.syncWithMAL()
-                            }
-                        }
-                    }
+                    .softScrollEdges(vm.trending.isEmpty ? .all : [.bottom, .leading, .trailing])
+                    .hideScrollEdgeEffect(vm.trending.isEmpty ? [] : .top)
                     .coordinateSpace(name: "homeScroll")
                     // Only the hero is allowed under the status bar — bleeding its banner up
                     // there is the point of it. Without one, this same modifier slid whatever
@@ -98,7 +115,7 @@ struct HomeView: View {
                     // overlapping the time looked like. The hero can be absent for ordinary
                     // reasons: a provider that doesn't fill Trending, or an outage on the
                     // endpoint behind it.
-                    .ignoresSafeArea(edges: vm.trending.isEmpty ? [] : .top)
+                    .ignoresSafeArea(edges: vm.trending.isEmpty ? [] : [.top, .leading])
                 }
             }
             // `ProviderStatusBanner` existed but was never placed in any view — a provider
@@ -114,13 +131,9 @@ struct HomeView: View {
             .toolbarBackgroundHidden()
             #endif
             .toolbar {
-                // One control per side. Sharing `.primaryAction` between two items is what
-                // pushed the provider switcher out — the platform may collapse or drop one —
-                // so the calendar takes the leading edge and the switcher keeps the trailing
-                // one it has always had, untouched.
                 ToolbarItem(placement: Self.leadingPlacement) {
                     Button { showUpcoming = true } label: {
-                        Label("Upcoming", systemImage: "calendar")
+                        Image(systemName: "calendar")
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -136,9 +149,19 @@ struct HomeView: View {
             }
             #endif
         }
+        .toolbarBackgroundHidden()
+        .observeSafeAreaLeading($leadingInset)
         .task { await vm.load() }
         .onAppear {
             #if os(iOS)
+            let navAppearance = UINavigationBarAppearance()
+            navAppearance.configureWithTransparentBackground()
+            navAppearance.shadowColor = .clear
+            navAppearance.shadowImage = UIImage()
+            UINavigationBar.appearance().standardAppearance = navAppearance
+            UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+            UINavigationBar.appearance().compactAppearance = navAppearance
+
             PlayerPresenter.shared.resetToAppOrientation()
             // Reclaim local-file copies left by cancelled picks or finished/removed items.
             ContinueWatchingManager.shared.pruneOrphanedLocalImports()
@@ -151,9 +174,12 @@ struct HomeView: View {
 
 private struct FeaturedCarousel: View {
     let items: [Media]
+    var isRefreshing: Bool = false
+    var onRefresh: (() async -> Void)? = nil
+    var leadingInset: CGFloat = 0
+
     @State private var selectedTab = 1000
-    @State private var containerWidth: CGFloat = 0
-    @State private var stretchAmount: CGFloat = 0
+    @State private var hasTriggeredThreshold = false
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var realItems: [Media] { items.prefix(8).map { $0 } }
@@ -174,69 +200,159 @@ private struct FeaturedCarousel: View {
         #endif
     }
 
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    private var carouselHeight: CGFloat {
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad || sizeClass == .regular
+        let screen = UIScreen.main.bounds
+        return isIPad ? (screen.height - 45) : (screen.height - 140)
+    }
+    #endif
+
     var body: some View {
         #if os(iOS) && !targetEnvironment(macCatalyst)
-        let isIPad = sizeClass == .regular
-        let effectiveWidth = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
-        let imageHeight: CGFloat = isIPad
-            ? effectiveWidth * (9.0 / 16.0)
-            : UIScreen.main.bounds.height - 140
-
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad || sizeClass == .regular
         let displayItems = realItems
-        // `displayItems` is `items.prefix(8)`, so it is empty exactly when `items` is — the old
-        // `displayItems.isEmpty ? items[0] : …` indexed the empty array in precisely the case it
-        // was guarding against. SwiftUI can still evaluate this body once with an emptied
-        // `items` while the parent's `if !vm.trending.isEmpty` is being torn down, which crashed
-        // the Home tab whenever trending went from populated to empty (failed refresh, offline).
         let currentMedia = displayItems.indices.contains(currentIndex) ? displayItems[currentIndex] : nil
+        let baseHeight = carouselHeight
 
         VStack(spacing: 0) {
-            ZStack {
-                // Pull-down sensor: sibling of TabView so re-evaluation never cascades into
-                // TabView layout. Preference fires max(0,scrollY); stretchAmount only changes
-                // when the user is pulling down — stable (= 0) during normal scroll and swipes.
-                GeometryReader { proxy in
-                    Color.clear.preference(key: CarouselStretchKey.self,
-                                           value: max(0, proxy.frame(in: .named("homeScroll")).minY))
-                }
+            GeometryReader { geo in
+                let minY = geo.frame(in: .named("homeScroll")).minY
+                let isPullingDown = minY > 4
+                let stretchAmount = isPullingDown ? (minY - 4) : 0
+                let scale = isPullingDown ? (1.0 + (stretchAmount / max(baseHeight, 1))) : 1.0
 
-                // iPad fanart background behind the cards
-                if isIPad, !displayItems.isEmpty {
-                    TVDBPosterImage(media: displayItems[currentIndex], type: .fanart)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+                let threshold: CGFloat = 70
+                let progress = min(1.0, max(0.0, (minY - 10) / threshold))
 
-                // TabView: completely stable — fixed height, zero scroll dependency.
-                // Images live inside FeaturedCard so they move naturally with swipe gestures.
-                TabView(selection: $selectedTab) {
-                    ForEach(0..<2000, id: \.self) { index in
-                        if !displayItems.isEmpty {
-                            FeaturedCard(media: displayItems[index % displayCount], isWide: isIPad)
-                                .allowsHitTesting(false)
+                let isWideCard = isIPad && geo.size.width > baseHeight
+
+                ZStack(alignment: .bottom) {
+                    TabView(selection: $selectedTab) {
+                        ForEach(0..<2000, id: \.self) { index in
+                            if !displayItems.isEmpty {
+                                FeaturedCard(
+                                    media: displayItems[index % displayCount],
+                                    isWide: isWideCard,
+                                    width: geo.size.width,
+                                    height: baseHeight
+                                )
+                                .frame(width: geo.size.width, height: baseHeight)
+                                .clipped()
                                 .tag(index)
+                            }
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(width: geo.size.width, height: baseHeight)
+                    .clipped()
+                    .scaleEffect(isPullingDown ? scale : 1.0, anchor: .bottom)
+
+                    ZStack(alignment: .bottom) {
+                        CurvedGradientShadow(height: 350, color: platformBackground, style: .prominent)
+
+                        if let currentMedia {
+                            VStack(spacing: 10) {
+                                TVDBTitleLogoView(media: currentMedia, maxHeight: 135, maxWidth: 360, alignment: .center)
+                                    .id(currentMedia.uniqueId)
+                                    .padding(.horizontal, 16)
+                                    .allowsHitTesting(false)
+
+                                if let genres = currentMedia.genres, !genres.isEmpty {
+                                    HStack(spacing: 6) {
+                                        ForEach(genres.prefix(3), id: \.self) { g in
+                                            Text(g)
+                                                .font(.caption2.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 3)
+                                                .background(Color.primary.opacity(0.1), in: Capsule())
+                                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+                                        }
+                                    }
+                                    .allowsHitTesting(false)
+                                }
+
+                                if let desc = currentMedia.plainDescription, !desc.isEmpty {
+                                    Text(String(desc.prefix(120)) + (desc.count > 120 ? "…" : ""))
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(2)
+                                        .padding(.horizontal, 8)
+                                        .allowsHitTesting(false)
+                                }
+
+                                NavigationLink {
+                                    AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "play.fill").font(.footnote.weight(.semibold))
+                                        Text("Watch").fontWeight(.semibold)
+                                    }
+                                    .foregroundStyle(platformBackground)
+                                    .frame(width: 130, height: 42)
+                                    .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 20)
+                            .padding(.leading, leadingInset)
+                            .padding(.bottom, isIPad ? 65 : 18)
                         }
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(maxWidth: .infinity)
-                .frame(height: imageHeight)
-            }
-            .frame(height: imageHeight)
-            // Elastic stretch: render-only transforms — layout size never changes so
-            // UIScrollView's bounce is never disrupted.
-            // scaleEffect grows the image from the top anchor.
-            // offset cancels the bounce displacement so the top edge stays pinned at screen y=0.
-            .scaleEffect(1 + stretchAmount / imageHeight, anchor: .top)
-            .offset(y: -stretchAmount)
-            .onPreferenceChange(CarouselStretchKey.self) { y in stretchAmount = y }
-            .background(
-                GeometryReader { geo in
-                    Color.clear
-                        .onAppear { containerWidth = geo.size.width }
-                        .onChangeOf(geo.size.width) { w in containerWidth = w }
+                .frame(width: geo.size.width, height: baseHeight)
+                .overlay(alignment: .top) {
+                    // Minimalistic Pull to Refresh Indicator
+                    if isPullingDown || isRefreshing {
+                        let topPadding: CGFloat = 52
+                        let slideOffset = isRefreshing ? (topPadding + 12) : (topPadding + min(minY * 0.42, 36))
+
+                        ZStack {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 36, height: 36)
+                                .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+                                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+
+                            if isRefreshing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.down")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .rotationEffect(.degrees(progress >= 1.0 ? 180 : progress * 180))
+                                    .scaleEffect(0.7 + progress * 0.3)
+                                    .opacity(Double(progress))
+                                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: progress >= 1.0)
+                            }
+                        }
+                        .offset(x: leadingInset / 2, y: slideOffset)
+                        .opacity(isRefreshing ? 1.0 : Double(progress))
+                        .allowsHitTesting(false)
+                    }
                 }
-            )
-            .mask(alignment: .bottom) { Rectangle().frame(height: imageHeight + 2000) }
+                .onChange(of: minY) { newY in
+                    if newY >= threshold && !hasTriggeredThreshold && !isRefreshing {
+                        hasTriggeredThreshold = true
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                    } else if newY < 20 && hasTriggeredThreshold {
+                        hasTriggeredThreshold = false
+                        if let onRefresh, !isRefreshing {
+                            Task {
+                                await onRefresh()
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(height: baseHeight)
             .background {
                 // Hidden preloader — triggers image fetch for all items into NSCache
                 ForEach(displayItems.indices, id: \.self) { i in
@@ -244,80 +360,20 @@ private struct FeaturedCarousel: View {
                         .frame(width: 1, height: 1)
                         .opacity(0)
                         .allowsHitTesting(false)
-                    TVDBPosterImage(media: displayItems[i], type: .poster)
+                    TVDBPosterImage(media: displayItems[i], type: .textlessPoster)
+                        .frame(width: 1, height: 1)
+                        .opacity(0)
+                        .allowsHitTesting(false)
+                    TVDBPosterImage(media: displayItems[i], type: .logo)
                         .frame(width: 1, height: 1)
                         .opacity(0)
                         .allowsHitTesting(false)
                 }
             }
-            .overlay(alignment: .bottom) {
-                ZStack(alignment: .bottom) {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: platformBackground.opacity(0.5), location: 0.38),
-                            .init(color: platformBackground.opacity(0.88), location: 0.68),
-                            .init(color: platformBackground, location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 360)
-                    .allowsHitTesting(false)
-
-                    if let currentMedia {
-                        VStack(spacing: 10) {
-                            if let genres = currentMedia.genres, !genres.isEmpty {
-                                HStack(spacing: 6) {
-                                    ForEach(genres.prefix(3), id: \.self) { g in
-                                        Text(g)
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(.primary)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(Color.primary.opacity(0.1), in: Capsule())
-                                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                                    }
-                                }
-                            }
-
-                            Text(currentMedia.title.displayTitle)
-                                .font(.title2.weight(.bold))
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-
-                            if let desc = currentMedia.plainDescription, !desc.isEmpty {
-                                Text(String(desc.prefix(120)) + (desc.count > 120 ? "…" : ""))
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-                                    .padding(.horizontal, 8)
-                            }
-
-                            NavigationLink {
-                                AniListDetailView(mediaId: currentMedia.id, preloadedMedia: currentMedia)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "play.fill").font(.footnote.weight(.semibold))
-                                    Text("Watch").fontWeight(.semibold)
-                                }
-                                .foregroundStyle(platformBackground)
-                                .frame(width: 130, height: 42)
-                                .background(Color.primary, in: RoundedRectangle(cornerRadius: 12))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 18)
-                    }
-                }
-            }
 
             PageIndicator(numberOfPages: displayCount, currentPage: currentIndex)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.leading, leadingInset)
                 .padding(.vertical, 10)
         }
         .onAppear {
@@ -374,11 +430,7 @@ private struct MacFeaturedCarousel: View {
                         .clipped()
 
                         // Gradient overlay
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.6), .black.opacity(0.95)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                        .frame(width: geo.size.width, height: cardHeight)
+                        CurvedGradientShadow(height: min(cardHeight * 0.65, 240), color: platformBackground, style: .prominent)
 
                         // Cover + text + watch button
                         HStack(alignment: .bottom, spacing: 12) {
@@ -388,10 +440,8 @@ private struct MacFeaturedCarousel: View {
                                 .shadow(radius: 4)
 
                             VStack(alignment: .leading, spacing: 6) {
-                                Text(media.title.displayTitle)
-                                    .font(.title2).fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                                    .lineLimit(2)
+                                TVDBTitleLogoView(media: media, maxHeight: 80, maxWidth: 280, alignment: .leading)
+                                    .id(media.uniqueId)
 
                                 if let desc = media.plainDescription, !desc.isEmpty {
                                     Text(desc)
@@ -494,6 +544,8 @@ private struct PageIndicator: View {
 private struct FeaturedCard: View {
     let media: Media
     var isWide: Bool = false
+    var width: CGFloat? = nil
+    var height: CGFloat? = nil
 
     private var aspectRatio: CGFloat {
         #if os(iOS) && !targetEnvironment(macCatalyst)
@@ -506,44 +558,15 @@ private struct FeaturedCard: View {
     var body: some View {
         Group {
             #if os(iOS) && !targetEnvironment(macCatalyst)
-            if isWide {
-                // iPad: fanart with horizontal parallax
-                Color.clear
-                    .overlay(
-                        ZStack {
-                            GeometryReader { geo in
-                                let minX = geo.frame(in: .global).minX
-                                let screenW = geo.size.width > 0 ? geo.size.width : 1
-                                let extra: CGFloat = 80
-                                let px = -(extra / 2) - minX * (extra / (2 * screenW))
-                                TVDBPosterImage(media: media, type: .fanart)
-                                    .frame(width: geo.size.width + extra, height: geo.size.height)
-                                    .offset(x: px)
-                                    .clipped()
-                            }
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .clear, location: 0),
-                                    .init(color: .black.opacity(0.4), location: 0.5),
-                                    .init(color: .black.opacity(0.92), location: 1)
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                // iPhone: portrait with horizontal parallax
-                GeometryReader { geo in
-                    let pageOffset = geo.frame(in: .global).minX
-                    let buffer: CGFloat = 100
-                    TVDBPosterImage(media: media)
-                        .frame(width: geo.size.width + buffer, height: geo.size.height)
-                        .offset(x: -(buffer / 2) - pageOffset * 0.25)
+            Color.clear
+                .frame(width: width, height: height)
+                .overlay {
+                    TVDBPosterImage(media: media, type: isWide ? .fanart : .textlessPoster)
+                        .frame(width: width, height: height)
+                        .clipped()
                 }
                 .clipped()
-            }
+                .contentShape(Rectangle())
             #else
             // macOS: banner background + poster overlay
             Color.clear
@@ -711,12 +734,6 @@ private struct AnimeSection: View {
     }
 }
 
-// MARK: - Carousel Stretch Preference
-
-private struct CarouselStretchKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
 
 // MARK: - Press Style
 

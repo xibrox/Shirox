@@ -205,3 +205,23 @@ struct MediaRelationEdge: Codable, Identifiable, Equatable, Hashable {
         relationType.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
+
+extension Media {
+    /// Returns the AniList/MAL ID of the parent or prequel anime, if known from relations.
+    var parentAnimeId: Int? {
+        guard let edges = relations?.edges else { return nil }
+        // 1. Prefer explicit PARENT relation
+        if let parent = edges.first(where: {
+            $0.relationType == "PARENT" && ($0.node.type == nil || $0.node.type?.uppercased() == "ANIME")
+        }) {
+            return parent.node.id
+        }
+        // 2. Fall back to PREQUEL relation
+        if let prequel = edges.first(where: {
+            $0.relationType == "PREQUEL" && ($0.node.type == nil || $0.node.type?.uppercased() == "ANIME")
+        }) {
+            return prequel.node.id
+        }
+        return nil
+    }
+}

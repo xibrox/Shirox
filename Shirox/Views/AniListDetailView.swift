@@ -55,6 +55,7 @@ struct AniListDetailView: View {
     @State private var selectedTab = 0
     @State private var sequelMediaId: Int? = nil
     @State private var watchOrder: [TVDBMappingService.AniraMediaEntry] = []
+    @State private var leadingInset: CGFloat = 0
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -130,7 +131,7 @@ struct AniListDetailView: View {
     private var navTitled: AnyView {
         AnyView(navBase
         #if os(iOS)
-        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea(edges: [.top, .leading])
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()
         #endif
@@ -241,6 +242,7 @@ struct AniListDetailView: View {
 
     var body: some View {
         navContent
+        .observeSafeAreaLeading($leadingInset)
         .task(id: mediaId) {
             watchOrder = await TVDBMappingService.shared.fetchWatchOrder(id: mediaId)
         }
@@ -531,24 +533,18 @@ struct AniListDetailView: View {
     // MARK: - Loading skeleton
     @ViewBuilder
     private var loadingSkeletonView: some View {
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let baseHeight: CGFloat = isIPad ? 500 : 420
+
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottom) {
                     Rectangle()
                         .fill(Color.secondary.opacity(0.35))
-                        .frame(height: 420)
+                        .frame(height: baseHeight)
                         .shimmer()
 
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: platformBackground.opacity(0.2), location: 0.45),
-                            .init(color: platformBackground, location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 420)
+                    CurvedGradientShadow(height: 350, color: platformBackground, style: .subtle)
 
                     HStack(alignment: .bottom, spacing: 14) {
                         RoundedRectangle(cornerRadius: 12)
@@ -567,10 +563,11 @@ struct AniListDetailView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 16)
+                    .padding(.leading, leadingInset)
                     .padding(.bottom, 20)
                     .shimmer()
                 }
-                .frame(height: 420)
+                .frame(height: baseHeight)
 
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 6) {
@@ -619,12 +616,14 @@ struct AniListDetailView: View {
                     .padding(.top, 20)
                     .shimmer()
                 }
+                .padding(.leading, leadingInset)
             }
             .padding(.bottom, 30)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .softScrollEdges()
-        .ignoresSafeArea(edges: .top)
+        .softScrollEdges([.bottom, .leading, .trailing])
+        .hideScrollEdgeEffect(.top)
+        .ignoresSafeArea(edges: [.top, .leading])
         .frame(maxWidth: .infinity)
     }
 
@@ -635,53 +634,30 @@ struct AniListDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 heroSection(media: media)
                     .frame(maxWidth: .infinity)
-                metadataSection(media: media)
-                    .frame(maxWidth: .infinity)
-                if let desc = media.plainDescription, !desc.isEmpty {
-                    SynopsisSection(text: desc)
-                        .padding(.top, 16)
-                }
 
-                #if os(iOS)
-                HStack(spacing: 10) {
-                    watchButton(media: media)
-
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            selectedTab = selectedTab == 0 ? 1 : 0
-                        }
-                    } label: {
-                        Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
-                            .frame(width: 46, height: 46)
-                            .background(
-                                selectedTab == 1
-                                    ? Color.primary
-                                    : Color.clear,
-                                in: Circle()
-                            )
-                            .background(.ultraThinMaterial, in: Circle())
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                            )
+                VStack(alignment: .leading, spacing: 0) {
+                    metadataSection(media: media)
+                        .frame(maxWidth: .infinity)
+                    if let desc = media.plainDescription, !desc.isEmpty {
+                        SynopsisSection(text: desc)
+                            .padding(.top, 16)
                     }
-                    .buttonStyle(.plain)
 
-                    if (media.episodes ?? 0) > 0 || media.status == "RELEASING" {
+                    #if os(iOS)
+                    HStack(spacing: 10) {
+                        watchButton(media: media)
+
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                isSelectionMode.toggle()
-                                if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+                                selectedTab = selectedTab == 0 ? 1 : 0
                             }
                         } label: {
-                            Image(systemName: isSelectionMode ? "arrow.down.circle.fill" : "arrow.down.circle")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(isSelectionMode ? platformBackground : .primary)
+                            Image(systemName: selectedTab == 0 ? "person.3.fill" : "list.bullet")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(selectedTab == 1 ? platformBackground : .primary)
                                 .frame(width: 46, height: 46)
                                 .background(
-                                    isSelectionMode
+                                    selectedTab == 1
                                         ? Color.primary
                                         : Color.clear,
                                     in: Circle()
@@ -693,48 +669,77 @@ struct AniListDetailView: View {
                                 )
                         }
                         .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
-                #endif
 
-                #if !os(iOS)
-                tabSelector
-                    .padding(.top, 8)
-                #endif
-                
-                if selectedTab == 0 {
-                    episodesSection(media: media)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    VStack(alignment: .leading, spacing: 20) {
-                        WatchOrderSection(entries: watchOrder)
-
-                        if let relations = media.relations?.edges, !relations.isEmpty {
-                            relationsSection(relations: relations)
-                                .frame(maxWidth: .infinity)
-                        } else if watchOrder.isEmpty {
-                            VStack(spacing: 20) {
-                                Image(systemName: "link.badge.plus")
-                                    .font(.system(size: 48))
-                                    .foregroundStyle(.secondary.opacity(0.5))
-                                Text("No relations found")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                        if (media.episodes ?? 0) > 0 || media.status == "RELEASING" {
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    isSelectionMode.toggle()
+                                    if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+                                }
+                            } label: {
+                                Image(systemName: isSelectionMode ? "arrow.down.circle.fill" : "arrow.down.circle")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(isSelectionMode ? platformBackground : .primary)
+                                    .frame(width: 46, height: 46)
+                                    .background(
+                                        isSelectionMode
+                                            ? Color.primary
+                                            : Color.clear,
+                                        in: Circle()
+                                    )
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                                    )
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 60)
+                            .buttonStyle(.plain)
                         }
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                    #endif
+
+                    #if !os(iOS)
+                    tabSelector
+                        .padding(.top, 8)
+                    #endif
+                    
+                    if selectedTab == 0 {
+                        episodesSection(media: media)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        VStack(alignment: .leading, spacing: 20) {
+                            WatchOrderSection(entries: watchOrder)
+
+                            if let relations = media.relations?.edges, !relations.isEmpty {
+                                relationsSection(relations: relations)
+                                    .frame(maxWidth: .infinity)
+                            } else if watchOrder.isEmpty {
+                                VStack(spacing: 20) {
+                                    Image(systemName: "link.badge.plus")
+                                        .font(.system(size: 48))
+                                        .foregroundStyle(.secondary.opacity(0.5))
+                                    Text("No relations found")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 60)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
                 }
+                .padding(.leading, leadingInset)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .softScrollEdges()
+        .softScrollEdges([.bottom, .leading, .trailing])
+        .hideScrollEdgeEffect(.top)
         .coordinateSpace(name: "heroScroll")
+        .ignoresSafeArea(edges: [.top, .leading])
         .frame(maxWidth: .infinity)
     }
 
@@ -898,32 +903,24 @@ struct AniListDetailView: View {
     // MARK: - Hero
     @ViewBuilder
     private func heroSection(media: Media) -> some View {
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let baseHeight: CGFloat = isIPad ? 500 : 420
+
         ZStack(alignment: .bottom) {
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("heroScroll")).minY
-                let stretch = max(0, scrollY)
-                let scrollDown = max(0, -scrollY)
-                let imageH = 420 + stretch + scrollDown * 0.5
-                let imageY = scrollDown * 0.5 - stretch
+                let isPullingDown = scrollY > 4
+                let stretchAmount = isPullingDown ? (scrollY - 4) : 0
+                let scale = isPullingDown ? (1.0 + (stretchAmount / max(baseHeight, 1))) : 1.0
 
                 TVDBPosterImage(media: media, type: .fanart)
-                    .frame(width: proxy.size.width, height: imageH)
+                    .frame(width: proxy.size.width, height: baseHeight)
                     .clipped()
-                    .offset(y: imageY)
+                    .scaleEffect(isPullingDown ? scale : 1.0, anchor: .bottom)
             }
-            .frame(height: 420)
-            .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
+            .frame(height: baseHeight)
 
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: platformBackground.opacity(0.2), location: 0.45),
-                    .init(color: platformBackground, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 420)
+            CurvedGradientShadow(height: 350, color: platformBackground, style: .subtle)
 
             HStack(alignment: .bottom, spacing: 14) {
                 TVDBPosterImage(media: media)
@@ -979,6 +976,7 @@ struct AniListDetailView: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
+            .padding(.leading, leadingInset)
             .padding(.bottom, 20)
         }
     }

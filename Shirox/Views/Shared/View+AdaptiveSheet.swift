@@ -63,6 +63,14 @@ extension View {
         if #available(iOS 16, macOS 13, *) {
             #if os(macOS)
                 self.toolbarBackground(.hidden, for: .windowToolbar)
+            #elseif os(iOS)
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    self
+                        .toolbarBackground(.hidden, for: .navigationBar)
+                        .toolbarBackground(.hidden, for: .tabBar)
+                } else {
+                    self.toolbarBackground(.hidden, for: .navigationBar)
+                }
             #else
                 self.toolbarBackground(.hidden, for: .navigationBar)
             #endif
@@ -78,6 +86,30 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+// MARK: - Safe Area Leading Preference Key
+
+struct SafeAreaLeadingKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+extension View {
+    func observeSafeAreaLeading(_ leadingInset: Binding<CGFloat>) -> some View {
+        self
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(key: SafeAreaLeadingKey.self, value: proxy.safeAreaInsets.leading)
+                        .onAppear { leadingInset.wrappedValue = proxy.safeAreaInsets.leading }
+                        .onChange(of: proxy.safeAreaInsets.leading) { newInset in leadingInset.wrappedValue = newInset }
+                }
+            }
+            .onPreferenceChange(SafeAreaLeadingKey.self) { newInset in
+                leadingInset.wrappedValue = newInset
+            }
     }
 }
 
@@ -196,3 +228,4 @@ extension View {
         }
     }
 }
+

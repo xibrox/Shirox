@@ -68,6 +68,7 @@ struct DetailView: View {
     @State private var showMatchingSearch = false
     @State private var sequelSearchItem: SearchItem? = nil
     @State private var watchOrder: [TVDBMappingService.AniraMediaEntry] = []
+    @State private var leadingInset: CGFloat = 0
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -123,32 +124,38 @@ struct DetailView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 heroSection
-                metadataSection(detail: detail).padding(.top, 12)
-                #if os(iOS)
-                VStack(alignment: .leading, spacing: 16) {
-                    synopsisSection(detail: detail).padding(.top, 16)
-                    actionBar(detail: detail).padding(.horizontal, 16).padding(.bottom, 8)
+                VStack(alignment: .leading, spacing: 0) {
+                    metadataSection(detail: detail).padding(.top, 12)
+                    #if os(iOS)
+                    VStack(alignment: .leading, spacing: 16) {
+                        synopsisSection(detail: detail).padding(.top, 16)
+                        actionBar(detail: detail).padding(.horizontal, 16).padding(.bottom, 8)
+                    }
+                    #endif
+                    #if !os(iOS)
+                    tabSelector.padding(.top, 8)
+                    #endif
+                    if selectedTab == 0 {
+                        episodesSection(detail: detail)
+                    } else {
+                        relationsSection
+                    }
                 }
-                #endif
-                #if !os(iOS)
-                tabSelector.padding(.top, 8)
-                #endif
-                if selectedTab == 0 {
-                    episodesSection(detail: detail)
-                } else {
-                    relationsSection
-                }
+                .padding(.leading, leadingInset)
             }
             .padding(.bottom, 30)
         }
-        .softScrollEdges()
+        .softScrollEdges([.bottom, .leading, .trailing])
+        .hideScrollEdgeEffect(.top)
         .coordinateSpace(name: "detailScroll")
-        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea(edges: [.top, .leading])
     }
 
     var body: some View {
         mainContent
+        .observeSafeAreaLeading($leadingInset)
         #if os(iOS)
+        .ignoresSafeArea(edges: [.top, .leading])
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()
         .scrollAwareNavTitle(item.title)
@@ -877,32 +884,24 @@ struct DetailView: View {
 
     // MARK: - Hero (unchanged, but poster overlay uses neutral strokes)
     private var heroSection: some View {
-        ZStack(alignment: .bottom) {
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let baseHeight: CGFloat = isIPad ? 500 : 420
+
+        return ZStack(alignment: .bottom) {
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("detailScroll")).minY
-                let stretch = max(0, scrollY)
-                let scrollDown = max(0, -scrollY)
-                let imageH = 420 + stretch + scrollDown * 0.5
-                let imageY = scrollDown * 0.5 - stretch
+                let isPullingDown = scrollY > 4
+                let stretchAmount = isPullingDown ? (scrollY - 4) : 0
+                let scale = isPullingDown ? (1.0 + (stretchAmount / max(baseHeight, 1))) : 1.0
 
                 CachedAsyncImage(urlString: heroBannerURL)
-                    .frame(width: proxy.size.width, height: imageH)
+                    .frame(width: proxy.size.width, height: baseHeight)
                     .clipped()
-                    .offset(y: imageY)
+                    .scaleEffect(isPullingDown ? scale : 1.0, anchor: .bottom)
             }
-            .frame(height: 420)
-            .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
+            .frame(height: baseHeight)
 
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: platformBackground.opacity(0.2), location: 0.45),
-                    .init(color: platformBackground, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 420)
+            CurvedGradientShadow(height: 350, color: platformBackground, style: .subtle)
 
             HStack(alignment: .bottom, spacing: 14) {
                 CachedAsyncImage(urlString: item.image)
@@ -959,6 +958,7 @@ struct DetailView: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
+            .padding(.leading, leadingInset)
             .padding(.bottom, 20)
         }
     }
@@ -970,59 +970,61 @@ struct DetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 heroSection
 
-                HStack(spacing: 8) {
-                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 68, height: 20)
-                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 52, height: 20)
-                    Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 44, height: 20)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .shimmer()
-
-                #if os(iOS)
-                VStack(alignment: .leading, spacing: 10) {
-                    RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 88, height: 20)
-                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
-                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
-                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 240)
-                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 13).frame(maxWidth: 160)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .shimmer()
-                #endif
-
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 96, height: 20)
-                        Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 28, height: 20)
-                        Spacer()
-                        Circle().fill(Color.secondary.opacity(0.3)).frame(width: 36, height: 36)
+                        Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 68, height: 20)
+                        Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 82, height: 20)
+                        Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 52, height: 20)
                     }
-                    .padding(.bottom, 12)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .shimmer()
 
-                    ForEach(0..<7, id: \.self) { _ in
-                        HStack(spacing: 14) {
-                            RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.35)).frame(width: 100, height: 56)
-                            VStack(alignment: .leading, spacing: 7) {
-                                RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 190)
-                                RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 11).frame(maxWidth: 110)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 10)
-                        Divider()
+                    VStack(alignment: .leading, spacing: 10) {
+                        RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 88, height: 20)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: .infinity)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 240)
+                        RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 13).frame(maxWidth: 160)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .shimmer()
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 96, height: 20)
+                            Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 28, height: 20)
+                            Spacer()
+                            Circle().fill(Color.secondary.opacity(0.3)).frame(width: 36, height: 36)
+                        }
+                        .padding(.bottom, 12)
+
+                        ForEach(0..<7, id: \.self) { _ in
+                            HStack(spacing: 14) {
+                                RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.35)).frame(width: 100, height: 56)
+                                VStack(alignment: .leading, spacing: 7) {
+                                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.35)).frame(height: 13).frame(maxWidth: 190)
+                                    RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.3)).frame(height: 11).frame(maxWidth: 110)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 10)
+                            Divider()
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 20)
+                    .shimmer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 20)
-                .shimmer()
+                .padding(.leading, leadingInset)
             }
             .padding(.bottom, 30)
         }
-        .softScrollEdges()
+        .softScrollEdges([.bottom, .leading, .trailing])
+        .hideScrollEdgeEffect(.top)
         .coordinateSpace(name: "detailScroll")
-        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea(edges: [.top, .leading])
     }
 
     @ViewBuilder

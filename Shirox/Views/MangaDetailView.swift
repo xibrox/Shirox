@@ -20,6 +20,7 @@ struct MangaDetailView: View {
     @State private var newestFirst = false
     @State private var readerContext: ReaderContext?
     @State private var showMatchSheet = false
+    @State private var leadingInset: CGFloat = 0
 
     #if os(iOS)
     @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
@@ -98,7 +99,9 @@ struct MangaDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .observeSafeAreaLeading($leadingInset)
         #if os(iOS)
+        .ignoresSafeArea(edges: [.top, .leading])
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackgroundHidden()
         .scrollAwareNavTitle(vm.detail?.title ?? item.title)
@@ -252,72 +255,68 @@ struct MangaDetailView: View {
         return ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 heroSection(detail)
-                if !displayTags.isEmpty {
-                    tagsSection(displayTags).padding(.top, 12)
-                }
-                VStack(alignment: .leading, spacing: 16) {
-                    if !synopsis.isEmpty {
-                        synopsisSection(text: synopsis).padding(.top, 16)
+                VStack(alignment: .leading, spacing: 0) {
+                    if !displayTags.isEmpty {
+                        tagsSection(displayTags).padding(.top, 12)
                     }
-                    #if os(iOS)
-                    readButton(detail)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .padding(.top, synopsis.isEmpty ? 16 : 0)
-                    libraryControls(detail)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                    #else
-                    Text("Reading is available on iOS")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 16)
-                    #endif
-                }
-                if let edges = vm.enrichment?.relations?.edges {
-                    let mangaRelations = edges.filter { $0.node.isManga }
-                    if !mangaRelations.isEmpty {
-                        mangaRelationsSection(mangaRelations).padding(.top, 16)
+                    VStack(alignment: .leading, spacing: 16) {
+                        if !synopsis.isEmpty {
+                            synopsisSection(text: synopsis).padding(.top, 16)
+                        }
+                        #if os(iOS)
+                        readButton(detail)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                            .padding(.top, synopsis.isEmpty ? 16 : 0)
+                        libraryControls(detail)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                        #else
+                        Text("Reading is available on iOS")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 16)
+                        #endif
                     }
+                    if let edges = vm.enrichment?.relations?.edges {
+                        let mangaRelations = edges.filter { $0.node.isManga }
+                        if !mangaRelations.isEmpty {
+                            mangaRelationsSection(mangaRelations).padding(.top, 16)
+                        }
+                    }
+                    chaptersSection(detail)
                 }
-                chaptersSection(detail)
+                .padding(.leading, leadingInset)
             }
             .padding(.bottom, 30)
         }
-        .softScrollEdges()
+        .softScrollEdges([.bottom, .leading, .trailing])
+        .hideScrollEdgeEffect(.top)
         .coordinateSpace(name: "mangaDetailScroll")
-        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea(edges: [.top, .leading])
     }
 
     // MARK: - Hero (mirrors DetailView's parallax banner)
 
     private func heroSection(_ detail: MangaDetail) -> some View {
-        ZStack(alignment: .bottom) {
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let baseHeight: CGFloat = isIPad ? 500 : 420
+
+        return ZStack(alignment: .bottom) {
             GeometryReader { proxy in
                 let scrollY = proxy.frame(in: .named("mangaDetailScroll")).minY
-                let stretch = max(0, scrollY)
-                let scrollDown = max(0, -scrollY)
-                let imageH = 420 + stretch + scrollDown * 0.5
-                let imageY = scrollDown * 0.5 - stretch
+                let isPullingDown = scrollY > 4
+                let stretchAmount = isPullingDown ? (scrollY - 4) : 0
+                let scale = isPullingDown ? (1.0 + (stretchAmount / max(baseHeight, 1))) : 1.0
 
                 CachedAsyncImage(urlString: detail.image)
-                    .frame(width: proxy.size.width, height: imageH)
+                    .frame(width: proxy.size.width, height: baseHeight)
                     .clipped()
-                    .offset(y: imageY)
+                    .scaleEffect(isPullingDown ? scale : 1.0, anchor: .bottom)
             }
-            .frame(height: 420)
-            .mask(alignment: .bottom) { Rectangle().frame(height: 420 + 2000) }
+            .frame(height: baseHeight)
 
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: platformBackground.opacity(0.2), location: 0.45),
-                    .init(color: platformBackground, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 420)
+            CurvedGradientShadow(height: 350, color: platformBackground, style: .subtle)
 
             HStack(alignment: .bottom, spacing: 14) {
                 CachedAsyncImage(urlString: detail.image)
@@ -381,6 +380,7 @@ struct MangaDetailView: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
+            .padding(.leading, leadingInset)
             .padding(.bottom, 20)
         }
     }

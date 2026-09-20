@@ -1,497 +1,262 @@
 import SwiftUI
 import Combine
 
+// MARK: - Navigation Row Component
+
+struct SettingsNavRow: View {
+    let icon: String
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 28, height: 28)
+            .glassChrome(
+                RoundedRectangle(cornerRadius: 7, style: .continuous),
+                enabled: true,
+                tint: nil,
+                off: .ultraThinMaterial
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5)
+            )
+
+            Text(title)
+                .font(.body)
+
+            Spacer()
+
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Root Settings View
+
 struct SettingsView: View {
-    @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
-    @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
-    @AppStorage("autoResumeDownloads") private var autoResumeDownloads = false
-    @AppStorage("autoDeleteWatched") private var autoDeleteWatched = false
-    @AppStorage(DataSaver.key) private var dataSaverEnabled = false
-    #if os(iOS)
-    @State private var showDeleteDownloadsConfirmation = false
-    @State private var downloadsSize = 0
-    #endif
-    @AppStorage("forceLandscape") private var forceLandscape = false
-    @AppStorage("playerSkipShort") private var skipShort: Int = 10
-    @AppStorage("playerSkipLong") private var skipLong: Int = 85
-    @AppStorage("speedBoostTolerance") private var speedBoostTolerance: Int = 10
-    @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
-    @StateObject private var librarySync = LibrarySyncService.shared
-    @State private var pendingSyncDirection: LibrarySyncService.Direction?
-    @State private var previewDirection: LibrarySyncService.Direction?
-    @State private var replacePlan: LibraryReplacePlan?
-    @AppStorage("autoNextEpisode") private var autoNextEpisode = true
-    @AppStorage("autoSkipSegments") private var autoSkipSegments = true
-    @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
-    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
-    @AppStorage("readerLiquidGlass") private var readerLiquidGlass = true
-    @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
-    @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
-    @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
-    @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
-    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
-    @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
-    @AppStorage("autoPickLastStream") private var autoPickLastStream = false
-    @AppStorage("dualSync") private var dualSync = false
-    @AppStorage("rateOnFinish") private var rateOnFinish = true
-    @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
-    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
-    @State private var showClearLocalLibrary = false
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
     @ObservedObject private var providerManager = ProviderManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
-    @State private var showResetCWConfirmation = false
-    @State private var showResetHistoryConfirmation = false
+    @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
     #if os(iOS)
-    @State private var imageCacheSize = 0
-    @State private var websiteDataSize = 0
-    @State private var tempFilesSize = 0
-    @State private var continueWatchingSize = 0
-    @State private var watchHistorySize = 0
-    @State private var searchAliasSize = 0
-    @State private var idMappingSize = 0
-    @State private var episodeSortSize = 0
     @State private var totalUsage = 0
-    @State private var isClearing = false
     #endif
 
-    private let shortOptions = [5, 10, 15, 30]
-    private let longOptions  = [30, 60, 85, 90, 120, 150, 180]
+    private var accountDisplayName: String {
+        if let username = aniListAuth.username, !username.isEmpty {
+            return username
+        }
+        if let username = malAuth.username, !username.isEmpty {
+            return username
+        }
+        if aniListAuth.isLoggedIn {
+            return "AniList User"
+        }
+        if malAuth.isLoggedIn {
+            return "MyAnimeList User"
+        }
+        return "Sign In"
+    }
 
-    private var orderedLanguages: [String] {
-        titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
+    private var accountSubtitle: String {
+        if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
+            return "AniList, MyAnimeList, and Tracking"
+        } else if aniListAuth.isLoggedIn {
+            return "AniList Account & Tracking"
+        } else if malAuth.isLoggedIn {
+            return "MyAnimeList Account & Tracking"
+        } else {
+            return "Connect AniList or MyAnimeList"
+        }
+    }
+
+    private var accountInitials: String {
+        let name = accountDisplayName
+        let parts = name.split(separator: " ")
+        if parts.count >= 2 {
+            let first = parts[0].prefix(1)
+            let second = parts[1].prefix(1)
+            return "\(first)\(second)".uppercased()
+        } else if name.count >= 2 {
+            return String(name.prefix(2)).uppercased()
+        } else if !name.isEmpty {
+            return name.uppercased()
+        }
+        return "S"
+    }
+
+    private var accountAvatarURL: String? {
+        if aniListAuth.isLoggedIn, let url = aniListAuth.avatarURL, !url.isEmpty {
+            return url
+        }
+        if malAuth.isLoggedIn, let url = malAuth.avatarURL, !url.isEmpty {
+            return url
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private var accountAvatar: some View {
+        if let url = accountAvatarURL {
+            CachedAsyncImage(urlString: url)
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 52, height: 52)
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5))
+        } else if aniListAuth.isLoggedIn || malAuth.isLoggedIn {
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.35, green: 0.75, blue: 0.98))
+                    .frame(width: 52, height: 52)
+                Text(accountInitials)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+        } else {
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.35, green: 0.75, blue: 0.98))
+                    .frame(width: 52, height: 52)
+                Image(systemName: "person.fill")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+        }
+    }
+
+    private var modulesSubtitle: String? {
+        moduleManager.activeModule?.sourceName ?? providerManager.primary?.providerType.displayName
+    }
+
+    private var playerSubtitle: String {
+        switch preferredQuality {
+        case "auto": return "Auto"
+        case "highest": return "Highest"
+        case "lowest": return "Lowest"
+        default: return "\(preferredQuality)p"
+        }
     }
 
     var body: some View {
         NavigationStack {
-            List {                
-                Section("Modules") {
+            List {
+                Section {
                     NavigationLink {
-                        ModuleListView()
+                        AccountsSettingsView()
                     } label: {
-                        HStack(spacing: 12) {
-                            // Icon
-                            Group {
-                                if let active = moduleManager.activeModule {
-                                    CachedAsyncImage(urlString: active.iconUrl ?? "", base64String: active.iconData)
-                                } else {
-                                    AsyncImage(url: URL(string: providerManager.primary?.providerType.iconURL ?? "")) { phase in
-                                        if case .success(let image) = phase {
-                                            image.resizable().aspectRatio(contentMode: .fit)
-                                        } else {
-                                            Image(systemName: "list.bullet")
-                                                .font(.title)
-                                                .foregroundStyle(Color.red)
-                                        }
-                                    }
-                                }
-                            }
-                            .frame(width: 48, height: 48)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(moduleManager.activeModule?.sourceName ?? providerManager.primary?.providerType.displayName ?? "AniList")
-                                    .font(.headline)
-                                Text("Manage your modules")
-                                    .font(.subheadline)
+                        HStack(spacing: 14) {
+                            accountAvatar
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(accountDisplayName)
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                Text(accountSubtitle)
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
-                    }
-                    Toggle("Use Default Extension", isOn: $useDefaultExtension)
-                        .tint(.secondary)
-                        .disabled(moduleManager.activeModule == nil)
-                    Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
-                        .tint(.secondary)
-                    Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
-                        .tint(.secondary)
-                }
-
-                ProvidersSettingsSection()
-
-                Section("Player") {
-                    Toggle("Force Landscape Mode", isOn: $forceLandscape)
-                        .tint(.secondary)
-                        #if os(iOS)
-                        .onChangeOf(forceLandscape) {
-                            PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
-                        }
-                        #endif
-                    if #available(iOS 26.0, macOS 26.0, *) {
-                        Toggle("Liquid Glass Controls", isOn: $playerLiquidGlass)
-                            .tint(.secondary)
-                        Text("Frosted glass buttons in the video player. Turn off for solid controls.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Picker("Preferred Quality", selection: $preferredQuality) {
-                        Text("Auto").tag("auto")
-                        Text("Highest").tag("highest")
-                        Text("1080p").tag("1080")
-                        Text("720p").tag("720")
-                        Text("480p").tag("480")
-                        Text("Lowest").tag("lowest")
-                    }
-                    Text("Which rendition to start on when a stream offers several. Auto lets the player adapt to your connection; a fixed choice falls back to the closest available.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Picker("Hold-to-Speed Tolerance", selection: $speedBoostTolerance) {
-                        Text("Strict").tag(10)
-                        Text("Relaxed").tag(30)
-                        Text("Very Relaxed").tag(60)
-                    }
-                    Text("How far your finger may drift while pressing and holding before the 2x speed boost is cancelled. Raise it if holding to speed up keeps dropping back to normal.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Picker("Skip Duration", selection: $skipShort) {
-                        ForEach(shortOptions, id: \.self) { s in
-                            Text("\(s)s").tag(s)
-                        }
-                    }
-                    Picker("Long Skip Duration", selection: $skipLong) {
-                        ForEach(longOptions, id: \.self) { s in
-                            Text("\(s)s").tag(s)
-                        }
-                    }
-                    Toggle("Auto Next Episode", isOn: $autoNextEpisode)
-                        .tint(.secondary)
-                    Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
-                        .tint(.secondary)
-                    Text("Automatically skip intros, recaps, credits, and previews")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
-                        .tint(.secondary)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Episode Progress Threshold")
-                            Spacer()
-                            Text("\(Int(watchedPercentage))%")
-                                .font(.headline)
-                                .monospacedDigit()
-                        }
-                        #if !os(tvOS)
-                        Slider(value: $watchedPercentage, in: 50...100, step: 1)
-                        #endif
-                    }
-                }
-
-                #if os(iOS)
-                if #available(iOS 26.0, *) {
-                    Section("Reader") {
-                        Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
-                            .tint(.secondary)
-                        Text("Frosted glass buttons in the manga reader. Turn off for solid controls.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                #endif
-
-                if aniListAuth.isLoggedIn || malAuth.isLoggedIn {
-                    Section("Tracking") {
-                        if aniListAuth.isLoggedIn {
-                            Toggle("Track on AniList", isOn: $aniListTrackingEnabled)
-                                .tint(.secondary)
-                        }
-                        if malAuth.isLoggedIn {
-                            Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
-                                .tint(.secondary)
-                        }
-                        if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
-                            Toggle("Sync edits to both services", isOn: $dualSync)
-                                .tint(.secondary)
-                        }
-                        Toggle("Never reduce progress", isOn: $skipReWatchTracking)
-                            .tint(.secondary)
-                        Toggle("Prompt to rate after finishing", isOn: $rateOnFinish)
-                            .tint(.secondary)
-                        Text("Automatically update your watch progress as you watch.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
-                    Section("Sync Library") {
-                        ForEach(LibrarySyncService.Direction.syncCases) { direction in
-                            syncRow(direction)
-                        }
-                        Text("Brings your two accounts into line — a one-time backfill for everything you tracked before signing in here. Syncing both ways reconciles them in a single pass; the one-way copies only ever write to the destination. Either way progress is only ever moved forward, so anything further along is left as it is.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Section("Replace Library") {
-                        ForEach(LibrarySyncService.Direction.replaceCases) { direction in
-                            syncRow(direction)
-                        }
-                        Text("Use when one account is simply the one you want to keep. Overwrites the other with it — progress, status, score and rewatch count — even where that means going backwards. Titles only the overwritten account has are left in place. This can't be undone.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Section("Mirror Library") {
-                        ForEach(LibrarySyncService.Direction.mirrorCases) { direction in
-                            syncRow(direction)
-                        }
-                        Text("Everything Replace does, and the overwritten account also loses any entry the other doesn't have, ending up an exact copy. Entries whose match can't be confirmed are kept rather than deleted. This can't be undone.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                Section("Library") {
-                    NavigationLink {
-                        LibrarySettingsView()
-                    } label: {
-                        Label("List Order & Custom Lists", systemImage: "list.bullet.indent")
+                        .padding(.vertical, 4)
                     }
                 }
 
                 Section {
-                    Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled)
-                        .tint(.secondary)
-                    Picker("Score Format", selection: $localScoreFormatRaw) {
-                        Text("100 Point").tag(ScoreFormat.point100.rawValue)
-                        Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
-                        Text("10 Point").tag(ScoreFormat.point10.rawValue)
-                        Text("5 Star").tag(ScoreFormat.point5.rawValue)
-                        Text("3 Point").tag(ScoreFormat.point3.rawValue)
-                    }
-                    Button(role: .destructive) {
-                        showClearLocalLibrary = true
+                    NavigationLink {
+                        PlayerSettingsView()
                     } label: {
-                        Label("Clear Local Library", systemImage: "trash")
+                        SettingsNavRow(
+                            icon: "play.tv",
+                            title: "Player",
+                            subtitle: playerSubtitle
+                        )
                     }
-                } header: {
-                    Text("Local Library")
-                } footer: {
-                    Text("Your on-device library works without signing in. Auto-track keeps its Watching list in sync with what you watch.")
-                }
-                .alert("Clear Local Library", isPresented: $showClearLocalLibrary) {
-                    Button("Clear", role: .destructive) { LocalLibraryManager.shared.clearAll() }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This permanently removes all on-device entries and collections. AniList/MyAnimeList lists are not affected.")
+
+                    #if os(iOS)
+                    NavigationLink {
+                        ReaderSettingsView()
+                    } label: {
+                        SettingsNavRow(
+                            icon: "book",
+                            title: "Reader"
+                        )
+                    }
+                    #endif
+
+                    NavigationLink {
+                        ModulesSettingsView()
+                    } label: {
+                        SettingsNavRow(
+                            icon: "puzzlepiece.extension",
+                            title: "Modules",
+                            subtitle: modulesSubtitle
+                        )
+                    }
                 }
 
-                Section("Downloads") {
-                    Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
-                        ForEach(1...5, id: \.self) { count in
-                            Text("\(count)").tag(count)
-                        }
+                Section {
+                    NavigationLink {
+                        LibrarySettingsView()
+                    } label: {
+                        SettingsNavRow(
+                            icon: "books.vertical",
+                            title: "Library",
+                            subtitle: "Lists & Matching"
+                        )
                     }
-                    Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
-                        .tint(.secondary)
-                    Toggle("Auto-Resume Interrupted", isOn: $autoResumeDownloads)
-                        .tint(.secondary)
-                    Toggle("Delete After Watching", isOn: $autoDeleteWatched)
-                        .tint(.secondary)
-                    Text("Delete After Watching removes a downloaded episode once you finish it and close the player. Retry downloads that were interrupted or failed when the app next opens — off by default so reopening the app never starts a large transfer on cellular without you asking.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                    NavigationLink {
+                        DownloadsSettingsView()
+                    } label: {
+                        SettingsNavRow(
+                            icon: "arrow.down.circle",
+                            title: "Downloads"
+                        )
+                    }
+
+                    #if os(iOS)
+                    NavigationLink {
+                        StorageSettingsView()
+                    } label: {
+                        SettingsNavRow(
+                            icon: "internaldrive",
+                            title: "Storage & Cache",
+                            subtitle: totalUsage > 0 ? Self.formattedBytes(totalUsage) : nil
+                        )
+                    }
+                    #endif
                 }
 
-                Section("Matching") {
-                    ForEach(orderedLanguages, id: \.self) { lang in
-                        HStack {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                            Text(lang.capitalized)
-                        }
-                    }
-                    .onMove { from, to in
-                        var langs = orderedLanguages
-                        langs.move(fromOffsets: from, toOffset: to)
-                        titlePriority = langs.joined(separator: ",")
-                    }
-                    Text("Drag to reorder title priority for display and matching.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                #if os(iOS)
-                .environment(\.editMode, .constant(.active))
-                #endif
-
-                #if os(iOS)
-                Section("Data") {
-                    Toggle("Data Saver", isOn: $dataSaverEnabled)
-                        .tint(.secondary)
-                    Text("Loads smaller artwork and skips the large banner images on Home. Posters look softer; everything still works, and downloads and playback are unaffected.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Backup") {
+                Section {
                     NavigationLink {
                         BackupSettingsView()
                     } label: {
-                        Label("Backup & Restore", systemImage: "arrow.up.arrow.down.circle")
+                        SettingsNavRow(
+                            icon: "arrow.up.arrow.down.circle",
+                            title: "Backup & Restore"
+                        )
                     }
-                    Text("Save your progress, library, settings and modules to a file, or restore them from one.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
 
-                Section("Storage & Cache") {
                     #if os(iOS)
-                    Button(role: .destructive) {
-                        showDeleteDownloadsConfirmation = true
-                    } label: {
-                        LabeledContent("Delete All Downloads") {
-                            Text(Self.formattedBytes(downloadsSize))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.red)
-                    .disabled(downloadsSize == 0)
-                    Text("Removes every downloaded episode and chapter. Kept out of Clear Everything below — these are files you saved for offline use, not a cache the app can rebuild.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    #endif
-
-                    Button(role: .destructive) {
-                        guard !isClearing else { return }
-                        isClearing = true
-                        Task {
-                            await CacheManager.shared.clearEverything()
-                            imageCacheSize = 0
-                            websiteDataSize = 0
-                            tempFilesSize = 0
-                            continueWatchingSize = 0
-                            watchHistorySize = 0
-                            searchAliasSize = 0
-                            idMappingSize = 0
-                            episodeSortSize = 0
-                            totalUsage = 0
-                            isClearing = false
-                        }
-                    } label: {
-                        LabeledContent("Clear Everything") {
-                            if isClearing {
-                                ProgressView().scaleEffect(0.7)
-                            } else {
-                                Text(Self.formattedBytes(totalUsage))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .foregroundStyle(.red)
-                    .disabled(isClearing)
-
-                    DisclosureGroup("Individual Resets") {
-                        Button {
-                            CacheManager.shared.clearImageCache()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset Image Cache") {
-                                Text(Self.formattedBytes(imageCacheSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.primary)
-
-                        Button {
-                            guard !isClearing else { return }
-                            isClearing = true
-                            Task {
-                                await CacheManager.shared.clearWebsiteData()
-                                totalUsage -= websiteDataSize
-                                websiteDataSize = 0
-                                isClearing = false
-                            }
-                        } label: {
-                            LabeledContent("Reset Website Data") {
-                                Text(Self.formattedBytes(websiteDataSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.primary)
-
-                        Button {
-                            CacheManager.shared.clearTempFiles()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Clear Temporary Files") {
-                                Text(Self.formattedBytes(tempFilesSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.primary)
-
-                        Button {
-                            CacheManager.shared.clearSearchAliases()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset Search Aliases") {
-                                Text(Self.formattedBytes(searchAliasSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.primary)
-
-                        Button {
-                            CacheManager.shared.clearIDMappingCache()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset ID Mapping Cache") {
-                                Text(Self.formattedBytes(idMappingSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.primary)
-
-                        Button {
-                            CacheManager.shared.clearEpisodeSortPreferences()
-                            updateCacheSizes()
-                        } label: {
-                            LabeledContent("Reset Episode Sort Preferences") {
-                                Text(Self.formattedBytes(episodeSortSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.primary)
-
-                        Button {
-                            showResetCWConfirmation = true
-                        } label: {
-                            LabeledContent("Reset Continue Watching") {
-                                Text(Self.formattedBytes(continueWatchingSize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.red)
-
-                        Button {
-                            showResetHistoryConfirmation = true
-                        } label: {
-                            LabeledContent("Reset Watch History") {
-                                Text(Self.formattedBytes(watchHistorySize))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .foregroundStyle(.red)
-                    }
-                    .font(.subheadline)
-                    .disabled(isClearing)
-
-                    Text("Website Data includes cookies and local storage from module scrapers. Watch Data includes continue watching and history. Search Aliases store remembered search results and stream picks per module.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Diagnostics") {
                     NavigationLink {
                         SettingsViewLogger()
                     } label: {
-                        Label("App Logs", systemImage: "terminal")
+                        SettingsNavRow(
+                            icon: "terminal",
+                            title: "App Logs"
+                        )
                     }
+                    #endif
                 }
-                #endif
 
                 Section {
                     ForEach([LegalPage.imprint, .privacy, .contributors, .licenses], id: \.title) { page in
@@ -513,92 +278,142 @@ struct SettingsView: View {
             .softScrollEdges()
             .navigationTitle("Settings")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
-                Button("Reset", role: .destructive) {
-                    CacheManager.shared.clearContinueWatching()
-                    #if os(iOS)
-                    updateCacheSizes()
-                    #endif
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all in-progress playback cards from the Home screen.")
-            }
-            #if os(iOS)
-            .alert("Delete All Downloads?", isPresented: $showDeleteDownloadsConfirmation) {
-                Button("Delete", role: .destructive) {
-                    // Through the managers rather than the filesystem, so the manifests don't
-                    // keep listing episodes whose files are gone.
-                    DownloadManager.shared.removeAll(DownloadManager.shared.items)
-                    MangaDownloadManager.shared.removeAll(MangaDownloadManager.shared.items)
-                    updateCacheSizes()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Every downloaded episode and chapter will be removed from this device. You can download them again later.")
-            }
-            #endif
-            .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
-                Button("Reset", role: .destructive) {
-                    CacheManager.shared.clearWatchHistory()
-                    #if os(iOS)
-                    updateCacheSizes()
-                    #endif
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will clear all 'Watched' checkmarks from episode lists.")
-            }
-            .alert(
-                pendingSyncDirection?.title ?? "Sync Library",
-                isPresented: Binding(
-                    get: { pendingSyncDirection != nil },
-                    set: { if !$0 { pendingSyncDirection = nil } }
-                ),
-                presenting: pendingSyncDirection
-            ) { direction in
-                Button(direction.confirmButtonTitle, role: direction.isDestructive ? .destructive : nil) {
-                    pendingSyncDirection = nil
-                    Task { await librarySync.sync(direction) }
-                }
-                Button("Cancel", role: .cancel) { pendingSyncDirection = nil }
-            } message: { direction in
-                Text(direction.confirmationMessage)
-            }
-            .sheet(isPresented: Binding(
-                get: { replacePlan != nil && previewDirection != nil },
-                set: { if !$0 { replacePlan = nil; previewDirection = nil } }
-            )) {
-                if let plan = replacePlan, let direction = previewDirection {
-                    ReplacePreviewSheet(direction: direction, plan: plan) {
-                        replacePlan = nil
-                        previewDirection = nil
-                        Task { await librarySync.apply(plan, for: direction) }
-                    } onCancel: {
-                        replacePlan = nil
-                        previewDirection = nil
-                    }
-                }
-            }
+            .navigationBarTitleDisplayMode(.large)
             .onAppear {
-                #if os(iOS)
                 PlayerPresenter.shared.resetToAppOrientation()
-                updateCacheSizes()
-                #endif
+                Task {
+                    totalUsage = await CacheManager.shared.totalDiskUsage
+                }
+            }
+            #endif
+        }
+    }
+
+    static func formattedBytes(_ bytes: Int) -> String {
+        guard bytes > 0 else { return "0 KB" }
+        if bytes >= 1_000_000 {
+            return String(format: "%.1f MB", Double(bytes) / 1_000_000)
+        } else {
+            return String(format: "%.0f KB", Double(bytes) / 1_000)
+        }
+    }
+}
+
+// MARK: - Accounts & Tracking Settings
+
+struct AccountsSettingsView: View {
+    @ObservedObject private var aniListAuth = AniListAuthManager.shared
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    @StateObject private var librarySync = LibrarySyncService.shared
+    @State private var pendingSyncDirection: LibrarySyncService.Direction?
+    @State private var previewDirection: LibrarySyncService.Direction?
+    @State private var replacePlan: LibraryReplacePlan?
+
+    @AppStorage("aniListTrackingEnabled") private var aniListTrackingEnabled = true
+    @AppStorage("malTrackingEnabled") private var malTrackingEnabled = true
+    @AppStorage("skipReWatchTracking") private var skipReWatchTracking = true
+    @AppStorage("dualSync") private var dualSync = false
+    @AppStorage("rateOnFinish") private var rateOnFinish = true
+
+    var body: some View {
+        List {
+            ProvidersSettingsSection()
+
+            if aniListAuth.isLoggedIn || malAuth.isLoggedIn {
+                Section("Tracking") {
+                    if aniListAuth.isLoggedIn {
+                        Toggle("Track on AniList", isOn: $aniListTrackingEnabled)
+                            .tint(.secondary)
+                    }
+                    if malAuth.isLoggedIn {
+                        Toggle("Track on MyAnimeList", isOn: $malTrackingEnabled)
+                            .tint(.secondary)
+                    }
+                    if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
+                        Toggle("Sync edits to both services", isOn: $dualSync)
+                            .tint(.secondary)
+                    }
+                    Toggle("Never reduce progress", isOn: $skipReWatchTracking)
+                        .tint(.secondary)
+                    Toggle("Prompt to rate after finishing", isOn: $rateOnFinish)
+                        .tint(.secondary)
+                    Text("Automatically update your watch progress as you watch.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if aniListAuth.isLoggedIn && malAuth.isLoggedIn {
+                Section("Sync Library") {
+                    ForEach(LibrarySyncService.Direction.syncCases) { direction in
+                        syncRow(direction)
+                    }
+                    Text("Brings your two accounts into line — a one-time backfill for everything you tracked before signing in here. Syncing both ways reconciles them in a single pass; the one-way copies only ever write to the destination. Either way progress is only ever moved forward, so anything further along is left as it is.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Replace Library") {
+                    ForEach(LibrarySyncService.Direction.replaceCases) { direction in
+                        syncRow(direction)
+                    }
+                    Text("Use when one account is simply the one you want to keep. Overwrites the other with it — progress, status, score and rewatch count — even where that means going backwards. Titles only the overwritten account has are left in place. This can't be undone.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Mirror Library") {
+                    ForEach(LibrarySyncService.Direction.mirrorCases) { direction in
+                        syncRow(direction)
+                    }
+                    Text("Everything Replace does, and the overwritten account also loses any entry the other doesn't have, ending up an exact copy. Entries whose match can't be confirmed are kept rather than deleted. This can't be undone.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Accounts & Tracking")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .alert(
+            pendingSyncDirection?.title ?? "Sync Library",
+            isPresented: Binding(
+                get: { pendingSyncDirection != nil },
+                set: { if !$0 { pendingSyncDirection = nil } }
+            ),
+            presenting: pendingSyncDirection
+        ) { direction in
+            Button(direction.confirmButtonTitle, role: direction.isDestructive ? .destructive : nil) {
+                pendingSyncDirection = nil
+                Task { await librarySync.sync(direction) }
+            }
+            Button("Cancel", role: .cancel) { pendingSyncDirection = nil }
+        } message: { direction in
+            Text(direction.confirmationMessage)
+        }
+        .sheet(isPresented: Binding(
+            get: { replacePlan != nil && previewDirection != nil },
+            set: { if !$0 { replacePlan = nil; previewDirection = nil } }
+        )) {
+            if let plan = replacePlan, let direction = previewDirection {
+                ReplacePreviewSheet(direction: direction, plan: plan) {
+                    replacePlan = nil
+                    previewDirection = nil
+                    Task { await librarySync.apply(plan, for: direction) }
+                } onCancel: {
+                    replacePlan = nil
+                    previewDirection = nil
+                }
             }
         }
     }
 
-    /// One row in the Sync / Replace / Mirror sections. Safe runs get a confirmation dialog;
-    /// destructive ones get a full preview of what they would change.
     @ViewBuilder
     private func syncRow(_ direction: LibrarySyncService.Direction) -> some View {
         Button {
             if direction.isDestructive {
-                // Destructive runs are never launched straight from a tap — they go through a
-                // preview of exactly what they would change.
                 previewDirection = direction
                 Task { replacePlan = await librarySync.preview(direction) }
             } else {
@@ -623,40 +438,299 @@ struct SettingsView: View {
         }
         .disabled(librarySync.isRunning)
     }
+}
 
-    #if os(iOS)
-    private func updateCacheSizes() {
-        websiteDataSize = CacheManager.shared.websiteDataSize
-        tempFilesSize = CacheManager.shared.tempFilesSize
-        continueWatchingSize = CacheManager.shared.continueWatchingSize
-        watchHistorySize = CacheManager.shared.watchHistorySize
-        searchAliasSize = CacheManager.shared.searchAliasSize
-        idMappingSize = CacheManager.shared.idMappingSize
-        episodeSortSize = CacheManager.shared.episodeSortSize
+// MARK: - Player Settings
+
+struct PlayerSettingsView: View {
+    @AppStorage("forceLandscape") private var forceLandscape = false
+    @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
+    @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
+    @AppStorage("speedBoostTolerance") private var speedBoostTolerance: Int = 10
+    @AppStorage("playerSkipShort") private var skipShort: Int = 10
+    @AppStorage("playerSkipLong") private var skipLong: Int = 85
+    @AppStorage("autoNextEpisode") private var autoNextEpisode = true
+    @AppStorage("autoSkipSegments") private var autoSkipSegments = true
+    @AppStorage("watchedPercentage") private var watchedPercentage = 90.0
+
+    private let shortOptions = [5, 10, 15, 30]
+    private let longOptions  = [30, 60, 85, 90, 120, 150, 180]
+
+    var body: some View {
+        List {
+            Section("Display & Style") {
+                Toggle("Force Landscape Mode", isOn: $forceLandscape)
+                    .tint(.secondary)
+                    #if os(iOS)
+                    .onChangeOf(forceLandscape) {
+                        PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
+                    }
+                    #endif
+
+                if #available(iOS 26.0, macOS 26.0, *) {
+                    Toggle("Liquid Glass Controls", isOn: $playerLiquidGlass)
+                        .tint(.secondary)
+                    Text("Frosted glass buttons in the video player. Turn off for solid controls.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Playback Quality & Gestures") {
+                Picker("Preferred Quality", selection: $preferredQuality) {
+                    Text("Auto").tag("auto")
+                    Text("Highest").tag("highest")
+                    Text("1080p").tag("1080")
+                    Text("720p").tag("720")
+                    Text("480p").tag("480")
+                    Text("Lowest").tag("lowest")
+                }
+                Text("Which rendition to start on when a stream offers several. Auto lets the player adapt to your connection; a fixed choice falls back to the closest available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Picker("Hold-to-Speed Tolerance", selection: $speedBoostTolerance) {
+                    Text("Strict").tag(10)
+                    Text("Relaxed").tag(30)
+                    Text("Very Relaxed").tag(60)
+                }
+                Text("How far your finger may drift while pressing and holding before the 2x speed boost is cancelled. Raise it if holding to speed up keeps dropping back to normal.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Skipping") {
+                Picker("Skip Duration", selection: $skipShort) {
+                    ForEach(shortOptions, id: \.self) { s in
+                        Text("\(s)s").tag(s)
+                    }
+                }
+                Picker("Long Skip Duration", selection: $skipLong) {
+                    ForEach(longOptions, id: \.self) { s in
+                        Text("\(s)s").tag(s)
+                    }
+                }
+                Toggle("Auto-Skip Segments", isOn: $autoSkipSegments)
+                    .tint(.secondary)
+                Text("Automatically skip intros, recaps, credits, and previews")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Episodes & Progress") {
+                Toggle("Auto Next Episode", isOn: $autoNextEpisode)
+                    .tint(.secondary)
+
+                Toggle("Reverse Episode List by Default", isOn: EpisodeSortManager.shared.$defaultReverseSort)
+                    .tint(.secondary)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Episode Progress Threshold")
+                        Spacer()
+                        Text("\(Int(watchedPercentage))%")
+                            .font(.headline)
+                            .monospacedDigit()
+                    }
+                    #if !os(tvOS)
+                    Slider(value: $watchedPercentage, in: 50...100, step: 1)
+                    #endif
+                }
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Player")
         #if os(iOS)
-        downloadsSize = DownloadManager.shared.bytesOnDisk + MangaDownloadManager.shared.bytesOnDisk
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            PlayerPresenter.shared.resetToAppOrientation()
+        }
         #endif
-        // Image cache + total are computed asynchronously (Kingfisher disk size).
-        Task {
-            imageCacheSize = await CacheManager.shared.imageCacheSize
-            totalUsage = await CacheManager.shared.totalDiskUsage
-        }
     }
-    #endif
+}
 
-    private static func formattedBytes(_ bytes: Int) -> String {
-        guard bytes > 0 else { return "0 KB" }
-        if bytes >= 1_000_000 {
-            return String(format: "%.1f MB", Double(bytes) / 1_000_000)
-        } else {
-            return String(format: "%.0f KB", Double(bytes) / 1_000)
+// MARK: - Reader Settings
+
+#if os(iOS)
+struct ReaderSettingsView: View {
+    @AppStorage("readerLiquidGlass") private var readerLiquidGlass = true
+
+    var body: some View {
+        List {
+            if #available(iOS 26.0, *) {
+                Section {
+                    Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
+                        .tint(.secondary)
+                } header: {
+                    Text("Style")
+                } footer: {
+                    Text("Frosted glass buttons in the manga reader. Turn off for solid controls.")
+                }
+            } else {
+                Section {
+                    Text("Standard reader controls are active on this iOS version.")
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
+        .softScrollEdges()
+        .navigationTitle("Reader")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+#endif
+
+// MARK: - Modules Settings
+
+struct ModulesSettingsView: View {
+    @AppStorage("useDefaultExtension") private var useDefaultExtension = false
+    @AppStorage("autoPickLastSearchResult") private var autoPickLastSearchResult = false
+    @AppStorage("autoPickLastStream") private var autoPickLastStream = false
+    @EnvironmentObject private var moduleManager: ModuleManager
+    @ObservedObject private var providerManager = ProviderManager.shared
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    ModuleListView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Group {
+                            if let active = moduleManager.activeModule {
+                                CachedAsyncImage(urlString: active.iconUrl ?? "", base64String: active.iconData)
+                            } else {
+                                AsyncImage(url: URL(string: providerManager.primary?.providerType.iconURL ?? "")) { phase in
+                                    if case .success(let image) = phase {
+                                        image.resizable().aspectRatio(contentMode: .fit)
+                                    } else {
+                                        Image(systemName: "list.bullet")
+                                            .font(.title)
+                                            .foregroundStyle(Color.red)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(moduleManager.activeModule?.sourceName ?? providerManager.primary?.providerType.displayName ?? "AniList")
+                                .font(.headline)
+                            Text("Manage Installed Modules")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
+            Section {
+                Toggle("Use Default Extension", isOn: $useDefaultExtension)
+                    .tint(.secondary)
+                    .disabled(moduleManager.activeModule == nil)
+                Toggle("Auto-pick Last Search Result", isOn: $autoPickLastSearchResult)
+                    .tint(.secondary)
+                Toggle("Auto-pick Last Stream", isOn: $autoPickLastStream)
+                    .tint(.secondary)
+            } header: {
+                Text("Automation")
+            } footer: {
+                Text("Auto-pick choices reuse your previous source and stream selections when opening an episode or chapter.")
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Modules")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 
 // MARK: - Library Settings
 
 struct LibrarySettingsView: View {
+    @AppStorage("titleLanguagePriority") private var titlePriority = "english,romaji,native"
+    @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
+    @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
+    @State private var showClearLocalLibrary = false
+
+    private var orderedLanguages: [String] {
+        titlePriority.components(separatedBy: ",").filter { !$0.isEmpty }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    LibraryListOrderView()
+                } label: {
+                    Label("List Order & Custom Lists", systemImage: "list.bullet.indent")
+                }
+            }
+
+            Section("Matching") {
+                ForEach(orderedLanguages, id: \.self) { lang in
+                    HStack {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text(lang.capitalized)
+                    }
+                }
+                .onMove { from, to in
+                    var langs = orderedLanguages
+                    langs.move(fromOffsets: from, toOffset: to)
+                    titlePriority = langs.joined(separator: ",")
+                }
+                Text("Drag to reorder title priority for display and matching.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            #if os(iOS)
+            .environment(\.editMode, .constant(.active))
+            #endif
+
+            Section {
+                Toggle("Auto-track what you watch", isOn: $localAutoTrackEnabled)
+                    .tint(.secondary)
+                Picker("Score Format", selection: $localScoreFormatRaw) {
+                    Text("100 Point").tag(ScoreFormat.point100.rawValue)
+                    Text("10 Point (Decimal)").tag(ScoreFormat.point10Decimal.rawValue)
+                    Text("10 Point").tag(ScoreFormat.point10.rawValue)
+                    Text("5 Star").tag(ScoreFormat.point5.rawValue)
+                    Text("3 Point").tag(ScoreFormat.point3.rawValue)
+                }
+                Button(role: .destructive) {
+                    showClearLocalLibrary = true
+                } label: {
+                    Label("Clear Local Library", systemImage: "trash")
+                }
+            } header: {
+                Text("Local Library")
+            } footer: {
+                Text("Your on-device library works without signing in. Auto-track keeps its Watching list in sync with what you watch.")
+            }
+            .alert("Clear Local Library", isPresented: $showClearLocalLibrary) {
+                Button("Clear", role: .destructive) { LocalLibraryManager.shared.clearAll() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently removes all on-device entries and collections. AniList/MyAnimeList lists are not affected.")
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Library")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Library List Order View
+
+struct LibraryListOrderView: View {
     @AppStorage("libraryStatusOrder") private var statusOrderRaw: String = MediaListStatus.allCases.map(\.rawValue).joined(separator: ",")
 
     private var statuses: [MediaListStatus] {
@@ -697,7 +771,7 @@ struct LibrarySettingsView: View {
             }
         }
         .softScrollEdges()
-        .navigationTitle("Library")
+        .navigationTitle("List Order")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .environment(\.editMode, .constant(.active))
@@ -715,6 +789,276 @@ struct LibrarySettingsView: View {
         }
     }
 }
+
+// MARK: - Downloads Settings
+
+struct DownloadsSettingsView: View {
+    @AppStorage("maxConcurrentDownloads") private var maxConcurrentDownloads: Int = 3
+    @AppStorage("backgroundDownloadsEnabled") private var backgroundDownloadsEnabled = true
+    @AppStorage("autoResumeDownloads") private var autoResumeDownloads = false
+    @AppStorage("autoDeleteWatched") private var autoDeleteWatched = false
+    #if os(iOS)
+    @State private var downloadsSize = 0
+    @State private var showDeleteDownloadsConfirmation = false
+    #endif
+
+    var body: some View {
+        List {
+            Section("Downloads") {
+                Picker("Concurrent Downloads", selection: $maxConcurrentDownloads) {
+                    ForEach(1...5, id: \.self) { count in
+                        Text("\(count)").tag(count)
+                    }
+                }
+                Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
+                    .tint(.secondary)
+                Toggle("Auto-Resume Interrupted", isOn: $autoResumeDownloads)
+                    .tint(.secondary)
+                Toggle("Delete After Watching", isOn: $autoDeleteWatched)
+                    .tint(.secondary)
+                Text("Delete After Watching removes a downloaded episode once you finish it and close the player. Retry downloads that were interrupted or failed when the app next opens — off by default so reopening the app never starts a large transfer on cellular without you asking.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            #if os(iOS)
+            Section {
+                Button(role: .destructive) {
+                    showDeleteDownloadsConfirmation = true
+                } label: {
+                    LabeledContent("Delete All Downloads") {
+                        Text(SettingsView.formattedBytes(downloadsSize))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .foregroundStyle(.red)
+                .disabled(downloadsSize == 0)
+            } footer: {
+                Text("Removes every downloaded episode and chapter. Kept out of cache resets — these are files you saved for offline use, not a cache the app can rebuild.")
+            }
+            #endif
+        }
+        .softScrollEdges()
+        .navigationTitle("Downloads")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Delete All Downloads?", isPresented: $showDeleteDownloadsConfirmation) {
+            Button("Delete", role: .destructive) {
+                DownloadManager.shared.removeAll(DownloadManager.shared.items)
+                MangaDownloadManager.shared.removeAll(MangaDownloadManager.shared.items)
+                downloadsSize = DownloadManager.shared.bytesOnDisk + MangaDownloadManager.shared.bytesOnDisk
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every downloaded episode and chapter will be removed from this device. You can download them again later.")
+        }
+        .onAppear {
+            downloadsSize = DownloadManager.shared.bytesOnDisk + MangaDownloadManager.shared.bytesOnDisk
+        }
+        #endif
+    }
+}
+
+// MARK: - Storage & Cache Settings
+
+#if os(iOS)
+struct StorageSettingsView: View {
+    @AppStorage(DataSaver.key) private var dataSaverEnabled = false
+    @State private var imageCacheSize = 0
+    @State private var websiteDataSize = 0
+    @State private var tempFilesSize = 0
+    @State private var continueWatchingSize = 0
+    @State private var watchHistorySize = 0
+    @State private var searchAliasSize = 0
+    @State private var idMappingSize = 0
+    @State private var episodeSortSize = 0
+    @State private var totalUsage = 0
+    @State private var isClearing = false
+    @State private var showResetCWConfirmation = false
+    @State private var showResetHistoryConfirmation = false
+
+    var body: some View {
+        List {
+            Section("Data") {
+                Toggle("Data Saver", isOn: $dataSaverEnabled)
+                    .tint(.secondary)
+                Text("Loads smaller artwork and skips the large banner images on Home. Posters look softer; everything still works, and downloads and playback are unaffected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Storage & Cache") {
+                Button(role: .destructive) {
+                    guard !isClearing else { return }
+                    isClearing = true
+                    Task {
+                        await CacheManager.shared.clearEverything()
+                        imageCacheSize = 0
+                        websiteDataSize = 0
+                        tempFilesSize = 0
+                        continueWatchingSize = 0
+                        watchHistorySize = 0
+                        searchAliasSize = 0
+                        idMappingSize = 0
+                        episodeSortSize = 0
+                        totalUsage = 0
+                        isClearing = false
+                    }
+                } label: {
+                    LabeledContent("Clear Everything") {
+                        if isClearing {
+                            ProgressView().scaleEffect(0.7)
+                        } else {
+                            Text(SettingsView.formattedBytes(totalUsage))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .foregroundStyle(.red)
+                .disabled(isClearing)
+
+                DisclosureGroup("Individual Resets") {
+                    Button {
+                        CacheManager.shared.clearImageCache()
+                        updateCacheSizes()
+                    } label: {
+                        LabeledContent("Reset Image Cache") {
+                            Text(SettingsView.formattedBytes(imageCacheSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        guard !isClearing else { return }
+                        isClearing = true
+                        Task {
+                            await CacheManager.shared.clearWebsiteData()
+                            totalUsage -= websiteDataSize
+                            websiteDataSize = 0
+                            isClearing = false
+                        }
+                    } label: {
+                        LabeledContent("Reset Website Data") {
+                            Text(SettingsView.formattedBytes(websiteDataSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        CacheManager.shared.clearTempFiles()
+                        updateCacheSizes()
+                    } label: {
+                        LabeledContent("Clear Temporary Files") {
+                            Text(SettingsView.formattedBytes(tempFilesSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        CacheManager.shared.clearSearchAliases()
+                        updateCacheSizes()
+                    } label: {
+                        LabeledContent("Reset Search Aliases") {
+                            Text(SettingsView.formattedBytes(searchAliasSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        CacheManager.shared.clearIDMappingCache()
+                        updateCacheSizes()
+                    } label: {
+                        LabeledContent("Reset ID Mapping Cache") {
+                            Text(SettingsView.formattedBytes(idMappingSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        CacheManager.shared.clearEpisodeSortPreferences()
+                        updateCacheSizes()
+                    } label: {
+                        LabeledContent("Reset Episode Sort Preferences") {
+                            Text(SettingsView.formattedBytes(episodeSortSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        showResetCWConfirmation = true
+                    } label: {
+                        LabeledContent("Reset Continue Watching") {
+                            Text(SettingsView.formattedBytes(continueWatchingSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.red)
+
+                    Button {
+                        showResetHistoryConfirmation = true
+                    } label: {
+                        LabeledContent("Reset Watch History") {
+                            Text(SettingsView.formattedBytes(watchHistorySize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.red)
+                }
+                .font(.subheadline)
+                .disabled(isClearing)
+
+                Text("Website Data includes cookies and local storage from module scrapers. Watch Data includes continue watching and history. Search Aliases store remembered search results and stream picks per module.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Storage & Cache")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
+            Button("Reset", role: .destructive) {
+                CacheManager.shared.clearContinueWatching()
+                updateCacheSizes()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear all in-progress playback cards from the Home screen.")
+        }
+        .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
+            Button("Reset", role: .destructive) {
+                CacheManager.shared.clearWatchHistory()
+                updateCacheSizes()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear all 'Watched' checkmarks from episode lists.")
+        }
+        .onAppear {
+            updateCacheSizes()
+        }
+    }
+
+    private func updateCacheSizes() {
+        websiteDataSize = CacheManager.shared.websiteDataSize
+        tempFilesSize = CacheManager.shared.tempFilesSize
+        continueWatchingSize = CacheManager.shared.continueWatchingSize
+        watchHistorySize = CacheManager.shared.watchHistorySize
+        searchAliasSize = CacheManager.shared.searchAliasSize
+        idMappingSize = CacheManager.shared.idMappingSize
+        episodeSortSize = CacheManager.shared.episodeSortSize
+        Task {
+            imageCacheSize = await CacheManager.shared.imageCacheSize
+            totalUsage = await CacheManager.shared.totalDiskUsage
+        }
+    }
+}
+#endif
 
 // MARK: - Logger Views & Utilities
 

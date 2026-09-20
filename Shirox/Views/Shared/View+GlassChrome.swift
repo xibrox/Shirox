@@ -45,6 +45,16 @@ extension View {
             self
         }
     }
+
+    /// Explicitly hides the scroll-edge effect on iOS/macOS/tvOS 26+; a no-op on older systems.
+    @ViewBuilder
+    func hideScrollEdgeEffect(_ edges: Edge.Set = .all) -> some View {
+        if #available(iOS 26.0, macOS 26.0, tvOS 26.0, *) {
+            scrollEdgeEffectHidden(true, for: edges)
+        } else {
+            self
+        }
+    }
 }
 
 extension View {
@@ -144,7 +154,7 @@ private struct ScrollAwareNavTitle: ViewModifier {
                     bar
                     Spacer(minLength: 0)
                 }
-                .ignoresSafeArea(edges: .top)
+                .ignoresSafeArea(edges: [.top, .leading])
                 .allowsHitTesting(false)
             }
     }

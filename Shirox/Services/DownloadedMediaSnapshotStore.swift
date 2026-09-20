@@ -122,9 +122,10 @@ final class DownloadedMediaSnapshotStore: ObservableObject {
         var snap = snapshots[mediaKey] ?? newSnapshot(item: item)
 
         let aniListMedia = await fetchAniListIfNeeded(snap: snap)
-        let tvdbArt: (poster: String?, fanart: String?) = await {
-            guard let aid = snap.aniListID else { return (nil, nil) }
-            return await TVDBMappingService.shared.getArtwork(for: aid)
+        let tvdbArt = await {
+            guard let aid = snap.aniListID else { return (poster: nil as String?, fanart: nil as String?) }
+            let art = await TVDBMappingService.shared.getArtwork(for: aid)
+            return (poster: art.poster, fanart: art.fanart)
         }()
 
         // Poster: TVDB → AniList → module. Stop at first success.

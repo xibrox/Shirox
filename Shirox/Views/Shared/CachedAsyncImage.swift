@@ -309,19 +309,30 @@ struct TVDBPosterImage: View {
     @State private var tvdbURL: String?
 
     enum TVDBArtworkType {
-        case poster, fanart
+        case poster, fanart, textlessPoster, logo
     }
 
     private var providerFallback: String {
-        type == .fanart
-            ? (media.bannerImage ?? media.coverImage.extraLarge ?? media.coverImage.large ?? "")
-            : (media.coverImage.extraLarge ?? media.coverImage.large ?? "")
+        switch type {
+        case .fanart:
+            return media.bannerImage ?? media.coverImage.extraLarge ?? media.coverImage.large ?? ""
+        case .poster, .textlessPoster:
+            return media.coverImage.extraLarge ?? media.coverImage.large ?? ""
+        case .logo:
+            return ""
+        }
     }
 
     /// Immediate URL — TVDB cache if available, otherwise provider's native image.
     private var immediateURL: String {
         let cached = TVDBMappingService.shared.getCachedArtwork(for: media.id, provider: media.provider)
-        let cachedURL = (type == .poster) ? cached.poster : cached.fanart
+        let cachedURL: String?
+        switch type {
+        case .poster: cachedURL = cached.poster
+        case .fanart: cachedURL = cached.fanart
+        case .textlessPoster: cachedURL = cached.textlessPoster ?? cached.poster
+        case .logo: cachedURL = cached.logo
+        }
         return cachedURL ?? providerFallback
     }
 
@@ -336,10 +347,79 @@ struct TVDBPosterImage: View {
             .task(id: media.uniqueId) {
                 if let url = tvdbURL, !url.isEmpty { return }
                 let artwork = await TVDBMappingService.shared.getArtwork(for: media.id, provider: media.provider)
-                let url = (type == .poster) ? artwork.poster : artwork.fanart
-                guard let url, !url.isEmpty, url != immediateURL else { return }
-                tvdbURL = url
+                let resolvedURL: String?
+                switch type {
+                case .poster: resolvedURL = artwork.poster
+                case .fanart: resolvedURL = artwork.fanart
+                case .textlessPoster: resolvedURL = artwork.textlessPoster ?? artwork.poster
+                case .logo: resolvedURL = artwork.logo
+                }
+                guard let resolvedURL, !resolvedURL.isEmpty, resolvedURL != immediateURL else { return }
+                tvdbURL = resolvedURL
             }
+    }
+}
+
+// MARK: - TVDB Title Logo View (Image Title with Text Fallback)
+
+struct TVDBTitleLogoView: View {
+    let media: Media
+    var maxHeight: CGFloat = 135
+    var maxWidth: CGFloat = 360
+    var alignment: Alignment = .center
+
+    @State private var tvdbLogoURL: String?
+
+    private var immediateLogoURL: String? {
+        let direct = TVDBMappingService.shared.getCachedArtwork(for: media.id, provider: media.provider).logo
+        if let direct, !direct.isEmpty { return direct }
+        if let parentId = media.parentAnimeId {
+            let parentCached = TVDBMappingService.shared.getCachedArtwork(for: parentId, provider: media.provider).logo
+            if let parentCached, !parentCached.isEmpty { return parentCached }
+        }
+        return nil
+    }
+
+    private var resolvedURL: String? {
+        tvdbLogoURL ?? immediateLogoURL
+    }
+
+    var body: some View {
+        Group {
+            if let url = resolvedURL, !url.isEmpty {
+                CachedAsyncImage(urlString: url, contentMode: .fit)
+                    .frame(maxWidth: maxWidth, maxHeight: maxHeight, alignment: alignment)
+                    .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 3)
+            } else {
+                Text(media.title.displayTitle)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(alignment == .leading ? .leading : .center)
+                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 1)
+            }
+        }
+        .allowsHitTesting(false)
+        .task(id: media.uniqueId) {
+            tvdbLogoURL = immediateLogoURL
+            let artwork = await TVDBMappingService.shared.getArtwork(for: media.id, provider: media.provider)
+            if let logo = artwork.logo, !logo.isEmpty {
+                tvdbLogoURL = logo
+            } else {
+                let parentId: Int?
+                if let directParent = media.parentAnimeId {
+                    parentId = directParent
+                } else {
+                    parentId = await TVDBMappingService.shared.getParentAnimeId(for: media.id, provider: media.provider)
+                }
+                if let parentId {
+                    let parentArt = await TVDBMappingService.shared.getArtwork(for: parentId, provider: media.provider)
+                    if let parentLogo = parentArt.logo, !parentLogo.isEmpty {
+                        tvdbLogoURL = parentLogo
+                    }
+                }
+            }
+        }
     }
 }
 
