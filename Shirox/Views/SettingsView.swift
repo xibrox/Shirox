@@ -447,6 +447,7 @@ struct PlayerSettingsView: View {
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
     @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
     @AppStorage("speedBoostTolerance") private var speedBoostTolerance: Int = 10
+    @AppStorage("playerHoldAction") private var playerHoldAction = "speed"
     @AppStorage("playerSkipShort") private var skipShort: Int = 10
     @AppStorage("playerSkipLong") private var skipLong: Int = 85
     @AppStorage("autoNextEpisode") private var autoNextEpisode = true
@@ -489,12 +490,17 @@ struct PlayerSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Picker("Hold-to-Speed Tolerance", selection: $speedBoostTolerance) {
+                Picker("Hold Action", selection: $playerHoldAction) {
+                    Text("2× Speed").tag("speed")
+                    Text("Save Frame to Photos").tag("saveFrame")
+                }
+
+                Picker("Hold Tolerance", selection: $speedBoostTolerance) {
                     Text("Strict").tag(10)
                     Text("Relaxed").tag(30)
                     Text("Very Relaxed").tag(60)
                 }
-                Text("How far your finger may drift while pressing and holding before the 2x speed boost is cancelled. Raise it if holding to speed up keeps dropping back to normal.")
+                Text("How far your finger may drift before a hold is recognized. Raise it if the hold action keeps cancelling.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
