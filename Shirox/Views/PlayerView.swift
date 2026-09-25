@@ -5,6 +5,8 @@ import Combine
 
 #if os(iOS)
 import AVFoundation
+import Photos
+import CoreImage
 #endif
 #if canImport(GoogleCast)
 import GoogleCast
@@ -142,6 +144,7 @@ struct PlayerView: View {
     @AppStorage("watchedPercentage") private var watchedPercentage: Double = 90
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
     @AppStorage("speedBoostTolerance") private var speedBoostTolerance: Int = 10
+    @AppStorage("playerHoldAction") private var playerHoldAction = "speed"
     @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
     @State private var playbackSpeed: Double = 1.0
     @State private var volume: Float = 1.0
@@ -186,6 +189,10 @@ struct PlayerView: View {
     }
 
     @State private var isSpeedBoosted = false
+    #if os(iOS)
+    @State private var showFrameSaveAlert = false
+    @State private var frameSaveMessage = ""
+    #endif
     @State private var isVideoScrubbing = false
     @State private var videoScrubTime: Double = 0
     @State private var videoScrubStartTime: Double = 0
@@ -313,6 +320,13 @@ struct PlayerView: View {
             }
         }
         .ignoresSafeArea()
+        #if os(iOS)
+        .alert("Save Frame", isPresented: $showFrameSaveAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(frameSaveMessage)
+        }
+        #endif
         .onPreferenceChange(Skip85ButtonFramePreferenceKey.self) { frame in
             if frame != .zero { skip85ButtonFrame = frame }
         }
@@ -746,11 +760,15 @@ struct PlayerView: View {
                 moveTolerance: CGFloat(speedBoostTolerance),
                 onBegan: {
                     if !castManager.isConnected {
-                        isSpeedBoosted = true
-                        player.rate = 2.0
-                        // Hide the controls (title, gradients, play/pause) so the
-                        // 2× badge sits cleanly at the top by itself while boosting.
-                        setControlsVisible(false)
+                        if playerHoldAction == "saveFrame" {
+                            saveCurrentFrame(from: player)
+                        } else {
+                            isSpeedBoosted = true
+                            player.rate = 2.0
+                            // Hide the controls (title, gradients, play/pause) so the
+                            // 2× badge sits cleanly at the top by itself while boosting.
+                            setControlsVisible(false)
+                        }
                     }
                 },
                 onEnded: {
@@ -791,6 +809,49 @@ struct PlayerView: View {
         .animation(.easeInOut(duration: 0.15), value: isSpeedBoosted)
         .allowsHitTesting(false)
     }
+
+    #if os(iOS)
+    private func addFrameOutput(to item: AVPlayerItem) {
+        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ])
+        item.add(output)
+    }
+
+    private func saveCurrentFrame(from player: AVPlayer) {
+        guard let item = player.currentItem,
+              let output = item.outputs.compactMap({ $0 as? AVPlayerItemVideoOutput }).first,
+              let pixelBuffer = output.copyPixelBuffer(forItemTime: item.currentTime(), itemTimeForDisplay: nil),
+              let cgImage = CIContext().createCGImage(CIImage(cvPixelBuffer: pixelBuffer),
+                                                     from: CGRect(x: 0, y: 0,
+                                                                  width: CVPixelBufferGetWidth(pixelBuffer),
+                                                                  height: CVPixelBufferGetHeight(pixelBuffer))) else {
+            frameSaveMessage = "The current video frame is unavailable. Try again while the video is playing."
+            showFrameSaveAlert = true
+            return
+        }
+
+        let image = UIImage(cgImage: cgImage)
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                DispatchQueue.main.async {
+                    frameSaveMessage = "Allow Photos access in Settings to save video frames."
+                    showFrameSaveAlert = true
+                }
+                return
+            }
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            } completionHandler: { success, error in
+                DispatchQueue.main.async {
+                    frameSaveMessage = success ? "Frame saved to Photos." :
+                        "Could not save the frame: \(error?.localizedDescription ?? "Unknown error")"
+                    showFrameSaveAlert = true
+                }
+            }
+        }
+    }
+    #endif
 
     private var safeAreaTopInset: CGFloat {
         #if os(iOS)
@@ -1596,6 +1657,9 @@ struct PlayerView: View {
             asset = AVURLAsset(url: currentStream.url)
         }
         let item = AVPlayerItem(asset: asset)
+        #if os(iOS)
+        addFrameOutput(to: item)
+        #endif
         item.preferredForwardBufferDuration = 0 // Automatic: let AVPlayer size the buffer adaptively (YouTube-style ABR). A fixed value fights stall-minimization and prolongs stalls on flaky CDNs.
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = true // Continue buffering when paused
         
@@ -2577,6 +2641,9 @@ struct PlayerView: View {
         if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }
         else { asset = AVURLAsset(url: next.url) }
         let newItem = AVPlayerItem(asset: asset)
+        #if os(iOS)
+        addFrameOutput(to: newItem)
+        #endif
         newItem.preferredForwardBufferDuration = 0
         newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         setupPlaybackEndObserver(for: newItem)
@@ -2636,6 +2703,9 @@ struct PlayerView: View {
         if !next.headers.isEmpty { asset = AVURLAsset(url: next.url, options: ["AVURLAssetHTTPHeaderFieldsKey": next.headers]) }
         else { asset = AVURLAsset(url: next.url) }
         let newItem = AVPlayerItem(asset: asset)
+        #if os(iOS)
+        addFrameOutput(to: newItem)
+        #endif
         newItem.preferredForwardBufferDuration = 0
         newItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         setupPlaybackEndObserver(for: newItem)
