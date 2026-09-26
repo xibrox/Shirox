@@ -753,6 +753,18 @@ final class AniListMappingManager {
         loadMappings()
     }
     
+    func automaticTrackingEnabled(for media: Media) -> Bool {
+        automaticTrackingEnabled(provider: media.provider, mediaId: media.id)
+    }
+
+    func automaticTrackingEnabled(provider: ProviderType, mediaId: Int) -> Bool {
+        !userDefaults.bool(forKey: "com.shirox.manual_tracking.\(provider.rawValue)-\(mediaId)")
+    }
+
+    func setAutomaticTracking(_ enabled: Bool, for media: Media) {
+        userDefaults.set(!enabled, forKey: "com.shirox.manual_tracking.\(media.uniqueId)")
+    }
+
     func saveMapping(title: String, aniListID: Int) {
         mappings[title.lowercased()] = aniListID
         persist()
