@@ -493,6 +493,7 @@ struct PlayerView: View {
                 JellyfinService.shared.reportStopped(itemId: jellyfinItemId, positionSeconds: currentTime)
             }
             #if os(iOS)
+            UIApplication.shared.isIdleTimerDisabled = false
             // Give up audio focus on exit so system music (Spotify/Apple Music)
             // can resume. .notifyOthersOnDeactivation triggers their auto-resume.
             AppAudioSession.deactivate()
@@ -502,6 +503,11 @@ struct PlayerView: View {
             }
         }
         .onChangeOf(isPlaying) { playing in
+            #if os(iOS)
+            // The screen stays on while a video plays. AVPlayer's own display-sleep prevention
+            // didn't hold on iOS 26 (the screen dimmed mid-episode), and mpv has none at all.
+            UIApplication.shared.isIdleTimerDisabled = playing
+            #endif
             // On a Mac the controls and the pointer go away together while playing and come
             // back on a pause. Not on iPhone or iPad, where a pause from Control Center or a
             // call shouldn't bring the controls up.
