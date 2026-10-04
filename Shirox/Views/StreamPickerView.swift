@@ -170,12 +170,13 @@ struct ModulePickerStrip<Content: View>: View {
     }
 }
 
-/// Placeholder cards while a module searches, shaped like the results that replace them.
+/// Placeholder cards while a module searches, shaped like the results that replace them. Only as
+/// many as fit: a fixed six were wider than a phone's row and pushed the row off screen.
 struct ModulePickerSkeletonStrip: View {
     var body: some View {
-        ModulePickerStrip {
+        GeometryReader { geo in
             HStack(alignment: .top, spacing: 10) {
-                ForEach(0..<6, id: \.self) { _ in
+                ForEach(0..<max(1, Int((geo.size.width + 10) / 82)), id: \.self) { _ in
                     VStack(alignment: .leading, spacing: 4) {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.primary.opacity(0.08))
@@ -192,6 +193,8 @@ struct ModulePickerSkeletonStrip: View {
             .shimmer()
             .accessibilityHidden(true)
         }
+        .frame(height: ModulePickerRowLayout.stripHeight)
+        .clipped()
     }
 }
 

@@ -145,43 +145,43 @@ struct NotificationsView: View {
             case .avatar(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
-                        .frame(width: 52, height: 52)
+                        .frame(width: 72, height: 72)
                         .clipShape(Circle())
                     badge(symbol, color)
                 }
-                .frame(width: 56, height: 56)
+                .frame(width: 78, height: 78)
             case .cover(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
-                        .frame(width: 48, height: 68)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .frame(width: 70, height: 100)
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
                     badge(symbol, color)
                 }
-                .frame(width: 52, height: 72)
+                .frame(width: 76, height: 106)
             }
         } else {
             Image(systemName: symbol)
                 .font(.body.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
+                .frame(width: 60, height: 60)
                 .background(Circle().fill(color))
-                .frame(width: 52)
+                .frame(width: 76)
         }
     }
 
     /// The kind of notification, on the picture's corner.
     private func badge(_ symbol: String, _ color: Color) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 9, weight: .bold))
+            .font(.system(size: 11, weight: .bold))
             .foregroundStyle(.white)
-            .frame(width: 20, height: 20)
+            .frame(width: 24, height: 24)
             .background(Circle().fill(color))
             .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
             .offset(x: 4, y: 4)
     }
 
     private func notificationRow(_ notif: ProviderNotification) -> some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 14) {
             notificationIcon(notif)
 
             VStack(alignment: .leading, spacing: 4) {
