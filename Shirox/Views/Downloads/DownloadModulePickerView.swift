@@ -180,35 +180,63 @@ private struct DownloadModuleRow: View {
         }
     }
 
-    @ViewBuilder
+    /// Every state fills the same search field, status line and strip, so the row keeps its
+    /// height from searching to results, nothing found or an error.
     private var stateContent: some View {
-        switch rowVm.state {
-        case .idle:
-            titleField
-        case .loading:
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
-                Text("Searching \"\(rowVm.searchTitle)\"…").font(.caption).foregroundStyle(.secondary)
-            }
-        case .loadingEpisodes(let item):
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
-                Text("Loading episodes for \"\(item.title)\"…").font(.caption).foregroundStyle(.secondary)
-            }
-        case .loadingStreams:
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
-                Text("Fetching streams…").font(.caption).foregroundStyle(.secondary)
-            }
-        case .searchResults(let items):
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    titleField
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                titleField
+                if case .searchResults = rowVm.state {
                     Button("Show All") { showAllResults = true }
                         .font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
                         .zoomSource("allResults", in: resultsZoom, cornerRadius: 8)
                 }
-                verifyBanner
+            }
+            ModulePickerStatusLine(text: statusText, isWorking: isWorking, accessory: statusAccessory)
+            strip
+        }
+    }
+
+    private var isWorking: Bool {
+        switch rowVm.state {
+        case .loading, .loadingEpisodes, .loadingStreams: return true
+        default: return false
+        }
+    }
+
+    private var statusText: String {
+        switch rowVm.state {
+        case .idle: return "Search stopped"
+        case .loading: return "Searching \"\(rowVm.searchTitle)\"…"
+        case .loadingEpisodes(let item): return "Loading episodes for \"\(item.title)\"…"
+        case .loadingStreams: return "Fetching streams…"
+        case .searchResults(let items): return items.count == 1 ? "1 result" : "\(items.count) results"
+        case .selectingEpisode: return "Episode \(episodeNumber) wasn't matched — pick it:"
+        case .notFound: return rowVm.cloudflareURL != nil ? "Blocked by Cloudflare" : "No results"
+        case .error: return "Couldn't load"
+        }
+    }
+
+    private var statusAccessory: AnyView? {
+        switch rowVm.state {
+        case .searchResults, .selectingEpisode:
+            guard rowVm.cloudflareURL != nil else { return nil }
+            return AnyView(CloudflareVerifyCompactButton { rowVm.verifyAndRetry() })
+        default:
+            return nil
+        }
+    }
+
+    @ViewBuilder
+    private var strip: some View {
+        switch rowVm.state {
+        case .idle:
+            ModulePickerMessage(icon: "magnifyingglass", title: "Not searching",
+                                detail: "Tap Find to search this module.")
+        case .loading, .loadingEpisodes, .loadingStreams:
+            ModulePickerSkeletonStrip()
+        case .searchResults(let items):
+            ModulePickerStrip {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
@@ -222,42 +250,22 @@ private struct DownloadModuleRow: View {
                 }
             }
         case .selectingEpisode(let episodes):
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
-                verifyBanner
-                Text("Episode not auto-matched — pick manually:").font(.caption).foregroundStyle(.secondary)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(episodes) { ep in
-                            Button("Ep \(ep.displayNumber)") { rowVm.startSelectEpisode(ep) }
-                                .buttonStyle(.bordered).controlSize(.mini).foregroundStyle(Color.accentColor)
-                        }
-                    }
-                }
-            }
+            ModulePickerEpisodeGrid(episodes: episodes) { rowVm.startSelectEpisode($0) }
         case .notFound:
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
-                if rowVm.cloudflareURL != nil {
-                    Text("Blocked by Cloudflare").font(.caption).foregroundStyle(.secondary)
-                    verifyBanner
-                } else {
-                    Text("No results found").font(.caption).foregroundStyle(.secondary)
+            if rowVm.cloudflareURL != nil {
+                ModulePickerMessage(icon: "shield.lefthalf.filled", title: "Blocked by Cloudflare", tint: .orange) {
+                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
                 }
+            } else {
+                ModulePickerMessage(icon: "questionmark.square.dashed", title: "Nothing found",
+                                    detail: "Try another title in the search field.")
             }
         case .error(let msg):
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
-                Text(msg).font(.caption).foregroundStyle(.primary)
-                verifyBanner
+            ModulePickerMessage(icon: "exclamationmark.triangle", title: "Couldn't load", detail: msg, tint: .orange) {
+                if rowVm.cloudflareURL != nil {
+                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
+                }
             }
-        }
-    }
-
-    @ViewBuilder
-    private var verifyBanner: some View {
-        if rowVm.cloudflareURL != nil {
-            CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
         }
     }
 
@@ -319,7 +327,12 @@ private final class DownloadModuleRowViewModel: ObservableObject {
         }
     }
 
-    func startFind() { guard case .idle = state else { return }; persistAlias(); currentTask = Task { await find() } }
+    func startFind() {
+        guard case .idle = state else { return }
+        state = .loading   // at once, or the row shows "Not searching" for a frame
+        persistAlias()
+        currentTask = Task { await find() }
+    }
     func startSelectResult(_ item: SearchItem, targetEpisodeNumber: Int) {
         persistAlias()
         currentTask = Task { await selectResult(item, targetEpisodeNumber: targetEpisodeNumber) }
@@ -343,7 +356,7 @@ private final class DownloadModuleRowViewModel: ObservableObject {
 
     private func find() async {
         let keyword = searchTitle.trimmingCharacters(in: .whitespaces)
-        guard !keyword.isEmpty else { return }
+        guard !keyword.isEmpty else { state = .idle; return }
         state = .loading; readyStreams = nil
         let r = ModuleJSRunner(); runner = r
         do {

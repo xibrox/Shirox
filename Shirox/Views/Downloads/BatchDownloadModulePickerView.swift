@@ -157,6 +157,7 @@ private final class BatchDownloadModuleRowViewModel: ObservableObject {
     func cancel() { currentTask?.cancel(); currentTask = nil; state = .idle }
 
     func startFind() {
+        state = .loading   // at once, or the row shows "Not searching" for a frame
         ModuleSearchAliasManager.shared.setAlias(mediaId: mediaId, animeTitle: originalAnimeTitle, moduleId: module.id, alias: searchTitle)
         currentTask = Task { await find() }
     }
@@ -178,7 +179,7 @@ private final class BatchDownloadModuleRowViewModel: ObservableObject {
 
     private func find() async {
         let keyword = searchTitle.trimmingCharacters(in: .whitespaces)
-        guard !keyword.isEmpty else { return }
+        guard !keyword.isEmpty else { state = .idle; return }
         state = .loading; readyStreams = nil; readySearchItem = nil
         let r = ModuleJSRunner(); runner = r
         do {
@@ -311,27 +312,59 @@ private struct BatchDownloadModuleRow: View {
         }
     }
 
-    @ViewBuilder
+    /// Every state fills the same search field, status line and strip, so the row keeps its
+    /// height from searching to results, nothing found or an error.
     private var stateContent: some View {
-        switch rowVm.state {
-        case .idle:
-            titleField
-        case .loading:
-            HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
-                Text("Searching \"\(rowVm.searchTitle)\"…").font(.caption).foregroundStyle(.secondary)
-            }
-        case .searchResults(let items):
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    titleField
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                titleField
+                if case .searchResults = rowVm.state {
                     Button("Show All") { showAllResults = true }
                         .font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
                         .zoomSource("allResults", in: resultsZoom, cornerRadius: 8)
                 }
-                verifyBanner
+            }
+            ModulePickerStatusLine(text: statusText, isWorking: isWorking, accessory: statusAccessory)
+            strip
+        }
+    }
+
+    private var isWorking: Bool {
+        switch rowVm.state {
+        case .loading, .downloading: return true
+        default: return false
+        }
+    }
+
+    private var statusText: String {
+        switch rowVm.state {
+        case .idle: return "Search stopped"
+        case .loading: return "Searching \"\(rowVm.searchTitle)\"…"
+        case .searchResults(let items): return items.count == 1 ? "1 result" : "\(items.count) results"
+        case .downloading(let current, let total): return "Fetching \(current) of \(total)…"
+        case .done: return "Queued"
+        case .notFound: return rowVm.cloudflareURL != nil ? "Blocked by Cloudflare" : "No results"
+        case .error: return "Couldn't load"
+        }
+    }
+
+    private var statusAccessory: AnyView? {
+        guard case .searchResults = rowVm.state, rowVm.cloudflareURL != nil else { return nil }
+        return AnyView(CloudflareVerifyCompactButton { rowVm.verifyAndRetry() })
+    }
+
+    @ViewBuilder
+    private var strip: some View {
+        switch rowVm.state {
+        case .idle:
+            ModulePickerMessage(icon: "magnifyingglass", title: "Not searching",
+                                detail: "Tap Find to search this module.")
+        case .loading:
+            ModulePickerSkeletonStrip()
+        case .searchResults(let items):
+            ModulePickerStrip {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 10) {
+                    LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(items) { item in
                             Button { rowVm.startFetchStreamsForPicker(from: item) } label: {
                                 BatchSearchResultCard(item: item, episodeCount: episodeNumbers.count)
@@ -343,39 +376,29 @@ private struct BatchDownloadModuleRow: View {
                 }
             }
         case .downloading(let current, let total):
-            HStack(spacing: 8) {
-                ProgressView(value: Double(current), total: Double(total)).scaleEffect(0.7)
-                Text("Fetching \(current) of \(total)…").font(.caption).foregroundStyle(.secondary)
+            ModulePickerMessage(icon: "arrow.down.circle", title: "Fetching \(current) of \(total)") {
+                ProgressView(value: Double(current), total: Double(max(total, 1)))
+                    .frame(maxWidth: 200)
             }
         case .done(let count):
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
-                Text("Queued \(count) episode\(count == 1 ? "" : "s") for download")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            ModulePickerMessage(icon: "checkmark.circle.fill",
+                                title: "Queued \(count) episode\(count == 1 ? "" : "s")",
+                                detail: "They're downloading now.", tint: .green)
         case .notFound:
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
-                if rowVm.cloudflareURL != nil {
-                    Text("Blocked by Cloudflare").font(.caption).foregroundStyle(.secondary)
-                    verifyBanner
-                } else {
-                    Text("No results found").font(.caption).foregroundStyle(.secondary)
+            if rowVm.cloudflareURL != nil {
+                ModulePickerMessage(icon: "shield.lefthalf.filled", title: "Blocked by Cloudflare", tint: .orange) {
+                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
                 }
+            } else {
+                ModulePickerMessage(icon: "questionmark.square.dashed", title: "Nothing found",
+                                    detail: "Try another title in the search field.")
             }
         case .error(let msg):
-            VStack(alignment: .leading, spacing: 6) {
-                titleField
-                Text(msg).font(.caption).foregroundStyle(.primary)
-                verifyBanner
+            ModulePickerMessage(icon: "exclamationmark.triangle", title: "Couldn't load", detail: msg, tint: .orange) {
+                if rowVm.cloudflareURL != nil {
+                    CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
+                }
             }
-        }
-    }
-
-    @ViewBuilder
-    private var verifyBanner: some View {
-        if rowVm.cloudflareURL != nil {
-            CloudflareVerifyInlineButton { rowVm.verifyAndRetry() }
         }
     }
 
