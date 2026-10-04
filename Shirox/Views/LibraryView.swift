@@ -653,44 +653,34 @@ struct LibraryView: View {
         .listRowBackground(Color.clear)
         #if !os(tvOS)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            if entry.media.simklTitleKind == .movie {
-                if entry.status != .completed {
-                    Button {
-                        Task {
-                            await vm.update(entry: entry, status: .completed, progress: entry.progress,
-                                            score: entry.score)
-                        }
-                    } label: {
-                        Label("Watched", systemImage: "checkmark.circle.fill")
-                    }
-                    .tint(.green)
-                }
-            } else if entry.media.simklTitleKind == .tv {
-                Button {
-                    Task { await markNextEpisode(entry) }
-                } label: {
-                    Label("+1 EP", systemImage: "plus.circle.fill")
-                }
-                .tint(.green)
-            } else {
-                Button {
-                    Task {
-                        await vm.update(
-                            entry: entry,
-                            status: entry.status,
-                            progress: entry.progress + 1,
-                            // Pass the score in the active format so the canonical
-                            // value is preserved (not reinterpreted in a new scale).
-                            score: entry.displayScore(in: scoreFormat)
-                        )
-                    }
-                } label: {
-                    Label(entry.media.isManga ? "+1 CH" : "+1 EP", systemImage: "plus.circle.fill")
+            if let quick = quickProgress(entry) {
+                Button { Task { await quick.run() } } label: {
+                    Label(quick.title, systemImage: quick.icon)
                 }
                 .tint(.green)
             }
         }
         #endif
+    }
+
+    /// The one-step progress a row's swipe and a card's menu offer: a movie watched, the next
+    /// Simkl episode, or one more episode or chapter. Nil once a movie's done.
+    private func quickProgress(_ entry: LibraryEntry) -> (title: String, icon: String, run: () async -> Void)? {
+        if entry.media.simklTitleKind == .movie {
+            guard entry.status != .completed else { return nil }
+            return ("Watched", "checkmark.circle.fill", {
+                await vm.update(entry: entry, status: .completed, progress: entry.progress, score: entry.score)
+            })
+        }
+        if entry.media.simklTitleKind == .tv {
+            return ("+1 EP", "plus.circle.fill", { await markNextEpisode(entry) })
+        }
+        return (entry.media.isManga ? "+1 CH" : "+1 EP", "plus.circle.fill", {
+            // Pass the score in the active format so the canonical value is preserved (not
+            // reinterpreted in a new scale).
+            await vm.update(entry: entry, status: entry.status, progress: entry.progress + 1,
+                            score: entry.displayScore(in: scoreFormat))
+        })
     }
 
     /// Module-scraped and AniList/MAL entries navigate to a detail screen (branched destination).
@@ -840,15 +830,17 @@ struct LibraryView: View {
         }
         .softScrollEdges()
         .listStyle(.plain)
-        .gooeyRefreshable {
-            // An explicit user request, so it always checks — the away-time throttle is
-            // for automatic checks only. On the Simkl list the reload below is that check, and
-            // shows what went wrong; checking here as well would spend a second request.
-            if vm.source != .simkl { await SimklLibraryService.shared.refreshNow() }
-            async let count: Void = refreshUnreadCountIfNeeded()
-            await vm.refresh()
-            await count
-        }
+        .gooeyRefreshable { await refreshLibrary() }
+    }
+
+    private func refreshLibrary() async {
+        // An explicit user request, so it always checks — the away-time throttle is
+        // for automatic checks only. On the Simkl list the reload below is that check, and
+        // shows what went wrong; checking here as well would spend a second request.
+        if vm.source != .simkl { await SimklLibraryService.shared.refreshNow() }
+        async let count: Void = refreshUnreadCountIfNeeded()
+        await vm.refresh()
+        await count
     }
 
     @ViewBuilder
@@ -871,6 +863,84 @@ struct LibraryView: View {
         6
         #endif
     }
+
+    #if os(iOS)
+    /// The grid, in a scroll view of its own rather than the List. As List rows (a row per line
+    /// of posters) holding a card lifted the whole line, so the menu seemed to belong to the
+    /// row. The header rows come first in it, as in the List, so this scroll view is still the
+    /// first on screen and keeps the search bar.
+    private var gridScroll: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
+                    .padding(.top, 4).padding(.bottom, 6)
+                mediaTypeSegment
+                    .padding(.horizontal, 16).padding(.bottom, 6)
+                filterCapsuleRow
+                    .padding(.horizontal, 16).padding(.bottom, 10)
+                if showsLibraryList {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top),
+                                             count: gridColumns),
+                              spacing: 18) {
+                        ForEach(displayedEntries, id: \.media.id) { entry in
+                            gridCard(entry)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                } else {
+                    statusContent
+                        .frame(maxWidth: .infinity, minHeight: 320)
+                }
+                if let request = simklSearchRequest {
+                    Button {
+                        simklSearch = request
+                    } label: {
+                        Label("Search Simkl for “\(request.query)”", systemImage: "magnifyingglass")
+                    }
+                    .padding(.top, 16)
+                }
+            }
+            .padding(.bottom, 24)
+        }
+        .softScrollEdges()
+        .gooeyRefreshable { await refreshLibrary() }
+    }
+
+    /// A card: tap opens it, the pencil edits it, holding it offers both and a quick +1.
+    private func gridCard(_ entry: LibraryEntry) -> some View {
+        Button { openFromGrid(entry) } label: {
+            LibraryGridCard(entry: entry, scoreFormat: scoreFormat)
+        }
+        .buttonStyle(LibraryCardButtonStyle())
+        .overlay(alignment: .topLeading) {
+            // Over the poster's corner, outside the card's own button so it isn't swallowed.
+            GeometryReader { geo in
+                Button { editEntry(entry) } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(.black.opacity(0.55), in: Circle())
+                        .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Edit \(entry.media.title.displayTitle)")
+                // Bottom-right of the 2:3 poster, above the progress bar.
+                .position(x: geo.size.width - 20, y: geo.size.width * 1.5 - 24)
+            }
+        }
+        .zoomSource(entry.id, in: sheetZoom)
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 12))
+        .contextMenu {
+            Button { openFromGrid(entry) } label: { Label("Open", systemImage: "arrow.up.right") }
+            Button { editEntry(entry) } label: { Label("Edit", systemImage: "pencil") }
+            if let quick = quickProgress(entry) {
+                Button { Task { await quick.run() } } label: { Label(quick.title, systemImage: quick.icon) }
+            }
+        }
+    }
+    #endif
 
     /// The grid, a List row per line of posters, so the List stays lazy and keeps the search bar.
     private var gridRows: some View {
@@ -949,8 +1019,13 @@ struct LibraryView: View {
     private var libraryContentBase: some View {
         VStack(spacing: 0) {
             #if os(iOS)
-            // One List in every state, the header rows included — see `entriesList`.
-            entriesList
+            // One List (or, laid out as a grid, one scroll view) in every state, the header rows
+            // included — see `entriesList`.
+            if gridLayout {
+                gridScroll
+            } else {
+                entriesList
+            }
             #else
             LibrarySourceSwitcher(selected: vm.source) { vm.selectSource($0) }
             mediaTypeSegment
@@ -1242,33 +1317,55 @@ private extension MediaKind {
 
 // MARK: - Library row
 
-/// A title in the Library's grid: its poster, score and progress, and its name below.
+/// A title in the Library's grid: its poster with score and a progress bar, its name and
+/// where the viewer is below.
 private struct LibraryGridCard: View {
     let entry: LibraryEntry
     var scoreFormat: ScoreFormat = .point10Decimal
 
     private var progressText: String {
+        if let kind = entry.media.simklTitleKind {
+            return kind == .movie ? SimklTitleLabels.movieLine(entry.media) : SimklTitleLabels.showProgress(entry)
+        }
         let unit = entry.media.isManga ? "Ch" : "Ep"
-        if let total = entry.media.episodes, total > 0 { return "\(unit) \(entry.progress)/\(total)" }
+        if let total = entry.media.episodes, total > 0 { return "\(unit) \(entry.progress) of \(total)" }
         return "\(unit) \(entry.progress)"
     }
 
+    /// How far through, when the total's known.
+    private var fraction: Double? {
+        guard let total = entry.media.episodes, total > 0 else { return nil }
+        return min(Double(entry.progress) / Double(total), 1)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             Color.clear
                 .aspectRatio(2/3, contentMode: .fit)
                 .overlay(
-                    CachedAsyncImage(urlString: entry.media.coverImage.thumb ?? "")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
+                    ZStack {
+                        CachedAsyncImage(urlString: entry.media.coverImage.thumb ?? "")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                        // Keeps the bar and the edit button readable on a light poster.
+                        LinearGradient(stops: [.init(color: .clear, location: 0.6),
+                                               .init(color: .black.opacity(0.6), location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                    }
                 )
-                .overlay(alignment: .bottomLeading) {
-                    Text(progressText)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(.black.opacity(0.6), in: Capsule())
-                        .padding(6)
+                .overlay(alignment: .bottom) {
+                    if let fraction {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.25))
+                                Capsule().fill(.white)
+                                    .frame(width: max(geo.size.width * fraction, fraction > 0 ? 4 : 0))
+                            }
+                        }
+                        .frame(height: 3)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 7)
+                    }
                 }
                 .overlay(alignment: .topTrailing) {
                     if entry.score > 0 {
@@ -1285,15 +1382,38 @@ private struct LibraryGridCard: View {
                         .padding(6)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            Text(entry.media.title.displayTitle)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 3)
+            VStack(alignment: .leading, spacing: 2) {
+                // Two lines' room whatever the title, so a row's cards line up below.
+                ZStack(alignment: .topLeading) {
+                    Text("A\nA").hidden().accessibilityHidden(true)
+                    Text(entry.media.title.displayTitle)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.primary)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(progressText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A gentle press for a grid card, in place of a List row's grey highlight.
+private struct LibraryCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
     }
 }
 
@@ -1352,6 +1472,13 @@ private struct LibraryRowView: View {
                 Text(progressLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                if let total = entry.media.episodes, total > 0 {
+                    ProgressView(value: min(Double(entry.progress), Double(total)), total: Double(total))
+                        .tint(.primary)
+                        .scaleEffect(x: 1, y: 0.8, anchor: .center)
+                        .frame(maxWidth: 180)
+                }
 
                 HStack(spacing: 8) {
                     if let avg = entry.media.averageScore {
