@@ -126,37 +126,68 @@ struct SimklTrackWrite: Equatable {
         LocalPlaybackCoordinator.shared.pruneOrphanedImports(keeping: referenced)
     }
 
-    /// Removes the watched key and any CW item for a single episode.
+    /// Removes the watched marks and any CW item for a single episode, under every identity the
+    /// title can be saved under: its AniList id and its module + title. A download keeps the
+    /// AniList id while a stream from the module page may not, and the rows read either — so
+    /// clearing only one left the episode showing as watched.
     func resetEpisodeProgress(aniListID: Int?, moduleId: String?, mediaTitle: String,
                               episodeNumber: Int, episodeHref: String? = nil) {
-        if let key = Self.watchedKey(aniListID: aniListID, moduleId: moduleId,
-                                     mediaTitle: mediaTitle, episodeNumber: episodeNumber) {
-            watchedKeys.remove(key)
+        for identity in Self.identities(aniListID: aniListID, moduleId: moduleId) {
+            if let key = Self.watchedKey(aniListID: identity.aniListID, moduleId: identity.moduleId,
+                                         mediaTitle: mediaTitle, episodeNumber: episodeNumber) {
+                watchedKeys.remove(key)
+            }
+            removeWatchedHref(aniListID: identity.aniListID, moduleId: identity.moduleId,
+                              mediaTitle: mediaTitle, episodeHref: episodeHref)
         }
-        removeWatchedHref(aniListID: aniListID, moduleId: moduleId,
-                          mediaTitle: mediaTitle, episodeHref: episodeHref)
         items.removeAll {
-            matchesShow($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
+            matchesAnyIdentity($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
             && $0.episodeNumber == episodeNumber
         }
         persist()
     }
 
-    /// Removes all watched keys and CW items for a single show.
+    /// Removes all watched marks and CW items for a single show, under every identity it can be
+    /// saved under (see `resetEpisodeProgress`).
     func resetProgress(aniListID: Int?, moduleId: String?, mediaTitle: String) {
-        if let aid = aniListID {
-            watchedKeys = watchedKeys.filter { !$0.hasPrefix("a:\(aid):") }
-        } else if let mid = moduleId, !mid.isEmpty {
-            let prefix = "m:\(mid):\(mediaTitle):"
-            watchedKeys = watchedKeys.filter { !$0.hasPrefix(prefix) }
+        for identity in Self.identities(aniListID: aniListID, moduleId: moduleId) {
+            if let prefix = Self.watchedPrefix(aniListID: identity.aniListID, moduleId: identity.moduleId,
+                                               mediaTitle: mediaTitle) {
+                watchedKeys = watchedKeys.filter { !$0.hasPrefix(prefix) }
+            }
+            if let hrefPrefix = Self.watchedHrefPrefix(aniListID: identity.aniListID, moduleId: identity.moduleId,
+                                                       mediaTitle: mediaTitle) {
+                watchedHrefKeys = watchedHrefKeys.filter { !$0.hasPrefix(hrefPrefix) }
+            }
         }
-        if let hrefPrefix = Self.watchedHrefPrefix(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle) {
-            watchedHrefKeys = watchedHrefKeys.filter { !$0.hasPrefix(hrefPrefix) }
-        }
-        var arr = items
-        removeAllShowItems(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle, in: &arr)
-        items = arr
+        items.removeAll { matchesAnyIdentity($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle) }
         persist()
+    }
+
+    /// The AniList identity and the module one, each on its own — the key builders prefer the
+    /// AniList id when given both, so each has to be asked for separately.
+    private static func identities(aniListID: Int?, moduleId: String?) -> [(aniListID: Int?, moduleId: String?)] {
+        var result: [(aniListID: Int?, moduleId: String?)] = []
+        if let aniListID { result.append((aniListID, nil)) }
+        if let moduleId, !moduleId.isEmpty { result.append((nil, moduleId)) }
+        return result
+    }
+
+    /// The prefix every watched mark of a show shares. Module titles are stored lowercased.
+    private static func watchedPrefix(aniListID: Int?, moduleId: String?, mediaTitle: String) -> String? {
+        if let aid = aniListID { return "a:\(aid):" }
+        if let mid = moduleId, !mid.isEmpty {
+            return "m:\(mid):\(mediaTitle.trimmingCharacters(in: .whitespaces).lowercased()):"
+        }
+        return nil
+    }
+
+    private func matchesAnyIdentity(_ item: ContinueWatchingItem,
+                                    aniListID: Int?, moduleId: String?, mediaTitle: String) -> Bool {
+        if let aniListID, item.aniListID == aniListID { return true }
+        if let moduleId, !moduleId.isEmpty, item.moduleId == moduleId,
+           item.mediaTitle.caseInsensitiveCompare(mediaTitle) == .orderedSame { return true }
+        return false
     }
 
     /// Returns true if the show has any CW item or watched episode.
@@ -164,13 +195,9 @@ struct SimklTrackWrite: Equatable {
         if items.contains(where: { matchesShow($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle) }) {
             return true
         }
-        if let aid = aniListID {
-            return watchedKeys.contains(where: { $0.hasPrefix("a:\(aid):") })
-        }
-        if let mid = moduleId, !mid.isEmpty {
-            return watchedKeys.contains(where: { $0.hasPrefix("m:\(mid):\(mediaTitle):") })
-        }
-        return false
+        guard let prefix = Self.watchedPrefix(aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
+        else { return false }
+        return watchedKeys.contains(where: { $0.hasPrefix(prefix) })
     }
 
     /// Clears all watched history and Continue Watching cards.

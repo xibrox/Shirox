@@ -758,7 +758,7 @@ struct AniListDetailView: View {
                             RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.35)).frame(width: 96, height: 20)
                             Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 28, height: 20)
                             Spacer()
-                            Circle().fill(Color.secondary.opacity(0.3)).frame(width: 36, height: 36)
+                            Circle().fill(Color.secondary.opacity(0.3)).frame(width: 42, height: 42)
                         }
                         .padding(.bottom, 12)
 
@@ -1254,9 +1254,9 @@ struct AniListDetailView: View {
                     isReversed.toggle()
                 } label: {
                     Image(systemName: isReversed ? "arrow.down" : "arrow.up")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 42, height: 42)
                         .background(.ultraThinMaterial, in: Circle())
                         .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                 }
@@ -1271,9 +1271,9 @@ struct AniListDetailView: View {
                             showResetConfirmation = true
                         } label: {
                             Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.primary)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 42, height: 42)
                                 .background(.ultraThinMaterial, in: Circle())
                                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                         }
@@ -1286,9 +1286,9 @@ struct AniListDetailView: View {
                         showResetConfirmation = true
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.primary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 42, height: 42)
                             .background(.ultraThinMaterial, in: Circle())
                             .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     }
