@@ -743,7 +743,7 @@ struct PlayerView: View {
                 availableTracks: subtitleTracks,
                 selectedTrack: Binding(get: { shownSubtitleTrack }, set: { pickSubtitleTrack($0) }),
                 allowLocalImport: canImportSubtitles,
-                onImport: addImportedSubtitle,
+                onImport: { addImportedSubtitle(keptWithDownload($0) ?? $0) },
                 embeddedTracks: embeddedSubtitles,
                 selectedEmbedded: shownEmbeddedSubtitle,
                 onSelectEmbedded: { pickEmbeddedSubtitle($0) },
@@ -762,7 +762,10 @@ struct PlayerView: View {
         }
         .onChangeOf(selectedSubtitleTrack) { loadSubtitles() }
         // What mpv draws follows who's drawing, and the viewer's settings.
-        .onChangeOf(subtitleRoute) { _ in applySubtitlesToMPV() }
+        .onChangeOf(subtitleRoute) { _ in
+            applySubtitlesToMPV()
+            hideStreamSubtitlesIfDrawingOurs()
+        }
         .onChangeOf(assScript) { _ in applySubtitlesToMPV() }
         #if os(iOS)
         // Under AirPlay the subtitles travel in the stream; a change has to reach the receiver.
@@ -2026,6 +2029,7 @@ struct PlayerView: View {
         e.play() // Ensure player starts
         isPlaying = true
         engine = e
+        hideStreamSubtitlesIfDrawingOurs()
         #if os(iOS)
         // AirPlay may already own the route when the player opens (picked in Control Center
         // beforehand), and then no route change ever arrives to move it onto the proxy: the
@@ -2397,13 +2401,22 @@ struct PlayerView: View {
         return currentStream.headers
     }
 
+    /// Each load only shows its result while it's still the track wanted. A stream's own track
+    /// coming in over the network after a quickly read imported file used to replace it, so the
+    /// import looked ignored.
     private func loadSubtitles() {
         if let track = selectedSubtitleTrack {
             Task {
                 do {
-                    show(try await VTTSubtitlesLoader.load(from: track.url.absoluteString, headers: subtitleHeaders(track.headers)))
+                    let loaded = try await VTTSubtitlesLoader.load(from: track.url.absoluteString, headers: subtitleHeaders(track.headers))
+                    guard selectedSubtitleTrack?.id == track.id else { return }
+                    show(loaded)
                 } catch {
                     Logger.shared.log("[Subtitles] Failed to load track '\(track.title)': \(error)", type: "Error")
+                    // Not the previous track's lines under the new one's name.
+                    guard selectedSubtitleTrack?.id == track.id else { return }
+                    subtitleCues = []
+                    assScript = nil
                 }
             }
             return
@@ -2417,7 +2430,9 @@ struct PlayerView: View {
             }
             Task {
                 do {
-                    show(try await VTTSubtitlesLoader.load(from: urlString, headers: subtitleHeaders(currentStream.subtitleHeaders)))
+                    let loaded = try await VTTSubtitlesLoader.load(from: urlString, headers: subtitleHeaders(currentStream.subtitleHeaders))
+                    guard selectedSubtitleTrack == nil, currentStream.subtitle == urlString else { return }
+                    show(loaded)
                 } catch {
                     Logger.shared.log("[Subtitles] Failed to load default: \(error)", type: "Error")
                 }
@@ -2429,7 +2444,9 @@ struct PlayerView: View {
             selectedSubtitleTrack = first
             Task {
                 do {
-                    show(try await VTTSubtitlesLoader.load(from: first.url.absoluteString, headers: subtitleHeaders(first.headers)))
+                    let loaded = try await VTTSubtitlesLoader.load(from: first.url.absoluteString, headers: subtitleHeaders(first.headers))
+                    guard selectedSubtitleTrack?.id == first.id else { return }
+                    show(loaded)
                 } catch {
                     Logger.shared.log("[Subtitles] Failed to load first track: \(error)", type: "Error")
                 }
@@ -3344,6 +3361,11 @@ struct PlayerView: View {
     private var shownEmbeddedSubtitle: Int? {
         if case .mpvEmbedded(let id) = subtitleRoute { return id }
         return nil
+    }
+
+    /// AVPlayer's own rendering of the stream's subtitles stays off while the overlay draws.
+    private func hideStreamSubtitlesIfDrawingOurs() {
+        (engine as? AVPlayerEngine)?.hidesStreamSubtitles = subtitleRoute != .none
     }
 
     /// Tells mpv what to draw — nothing when the overlay's drawing — and how.

@@ -45,6 +45,34 @@ final class SubtitleLoaderTests: XCTestCase {
         XCTAssertTrue(script.contains("Dialogue: 0,0:00:01.00"))
     }
 
+    /// Windows editors save SRT with a UTF-8 byte-order mark. It sat in front of the first
+    /// index, the file wasn't recognised, and an imported track silently didn't replace the
+    /// stream's own.
+    func testSRTAfterAByteOrderMarkIsCues() throws {
+        guard case .cues(let cues) = try parse("\u{FEFF}1\r\n00:00:01,000 --> 00:00:02,000\r\nمرحبا\r\n") else {
+            return XCTFail()
+        }
+        XCTAssertEqual(cues.map(\.text), ["مرحبا"])
+    }
+
+    /// Some tools leave out the cue numbers.
+    func testSRTWithoutIndexesIsCues() throws {
+        guard case .cues(let cues) = try parse("00:00:01,000 --> 00:00:02,000\nOne\n\n00:00:03,000 --> 00:00:04,000\nTwo\n") else {
+            return XCTFail()
+        }
+        XCTAssertEqual(cues.map(\.text), ["One", "Two"])
+    }
+
+    /// Arabic subtitles are often Windows-1256, which isn't UTF-8.
+    func testWindowsArabicSRTIsRead() throws {
+        let cp1256 = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
+            CFStringEncoding(CFStringEncodings.windowsArabic.rawValue)))
+        let text = "1\r\n00:00:01,000 --> 00:00:02,000\r\nمرحبا بكم في البيت\r\n"
+        let data = try XCTUnwrap(text.data(using: cp1256))
+        guard case .cues(let cues) = try VTTSubtitlesLoader.parse(data) else { return XCTFail() }
+        XCTAssertEqual(cues.map(\.text), ["مرحبا بكم في البيت"])
+    }
+
     func testSomethingElseIsRefused() {
         XCTAssertThrowsError(try parse("<html>nope</html>"))
     }

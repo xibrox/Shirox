@@ -27,6 +27,27 @@ final class AVPlayerEngine: PlaybackEngine {
     private var requestedRate: Float = 1
     private var audioGroup: AVMediaSelectionGroup?
     private var audioLoad: Task<Void, Never>?
+    /// The stream's own subtitle renditions, once loaded for the item on screen.
+    private var legibleGroup: AVMediaSelectionGroup?
+
+    /// Keep the stream's own subtitles off while the app draws subtitles of its own. AVPlayer
+    /// turns them on by itself when the system's caption settings ask for them, and they then
+    /// showed under the app's — twice the lines, or an imported track over the stream's.
+    var hidesStreamSubtitles = false {
+        didSet {
+            guard hidesStreamSubtitles != oldValue else { return }
+            applyStreamSubtitleVisibility()
+        }
+    }
+
+    private func applyStreamSubtitleVisibility() {
+        guard let item = player.currentItem, let group = legibleGroup else { return }
+        if hidesStreamSubtitles {
+            item.select(nil, in: group)
+        } else {
+            item.selectMediaOptionAutomatically(in: group)
+        }
+    }
 
     init() {
         #if os(iOS)
@@ -116,17 +137,22 @@ final class AVPlayerEngine: PlaybackEngine {
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
         observe(item)
         audioGroup = nil
+        legibleGroup = nil
         audioLoad?.cancel()
         let prefersJapanese = source.prefersJapaneseAudio
-        if source.selectsSubtitles {
-            // AVPlayer leaves subtitles off unless the system's caption settings ask for them.
-            Task { [weak self] in
-                guard let group = try? await asset.loadMediaSelectionGroup(for: .legible),
-                      let self, self.player.currentItem === item,
-                      let option = group.options.first(where: {
-                          !$0.hasMediaCharacteristic(.containsOnlyForcedSubtitles)
-                      }) else { return }
+        let selectsSubtitles = source.selectsSubtitles
+        Task { [weak self] in
+            guard let group = try? await asset.loadMediaSelectionGroup(for: .legible),
+                  let self, self.player.currentItem === item else { return }
+            if selectsSubtitles {
+                // AVPlayer leaves subtitles off unless the system's caption settings ask for them.
+                guard let option = group.options.first(where: {
+                    !$0.hasMediaCharacteristic(.containsOnlyForcedSubtitles)
+                }) else { return }
                 item.select(option, in: group)
+            } else {
+                self.legibleGroup = group
+                self.applyStreamSubtitleVisibility()
             }
         }
         audioLoad = Task { [weak self] in

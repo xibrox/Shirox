@@ -77,12 +77,30 @@ enum VTTSubtitlesLoader {
     }
 
     /// UTF-16 when it says so with a byte-order mark — older fansub scripts are saved that way.
+    /// Anything that isn't UTF-8 is most likely a Windows code page: Arabic, Cyrillic and Greek
+    /// subtitles still come as those, and reading them as Latin-1 garbled every line.
+    /// A UTF-8 byte-order mark is dropped so it can't sit in front of the first line.
     private static func decode(_ data: Data) -> String? {
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
             return String(data: data, encoding: .utf16)
         }
-        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1)
+        if let utf8 = String(data: data, encoding: .utf8) {
+            return utf8.hasPrefix("\u{FEFF}") ? String(utf8.dropFirst()) : utf8
+        }
+        var converted: NSString?
+        let found = NSString.stringEncoding(for: data, encodingOptions: [
+            .suggestedEncodingsKey: windowsCodePages.map { NSNumber(value: $0.rawValue) },
+            .useOnlySuggestedEncodingsKey: true
+        ], convertedString: &converted, usedLossyConversion: nil)
+        if found != 0, let converted { return converted as String }
+        return String(data: data, encoding: .isoLatin1)
     }
+
+    private static let windowsCodePages: [String.Encoding] = [
+        CFStringEncodings.windowsArabic, .windowsCyrillic, .windowsGreek, .windowsHebrew,
+        .windowsLatin2, .windowsLatin5
+    ].map { String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding($0.rawValue))) }
+        + [.windowsCP1252]
 
     // MARK: Format detection
 
@@ -96,13 +114,16 @@ enum VTTSubtitlesLoader {
         return stripped.hasPrefix("WEBVTT")
     }
 
+    /// A numeric index, or straight away a timing line — some tools leave the indexes out.
     private static func isSRT(_ content: String) -> Bool {
-        // First non-empty line of a valid SRT file is a numeric index
-        let firstNonEmpty = content
+        let firstLines = content
             .components(separatedBy: .newlines)
-            .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard let line = firstNonEmpty else { return false }
-        return Int(line.trimmingCharacters(in: .whitespaces)) != nil
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .prefix(2)
+        guard let first = firstLines.first else { return false }
+        if Int(first) != nil { return true }
+        return parseTimestampLine(first) != nil
     }
 
     // MARK: VTT parser
@@ -156,14 +177,11 @@ enum VTTSubtitlesLoader {
                              .map { $0.trimmingCharacters(in: .whitespaces) }
                              .filter { !$0.isEmpty }
 
-            // Need at least: index line, timestamp line, and one text line
-            guard lines.count >= 3 else { continue }
+            // The timing line, after the cue's index when it has one.
+            guard let tsIndex = lines.prefix(2).firstIndex(where: { $0.contains("-->") }),
+                  let (start, end) = parseTimestampLine(lines[tsIndex]) else { continue }
 
-            // lines[0] is the numeric index – skip it
-            let tsLine = lines[1]
-            guard let (start, end) = parseTimestampLine(tsLine) else { continue }
-
-            let textLines = lines[2...]
+            let textLines = lines[(tsIndex + 1)...]
             let rawText = textLines.joined(separator: "\n")
             let text = stripTags(rawText)
             guard !text.isEmpty else { continue }
