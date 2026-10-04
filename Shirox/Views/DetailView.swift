@@ -64,6 +64,7 @@ struct DetailView: View {
     @State private var simklEdit: SimklEditTarget?
     @State private var isSelectionMode = false
     @State private var selectedEpisodeNumbers: Set<Int> = []
+    @State private var showBatchDeleteConfirmation = false
     @State private var showBatchDownloadPicker = false
     /// Which of the two download buttons the batch sheet grows out of.
     @State private var batchDownloadZoomID = "batchDownload"
@@ -142,6 +143,23 @@ struct DetailView: View {
                     // No corner clip: it would cut the count badge sitting off the circle's edge.
                     .zoomSource("batchDownloadFloating", in: sheetZoom)
                     .transition(.scale.combined(with: .opacity))
+                } else if isSelectionMode, let detail = vm.detail, showsOfflineEpisodes(detail) {
+                    FloatingDeleteButton(count: selectedOfflineDownloads().count) {
+                        showBatchDeleteConfirmation = true
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                    .confirmationDialog(
+                        "Delete \(selectedOfflineDownloads().count) downloaded episodes?",
+                        isPresented: $showBatchDeleteConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Delete", role: .destructive) {
+                            for it in selectedOfflineDownloads() {
+                                DownloadManager.shared.remove(it)
+                                selectedEpisodeNumbers.remove(it.episodeNumber)
+                            }
+                        }
+                    }
                 } else {
                     BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
                 }
@@ -1373,6 +1391,15 @@ struct DetailView: View {
     }
 
     #if os(iOS)
+    /// Picked episodes on the downloaded-only list — what the floating delete button removes.
+    private func selectedOfflineDownloads() -> [DownloadItem] {
+        guard let snap = offlineSnapshot else { return [] }
+        return DownloadManager.shared.items.filter {
+            $0.mediaTitle == snap.mediaTitle && $0.moduleId == snap.moduleId
+                && $0.state == .completed && selectedEpisodeNumbers.contains($0.episodeNumber)
+        }
+    }
+
     /// Picked episodes that aren't downloaded yet — what the batch download would fetch.
     private func downloadableSelectionCount(_ detail: MediaDetail) -> Int {
         let downloaded = DownloadManager.shared.items.filter { item in

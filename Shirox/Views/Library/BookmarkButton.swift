@@ -49,10 +49,37 @@ struct FloatingDownloadButton: View {
     let action: () -> Void
 
     var body: some View {
+        FloatingBatchButton(icon: "arrow.down", tint: .accentColor, count: count,
+                            label: count > 0 ? "Download \(count) episodes" : "Download",
+                            action: action)
+    }
+}
+
+/// The same thumb-reach button for the downloaded-episodes list, where picking is for deleting.
+struct FloatingDeleteButton: View {
+    let count: Int
+    let action: () -> Void
+
+    var body: some View {
+        FloatingBatchButton(icon: "trash", tint: .red, count: count,
+                            label: count > 0 ? "Delete \(count) episodes" : "Delete",
+                            action: action)
+    }
+}
+
+/// A round button with a count badge, sized and placed like `BookmarkButton`.
+struct FloatingBatchButton: View {
+    let icon: String
+    let tint: Color
+    let count: Int
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
         Button(action: action) {
-            Image(systemName: "arrow.down")
+            Image(systemName: icon)
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(count > 0 ? Color.accentColor : .secondary)
+                .foregroundStyle(count > 0 ? tint : .secondary)
                 .frame(width: 52, height: 52)
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
@@ -73,7 +100,7 @@ struct FloatingDownloadButton: View {
         }
         .buttonStyle(.plain)
         .disabled(count == 0)
-        .accessibilityLabel(count > 0 ? "Download \(count) episodes" : "Download")
+        .accessibilityLabel(label)
     }
 
     private static var badgeText: Color {
