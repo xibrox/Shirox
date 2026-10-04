@@ -984,6 +984,17 @@ struct LibraryView: View {
         .navigationDestinationCompat(isPresented: $showNotifications) {
             NotificationsView(vm: profileVM)
         }
+        // A page like Notifications, not a sheet: the profile's tabs and feeds want the room.
+        .navigationDestinationCompat(isPresented: $showProfile) {
+            if activeProviderType == .mal, let uid = malAuth.userId {
+                ProfileView(userId: uid, username: malAuth.username ?? "Profile",
+                            avatarURL: malAuth.avatarURL, isPushed: true)
+            } else if let uid = anilistAuth.userId, let username = anilistAuth.username {
+                ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL, isPushed: true)
+            } else {
+                profileUnavailable
+            }
+        }
         .navigationDestinationCompat(isPresented: $gridLinkActive) {
             if let entry = gridDestination { rowDestination(entry) }
         }
@@ -1184,18 +1195,6 @@ struct LibraryView: View {
                 // From the row "Edit on which service?" was asked about.
                 .zoomingOut(of: pendingEntry?.id ?? 0, in: sheetZoom)
             }
-        }
-        .adaptiveSheet(isPresented: $showProfile) {
-            Group {
-                if activeProviderType == .mal, let uid = malAuth.userId {
-                    ProfileView(userId: uid, username: malAuth.username ?? "Profile", avatarURL: malAuth.avatarURL)
-                } else if let uid = anilistAuth.userId, let username = anilistAuth.username {
-                    ProfileView(userId: uid, username: username, avatarURL: anilistAuth.avatarURL)
-                } else {
-                    profileUnavailable
-                }
-            }
-            .zoomingOut(of: "account", in: sheetZoom, fromToolbar: true)
         }
         .adaptiveSheet(isPresented: $showManageCollections) {
             ManageCollectionsView()

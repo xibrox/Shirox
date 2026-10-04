@@ -145,44 +145,46 @@ struct NotificationsView: View {
             case .avatar(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 52, height: 52)
                         .clipShape(Circle())
-                    Image(systemName: symbol)
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 15, height: 15)
-                        .background(Circle().fill(color))
-                        .offset(x: 3, y: 3)
+                    badge(symbol, color)
                 }
-                .frame(width: 40, height: 40)
+                .frame(width: 56, height: 56)
             case .cover(let url):
                 ZStack(alignment: .bottomTrailing) {
                     CachedAsyncImage(urlString: url)
-                        .frame(width: 30, height: 42)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                    Image(systemName: symbol)
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 15, height: 15)
-                        .background(Circle().fill(color))
-                        .offset(x: 3, y: 3)
+                        .frame(width: 48, height: 68)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                    badge(symbol, color)
                 }
-                .frame(width: 34, height: 46)
+                .frame(width: 52, height: 72)
             }
         } else {
             Image(systemName: symbol)
-                .font(.caption.weight(.bold))
+                .font(.body.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(width: 26, height: 26)
+                .frame(width: 44, height: 44)
                 .background(Circle().fill(color))
+                .frame(width: 52)
         }
     }
 
+    /// The kind of notification, on the picture's corner.
+    private func badge(_ symbol: String, _ color: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(Circle().fill(color))
+            .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            .offset(x: 4, y: 4)
+    }
+
     private func notificationRow(_ notif: ProviderNotification) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             notificationIcon(notif)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 bodyText(for: notif)
                     .font(.subheadline)
                     .lineLimit(3)
@@ -197,15 +199,13 @@ struct NotificationsView: View {
             if isTappable(notif) {
                 Image(systemName: "chevron.right")
                     .font(.caption2).foregroundStyle(.tertiary)
-                    .padding(.top, 4)
             } else if notif.kind.externalURL != nil {
                 Image(systemName: "arrow.up.right")
                     .font(.caption2).foregroundStyle(.tertiary)
-                    .padding(.top, 4)
             }
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.07)))
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.secondary.opacity(0.07)))
     }
 
     @ViewBuilder

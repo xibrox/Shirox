@@ -26,6 +26,9 @@ struct ProfileView: View {
     let userId: Int
     let username: String
     let avatarURL: String?
+    /// Pushed onto the Library's navigation stack (your own profile) rather than shown in a
+    /// sheet of its own: no stack or Done button of its own then.
+    var isPushed = false
 
     @StateObject private var vm = ProfileViewModel()
     @State private var selectedTab: ProfileTab = .activity
@@ -71,36 +74,45 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                if vm.user == nil && vm.profileLoadFailed {
-                    retryState
-                } else if vm.user == nil && vm.isLoadingProfile {
-                    loadingState
-                } else {
-                    VStack(spacing: 0) {
-                        if vm.usingCachedData && !staleBannerDismissed {
-                            staleBanner
-                        }
-                        tabContent
+        if isPushed {
+            page
+        } else {
+            NavigationStack { page }
+        }
+    }
+
+    private var page: some View {
+        ZStack {
+            if vm.user == nil && vm.profileLoadFailed {
+                retryState
+            } else if vm.user == nil && vm.isLoadingProfile {
+                loadingState
+            } else {
+                VStack(spacing: 0) {
+                    if vm.usingCachedData && !staleBannerDismissed {
+                        staleBanner
                     }
+                    tabContent
                 }
             }
-            .onChangeOf(vm.usingCachedData) { isStale in
-                if !isStale { staleBannerDismissed = false }
-            }
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    if isOwnProfile {
-                        Button(role: .destructive) { showLogoutConfirm = true } label: {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .foregroundStyle(.red)
-                        }
+        }
+        .onChangeOf(vm.usingCachedData) { isStale in
+            if !isStale { staleBannerDismissed = false }
+        }
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: isPushed ? .primaryAction : .cancellationAction) {
+                if isOwnProfile {
+                    Button(role: .destructive) { showLogoutConfirm = true } label: {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .foregroundStyle(.red)
                     }
+                    .accessibilityLabel("Log Out")
                 }
+            }
+            if !isPushed {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
