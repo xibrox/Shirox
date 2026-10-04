@@ -190,7 +190,7 @@ struct DetailView: View {
                     #if !os(iOS)
                     tabSelector.padding(.top, 8)
                     #endif
-                    if selectedTab == 0 {
+                    if selectedTab == 0 && !isSingleEpisode(detail) {
                         episodesSection(detail: detail)
                     } else {
                         relationsSection
@@ -571,7 +571,7 @@ struct DetailView: View {
 
     @ViewBuilder
     private func tabContent(detail: MediaDetail) -> some View {
-        if selectedTab == 0 {
+        if selectedTab == 0 && !isSingleEpisode(detail) {
             episodesSection(detail: detail)
         } else {
             relationsSection
@@ -604,23 +604,25 @@ struct DetailView: View {
     private func actionBar(detail: MediaDetail) -> some View {
         HStack(spacing: 12) {
             watchButton(detail: detail)
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    selectedTab = selectedTab == 0 ? 1 : 0
+            if !isSingleEpisode(detail) {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        selectedTab = selectedTab == 0 ? 1 : 0
+                    }
+                } label: {
+                    circleIconButton(icon: selectedTab == 0 ? "person.3.fill" : "list.bullet", isActive: selectedTab == 1, size: 16)
                 }
-            } label: {
-                circleIconButton(icon: selectedTab == 0 ? "person.3.fill" : "list.bullet", isActive: selectedTab == 1, size: 16)
-            }
-            .buttonStyle(.plain)
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    isSelectionMode.toggle()
-                    if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+                .buttonStyle(.plain)
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isSelectionMode.toggle()
+                        if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+                    }
+                } label: {
+                    circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
                 }
-            } label: {
-                circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
     #endif
@@ -635,22 +637,37 @@ struct DetailView: View {
             .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
     }
 
+    /// A film or one-off special: no one-row episode list, just the Watch button — as a Simkl
+    /// movie's page has. Its menu covers what the row's did. The downloaded-only list stays a
+    /// list: it's where downloads are picked for deleting.
+    private func isSingleEpisode(_ detail: MediaDetail) -> Bool {
+        detail.episodes.count == 1 && !showsOfflineEpisodes(detail)
+    }
+
     #if os(iOS)
     @ViewBuilder
     private func watchButton(detail: MediaDetail) -> some View {
         let item = continueWatchingItem(for: detail)
         let nextEp = item?.episodeNumber ?? 1
-        let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
-        
+        let continuing = item != nil && !item!.streamUrl.isEmpty
+        let label = isSingleEpisode(detail)
+            ? (continuing ? "Continue" : "Watch")
+            : continuing ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
+        let activeModule = effectiveModuleId
+        let downloadedTarget = DownloadManager.shared.items.first {
+            $0.mediaTitle == detail.title
+                && $0.moduleId == activeModule
+                && $0.episodeNumber == nextEp
+                && $0.state == .completed
+        }
+        let targetEpisode = detail.episodes.first(where: { Int($0.number) == nextEp }) ?? detail.episodes.first
+        let hasProgress = continueWatching.items.contains {
+            ($0.aniListID != nil ? $0.aniListID == (vm.aniListID ?? aniListID)
+                : $0.moduleId == activeModule && $0.mediaTitle == detail.title) && $0.episodeNumber == nextEp
+        }
+
         Button {
             // Prefer the local file when the target episode is already downloaded.
-            let activeModule = effectiveModuleId
-            let downloadedTarget = DownloadManager.shared.items.first {
-                $0.mediaTitle == detail.title
-                    && $0.moduleId == activeModule
-                    && $0.episodeNumber == nextEp
-                    && $0.state == .completed
-            }
             if let downloadedTarget {
                 playDownloaded(downloadedTarget)
             } else if let item {
@@ -677,6 +694,33 @@ struct DetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(detail.episodes.isEmpty && item == nil)
+        .contextMenu {
+            if let targetEpisode, !targetEpisode.href.isEmpty {
+                Button { vm.loadStreams(for: targetEpisode) } label: {
+                    Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
+                }
+                if downloadedTarget == nil {
+                    Button { vm.loadDownloadStreams(for: targetEpisode) } label: {
+                        Label("Download Episode", systemImage: "arrow.down.circle")
+                    }
+                }
+            }
+            if let downloadedTarget {
+                Button(role: .destructive) { DownloadManager.shared.remove(downloadedTarget) } label: {
+                    Label("Delete Download", systemImage: "trash")
+                }
+            }
+            if hasProgress {
+                Divider()
+                Button(role: .destructive) {
+                    ContinueWatchingManager.shared.resetEpisodeProgress(
+                        aniListID: vm.aniListID ?? aniListID, moduleId: activeModule, mediaTitle: detail.title,
+                        episodeNumber: nextEp, episodeHref: targetEpisode?.href)
+                } label: {
+                    Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                }
+            }
+        }
     }
 
     @ViewBuilder

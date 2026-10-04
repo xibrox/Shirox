@@ -107,207 +107,7 @@ struct ContinueWatchingSection: View {
     }
 
     private func resume(_ item: ContinueWatchingItem) {
-        #if os(iOS)
-        // Local file: resume from our persistent copy and reload the up-front subtitle if any.
-        if let name = item.localImportName {
-            if let url = LocalPlaybackCoordinator.shared.resolveImport(name: name) {
-                let subtitle = item.localSubtitleImportName
-                    .flatMap { LocalPlaybackCoordinator.shared.resolveImport(name: $0) }
-                    .map { SubtitleTrack(title: LocalPlaybackCoordinator.displayTitle(for: $0), url: $0, headers: [:]) }
-                LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: subtitle, resumeFrom: item.watchedSeconds)
-            } else {
-                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
-            }
-            return
-        }
-        // Legacy bookmark resume for items saved before the copy-into-storage change.
-        if let data = item.bookmarkData {
-            if let url = LocalPlaybackCoordinator.shared.resolveBookmark(data) {
-                LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: item.watchedSeconds)
-            } else {
-                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
-            }
-            return
-        }
-        #endif
-        guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
-        Logger.shared.log("[Subtitles] CW resume: item.subtitle=\(item.subtitle ?? "nil") item.subtitleHeaders=\(item.subtitleHeaders?.count ?? -1) item.allSubtitles=\(item.allSubtitles?.count ?? -1) item.detailHref=\(item.detailHref ?? "nil") item.moduleId=\(item.moduleId ?? "nil")", type: "Debug")
-
-        // Ensure the correct module is active
-        if let mid = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
-            ModuleManager.shared.selectModule(module)
-        }
-
-        let stream = StreamResult(
-            title: item.streamTitle ?? item.episodeTitle ?? "Episode \(item.episodeNumber)",
-            url: url,
-            headers: item.headers ?? [:],
-            subtitle: item.subtitle,
-            subtitleHeaders: item.subtitleHeaders ?? [:],
-            allSubtitles: item.allSubtitles,
-            playlistKey: item.playlistKey
-        )
-
-        var context = PlayerContext(
-            mediaTitle: item.mediaTitle,
-            episodeNumber: item.episodeNumber,
-            episodeTitle: item.episodeTitle,
-            imageUrl: item.imageUrl,
-            aniListID: item.aniListID,
-            malID: item.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
-            moduleId: item.moduleId,
-            totalEpisodes: item.totalEpisodes,
-            availableEpisodes: item.availableEpisodes,
-            isAiring: item.isAiring,
-            resumeFrom: item.watchedSeconds,
-            detailHref: item.detailHref,
-            episodeHref: item.episodeHref,
-            streamTitle: item.streamTitle,
-            workingDetailHref: item.detailHref,
-            thumbnailUrl: item.thumbnailUrl
-        )
-        context.simklTitle = item.simklTitle
-
-        // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList).
-        // Anchor on the saved episode href so multi-season flat lists (numbers repeat) advance
-        // to the right season; the number-based match remains a fallback for items saved before
-        // episodeHref was recorded.
-        var currentHref = item.episodeHref
-
-        /// The next episode's number in the units the item plays in; see
-        /// `EpisodeNavigator.upNextNumber`. Only tracked items can be season-relative.
-        @Sendable func seasonRelativeNextNumber(next: EpisodeLink, playingHref: String?, playingNumber: Int,
-                                                in episodes: [EpisodeLink]) async -> Int {
-            guard let aniListID = item.aniListID else { return Int(next.number) }
-            let seasonOffset = await SeasonChainMapper.shared.resolveOffset(
-                anchorAniListID: aniListID,
-                anchorMALID: IDMappingService.shared.cachedMalId(forAnilistId: aniListID)) ?? 0
-            return EpisodeNavigator.upNextNumber(next: next, playingHref: playingHref, playingNumber: playingNumber,
-                                                 in: episodes, seasonOffset: seasonOffset)
-        }
-
-        let onWatchNext: WatchNextLoader? = { currentEpNum in
-            Logger.shared.log("[ContinueWatching] onWatchNext called for episode \(currentEpNum)", type: "Debug")
-
-            // For module-sourced items
-            if let moduleId = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
-                do {
-                    let runner = ModuleJSRunner()
-                    try await runner.load(module: module)
-
-                    // Fetch episodes via detailHref or search
-                    var episodes: [EpisodeLink] = []
-                    if let href = item.detailHref {
-                        episodes = try await runner.fetchEpisodes(url: href)
-                    } else {
-                        let results = try await runner.search(keyword: item.mediaTitle)
-                        if let match = results.first {
-                            episodes = try await runner.fetchEpisodes(url: match.href)
-                        }
-                    }
-
-                    guard !episodes.isEmpty else {
-                        return nil
-                    }
-
-                    let playingHref = currentHref
-                    guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else {
-                        return nil
-                    }
-                    let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
-
-                    guard !streams.isEmpty else { return nil }
-                    currentHref = nextEp.href
-                    // A play from a Simkl page counts within its season; on a page listing every season
-                    // the module's own number would be read as that season's episode 16.
-                    var number = Int(nextEp.number)
-                    if let ref = item.simklTitle, ref.kind != .movie, let season = ref.season,
-                       let index = episodes.firstIndex(where: { $0.href == nextEp.href }) {
-                        let simklEpisodes = (try? await SimklCatalog.loadEpisodes(simklID: ref.simklID)) ?? []
-                        number = SimklPlayNumbering.upNextNumber(moduleNumber: number, index: index, in: episodes,
-                                                                 season: season, simklEpisodes: simklEpisodes)
-                    } else {
-                        number = await seasonRelativeNextNumber(next: nextEp, playingHref: playingHref,
-                                                                playingNumber: currentEpNum, in: episodes)
-                    }
-                    return (streams: streams, episodeNumber: number, episodeHref: nextEp.href)
-                } catch {
-                    Logger.shared.log("[ContinueWatching] Next episode failed (module): \(error)", type: "Error")
-                    return nil
-                }
-            }
-            // For AniList-sourced items with detailHref
-            else if let href = item.detailHref {
-                do {
-                    let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-                    let playingHref = currentHref
-                    guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else {
-                        return nil
-                    }
-                    let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
-                    guard !streams.isEmpty else { return nil }
-                    currentHref = nextEp.href
-                    let number = await seasonRelativeNextNumber(next: nextEp, playingHref: playingHref,
-                                                                playingNumber: currentEpNum, in: episodes)
-                    return (streams: streams, episodeNumber: number, episodeHref: nextEp.href)
-                } catch {
-                    Logger.shared.log("[ContinueWatching] Next episode failed (anilist): \(error)", type: "Error")
-                    return nil
-                }
-            }
-            // No way to fetch next episode
-            else {
-                return nil
-            }
-        }
-
-        // Anchor on the current episode's href (number repeats on flat multi-season lists),
-        // so a post-advance refetch resolves the episode actually on screen.
-        let onExpired: StreamRefetchLoader? = { episodeNumber, episodeHref in
-            if let moduleId = item.moduleId,
-               let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }),
-               let href = item.detailHref {
-                let runner = ModuleJSRunner()
-                try await runner.load(module: module)
-                let episodes = try await runner.fetchEpisodes(url: href)
-                guard let ep = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
-                return try await runner.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
-            } else if let href = item.detailHref {
-                let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
-                guard let ep = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
-                return try await JSEngine.shared.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
-            }
-            return []
-        }
-
-        let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
-
-        #if os(iOS)
-        // Downloaded episodes saved a local URL: a file:// (MP4) or a 127.0.0.1 proxy URL
-        // (HLS). The HLS proxy only works while DownloadManager's server is running, which
-        // this path never starts — so replaying the stored URL fails and the onStreamExpired
-        // fallback silently re-extracts the ONLINE stream. Re-resolve through getStream() to
-        // get a fresh, server-backed local stream and drop the online fallback entirely.
-        let isLocal = url.isFileURL || url.host == "127.0.0.1" || url.host == "localhost"
-        if isLocal, let download = DownloadManager.shared.completedDownload(
-            mediaTitle: item.mediaTitle,
-            episodeNumber: item.episodeNumber,
-            aniListID: item.aniListID,
-            moduleId: item.moduleId,
-            streamTitle: item.streamTitle
-        ) {
-            Task {
-                guard let localStream = await DownloadManager.shared.getStream(for: download) else {
-                    ToastManager.shared.show(message: "Downloaded file is missing — re-download to play offline", type: .error)
-                    return
-                }
-                PlayerPresenter.shared.presentPlayer(stream: localStream, context: context, onWatchNext: onWatchNext, onSequelNeeded: SequelResolver.loader(aniListID: item.aniListID, moduleId: item.moduleId))
-            }
-            return
-        }
-
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired, onSequelNeeded: SequelResolver.loader(aniListID: item.aniListID, moduleId: item.moduleId))
-        #endif
+        ContinueWatchingResume.resume(item)
     }
 
     @ViewBuilder
@@ -544,3 +344,214 @@ private struct CardThumbnail: View {
     }
 }
 
+// MARK: - Resuming
+
+/// Plays a Continue Watching item from where it was left, with its stored stream — what tapping
+/// its card on Home does. Title pages use it too, so their Continue button doesn't send the
+/// viewer back through the module picker for an episode that's already half watched.
+@MainActor
+enum ContinueWatchingResume {
+    static func resume(_ item: ContinueWatchingItem) {
+        #if os(iOS)
+        // Local file: resume from our persistent copy and reload the up-front subtitle if any.
+        if let name = item.localImportName {
+            if let url = LocalPlaybackCoordinator.shared.resolveImport(name: name) {
+                let subtitle = item.localSubtitleImportName
+                    .flatMap { LocalPlaybackCoordinator.shared.resolveImport(name: $0) }
+                    .map { SubtitleTrack(title: LocalPlaybackCoordinator.displayTitle(for: $0), url: $0, headers: [:]) }
+                LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: subtitle, resumeFrom: item.watchedSeconds)
+            } else {
+                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
+            }
+            return
+        }
+        // Legacy bookmark resume for items saved before the copy-into-storage change.
+        if let data = item.bookmarkData {
+            if let url = LocalPlaybackCoordinator.shared.resolveBookmark(data) {
+                LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: item.watchedSeconds)
+            } else {
+                ToastManager.shared.show(message: "File moved or unavailable — remove this item", type: .error)
+            }
+            return
+        }
+        #endif
+        guard !item.streamUrl.isEmpty, let url = URL(string: item.streamUrl) else { return }
+        Logger.shared.log("[Subtitles] CW resume: item.subtitle=\(item.subtitle ?? "nil") item.subtitleHeaders=\(item.subtitleHeaders?.count ?? -1) item.allSubtitles=\(item.allSubtitles?.count ?? -1) item.detailHref=\(item.detailHref ?? "nil") item.moduleId=\(item.moduleId ?? "nil")", type: "Debug")
+
+        // Ensure the correct module is active
+        if let mid = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == mid }) {
+            ModuleManager.shared.selectModule(module)
+        }
+
+        let stream = StreamResult(
+            title: item.streamTitle ?? item.episodeTitle ?? "Episode \(item.episodeNumber)",
+            url: url,
+            headers: item.headers ?? [:],
+            subtitle: item.subtitle,
+            subtitleHeaders: item.subtitleHeaders ?? [:],
+            allSubtitles: item.allSubtitles,
+            playlistKey: item.playlistKey
+        )
+
+        var context = PlayerContext(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            episodeTitle: item.episodeTitle,
+            imageUrl: item.imageUrl,
+            aniListID: item.aniListID,
+            malID: item.aniListID.flatMap { IDMappingService.shared.cachedMalId(forAnilistId: $0) },
+            moduleId: item.moduleId,
+            totalEpisodes: item.totalEpisodes,
+            availableEpisodes: item.availableEpisodes,
+            isAiring: item.isAiring,
+            resumeFrom: item.watchedSeconds,
+            detailHref: item.detailHref,
+            episodeHref: item.episodeHref,
+            streamTitle: item.streamTitle,
+            workingDetailHref: item.detailHref,
+            thumbnailUrl: item.thumbnailUrl
+        )
+        context.simklTitle = item.simklTitle
+
+        // Setup Next Episode loader using ModuleJSRunner (if module) or JSEngine (if AniList).
+        // Anchor on the saved episode href so multi-season flat lists (numbers repeat) advance
+        // to the right season; the number-based match remains a fallback for items saved before
+        // episodeHref was recorded.
+        var currentHref = item.episodeHref
+
+        /// The next episode's number in the units the item plays in; see
+        /// `EpisodeNavigator.upNextNumber`. Only tracked items can be season-relative.
+        @Sendable func seasonRelativeNextNumber(next: EpisodeLink, playingHref: String?, playingNumber: Int,
+                                                in episodes: [EpisodeLink]) async -> Int {
+            guard let aniListID = item.aniListID else { return Int(next.number) }
+            let seasonOffset = await SeasonChainMapper.shared.resolveOffset(
+                anchorAniListID: aniListID,
+                anchorMALID: IDMappingService.shared.cachedMalId(forAnilistId: aniListID)) ?? 0
+            return EpisodeNavigator.upNextNumber(next: next, playingHref: playingHref, playingNumber: playingNumber,
+                                                 in: episodes, seasonOffset: seasonOffset)
+        }
+
+        let onWatchNext: WatchNextLoader? = { currentEpNum in
+            Logger.shared.log("[ContinueWatching] onWatchNext called for episode \(currentEpNum)", type: "Debug")
+
+            // For module-sourced items
+            if let moduleId = item.moduleId, let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }) {
+                do {
+                    let runner = ModuleJSRunner()
+                    try await runner.load(module: module)
+
+                    // Fetch episodes via detailHref or search
+                    var episodes: [EpisodeLink] = []
+                    if let href = item.detailHref {
+                        episodes = try await runner.fetchEpisodes(url: href)
+                    } else {
+                        let results = try await runner.search(keyword: item.mediaTitle)
+                        if let match = results.first {
+                            episodes = try await runner.fetchEpisodes(url: match.href)
+                        }
+                    }
+
+                    guard !episodes.isEmpty else {
+                        return nil
+                    }
+
+                    let playingHref = currentHref
+                    guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else {
+                        return nil
+                    }
+                    let streams = try await runner.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+
+                    guard !streams.isEmpty else { return nil }
+                    currentHref = nextEp.href
+                    // A play from a Simkl page counts within its season; on a page listing every season
+                    // the module's own number would be read as that season's episode 16.
+                    var number = Int(nextEp.number)
+                    if let ref = item.simklTitle, ref.kind != .movie, let season = ref.season,
+                       let index = episodes.firstIndex(where: { $0.href == nextEp.href }) {
+                        let simklEpisodes = (try? await SimklCatalog.loadEpisodes(simklID: ref.simklID)) ?? []
+                        number = SimklPlayNumbering.upNextNumber(moduleNumber: number, index: index, in: episodes,
+                                                                 season: season, simklEpisodes: simklEpisodes)
+                    } else {
+                        number = await seasonRelativeNextNumber(next: nextEp, playingHref: playingHref,
+                                                                playingNumber: currentEpNum, in: episodes)
+                    }
+                    return (streams: streams, episodeNumber: number, episodeHref: nextEp.href)
+                } catch {
+                    Logger.shared.log("[ContinueWatching] Next episode failed (module): \(error)", type: "Error")
+                    return nil
+                }
+            }
+            // For AniList-sourced items with detailHref
+            else if let href = item.detailHref {
+                do {
+                    let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+                    let playingHref = currentHref
+                    guard let nextEp = EpisodeNavigator.next(afterHref: currentHref, orNumber: currentEpNum, in: episodes) else {
+                        return nil
+                    }
+                    let streams = try await JSEngine.shared.fetchStreams(episodeUrl: nextEp.href).sorted { $0.title < $1.title }
+                    guard !streams.isEmpty else { return nil }
+                    currentHref = nextEp.href
+                    let number = await seasonRelativeNextNumber(next: nextEp, playingHref: playingHref,
+                                                                playingNumber: currentEpNum, in: episodes)
+                    return (streams: streams, episodeNumber: number, episodeHref: nextEp.href)
+                } catch {
+                    Logger.shared.log("[ContinueWatching] Next episode failed (anilist): \(error)", type: "Error")
+                    return nil
+                }
+            }
+            // No way to fetch next episode
+            else {
+                return nil
+            }
+        }
+
+        // Anchor on the current episode's href (number repeats on flat multi-season lists),
+        // so a post-advance refetch resolves the episode actually on screen.
+        let onExpired: StreamRefetchLoader? = { episodeNumber, episodeHref in
+            if let moduleId = item.moduleId,
+               let module = ModuleManager.shared.modules.first(where: { $0.id == moduleId }),
+               let href = item.detailHref {
+                let runner = ModuleJSRunner()
+                try await runner.load(module: module)
+                let episodes = try await runner.fetchEpisodes(url: href)
+                guard let ep = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
+                return try await runner.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
+            } else if let href = item.detailHref {
+                let episodes = try await JSEngine.shared.fetchEpisodes(url: href)
+                guard let ep = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes) else { return [] }
+                return try await JSEngine.shared.fetchStreams(episodeUrl: ep.href).sorted { $0.title < $1.title }
+            }
+            return []
+        }
+
+        let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
+
+        #if os(iOS)
+        // Downloaded episodes saved a local URL: a file:// (MP4) or a 127.0.0.1 proxy URL
+        // (HLS). The HLS proxy only works while DownloadManager's server is running, which
+        // this path never starts — so replaying the stored URL fails and the onStreamExpired
+        // fallback silently re-extracts the ONLINE stream. Re-resolve through getStream() to
+        // get a fresh, server-backed local stream and drop the online fallback entirely.
+        let isLocal = url.isFileURL || url.host == "127.0.0.1" || url.host == "localhost"
+        if isLocal, let download = DownloadManager.shared.completedDownload(
+            mediaTitle: item.mediaTitle,
+            episodeNumber: item.episodeNumber,
+            aniListID: item.aniListID,
+            moduleId: item.moduleId,
+            streamTitle: item.streamTitle
+        ) {
+            Task {
+                guard let localStream = await DownloadManager.shared.getStream(for: download) else {
+                    ToastManager.shared.show(message: "Downloaded file is missing — re-download to play offline", type: .error)
+                    return
+                }
+                PlayerPresenter.shared.presentPlayer(stream: localStream, context: context, onWatchNext: onWatchNext, onSequelNeeded: SequelResolver.loader(aniListID: item.aniListID, moduleId: item.moduleId))
+            }
+            return
+        }
+
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired, onSequelNeeded: SequelResolver.loader(aniListID: item.aniListID, moduleId: item.moduleId))
+        #endif
+    }
+}

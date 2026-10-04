@@ -813,6 +813,7 @@ struct AniListDetailView: View {
                     HStack(spacing: 10) {
                         watchButton(media: media)
 
+                        if !isSingleEpisode(media) {
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                 selectedTab = selectedTab == 0 ? 1 : 0
@@ -861,6 +862,7 @@ struct AniListDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
@@ -872,7 +874,7 @@ struct AniListDetailView: View {
                         .padding(.top, 8)
                     #endif
                     
-                    if selectedTab == 0 {
+                    if selectedTab == 0 && !isSingleEpisode(media) {
                         episodesSection(media: media)
                             .frame(maxWidth: .infinity)
                     } else {
@@ -927,13 +929,23 @@ struct AniListDetailView: View {
         }
     }
 
+    /// A film or one-off special: no one-row episode list, just the Watch button — as a Simkl
+    /// movie's page has. Its menu covers what the row's did.
+    private func isSingleEpisode(_ media: Media) -> Bool {
+        media.airedOrAnnouncedEpisodes == 1 && media.status != "RELEASING"
+    }
+
     @ViewBuilder
     private func watchButton(media: Media) -> some View {
         let item = continueWatchingItem(for: media)
         let total = media.airedOrAnnouncedEpisodes ?? 0
         let rawNext = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
         let nextEp = rawNext > total && total > 0 ? 1 : rawNext
-        let label = item != nil && !item!.streamUrl.isEmpty ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
+        let continuing = item != nil && !item!.streamUrl.isEmpty
+        let label = isSingleEpisode(media)
+            ? (continuing ? "Continue" : "Watch") + (media.format == "MOVIE" ? " Movie" : "")
+            : continuing ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
+        let hasProgress = continueWatching.items.contains { $0.aniListID == media.id && $0.episodeNumber == nextEp }
 
         Button {
             if let item {
@@ -959,6 +971,28 @@ struct AniListDetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(total == 0)
+        .contextMenu {
+            if total > 0 {
+                Button { vm.watchEpisode(nextEp) } label: {
+                    Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
+                }
+                #if os(iOS)
+                Button { pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: nextEp) } label: {
+                    Label("Download Episode", systemImage: "arrow.down.circle")
+                }
+                #endif
+                if hasProgress {
+                    Divider()
+                    Button(role: .destructive) {
+                        ContinueWatchingManager.shared.resetEpisodeProgress(
+                            aniListID: media.id, moduleId: nil, mediaTitle: media.title.searchTitle,
+                            episodeNumber: nextEp)
+                    } label: {
+                        Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                    }
+                }
+            }
+        }
     }
 
     private func resumeWatching(item: ContinueWatchingItem) {

@@ -242,11 +242,19 @@ struct SimklTitlePage: View {
     }
 
     /// As AniListDetailView.watchButton: a capsule that continues or starts the right episode.
+    /// Continuing plays the saved stream from where it stopped, as Home's Continue Watching card
+    /// does; it used to open the module picker for the episode afresh. Holding it offers what an
+    /// episode row's menu does.
     private var watchButton: some View {
         let target = kind == .movie ? nil : SimklWatchTarget.episode(resume: resumeEpisode, watched: watched, episodes: episodes)
         let resuming = kind == .movie ? resumeItem != nil : (resumeEpisode != nil && resumeEpisode == target)
+        let resumable = resuming ? resumeItem.flatMap { $0.streamUrl.isEmpty ? nil : $0 } : nil
         return Button {
-            play(target)
+            if let resumable {
+                ContinueWatchingResume.resume(resumable)
+            } else {
+                play(target)
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "play.fill").font(.system(size: 13, weight: .bold))
@@ -261,6 +269,30 @@ struct SimklTitlePage: View {
         }
         .buttonStyle(.plain)
         .disabled(kind.hasSimklEpisodes && target == nil)
+        .contextMenu {
+            if kind == .movie || target != nil {
+                Button { play(target) } label: {
+                    Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
+            if let target {
+                if watched.contains(target) {
+                    Button { Task { await mark(target, watched: false) } } label: {
+                        Label("Mark as Unwatched", systemImage: "xmark.circle")
+                    }
+                } else {
+                    Button { Task { await mark(target, watched: true) } } label: {
+                        Label("Mark as Watched", systemImage: "checkmark.circle")
+                    }
+                }
+            }
+            if resuming, let item = resumeItem {
+                Divider()
+                Button(role: .destructive) { ContinueWatchingManager.shared.remove(item) } label: {
+                    Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                }
+            }
+        }
     }
 
     private func circleButton(systemImage: String, action: @escaping () -> Void) -> some View {
