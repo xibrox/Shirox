@@ -220,6 +220,10 @@ final class MPVEngine: PlaybackEngine {
         // Two minutes ahead, not as far as 150 MB goes: minutes of a stream through the proxy and
         // decrypted as fast as the network allowed, warming the phone, and thrown away by a seek.
         setOption("cache-secs", "120")
+        // Half a second of audio queued for the output, not mpv's 0.2: the phone logged
+        // "Audio device underrun detected" — the output running dry, heard as a pop — in a
+        // stream's first seconds, when the thread that feeds it is busiest.
+        setOption("audio-buffer", "0.5")
         // Subtitles are the player's overlay's for now; mpv draws none of its own.
         setOption("sub-auto", "no")
         setOption("sid", "no")
