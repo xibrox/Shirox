@@ -65,6 +65,9 @@ struct SearchView: View {
                     moduleButton
                 }
                 .modifier(ConditionalSearchable(enabled: !isLocalModule && !isJellyfinModule, text: $vm.query))
+                // The module button stays up while searching, keyboard and all, rather than
+                // going with the navigation bar.
+                .keepsToolbarWhileSearching()
                 .onSubmit(of: .search) {
                     history.add(vm.query)
                     vm.search(usingModule: usingModule)
@@ -562,6 +565,18 @@ private struct SearchActivationObserver: View {
             .onChangeOf(isSearching) { active in
                 if active { onActivate() }
             }
+    }
+}
+
+extension View {
+    /// The navigation bar, and its buttons, stay while search is active. iOS hides it by default.
+    @ViewBuilder
+    func keepsToolbarWhileSearching() -> some View {
+        if #available(iOS 17.1, macOS 14.1, tvOS 17.1, *) {
+            searchPresentationToolbarBehavior(.avoidHidingContent)
+        } else {
+            self
+        }
     }
 }
 

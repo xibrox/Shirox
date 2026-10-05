@@ -368,27 +368,12 @@ private struct RootTabView: View {
                     Tab("Settings", systemImage: "gearshape.fill", value: 3) {
                         SettingsView()
                     }
-                    // `.prominent` is in the iOS 27 SDK only (Xcode 27, Swift 6.4); the nightly
-                    // build still uses Xcode 26, which has no such role.
-                    #if compiler(>=6.4)
-                    if #available(iOS 27, tvOS 27, *) {
-                        // iOS 27 gives a search tab its own circle only when tapping it opens search
-                        // at once; as the prominent tab it keeps the circle and opens as a page.
-                        Tab("Search", systemImage: "magnifyingglass", value: 4, role: .prominent) {
-                            SearchView()
-                        }
-                    } else {
-                        Tab(value: 4, role: .search) {
-                            SearchView()
-                        }
-                    }
-                    #else
                     Tab(value: 4, role: .search) {
                         SearchView()
                     }
-                    #endif
                 }
                 .tabViewStyle(.sidebarAdaptable)
+                .searchTabOpensWithoutKeyboard(selectedTab: selectedTab)
                 .toolbarBackgroundHidden()
                 .tint(.primary)
                 #endif
@@ -507,6 +492,96 @@ private struct RootTabView: View {
 extension Notification.Name {
     static let openSettingsTab = Notification.Name("OpenSettingsTab")
 }
+
+extension View {
+    /// Search keeps its own circle in the tab bar and opens with its field at the bottom,
+    /// but without raising the keyboard.
+    ///
+    /// Built with the iOS 27 SDK, a search tab gets its circle and the bottom field only when
+    /// selecting it opens search straight away; otherwise it joins the other tabs and opens
+    /// as a page with the field up top. Opening straight away also raises the keyboard, so
+    /// the field gives it up as it takes it: search stays open, and a tap on the field
+    /// brings the keyboard when it's wanted.
+    @ViewBuilder
+    func searchTabOpensWithoutKeyboard(selectedTab: Int) -> some View {
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            tabViewSearchActivation(.searchTabSelection)
+                .onChangeOf(selectedTab) { tab in
+                    if tab == 4 { SearchKeyboardHold.shared.holdNextKeyboard() }
+                }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
+#if os(iOS)
+/// Keeps the keyboard down when the search tab focuses its field by itself.
+///
+/// Giving up focus doesn't work: the tab takes it straight back, several times over, and the
+/// two fighting made the field jump. The field keeps its focus instead, with no keyboard
+/// behind it, until the user taps it.
+@MainActor
+final class SearchKeyboardHold: NSObject {
+    static let shared = SearchKeyboardHold()
+    /// Until when a search field starting to edit is the tab's doing, not the user's.
+    private var holdUntil: Date?
+    private weak var heldField: UISearchTextField?
+    private var tap: UITapGestureRecognizer?
+
+    private override init() {
+        super.init()
+        NotificationCenter.default.addObserver(forName: UITextField.textDidBeginEditingNotification,
+                                               object: nil, queue: .main) { note in
+            guard let field = note.object as? UISearchTextField else { return }
+            MainActor.assumeIsolated { SearchKeyboardHold.shared.fieldBeganEditing(field) }
+        }
+        NotificationCenter.default.addObserver(forName: UITextField.textDidEndEditingNotification,
+                                               object: nil, queue: .main) { note in
+            guard let field = note.object as? UISearchTextField else { return }
+            MainActor.assumeIsolated {
+                if field === SearchKeyboardHold.shared.heldField { SearchKeyboardHold.shared.release() }
+            }
+        }
+    }
+
+    func holdNextKeyboard() {
+        holdUntil = Date().addingTimeInterval(1.5)
+    }
+
+    private func fieldBeganEditing(_ field: UISearchTextField) {
+        guard let until = holdUntil, Date() < until, field !== heldField else { return }
+        holdUntil = nil
+        release()
+        heldField = field
+        // An empty input view: focused, but nothing comes up.
+        field.inputView = UIView(frame: .zero)
+        field.reloadInputViews()
+        let tap = UITapGestureRecognizer(target: self, action: #selector(fieldTapped))
+        tap.cancelsTouchesInView = false
+        field.addGestureRecognizer(tap)
+        self.tap = tap
+    }
+
+    /// The user wants to type: the keyboard comes back.
+    @objc private func fieldTapped() {
+        release()
+    }
+
+    private func release() {
+        guard let field = heldField else { return }
+        if let tap { field.removeGestureRecognizer(tap) }
+        tap = nil
+        heldField = nil
+        field.inputView = nil
+        field.reloadInputViews()
+    }
+}
+#endif
 
 /// Things a tab's page is asked to do from outside it — the tab bar, or the menu held up
 /// from it — picked up once the page is showing.
