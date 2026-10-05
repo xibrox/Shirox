@@ -77,4 +77,48 @@ final class ContinueWatchingResetTests: XCTestCase {
         XCTAssertTrue(cw.items.isEmpty)
         XCTAssertEqual(cw.watchedKeys, ["a:7:1"], "another show's marks stay")
     }
+
+    // MARK: - Tracker syncs after a reset
+
+    /// AniList's sync marks 1…progress watched for a show on the Watching list; a reset show
+    /// mustn't come straight back on the next one, nor its Continue Watching card.
+    func testAResetShowStaysResetThroughTheSync() {
+        let plan = TrackerResetFloor.plan(progress: 5, floor: TrackerResetFloor.adding(nil, to: nil))
+        XCTAssertEqual(plan.seed, [])
+        XCTAssertTrue(plan.holdCard)
+        XCTAssertEqual(plan.floor, TrackerResetFloor(baseline: 5, episodes: nil))
+        // The next sync, the list unchanged: still held.
+        let again = TrackerResetFloor.plan(progress: 5, floor: plan.floor)
+        XCTAssertEqual(again.seed, [])
+        XCTAssertEqual(again.floor, plan.floor)
+    }
+
+    func testOnlyTheResetEpisodesAreHeldBack() {
+        let plan = TrackerResetFloor.plan(progress: 4, floor: TrackerResetFloor(baseline: nil, episodes: [2, 3]))
+        XCTAssertEqual(plan.seed, [1, 4])
+        XCTAssertFalse(plan.holdCard)
+    }
+
+    /// Watched further since — on another device, or marked here — the list is believed again.
+    func testProgressPastTheResetLiftsIt() {
+        let plan = TrackerResetFloor.plan(progress: 6, floor: TrackerResetFloor(baseline: 5, episodes: nil))
+        XCTAssertEqual(plan.seed, [1, 2, 3, 4, 5, 6])
+        XCTAssertNil(plan.floor)
+        XCTAssertFalse(plan.holdCard)
+    }
+
+    func testNoResetSeedsAsBefore() {
+        XCTAssertEqual(TrackerResetFloor.plan(progress: 3, floor: nil).seed, [1, 2, 3])
+        XCTAssertEqual(TrackerResetFloor.plan(progress: 0, floor: nil).seed, [])
+    }
+
+    func testEpisodeResetsAddUpAndAShowResetHoldsItAll() {
+        let episode = TrackerResetFloor.adding([2], to: nil)
+        XCTAssertEqual(episode.episodes, [2], "one episode, not the whole show")
+        XCTAssertEqual(TrackerResetFloor.adding([3], to: episode).episodes, [2, 3])
+        XCTAssertNil(TrackerResetFloor.adding(nil, to: episode).episodes)
+        XCTAssertNil(TrackerResetFloor.adding([4], to: TrackerResetFloor.adding(nil, to: nil)).episodes)
+        // A baseline already taken is kept.
+        XCTAssertEqual(TrackerResetFloor.adding([1], to: TrackerResetFloor(baseline: 7, episodes: [2])).baseline, 7)
+    }
 }

@@ -1456,7 +1456,29 @@ struct DetailView: View {
     }
     #endif
 
+    /// The episode list, online or downloaded, with the show's Reset Progress confirmation. It
+    /// used to hang off the online list alone, so on a downloaded show's page the reset button
+    /// set a flag nothing showed and did nothing.
     private func episodesSection(detail: MediaDetail) -> some View {
+        episodeList(detail: detail)
+            .alert("Reset Progress", isPresented: $showResetConfirmation) {
+                Button("Reset", role: .destructive) {
+                    // Both the AniList id and the module's title: a download keeps the id, so
+                    // resetting by module alone left downloaded episodes watched.
+                    ContinueWatchingManager.shared.resetProgress(
+                        aniListID: vm.aniListID ?? aniListID, moduleId: effectiveModuleId, mediaTitle: detail.title)
+                    if let snap = offlineSnapshot {
+                        ContinueWatchingManager.shared.resetProgress(
+                            aniListID: snap.aniListID, moduleId: snap.moduleId, mediaTitle: snap.mediaTitle)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will clear all watched history and progress for \(detail.title).")
+            }
+    }
+
+    private func episodeList(detail: MediaDetail) -> AnyView {
         #if os(iOS)
         if let captured = offlineSnapshot, showsOfflineEpisodes(detail) {
             // Read the freshest copy from the store so re-enriched titles/thumbnails
@@ -1826,21 +1848,6 @@ struct DetailView: View {
                 }
                 .padding(.horizontal, 16)
             }
-        }
-        .alert("Reset Progress", isPresented: $showResetConfirmation) {
-            Button("Reset", role: .destructive) {
-                // Both the AniList id and the module's title: a download keeps the id, so
-                // resetting by module alone left downloaded episodes watched.
-                ContinueWatchingManager.shared.resetProgress(
-                    aniListID: vm.aniListID ?? aniListID, moduleId: effectiveModuleId, mediaTitle: detail.title)
-                if let snap = offlineSnapshot {
-                    ContinueWatchingManager.shared.resetProgress(
-                        aniListID: snap.aniListID, moduleId: snap.moduleId, mediaTitle: snap.mediaTitle)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will clear all watched history and progress for \(detail.title).")
         }
     }
 

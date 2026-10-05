@@ -1,6 +1,47 @@
 import Foundation
 import Combine
 
+/// What a local Reset Progress holds back from the AniList and MyAnimeList syncs. They mark
+/// episodes 1…progress watched for every show on the Watching list, so a reset of such a show
+/// came straight back on the next sync — at launch, or as Home or the Library opened.
+struct TrackerResetFloor: Codable, Equatable {
+    /// The list's progress when the reset was first seen by a sync; nil until then. Progress past
+    /// it means the show was watched further since, and the list is believed again.
+    var baseline: Int?
+    /// The episodes reset; nil for the whole show.
+    var episodes: Set<Int>?
+
+    /// A reset of `episodes` (nil: the whole show) on top of `existing`, if there's one.
+    static func adding(_ episodes: Set<Int>?, to existing: TrackerResetFloor?) -> TrackerResetFloor {
+        guard let existing else { return TrackerResetFloor(baseline: nil, episodes: episodes) }
+        guard let current = existing.episodes, let episodes else {
+            return TrackerResetFloor(baseline: existing.baseline, episodes: nil)
+        }
+        return TrackerResetFloor(baseline: existing.baseline, episodes: current.union(episodes))
+    }
+
+    /// What a sync does for a show at `progress` on the list.
+    struct Plan: Equatable {
+        /// Episodes to mark watched locally.
+        let seed: [Int]
+        /// The floor to keep; nil once it's lifted.
+        let floor: TrackerResetFloor?
+        /// Leave the show's Continue Watching card as the reset left it.
+        let holdCard: Bool
+    }
+
+    static func plan(progress: Int, floor: TrackerResetFloor?) -> Plan {
+        let all = progress > 0 ? Array(1...progress) : []
+        guard var floor else { return Plan(seed: all, floor: nil, holdCard: false) }
+        if floor.baseline == nil { floor.baseline = progress }
+        if let baseline = floor.baseline, progress > baseline {
+            return Plan(seed: all, floor: nil, holdCard: false)
+        }
+        guard let episodes = floor.episodes else { return Plan(seed: [], floor: floor, holdCard: true) }
+        return Plan(seed: all.filter { !episodes.contains($0) }, floor: floor, holdCard: false)
+    }
+}
+
 /// The write finishing an episode makes on Simkl.
 struct SimklTrackWrite: Equatable {
     let status: MediaListStatus
@@ -17,6 +58,7 @@ struct SimklTrackWrite: Equatable {
         static let watched = "watchedEpisodeKeys"
         static let watchedHrefs = "watchedEpisodeHrefKeys"
         static let dataVersion = "cwDataVersion"
+        static let resetFloors = "trackerResetFloors"
     }
 
     // MARK: - Published Properties
@@ -28,6 +70,8 @@ struct SimklTrackWrite: Equatable {
     /// so they disambiguate flat multi-season lists where episode numbers repeat. Purely
     /// additive — reads still fall back to `watchedKeys` for shows without any marker.
     @Published private(set) var watchedHrefKeys: Set<String> = []
+    /// Local resets the tracker syncs mustn't undo, by AniList id (see ``TrackerResetFloor``).
+    private var resetFloors: [Int: TrackerResetFloor] = [:]
 
     // MARK: - Private Properties
 
@@ -144,6 +188,7 @@ struct SimklTrackWrite: Equatable {
             matchesAnyIdentity($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle)
             && $0.episodeNumber == episodeNumber
         }
+        holdFromTrackerSync(aniListID: aniListID, episodes: [episodeNumber])
         persist()
     }
 
@@ -161,7 +206,34 @@ struct SimklTrackWrite: Equatable {
             }
         }
         items.removeAll { matchesAnyIdentity($0, aniListID: aniListID, moduleId: moduleId, mediaTitle: mediaTitle) }
+        holdFromTrackerSync(aniListID: aniListID, episodes: nil)
         persist()
+    }
+
+    /// Keeps the AniList and MyAnimeList syncs from marking reset episodes watched again (see
+    /// ``TrackerResetFloor``). Only shows with an AniList id are synced, so only they need it.
+    private func holdFromTrackerSync(aniListID: Int?, episodes: Set<Int>?) {
+        guard let aniListID else { return }
+        resetFloors[aniListID] = TrackerResetFloor.adding(episodes, to: resetFloors[aniListID])
+        persistResetFloors()
+    }
+
+    /// The sync's plan for a show on the list at `progress`, keeping or lifting its floor.
+    private func trackerSyncPlan(aniListID: Int?, progress: Int) -> TrackerResetFloor.Plan {
+        guard let aniListID else { return TrackerResetFloor.plan(progress: progress, floor: nil) }
+        let plan = TrackerResetFloor.plan(progress: progress, floor: resetFloors[aniListID])
+        if plan.floor != resetFloors[aniListID] {
+            resetFloors[aniListID] = plan.floor
+            persistResetFloors()
+        }
+        return plan
+    }
+
+    private func persistResetFloors() {
+        let stored = Dictionary(uniqueKeysWithValues: resetFloors.map { (String($0.key), $0.value) })
+        if let data = try? JSONEncoder().encode(stored) {
+            UserDefaults.standard.set(data, forKey: Keys.resetFloors)
+        }
     }
 
     /// The AniList identity and the module one, each on its own — the key builders prefer the
@@ -208,6 +280,8 @@ struct SimklTrackWrite: Equatable {
         UserDefaults.standard.removeObject(forKey: Keys.storage)
         UserDefaults.standard.removeObject(forKey: Keys.watched)
         UserDefaults.standard.removeObject(forKey: Keys.watchedHrefs)
+        resetFloors = [:]
+        UserDefaults.standard.removeObject(forKey: Keys.resetFloors)
         UserDefaults.standard.set(Self.currentDataVersion, forKey: Keys.dataVersion)
     }
 
@@ -231,15 +305,16 @@ struct SimklTrackWrite: Equatable {
                     : media.episodes
                 let isAiring = media.status == "RELEASING"
 
-                // Reconcile watched keys: mark all eps 1...progress as watched locally (highest wins).
-                if entry.progress > 0 {
-                    for ep in 1...entry.progress {
-                        if let key = Self.watchedKey(aniListID: media.id, moduleId: nil,
-                                                     mediaTitle: media.title.displayTitle, episodeNumber: ep) {
-                            watchedKeys.insert(key)
-                        }
+                // Reconcile watched keys: mark all eps 1...progress as watched locally (highest wins),
+                // but not ones reset here since.
+                let plan = trackerSyncPlan(aniListID: media.id, progress: entry.progress)
+                for ep in plan.seed {
+                    if let key = Self.watchedKey(aniListID: media.id, moduleId: nil,
+                                                 mediaTitle: media.title.displayTitle, episodeNumber: ep) {
+                        watchedKeys.insert(key)
                     }
                 }
+                if plan.holdCard { continue }
 
                 // User is caught up on all aired episodes: don't advance/create an "Up Next",
                 // but refresh an existing card's availability so its "Caught up" label stays accurate.
@@ -326,13 +401,15 @@ struct SimklTrackWrite: Equatable {
                 guard progress > 0 else { continue }
                 let aniListID = IDMappingService.shared.cachedAnilistId(forMALId: entry.node.id)
 
-                // Seed watched keys (highest-wins, insert only).
-                for ep in 1...progress {
+                // Seed watched keys (highest-wins, insert only), but not ones reset here since.
+                let plan = trackerSyncPlan(aniListID: aniListID, progress: progress)
+                for ep in plan.seed {
                     if let key = Self.watchedKey(aniListID: aniListID, moduleId: nil,
                                                  mediaTitle: entry.node.title, episodeNumber: ep) {
                         watchedKeys.insert(key)
                     }
                 }
+                if plan.holdCard { continue }
 
                 // Advance an existing Continue Watching card if MAL shows further progress.
                 // Matching needs a cached aniListID mapping; never moves a card backward.
@@ -1371,6 +1448,12 @@ struct SimklTrackWrite: Equatable {
         if let hdata = UserDefaults.standard.data(forKey: Keys.watchedHrefs),
            let hdecoded = try? JSONDecoder().decode(Set<String>.self, from: hdata) {
             watchedHrefKeys = hdecoded
+        }
+        if let fdata = UserDefaults.standard.data(forKey: Keys.resetFloors),
+           let fdecoded = try? JSONDecoder().decode([String: TrackerResetFloor].self, from: fdata) {
+            resetFloors = Dictionary(uniqueKeysWithValues: fdecoded.compactMap { key, floor in
+                Int(key).map { ($0, floor) }
+            })
         }
     }
 }
