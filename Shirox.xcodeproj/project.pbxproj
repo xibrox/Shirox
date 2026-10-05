@@ -735,6 +735,7 @@
 		8394FB1A2900AA0612B931C8 /* SeanimeRuntime.js in Resources */ = {isa = PBXBuildFile; fileRef = 2E7F10F162A39F3D89AE3150 /* SeanimeRuntime.js */; };
 		83D181EC651FE51A5DAFBAC8 /* NSFWContentFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB32994B31FB72D2DAA8327A /* NSFWContentFilter.swift */; };
 		84686C48B100D246AF48C729 /* SimklAnimeOpener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7496DED830909E3851C4653D /* SimklAnimeOpener.swift */; };
+		8469B27C3309FF02A1D36D98 /* TabBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79589A2A89DDE986D3CF0875 /* TabBarMenu.swift */; };
 		848E8B943BFF423E59D9C7F6 /* MPVEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF7675FF198EE0091C6488D /* MPVEngine.swift */; };
 		8530E21E3ED79809A04B7B69 /* SimklTitlePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8BBD389DB40AD3F56F5BCE /* SimklTitlePage.swift */; };
 		85DFED69CC655F32E4928643 /* SimklAnimeIDCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58547332ADF7A5D7D69ACA06 /* SimklAnimeIDCache.swift */; };
@@ -1364,6 +1365,7 @@
 		78A498256CCC09BF0F188F4B /* PlayerSubtitleMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerSubtitleMenu.swift; sourceTree = "<group>"; };
 		78D4A37BF102E8773C0C1051 /* AniListThrottleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AniListThrottleTests.swift; sourceTree = "<group>"; };
 		78D8556737F55F2772288018 /* MangaModuleResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaModuleResolver.swift; sourceTree = "<group>"; };
+		79589A2A89DDE986D3CF0875 /* TabBarMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TabBarMenu.swift; sourceTree = "<group>"; };
 		798AB494EC01E0CCE8CFB2D7 /* SimklLiveTrackingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SimklLiveTrackingTests.swift; sourceTree = "<group>"; };
 		7C9313A0054C5783AAFFF837 /* ProfileViewModelCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileViewModelCacheTests.swift; sourceTree = "<group>"; };
 		7E3C8D23E3797E6BC0B5EF3A /* PosterViewer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PosterViewer.swift; sourceTree = "<group>"; };
@@ -1910,6 +1912,7 @@
 				EEF179C5853A32B15AFE3F8A /* ModuleWebsiteButton.swift */,
 				E8C16892D7318AC9921F236D /* SimklAnimeEditSheet.swift */,
 				994DF732D9DE948DA9C01ABA /* MediaDetailsSheet.swift */,
+				79589A2A89DDE986D3CF0875 /* TabBarMenu.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -3510,6 +3513,7 @@
 				BBC12BC7B6C8F50AE4BBF23A /* MediaDetailsSheet.swift in Sources */,
 				325DD05EDEB96E9A3DF41493 /* AppAudioSession.swift in Sources */,
 				27E688310674413D73AD3F09 /* MouseCursorManager.swift in Sources */,
+				8469B27C3309FF02A1D36D98 /* TabBarMenu.swift in Sources */,
 				5F4CFD741F26ED40296B4E20 /* ExternalDisplay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

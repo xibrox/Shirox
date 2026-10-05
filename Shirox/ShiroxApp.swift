@@ -290,6 +290,12 @@ private struct RootTabView: View {
     @ObservedObject private var quickActions = QuickActionManager.shared
     #endif
     @State private var selectedTab = 0
+    #if os(iOS)
+    /// Where the menu raised by holding the tab bar opens from, while it's up (iPhone).
+    @State private var tabBarMenuSource: CGRect?
+    @State private var hidesTabBar = false
+    @State private var showsModuleList = false
+    #endif
     #if targetEnvironment(macCatalyst) || os(macOS)
     @State private var sidebarTab: SidebarTab = .home
     #endif
@@ -303,6 +309,19 @@ private struct RootTabView: View {
         case .search:    selectedTab = 4
         }
         quickActions.pending = nil
+    }
+    #endif
+
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    private func openFromTabBarMenu(_ destination: TabBarMenuDestination) {
+        switch destination {
+        case .tab(let tab):        selectedTab = tab
+        case .calendar:
+            selectedTab = 0
+            TabRequests.shared.showsCalendar = true
+        case .module(let module):  moduleManager.selectModule(module)
+        case .manageModules:       showsModuleList = true
+        }
     }
     #endif
 
@@ -414,6 +433,29 @@ private struct RootTabView: View {
             selectedTab = 3
             #endif
         }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        .background {
+            // The bar sits at the top on iPad, where a menu rising from the bottom makes no sense.
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                TabBarHoldProbe(hidesBar: hidesTabBar) { tabBarMenuSource = $0 }
+            }
+        }
+        .overlay {
+            if let source = tabBarMenuSource {
+                TabBarMenu(source: source, selectedTab: selectedTab, onPick: openFromTabBarMenu,
+                           onHidesBar: { hidesTabBar = $0 }) {
+                    tabBarMenuSource = nil
+                }
+            }
+        }
+        .adaptiveSheet(isPresented: $showsModuleList) {
+            NavigationStack {
+                ModuleListView()
+            }
+            .environmentObject(moduleManager)
+            .tint(.primary)
+        }
+        #endif
         #if os(iOS)
         .onAppear { routePendingQuickAction() }
         .onChange(of: quickActions.pending) { _ in routePendingQuickAction() }
@@ -464,6 +506,15 @@ private struct RootTabView: View {
 
 extension Notification.Name {
     static let openSettingsTab = Notification.Name("OpenSettingsTab")
+}
+
+/// Things a tab's page is asked to do from outside it — the tab bar, or the menu held up
+/// from it — picked up once the page is showing.
+@MainActor
+final class TabRequests: ObservableObject {
+    static let shared = TabRequests()
+    /// Home pushes the Upcoming calendar.
+    @Published var showsCalendar = false
 }
 
 #if os(iOS)

@@ -272,54 +272,49 @@ final class UpcomingCalendarViewModel: ObservableObject {
 /// anime, shows or movies.
 struct UpcomingCalendarView: View {
     @StateObject private var vm = UpcomingCalendarViewModel()
-    @Environment(\.dismiss) private var dismiss
 
+    /// A page pushed onto Home's navigation, so the back button closes it.
     var body: some View {
-        NavigationStack {
-            Group {
-                if vm.isLoading && vm.days.isEmpty {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let errorMessage = vm.errorMessage, vm.days.isEmpty {
-                    ContentUnavailableView(
-                        "Couldn't Load",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text(errorMessage)
-                    )
-                } else if vm.days.isEmpty {
-                    ContentUnavailableView(
-                        LocalizedStringKey(vm.emptyTitle),
-                        systemImage: "calendar",
-                        description: Text(vm.emptyDescription)
-                    )
+        Group {
+            if vm.isLoading && vm.days.isEmpty {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage = vm.errorMessage, vm.days.isEmpty {
+                ContentUnavailableView(
+                    "Couldn't Load",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(errorMessage)
+                )
+            } else if vm.days.isEmpty {
+                ContentUnavailableView(
+                    LocalizedStringKey(vm.emptyTitle),
+                    systemImage: "calendar",
+                    description: Text(vm.emptyDescription)
+                )
+            } else {
+                list
+            }
+        }
+        .navigationTitle("Upcoming")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            // The condition lives inside the item, not around it: a bare `if` in a toolbar
+            // builder needs iOS 16 and this ships to 15.
+            ToolbarItem(placement: .principal) {
+                if vm.usesSimkl {
+                    SimklKindMenu(kind: $vm.simklKind) { "Upcoming \($0.simklKindTitle)" }
                 } else {
-                    list
+                    Text("Upcoming").font(.headline)
                 }
             }
-            .navigationTitle("Upcoming")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                // The condition lives inside the item, not around it: a bare `if` in a toolbar
-                // builder needs iOS 16 and this ships to 15.
-                ToolbarItem(placement: .principal) {
-                    if vm.usesSimkl {
-                        SimklKindMenu(kind: $vm.simklKind) { "Upcoming \($0.simklKindTitle)" }
-                    } else {
-                        Text("Upcoming").font(.headline)
+            ToolbarItem(placement: .primaryAction) {
+                if vm.canFilterByLibrary {
+                    Button {
+                        vm.libraryOnly.toggle()
+                    } label: {
+                        Label("My library", systemImage: vm.libraryOnly ? "bookmark.fill" : "bookmark")
                     }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    if vm.canFilterByLibrary {
-                        Button {
-                            vm.libraryOnly.toggle()
-                        } label: {
-                            Label("My library", systemImage: vm.libraryOnly ? "bookmark.fill" : "bookmark")
-                        }
-                    }
-                }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
                 }
             }
         }

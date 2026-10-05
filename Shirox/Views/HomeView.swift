@@ -10,11 +10,12 @@ struct HomeView: View {
     @State private var readingDetail: MangaReadingItem?
     @State private var readerContext: ReaderContext?
     @State private var showUpcoming = false
-    /// The calendar button the Upcoming sheet grows out of.
+    /// The calendar button the Upcoming page grows out of.
     @Namespace private var calendarZoom
     /// Where the page before this one sat in `pagePosition`'s order.
     @State private var lastPagePosition: Int?
     @ObservedObject private var providerManager = ProviderManager.shared
+    @ObservedObject private var tabRequests = TabRequests.shared
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -230,9 +231,16 @@ struct HomeView: View {
             .toolbarBackgroundHidden()
             #endif
             .modifier(HomeToolbar(discovery: discovery, kind: $discovery.simklKind) { showUpcoming = true })
-            .sheet(isPresented: $showUpcoming) {
+            // A page, growing out of the calendar button on its way in.
+            .navigationDestinationCompat(isPresented: $showUpcoming) {
                 UpcomingCalendarView()
                     .zoomingOut(of: HomeToolbar.calendarID, in: calendarZoom)
+            }
+            // Asked for from the tab bar's menu.
+            .onChangeOf(tabRequests.showsCalendar) { requested in
+                guard requested else { return }
+                tabRequests.showsCalendar = false
+                showUpcoming = true
             }
             // Outside the ScrollView, where a navigation destination is honoured.
             .continueWatchingNavigation($cwNavTarget)
