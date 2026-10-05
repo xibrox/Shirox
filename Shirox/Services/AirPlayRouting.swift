@@ -47,4 +47,16 @@ enum AirPlayRouting {
     static func shouldRebuild(currentlyProxied: Bool, needsProxy: Bool) -> Bool {
         currentlyProxied != needsProxy
     }
+
+    /// Whether an MPV session moves onto the native engine when AirPlay takes the route.
+    ///
+    /// MPV draws its own picture and has no way to hand it to a receiver — choosing an Apple
+    /// TV under it sent only the sound. AVPlayer can, so a stream it plays carries on there
+    /// from the same position. One it can't stays on MPV, and AirPlay gets the audio.
+    /// - Parameters:
+    ///   - url: the stream's URL.
+    ///   - avPlayerFailedIt: AVPlayer already gave up on this session and MPV took over.
+    static func handsMPVToNative(url: URL, avPlayerFailedIt: Bool) -> Bool {
+        !avPlayerFailedIt && !PlaybackFallback.mpvOnlyExtensions.contains(url.pathExtension.lowercased())
+    }
 }

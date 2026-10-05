@@ -649,6 +649,7 @@
 		5EA50C4E170000000000000A /* PlaybackRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4E1700000000000009 /* PlaybackRoutingTests.swift */; };
 		5EA50C4E170000000000000C /* RemoteCommandCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4E170000000000000B /* RemoteCommandCoordinatorTests.swift */; };
 		5EA50C4F1700000000000002 /* NotificationSentenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA50C4F1700000000000001 /* NotificationSentenceTests.swift */; };
+		5F4CFD741F26ED40296B4E20 /* ExternalDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47AA022027AA055BCC1917AC /* ExternalDisplay.swift */; };
 		5F7E32EBD5AABB9509A45DBD /* KingfisherImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FA0EC2AB65F7E504507BAE /* KingfisherImageCache.swift */; };
 		5F83CE1F5E570570D05EACC0 /* AssRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2DAFA9A196583A0A148F391 /* AssRendererTests.swift */; };
 		5FB74309D6A71092AF3DA526 /* ModuleLinkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983C54B88B22E0D2078425A1 /* ModuleLinkError.swift */; };
@@ -1278,6 +1279,7 @@
 		46A77C1128934BF5BD3A9047 /* RatingPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptView.swift; sourceTree = "<group>"; };
 		471774F55A780636AB2EE602 /* SubtitleRoutingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubtitleRoutingTests.swift; sourceTree = "<group>"; };
 		4737DA623BC62737787AD6FB /* BackupSummaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupSummaryTests.swift; sourceTree = "<group>"; };
+		47AA022027AA055BCC1917AC /* ExternalDisplay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExternalDisplay.swift; sourceTree = "<group>"; };
 		480ECDBED1F683F27CA3D75C /* SimklLibraryMirrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SimklLibraryMirrorTests.swift; sourceTree = "<group>"; };
 		49B5885AD320A89432B9989B /* MangaTrackingCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaTrackingCoordinator.swift; sourceTree = "<group>"; };
 		49DFA57CE44ED5570821789D /* PendingWriteTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingWriteTests.swift; sourceTree = "<group>"; };
@@ -1785,6 +1787,7 @@
 				0E696EC6140A22B62B4A48B5 /* AirPlaySubtitles.swift */,
 				EDE73B1CB59832DCFDFF4FC7 /* AppAudioSession.swift */,
 				3441A874201C391FE263F1A6 /* MouseCursorManager.swift */,
+				47AA022027AA055BCC1917AC /* ExternalDisplay.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -3507,6 +3510,7 @@
 				BBC12BC7B6C8F50AE4BBF23A /* MediaDetailsSheet.swift in Sources */,
 				325DD05EDEB96E9A3DF41493 /* AppAudioSession.swift in Sources */,
 				27E688310674413D73AD3F09 /* MouseCursorManager.swift in Sources */,
+				5F4CFD741F26ED40296B4E20 /* ExternalDisplay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

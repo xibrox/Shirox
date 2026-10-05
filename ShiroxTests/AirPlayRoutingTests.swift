@@ -57,4 +57,23 @@ final class AirPlayRoutingTests: XCTestCase {
         XCTAssertFalse(AirPlayRouting.shouldRebuild(currentlyProxied: false, needsProxy: false))
         XCTAssertFalse(AirPlayRouting.shouldRebuild(currentlyProxied: true, needsProxy: true))
     }
+
+    // MARK: - MPV under AirPlay
+
+    /// MPV can't send its picture to a receiver; AVPlayer can, so a stream it plays moves over.
+    func testMPVHandsAnHLSStreamToNative() {
+        XCTAssertTrue(AirPlayRouting.handsMPVToNative(url: remote, avPlayerFailedIt: false))
+        XCTAssertTrue(AirPlayRouting.handsMPVToNative(url: local, avPlayerFailedIt: false))
+    }
+
+    /// A container AVPlayer can't open stays on MPV; the receiver gets the sound.
+    func testMPVKeepsAnMKV() {
+        let mkv = URL(string: "https://cdn.example/video/ep1.MKV")!
+        XCTAssertFalse(AirPlayRouting.handsMPVToNative(url: mkv, avPlayerFailedIt: false))
+    }
+
+    /// AVPlayer already failed this session — handing it back would only fail again.
+    func testMPVKeepsWhatAVPlayerFailed() {
+        XCTAssertFalse(AirPlayRouting.handsMPVToNative(url: remote, avPlayerFailedIt: true))
+    }
 }

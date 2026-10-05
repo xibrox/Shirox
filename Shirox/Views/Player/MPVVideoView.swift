@@ -9,9 +9,17 @@ struct MPVVideoView: UIViewRepresentable {
     let engine: MPVEngine
     /// Crop to fill the screen rather than fit the whole picture.
     var filled = false
+    #if os(iOS)
+    /// Off on a mirrored TV: Picture in Picture belongs to the phone's player.
+    var hostsPictureInPicture = true
+    #endif
 
     func makeUIView(context: Context) -> MPVLayerHostView {
+        #if os(iOS)
+        MPVLayerHostView(hosting: engine.layer, hostsPictureInPicture: hostsPictureInPicture)
+        #else
         MPVLayerHostView(hosting: engine.layer)
+        #endif
     }
 
     func updateUIView(_ view: MPVLayerHostView, context: Context) {
@@ -30,14 +38,17 @@ final class MPVLayerHostView: UIView {
         }
     }
 
-    init(hosting layer: CALayer) {
+    private var hostsPictureInPicture = false
+
+    init(hosting layer: CALayer, hostsPictureInPicture: Bool = true) {
         hosted = layer
         super.init(frame: .zero)
         backgroundColor = .black
         attach()
         #if os(iOS)
         // Picture in Picture's layer, over the Metal one.
-        MPVPictureInPicture.shared.attach(to: self.layer)
+        self.hostsPictureInPicture = hostsPictureInPicture
+        if hostsPictureInPicture { MPVPictureInPicture.shared.attach(to: self.layer) }
         #endif
     }
 
@@ -63,7 +74,7 @@ final class MPVLayerHostView: UIView {
         CATransaction.setDisableActions(true)
         hosted.frame = bounds
         #if os(iOS)
-        MPVPictureInPicture.shared.layout(in: layer, bounds: bounds)
+        if hostsPictureInPicture { MPVPictureInPicture.shared.layout(in: layer, bounds: bounds) }
         #endif
         CATransaction.commit()
     }

@@ -30,6 +30,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
         let config = UISceneConfiguration(name: connectingSceneSession.configuration.name,
                                           sessionRole: connectingSceneSession.role)
+        #if !targetEnvironment(macCatalyst)
+        // A mirrored TV, where MPV's picture can go (see `ExternalDisplay`).
+        if ExternalDisplay.isExternalDisplay(connectingSceneSession.role) {
+            config.delegateClass = ExternalDisplaySceneDelegate.self
+            return config
+        }
+        #endif
         config.delegateClass = SceneDelegate.self
         return config
     }

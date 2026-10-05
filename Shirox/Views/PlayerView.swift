@@ -98,6 +98,9 @@ struct PlayerView: View {
     /// Set once AVPlayer has given up on something MPV then played; the rest of the session stays
     /// on MPV, since the next episode would most likely fail the same way first.
     @State private var fellBackToMPV = false
+    /// MPV was playing when AirPlay took the route, and the native engine took over so the
+    /// receiver gets the picture; MPV comes back when AirPlay ends.
+    @State private var airPlayTookOverFromMPV = false
     /// A fresh URL was already fetched after a failure of this episode, so the next failure moves
     /// on (to MPV, or to the retry) instead of fetching another.
     @State private var refetchedAfterFailure = false
@@ -239,6 +242,9 @@ struct PlayerView: View {
     @State private var subtitleTracks: [SubtitleTrack]? = nil
     @ObservedObject var subtitleSettings = SubtitleSettingsManager.shared
     @ObservedObject var castManager = CastManager.shared
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    @ObservedObject private var externalDisplay = ExternalDisplay.shared
+    #endif
 
     private var isPad: Bool {
         #if os(iOS)
@@ -308,9 +314,15 @@ struct PlayerView: View {
                         .ignoresSafeArea()
                         .overlay { videoLoadingOverlay }
                 } else if let mpv = engine as? MPVEngine {
-                    MPVVideoView(engine: mpv, filled: isFilled)
-                        .ignoresSafeArea()
-                        .overlay { videoLoadingOverlay }
+                    if mpvOnExternalDisplay {
+                        MPVOnExternalDisplayPlaceholder()
+                            .ignoresSafeArea()
+                            .overlay { videoLoadingOverlay }
+                    } else {
+                        MPVVideoView(engine: mpv, filled: isFilled)
+                            .ignoresSafeArea()
+                            .overlay { videoLoadingOverlay }
+                    }
                 }
                 #elseif os(tvOS)
                 if let mpv = engine as? MPVEngine {
@@ -341,7 +353,8 @@ struct PlayerView: View {
 
                 ClockReader(clock: clock) { clock in
                     PlayerSubtitleOverlay(
-                        cues: subtitleRoute == .cues ? subtitleCues : [],
+                        // On a mirrored TV they're drawn over the picture there instead.
+                        cues: subtitleRoute == .cues && !mpvOnExternalDisplay ? subtitleCues : [],
                         currentTime: clock.currentTime,
                         showControls: showControls,
                         settings: subtitleSettings
@@ -773,6 +786,9 @@ struct PlayerView: View {
             hideStreamSubtitlesIfDrawingOurs()
         }
         .onChangeOf(assScript) { _ in applySubtitlesToMPV() }
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        .background(externalDisplaySync)
+        #endif
         #if os(iOS)
         // Under AirPlay the subtitles travel in the stream; a change has to reach the receiver.
         .onChangeOf(assScript) { _ in refreshAirPlaySubtitles() }
@@ -1103,8 +1119,7 @@ struct PlayerView: View {
             title: currentStream.title,
             onDismiss: castManager.isConnected ? exitCastMode : handleDismiss,
             isLocked: $isLocked,
-            // AirPlay video needs the native engine's AVPlayer; MPV's Picture in Picture goes
-            // through its software renderer.
+            // MPV's Picture in Picture goes through its software renderer.
             onPiP: {
                 #if os(iOS)
                 if let mpv = engine as? MPVEngine {
@@ -1114,7 +1129,6 @@ struct PlayerView: View {
                 }
                 #endif
             },
-            showsAirPlay: !(engine is MPVEngine),
             topPadding: topPad,
             isLandscape: isLandscape
         )
@@ -1606,8 +1620,54 @@ struct PlayerView: View {
         // While casting the local player is deliberately parked and the TV is fed by the
         // Chromecast path. Rebuilding it here would start a second, audible playback.
         guard !castManager.isConnected else { return }
-        // MPV can't hand its picture to an AirPlay receiver, so there's no route to rebuild for.
+        // MPV can't hand its picture to an AirPlay receiver; AVPlayer takes over from it.
+        if engine is MPVEngine {
+            guard isActive else { return }
+            Task { @MainActor in
+                // Screen Mirroring takes the route too, and its display connects a moment
+                // later. MPV then draws on the TV itself (`ExternalDisplay`), which beats
+                // handing over: every format and subtitle style, and no reload.
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard engine is MPVEngine, Self.isAirPlayRouteActive, !castManager.isConnected,
+                      !ExternalDisplay.shared.isConnected else { return }
+                guard AirPlayRouting.handsMPVToNative(url: currentStream.url, avPlayerFailedIt: fellBackToMPV) else {
+                    // Nothing else can play it, so the receiver gets the sound only.
+                    Logger.shared.log("[AirPlay] MPV-only stream; the receiver gets the sound. Screen Mirroring shows the picture.", type: "Stream")
+                    return
+                }
+                Logger.shared.log("[AirPlay] Moving from MPV to the native engine at \(currentTime)s", type: "Stream")
+                airPlayTookOverFromMPV = true
+                if currentTime > 0 { currentContext?.resumeFrom = currentTime }
+                didSeekToResume = false
+                // Comes back through here on AVPlayer, which puts the stream on the proxy if it needs it.
+                setupPlayer()
+            }
+            return
+        }
         guard engine is AVPlayerEngine else { return }
+
+        if airPlayTookOverFromMPV, !isActive {
+            isSwappingAirPlayRoute = true
+            Task { @MainActor in
+                defer { isSwappingAirPlayRoute = false }
+                // The route reads as the phone's speaker for a moment while AirPlay
+                // re-attaches; only one that stays off AirPlay ends it (see below).
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Self.isAirPlayRouteActive, airPlayTookOverFromMPV,
+                      !castManager.isConnected else { return }
+                Logger.shared.log("[AirPlay] Ended; back to MPV at \(currentTime)s", type: "Stream")
+                airPlayTookOverFromMPV = false
+                if airPlayProxyURL != nil {
+                    airPlayProxyURL = nil
+                    airPlaySubtitlesSignature = nil
+                    CastProxyServer.shared.stop(reason: "airplay")
+                }
+                if currentTime > 0 { currentContext?.resumeFrom = currentTime }
+                didSeekToResume = false
+                setupPlayer()
+            }
+            return
+        }
 
         let needsProxy = AirPlayRouting.needsProxy(
             url: currentStream.url,
@@ -1651,6 +1711,37 @@ struct PlayerView: View {
         }
         #endif
     }
+
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    /// MPV is drawing on a mirrored TV rather than on the phone.
+    private var mpvOnExternalDisplay: Bool {
+        externalDisplay.isConnected && engine is MPVEngine && !castManager.isConnected
+    }
+
+    /// Keeps the mirrored TV showing MPV's picture, with the subtitles the phone would draw.
+    private var externalDisplaySync: some View {
+        Color.clear
+            .onAppear(perform: updateExternalDisplay)
+            .onChangeOf(mpvOnExternalDisplay) { _ in updateExternalDisplay() }
+            .onChangeOf(engine.map { ObjectIdentifier($0) }) { _ in updateExternalDisplay() }
+            .onChangeOf(subtitleRoute) { _ in updateExternalDisplay() }
+            .onChangeOf(subtitleCues.count) { _ in updateExternalDisplay() }
+            .onDisappear { ExternalDisplay.shared.hide() }
+    }
+
+    private func updateExternalDisplay() {
+        guard mpvOnExternalDisplay, let mpv = engine as? MPVEngine else {
+            ExternalDisplay.shared.hide()
+            return
+        }
+        ExternalDisplay.shared.show(AnyView(
+            MPVExternalScreen(engine: mpv, cues: subtitleRoute == .cues ? subtitleCues : [],
+                              clock: clock, settings: subtitleSettings)
+        ))
+    }
+    #else
+    private var mpvOnExternalDisplay: Bool { false }
+    #endif
 
     /// Reloads the stream at the current position on the same AVPlayer — for a route or
     /// subtitle change under AirPlay. Not a rebuild: the external playback session belongs to
@@ -2020,6 +2111,8 @@ struct PlayerView: View {
         #else
         let kind = fellBackToMPV
             ? PlaybackEngineKind.mpv
+            : airPlayTookOverFromMPV && AirPlayRouting.handsMPVToNative(url: currentStream.url, avPlayerFailedIt: false)
+            ? PlaybackEngineKind.native
             : PlaybackFallback.initialEngine(preferred: PlaybackEngineKind(rawValue: preferredEngine) ?? .native,
                                              url: currentStream.url)
         #endif
@@ -3942,5 +4035,47 @@ private final class DragToDismissCoordinator: NSObject, UIGestureRecognizerDeleg
         return v.y > 0 && v.y > abs(v.x)
     }
     func gestureRecognizer(_ gr: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+}
+#endif
+
+#if os(iOS)
+/// What a mirrored TV shows while MPV plays: its picture, fitted, and the plain-text
+/// subtitles the phone would otherwise draw over it. mpv draws ASS and a file's own tracks
+/// into the picture itself.
+private struct MPVExternalScreen: View {
+    let engine: MPVEngine
+    let cues: [SubtitleCue]
+    @ObservedObject var clock: PlaybackClock
+    @ObservedObject var settings: SubtitleSettingsManager
+
+    var body: some View {
+        ZStack {
+            Color.black
+            MPVVideoView(engine: engine, filled: false, hostsPictureInPicture: false)
+            PlayerSubtitleOverlay(cues: cues, currentTime: clock.currentTime, showControls: false,
+                                  settings: settings)
+                .allowsHitTesting(false)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+/// The phone's player while its picture is on the TV; the controls stay over it.
+private struct MPVOnExternalDisplayPlaceholder: View {
+    var body: some View {
+        ZStack {
+            Color.black
+            VStack(spacing: 12) {
+                Image(systemName: "tv")
+                    .font(.system(size: 44, weight: .light))
+                Text("Playing on the TV")
+                    .font(.headline)
+                Text("Screen Mirroring")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.white)
+        }
+    }
 }
 #endif

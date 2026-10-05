@@ -5,8 +5,6 @@ struct PlayerTopBar: View {
     var onDismiss: () -> Void
     @Binding var isLocked: Bool
     var onPiP: (() -> Void)? = nil
-    /// AirPlay video needs the native engine; MPV can't hand its picture over.
-    var showsAirPlay = true
     var topPadding: CGFloat = 24
     var isLandscape: Bool = true
     var showDismiss: Bool = true
@@ -96,10 +94,8 @@ struct PlayerTopBar: View {
         CastButton()
             .frame(width: frameSize, height: frameSize)
         #endif
-        if showsAirPlay {
-            AirPlayButton()
-                .frame(width: frameSize, height: frameSize)
-        }
+        AirPlayButton()
+            .frame(width: frameSize, height: frameSize)
         if onPiP != nil {
             Button { onPiP?() } label: {
                 Image(systemName: "pip.enter")
