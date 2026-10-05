@@ -56,4 +56,18 @@ final class SimklPlayTrackerTests: XCTestCase {
                                                 runtime: nil, totalEpisodes: nil, status: .completed)
         XCTAssertNil(SimklPlayTracker.change(for: movie, number: 1, entry: watchedMovie, episodes: []))
     }
+
+    /// A rating is asked for at the end of a film, or of a show that has finished airing.
+    func testOnlyAFilmOrAFinishedShowsLastEpisodeFinishesTheTitle() {
+        XCTAssertTrue(SimklPlayTracker.finishesTitle(SimklPlayRef(simklID: 9, kind: .movie, season: nil),
+                                                     number: 1, episodes: []))
+        XCTAssertTrue(SimklPlayTracker.finishesTitle(season2, number: 2, episodes: catalog))
+        XCTAssertFalse(SimklPlayTracker.finishesTitle(season2, number: 1, episodes: catalog))
+        XCTAssertFalse(SimklPlayTracker.finishesTitle(SimklPlayRef(simklID: 7, kind: .tv, season: 1),
+                                                      number: 3, episodes: catalog), "a season's end")
+        var airing = catalog
+        airing.append(SimklEpisode(season: 2, episode: 3, title: nil, aired: false, img: nil, date: nil,
+                                   isSpecial: false, simklID: 203))
+        XCTAssertFalse(SimklPlayTracker.finishesTitle(season2, number: 2, episodes: airing), "more to come")
+    }
 }

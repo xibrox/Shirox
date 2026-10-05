@@ -4,6 +4,7 @@ struct RatingPromptView: View {
     let title: String
     let imageUrl: String
     let scoreFormat: ScoreFormat
+    var heading = "Rate Anime"
     let onSave: (Double) -> Void
     let onSkip: () -> Void
 
@@ -37,7 +38,7 @@ struct RatingPromptView: View {
                 }
             }
             .softScrollEdges()
-            .navigationTitle("Rate Anime")
+            .navigationTitle(heading)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

@@ -53,6 +53,8 @@ extension Animation {
 
 private final class CompletionBox {
     var context: PlayerContext?
+    /// A Simkl movie or show finished unrated, to rate once the player closes.
+    var simklRating: SimklRatingRequest?
 }
 
 /// Where playback is, which moves on every half-second tick. Kept out of the player's own state:
@@ -486,6 +488,11 @@ struct PlayerView: View {
                 PlayerPresenter.shared.presentRatingPromptIfNeeded(context: ctx)
                 #endif
             }
+            #if os(iOS)
+            if let request = completionBox.simklRating {
+                PlayerPresenter.shared.presentSimklRatingPrompt(request)
+            }
+            #endif
             hideTask?.cancel()
             autoAdvanceTask?.cancel()
             autoAdvanceTask = nil
@@ -1397,7 +1404,8 @@ struct PlayerView: View {
         if let ref = ctx.simklTitle {
             let number = ctx.episodeNumber
             let title = ctx.mediaTitle
-            Task { await SimklPlayTracker.finished(ref, number: number, title: title) }
+            let box = completionBox
+            Task { box.simklRating = await SimklPlayTracker.finished(ref, number: number, title: title) }
             return
         }
         // A module page linked to a Simkl show or movie: marked there, by the episode's place on
@@ -1408,15 +1416,16 @@ struct PlayerView: View {
             break
         case .linked(let play):
             let title = ctx.mediaTitle
+            let box = completionBox
             if let play {
-                Task { await SimklPlayTracker.finished(play.ref, number: play.number, title: title) }
+                Task { box.simklRating = await SimklPlayTracker.finished(play.ref, number: play.number, title: title) }
             } else {
                 // A new episode, or a list never remembered: the page is fetched and the episode placed.
                 let moduleId = ctx.moduleId, detailHref = ctx.detailHref, episodeHref = ctx.episodeHref
                 Task {
                     if let play = await SimklModuleTracker.placeByFetching(
                         moduleId: moduleId, detailHref: detailHref, episodeHref: episodeHref) {
-                        await SimklPlayTracker.finished(play.ref, number: play.number, title: title)
+                        box.simklRating = await SimklPlayTracker.finished(play.ref, number: play.number, title: title)
                     } else {
                         Logger.shared.log("[Simkl] \(title): this episode's place on its page isn't known — not marked",
                                           type: "Provider")
@@ -3280,6 +3289,7 @@ struct PlayerView: View {
         if episodeNumber != currentContext?.episodeNumber { refetchedAfterFailure = false }
         didTrackEpisode = false
         completionBox.context = nil
+        completionBox.simklRating = nil
         // onWatchNext confirmed ep `episodeNumber` exists. If availableEpisodes is stale
         // (set lower), bump it so saveProgress() correctly sees ep N as non-last.
         let preSwapAvailableEpisodes = currentContext?.availableEpisodes

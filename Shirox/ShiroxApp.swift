@@ -466,6 +466,22 @@ private struct RootTabView: View {
                 .adaptivePresentationDetents([.medium, .large])
             }
         }
+        .sheet(item: $playerPresenter.pendingSimklRating) { request in
+            RatingPromptView(
+                title: request.title,
+                imageUrl: request.posterURL ?? "",
+                scoreFormat: .point10,
+                heading: request.ref.kind == .movie ? "Rate Movie" : "Rate Show",
+                onSave: { score in
+                    Task { await SimklPlayTracker.rate(request, score: score) }
+                    playerPresenter.pendingSimklRating = nil
+                },
+                onSkip: {
+                    playerPresenter.pendingSimklRating = nil
+                }
+            )
+            .adaptivePresentationDetents([.medium, .large])
+        }
 
         .overlay(alignment: .bottom) {
             ToastView()

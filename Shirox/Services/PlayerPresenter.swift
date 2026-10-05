@@ -38,6 +38,8 @@ final class PlayerPresenter: ObservableObject {
     /// Observed by `RootTabView` which presents the rating sheet via SwiftUI — using
     /// native `.sheet()` so dark mode and detent backgrounds match other sheets.
     @Published var pendingRatingContext: PlayerContext?
+    /// The Simkl movie or show to rate, set as the player closes on its end.
+    @Published var pendingSimklRating: SimklRatingRequest?
 
     #if os(iOS)
     private weak var playerVC: UIViewController?
@@ -250,6 +252,14 @@ final class PlayerPresenter: ObservableObject {
             Logger.shared.log("[Rating] presentRatingPromptIfNeeded: setting pendingRatingContext", type: "Debug")
             self.pendingRatingContext = context
         }
+    }
+
+    /// A Simkl movie, or a show's last episode, played to the end — asked like AniList's, with
+    /// the same Settings switch.
+    func presentSimklRatingPrompt(_ request: SimklRatingRequest) {
+        let enabled = UserDefaults.standard.object(forKey: "rateOnFinish") as? Bool ?? true
+        guard enabled, pendingRatingContext == nil else { return }
+        pendingSimklRating = request
     }
 
     /// Called by the SwiftUI sheet's onSave to push the score to AniList/MAL.
