@@ -98,53 +98,71 @@ final class DetailViewModel: ObservableObject {
         Task {
             isLoadingDetail = true
             errorMessage = nil
-            do {
-                var d = try await JSEngine.shared.fetchDetails(
-                    url: item.href,
-                    title: item.title,
-                    image: item.image
-                )
-                // Snapshot is authoritative for text fields: AniList synopsis/year are
-                // higher-quality than the module's, and an offline JS module that swallows
-                // its own network errors often returns the error string as `description`.
-                // We never let that overwrite a hydrated snapshot.
-                if hydratedFromSnapshot, let existing = detail {
-                    d = MediaDetail(
-                        title: existing.title,
-                        image: existing.image,
-                        description: existing.description,
-                        aliases: existing.aliases,
-                        airdate: existing.airdate,
-                        episodes: existing.episodes
-                    )
-                } else if let existing = detail, d.episodes.isEmpty {
-                    d.episodes = existing.episodes
-                }
-                show(d)
-                isLoadingDetail = false
-
-                isLoadingEpisodes = true
-                let fetched = try await JSEngine.shared.fetchEpisodes(url: item.href)
-                // Only overwrite the existing episode list when the fetched one looks
-                // strictly real. Modules that swallow their own network errors often
-                // return [] or [{href: "stub"}] which parses to episode-0 entries —
-                // the snapshot's actual download list survives that.
-                let looksValid = !fetched.isEmpty
-                    && fetched.allSatisfy { !$0.href.isEmpty }
-                    && (!hydratedFromSnapshot || fetched.allSatisfy { $0.number > 0 })
-                if looksValid {
-                    d.episodes = fetched
-                    show(d)
-                }
-            } catch {
-                // If we already rendered something (e.g. from an offline snapshot),
-                // silently keep that view instead of replacing it with an error screen.
-                if detail == nil {
-                    errorMessage = error.localizedDescription
+            CloudflareBypassManager.shared.pendingVerificationURL = nil
+            await fetchPage(item: item)
+            // A site that walls its detail pages behind Cloudflare: solve it on the walled page
+            // and load once more, as search does. The page had no way to verify before, and a
+            // module swallowing the wall often shows an empty page rather than an error.
+            if !Task.isCancelled, let walled = CloudflareBypassManager.shared.pendingVerificationURL {
+                try? await CloudflareBypassManager.shared.triggerBypass(for: walled)
+                CloudflareBypassManager.shared.pendingVerificationURL = nil
+                if !Task.isCancelled {
+                    errorMessage = nil
+                    isLoadingDetail = detail == nil
+                    await fetchPage(item: item)
                 }
             }
             isLoadingDetail = false
             isLoadingEpisodes = false
+        }
+    }
+
+    /// The module's detail and episodes for `item`, shown as they come.
+    private func fetchPage(item: SearchItem) async {
+        do {
+            var d = try await JSEngine.shared.fetchDetails(
+                url: item.href,
+                title: item.title,
+                image: item.image
+            )
+            // Snapshot is authoritative for text fields: AniList synopsis/year are
+            // higher-quality than the module's, and an offline JS module that swallows
+            // its own network errors often returns the error string as `description`.
+            // We never let that overwrite a hydrated snapshot.
+            if hydratedFromSnapshot, let existing = detail {
+                d = MediaDetail(
+                    title: existing.title,
+                    image: existing.image,
+                    description: existing.description,
+                    aliases: existing.aliases,
+                    airdate: existing.airdate,
+                    episodes: existing.episodes
+                )
+            } else if let existing = detail, d.episodes.isEmpty {
+                d.episodes = existing.episodes
+            }
+            show(d)
+            isLoadingDetail = false
+
+            isLoadingEpisodes = true
+            let fetched = try await JSEngine.shared.fetchEpisodes(url: item.href)
+            // Only overwrite the existing episode list when the fetched one looks
+            // strictly real. Modules that swallow their own network errors often
+            // return [] or [{href: "stub"}] which parses to episode-0 entries —
+            // the snapshot's actual download list survives that.
+            let looksValid = !fetched.isEmpty
+                && fetched.allSatisfy { !$0.href.isEmpty }
+                && (!hydratedFromSnapshot || fetched.allSatisfy { $0.number > 0 })
+            if looksValid {
+                d.episodes = fetched
+                show(d)
+            }
+        } catch {
+            // If we already rendered something (e.g. from an offline snapshot),
+            // silently keep that view instead of replacing it with an error screen.
+            if detail == nil {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 

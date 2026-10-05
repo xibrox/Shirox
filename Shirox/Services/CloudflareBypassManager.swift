@@ -282,9 +282,9 @@ final class CloudflareBypassManager: ObservableObject {
         defer { inProgressHosts.remove(host) }
 
         let webView = makeBypassWebView()
-        let rootUrl = URL(string: "\(url.scheme ?? "https")://\(host)/") ?? url
-        Logger.shared.log("[CFBypass] Loading \(rootUrl) for host \(host)", type: "Debug")
-        webView.load(URLRequest(url: rootUrl))
+        let challengeURL = Self.challengePage(for: url)
+        Logger.shared.log("[CFBypass] Loading \(Logger.redact(challengeURL)) for host \(host)", type: "Debug")
+        webView.load(URLRequest(url: challengeURL))
 
         activeBypassWebView = webView
         defer { activeBypassWebView = nil }
@@ -332,6 +332,18 @@ final class CloudflareBypassManager: ObservableObject {
         }
         Logger.shared.log("[CFBypass] Timeout waiting for cf_clearance for \(host)", type: "Error")
         throw CloudflareBypassError.timeout
+    }
+
+    /// The page to solve the challenge on: the one that was walled. The site's front page was
+    /// loaded before, and a site that puts the challenge only on its detail pages showed no
+    /// challenge there, so it could never be solved. The clearance is the host's, so any page
+    /// earns it. A stream, subtitle or image file can't show a challenge page; the front page
+    /// stands in for those.
+    nonisolated static func challengePage(for url: URL) -> URL {
+        let media: Set<String> = ["m3u8", "m3u", "ts", "m4s", "mp4", "mkv", "webm", "aac", "mp3", "key",
+                                  "vtt", "srt", "ass", "jpg", "jpeg", "png", "webp", "gif", "avif"]
+        guard media.contains(url.pathExtension.lowercased()), let host = url.host else { return url }
+        return URL(string: "\(url.scheme ?? "https")://\(host)/") ?? url
     }
 
     func cancelActiveBypass() {
