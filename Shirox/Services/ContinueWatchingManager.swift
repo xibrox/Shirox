@@ -1132,6 +1132,16 @@ struct SimklTrackWrite: Equatable {
                   off > 0, rawEp - off > 0 {
             // Fallback tier 1: anchor is itself a later cour within one tvdb_season.
             ep = rawEp - off
+        } else if let anchorAniList = context.aniListID, let total = context.totalEpisodes, total > 0,
+                  rawEp > total,
+                  let carried = await SequelOverflow.resolve(aniListID: anchorAniList, episode: rawEp) {
+            // Fallback tier 2: past the season's end with no TVDB mapping (a new season isn't in
+            // it yet) — the next season along AniList's sequels, not "13 / 12" on this one.
+            ep = carried.episode
+            aniListID = carried.aniListID
+            malID = carried.malID
+            totalEpisodes = carried.seasonEpisodeCount
+            Logger.shared.log("[Tracking] sequel carry: ep \(rawEp) of \(anchorAniList) -> ep \(ep) of \(carried.aniListID)", type: "Debug")
         }
 
         // The user's tracking links win over the automatic ids. Applied after season mapping so

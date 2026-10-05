@@ -243,11 +243,16 @@ final class DetailViewModel: ObservableObject {
                 media.title.romaji?.lowercased() == title.lowercased()
             }
 
-            // Fall back to the top (most relevant) search result when there's no exact match.
-            // Module titles rarely match AniList's exactly, and without an ID the player can't
-            // track progress to AniList/MAL at all — the whole point of matching. AniList ranks
-            // by relevance, so the first hit is almost always the right show.
-            let match = perfectMatch ?? results.first
+            // Without an exact match, the closest result of the same season (see
+            // AniListTitleMatcher). AniList's top result was taken before, and that's the
+            // best-known entry: a later cour's episodes were tracked on the first season.
+            let guessedID = perfectMatch == nil
+                ? AniListTitleMatcher.bestMatch(for: title, among: results.map {
+                    AniListTitleMatcher.Candidate(id: $0.id, titles: [$0.title.english, $0.title.romaji,
+                                                                      $0.title.native].compactMap { $0 })
+                })
+                : nil
+            let match = perfectMatch ?? results.first { $0.id == guessedID }
             if let match {
                 aniListID = match.id
                 aniListMatchIsGuess = perfectMatch == nil
