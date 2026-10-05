@@ -546,7 +546,10 @@ enum ContinueWatchingResume {
                     ToastManager.shared.show(message: "Downloaded file is missing — re-download to play offline", type: .error)
                     return
                 }
-                PlayerPresenter.shared.presentPlayer(stream: localStream, context: context, onWatchNext: onWatchNext, onSequelNeeded: SequelResolver.loader(aniListID: item.aniListID, moduleId: item.moduleId))
+                // Next plays the next download when there is one, and streams otherwise.
+                PlayerPresenter.shared.presentPlayer(stream: localStream, context: context,
+                                                     onWatchNext: DetailView.nextDownloadLoader(after: download, online: onWatchNext),
+                                                     onSequelNeeded: SequelResolver.loader(aniListID: item.aniListID, moduleId: item.moduleId))
             }
             return
         }

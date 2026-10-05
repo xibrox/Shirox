@@ -2126,21 +2126,28 @@ struct DetailView: View {
         }
     }
 
-    /// Next for a downloaded episode: the show's next downloaded episode. A download played
-    /// with no loader, so it had no Next button and nothing to move on to by hand.
-    static func nextDownloadLoader(after item: DownloadItem) -> WatchNextLoader {
+    /// Next for a downloaded episode: the very next episode when it's downloaded too, else the
+    /// source's own Next (`online`), else — with no connection — the next one downloaded. A
+    /// download played with no loader once, so it had no Next button; then it skipped to the
+    /// next download past episodes that weren't downloaded but could stream.
+    static func nextDownloadLoader(after item: DownloadItem, online: WatchNextLoader? = nil) -> WatchNextLoader {
         { currentNumber in
-            let next = await MainActor.run { () -> DownloadItem? in
-                DownloadManager.shared.items
-                    .filter {
-                        $0.state == .completed && $0.episodeNumber > currentNumber
-                            && (($0.aniListID != nil && $0.aniListID == item.aniListID)
-                                || ($0.mediaTitle == item.mediaTitle && $0.moduleId == item.moduleId))
-                    }
-                    .min { $0.episodeNumber < $1.episodeNumber }
+            func downloaded(_ wanted: (Int) -> Bool) async -> (streams: [StreamResult], episodeNumber: Int, episodeHref: String?)? {
+                let next = await MainActor.run { () -> DownloadItem? in
+                    DownloadManager.shared.items
+                        .filter {
+                            $0.state == .completed && wanted($0.episodeNumber)
+                                && (($0.aniListID != nil && $0.aniListID == item.aniListID)
+                                    || ($0.mediaTitle == item.mediaTitle && $0.moduleId == item.moduleId))
+                        }
+                        .min { $0.episodeNumber < $1.episodeNumber }
+                }
+                guard let next, let stream = await DownloadManager.shared.getStream(for: next) else { return nil }
+                return (streams: [stream], episodeNumber: next.episodeNumber, episodeHref: next.episodeHref)
             }
-            guard let next, let stream = await DownloadManager.shared.getStream(for: next) else { return nil }
-            return (streams: [stream], episodeNumber: next.episodeNumber, episodeHref: next.episodeHref)
+            if let exact = await downloaded({ $0 == currentNumber + 1 }) { return exact }
+            if let online, let streamed = try? await online(currentNumber) { return streamed }
+            return await downloaded({ $0 > currentNumber })
         }
     }
     #endif
