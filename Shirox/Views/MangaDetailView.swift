@@ -914,10 +914,13 @@ private struct MangaChapterRowView: View {
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(.white)   // green is dark enough in both modes
                         } else {
+                            // One line, shrunk to fit: with only a scale factor, a larger text size
+                            // wrapped "200" into "20 / 0" inside the circle.
                             Text(chapter.displayNumber)
                                 .font(.footnote.weight(.bold))
                                 .foregroundStyle(adaptiveBackground)
-                                .minimumScaleFactor(0.55)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.4)
                                 .frame(width: 34)
                         }
                     }

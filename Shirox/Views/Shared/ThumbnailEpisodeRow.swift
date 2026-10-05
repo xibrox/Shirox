@@ -84,6 +84,9 @@ struct ThumbnailEpisodeRow: View {
                                 Text("\(number)")
                                     .font(.footnote.weight(.bold))
                                     .foregroundStyle(adaptiveBackground)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.4)
+                                    .frame(width: 34)
                             }
                         }
                         .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
@@ -96,6 +99,8 @@ struct ThumbnailEpisodeRow: View {
                         Text("Episode \(number)")
                             .font(.callout.weight(.semibold))
                             .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
 
                         if let badge = Self.fillerBadge(for: fillerType) {
                             Text(badge.label)
@@ -126,12 +131,12 @@ struct ThumbnailEpisodeRow: View {
                     }
 
                     if let t = title, !t.isEmpty {
-                        // Two lines: one cut most titles off halfway, beside a thumbnail that
-                        // leaves the text column narrow on a phone.
+                        // Up to four lines: one, then two, still cut titles off beside a
+                        // thumbnail that leaves the text column narrow, worse at larger text sizes.
                         Text(t)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                            .lineLimit(4)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }

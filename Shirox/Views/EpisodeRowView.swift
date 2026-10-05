@@ -57,7 +57,10 @@ struct EpisodeRowView: View {
                             } else {
                                 Text(episode.displayNumber)
                                     .font(.footnote.weight(.bold))
-                                    .foregroundStyle(adaptiveBackground)   // ← now defined locally
+                                    .foregroundStyle(adaptiveBackground)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.4)
+                                    .frame(width: 34)
                             }
                         }
                         .shadow(color: (isComplete ? Color.green : Color.primary).opacity(0.3),
