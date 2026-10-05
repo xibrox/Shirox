@@ -44,7 +44,9 @@ final class CacheManager: ObservableObject {
     }
     
     var continueWatchingSize: Int {
-        let keys = ["continueWatchingItems", "watchedEpisodeKeys"]
+        // Everything Reset Watch Progress clears: the cards, both kinds of watched mark, and the
+        // resets held back from the tracker syncs. Only the first two were counted.
+        let keys = ["continueWatchingItems", "watchedEpisodeKeys", "watchedEpisodeHrefKeys", "trackerResetFloors"]
         var total = 0
         for key in keys {
             if let data = UserDefaults.standard.data(forKey: key) {
@@ -78,6 +80,30 @@ final class CacheManager: ObservableObject {
         return dict.count * 16
     }
 
+    /// The HTTP response cache every request shares (`URLCache.shared`): API answers and pages.
+    /// It was neither counted nor cleared anywhere.
+    var networkCacheSize: Int {
+        URLCache.shared.currentDiskUsage
+    }
+
+    /// Home's saved rows, Simkl's lists and catalog pages, and AniList-to-TVDB episode
+    /// mappings: all fetched again when gone, and none counted or cleared before.
+    var dataCacheSize: Int {
+        dataCacheFiles.reduce(0) { total, url in
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return total }
+            if isDirectory.boolValue { return total + ((try? sizeOfDirectory(at: url)) ?? 0) }
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            return total + size
+        } + HomeCacheStore.shared.diskByteSize()
+    }
+
+    private var dataCacheFiles: [URL] {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        return ["simkl-feed", "simkl-catalog", "anira_all_mappings_v2.json", "anira_all_mappings_v1.json"]
+            .map { caches.appendingPathComponent($0) }
+    }
+
     var libraryCacheSize: Int {
         LibraryCacheStore.shared.diskByteSize()
     }
@@ -91,7 +117,7 @@ final class CacheManager: ObservableObject {
             // What Clear Everything clears, so the figure beside it is what it frees.
             (await imageCacheSize) + websiteDataSize + tempFilesSize
                 + searchAliasSize + idMappingSize + episodeSortSize
-                + libraryCacheSize + profileCacheSize
+                + libraryCacheSize + profileCacheSize + networkCacheSize + dataCacheSize
         }
     }
 
@@ -117,6 +143,15 @@ final class CacheManager: ObservableObject {
                 try? FileManager.default.removeItem(at: file)
             }
         }
+    }
+
+    func clearNetworkCache() {
+        URLCache.shared.removeAllCachedResponses()
+    }
+
+    func clearDataCaches() {
+        HomeCacheStore.shared.clearAll()
+        for url in dataCacheFiles { try? FileManager.default.removeItem(at: url) }
     }
 
     func clearContinueWatching() {
@@ -160,6 +195,8 @@ final class CacheManager: ObservableObject {
         clearEpisodeSortPreferences()
         clearLibraryCache()
         clearProfileCache()
+        clearNetworkCache()
+        clearDataCaches()
         cleanupOrphanedDownloads()
     }
     

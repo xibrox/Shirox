@@ -203,6 +203,7 @@ final class MPVEngine: PlaybackEngine {
     /// - Parameter router: decides where each stream is fetched from; nil opens it as given.
     init(output: Output = .metal, router: MPVRouter? = nil) {
         self.router = router
+        _ = Self.sweepLeftoverScripts
         guard let mpv = mpv_create() else {
             Logger.shared.log("[MPV] Couldn't create an mpv instance", type: "Error")
             return
@@ -906,6 +907,17 @@ final class MPVEngine: PlaybackEngine {
         }
         removeScriptFile()
     }
+
+    /// Subtitle scripts left behind by players that ended without `stop()` (the app closed
+    /// mid-episode): they piled up in the temporary folder, one per episode. Swept once, before
+    /// the first player of a launch, when none can be in use.
+    private static let sweepLeftoverScripts: Void = {
+        let tmp = FileManager.default.temporaryDirectory
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: tmp.path)) ?? []
+        for name in names where name.hasPrefix("shirox-subtitles-") && name.hasSuffix(".ass") {
+            try? FileManager.default.removeItem(at: tmp.appendingPathComponent(name))
+        }
+    }()
 
     private func removeScriptFile() {
         guard let scriptFile else { return }

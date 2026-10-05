@@ -1071,14 +1071,14 @@ struct StorageSettingsView: View {
     @State private var websiteDataSize = 0
     @State private var tempFilesSize = 0
     @State private var continueWatchingSize = 0
-    @State private var watchHistorySize = 0
+    @State private var networkCacheSize = 0
+    @State private var dataCacheSize = 0
     @State private var searchAliasSize = 0
     @State private var idMappingSize = 0
     @State private var episodeSortSize = 0
     @State private var totalUsage = 0
     @State private var isClearing = false
     @State private var showResetCWConfirmation = false
-    @State private var showResetHistoryConfirmation = false
     @State private var downloadsSize = 0
     @State private var showDeleteDownloadsConfirmation = false
 
@@ -1146,6 +1146,28 @@ struct StorageSettingsView: View {
                     .foregroundStyle(.primary)
 
                     Button {
+                        CacheManager.shared.clearNetworkCache()
+                        updateCacheSizes()
+                    } label: {
+                        LabeledContent("Reset Network Cache") {
+                            Text(SettingsView.formattedBytes(networkCacheSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        CacheManager.shared.clearDataCaches()
+                        updateCacheSizes()
+                    } label: {
+                        LabeledContent("Reset Home & Simkl Cache") {
+                            Text(SettingsView.formattedBytes(dataCacheSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
                         CacheManager.shared.clearTempFiles()
                         updateCacheSizes()
                     } label: {
@@ -1192,18 +1214,8 @@ struct StorageSettingsView: View {
                     Button {
                         showResetCWConfirmation = true
                     } label: {
-                        LabeledContent("Reset Continue Watching") {
+                        LabeledContent("Reset Watch Progress") {
                             Text(SettingsView.formattedBytes(continueWatchingSize))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.red)
-
-                    Button {
-                        showResetHistoryConfirmation = true
-                    } label: {
-                        LabeledContent("Reset Watch History") {
-                            Text(SettingsView.formattedBytes(watchHistorySize))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -1212,7 +1224,7 @@ struct StorageSettingsView: View {
                 .font(.subheadline)
                 .disabled(isClearing)
 
-                Text("Clear Everything removes caches the app can rebuild. It keeps Continue Watching and watch history, which have their own resets. Website Data includes cookies and local storage from module scrapers. Search Aliases store remembered search results and stream picks per module.")
+                Text("Clear Everything removes caches the app can rebuild. It keeps your watch progress, which has its own reset. Website Data includes cookies and local storage from module scrapers. Search Aliases store remembered search results and stream picks per module. The Network Cache holds saved answers from sites and services.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1248,23 +1260,16 @@ struct StorageSettingsView: View {
         .softScrollEdges()
         .navigationTitle("Storage & Cache")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Reset Continue Watching?", isPresented: $showResetCWConfirmation) {
+        .alert("Reset Watch Progress?", isPresented: $showResetCWConfirmation) {
             Button("Reset", role: .destructive) {
                 CacheManager.shared.clearContinueWatching()
                 updateCacheSizes()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will clear all in-progress playback cards from the Home screen.")
-        }
-        .alert("Reset Watch History?", isPresented: $showResetHistoryConfirmation) {
-            Button("Reset", role: .destructive) {
-                CacheManager.shared.clearWatchHistory()
-                updateCacheSizes()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will clear all 'Watched' checkmarks from episode lists.")
+            // It takes the watched marks too: the old wording promised only the Home cards, and a
+            // separate Watch History reset, of data nothing writes any more, promised the marks.
+            Text("Clears Continue Watching and every Watched mark in episode lists on this device. AniList, MyAnimeList and Simkl aren't changed.")
         }
         .onAppear {
             updateCacheSizes()
@@ -1276,7 +1281,8 @@ struct StorageSettingsView: View {
         websiteDataSize = CacheManager.shared.websiteDataSize
         tempFilesSize = CacheManager.shared.tempFilesSize
         continueWatchingSize = CacheManager.shared.continueWatchingSize
-        watchHistorySize = CacheManager.shared.watchHistorySize
+        networkCacheSize = CacheManager.shared.networkCacheSize
+        dataCacheSize = CacheManager.shared.dataCacheSize
         searchAliasSize = CacheManager.shared.searchAliasSize
         idMappingSize = CacheManager.shared.idMappingSize
         episodeSortSize = CacheManager.shared.episodeSortSize
