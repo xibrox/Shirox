@@ -42,11 +42,12 @@ actor HLSDownloader {
         Logger.shared.log("[HLS] Downloading manifest: \(Logger.redact(url))", type: "Download")
 
         // 1. Resolve Master Playlist → the media playlist at the Download Quality setting, and its audio when
-        //    that comes as a rendition of its own. Only the video used to be fetched, so a
-        //    stream with separate audio downloaded silent.
+        //    that comes as renditions of its own — every language, as the subtitles are. Only the
+        //    video used to be fetched, so a stream with separate audio downloaded silent; then only
+        //    the default language, so a dub couldn't be picked offline.
         var manifest = try await fetchManifest(url: url, headers: headers, playlistKey: playlistKey)
         var videoURL = url
-        var audio: (url: URL, manifest: String)?
+        var audio: [(rendition: HLSAudioRendition, manifest: String)] = []
         var choice: HLSVariantChoice?
         if manifest.contains("#EXT-X-STREAM-INF"),
            let picked = HLSManifestParser.selectBestVariantChoice(
@@ -55,8 +56,14 @@ actor HLSDownloader {
             choice = picked
             videoURL = picked.video
             manifest = try await fetchManifest(url: picked.video, headers: headers, playlistKey: playlistKey)
-            if let audioURL = picked.audio {
-                audio = (audioURL, try await fetchManifest(url: audioURL, headers: headers, playlistKey: playlistKey))
+            for rendition in picked.audioRenditions {
+                do {
+                    audio.append((rendition, try await fetchManifest(url: rendition.url, headers: headers,
+                                                                     playlistKey: playlistKey)))
+                } catch where rendition.url != picked.audio {
+                    // An extra language that won't load is left out; the default one is needed.
+                    Logger.shared.log("[HLS] Skipping audio '\(rendition.name)': \(error.localizedDescription)", type: "Download")
+                }
             }
         }
 
@@ -66,29 +73,45 @@ actor HLSDownloader {
         //    and crashed the player a couple seconds in.
         let videoPlan = HLSManifestParser.parseMediaPlaylist(manifest, baseURL: videoURL)
         guard !videoPlan.segments.isEmpty else { throw HLSError.invalidManifest }
-        let audioPlan = audio.map { HLSManifestParser.parseMediaPlaylist($0.manifest, baseURL: $0.url) }
-        if let audioPlan, audioPlan.segments.isEmpty { throw HLSError.invalidManifest }
+        var audioPlans: [(rendition: HLSAudioRendition, plan: HLSDownloadPlan)] = []
+        for (rendition, text) in audio {
+            let plan = HLSManifestParser.parseMediaPlaylist(text, baseURL: rendition.url)
+            if !plan.segments.isEmpty {
+                audioPlans.append((rendition, plan))
+            } else if rendition.url == choice?.audio {
+                throw HLSError.invalidManifest
+            }
+        }
 
         // 3. Create Episode Folder
         let episodeFolder = downloadDir.appendingPathComponent(id.uuidString)
         try FileManager.default.createDirectory(at: episodeFolder, withIntermediateDirectories: true)
 
-        // 4–5. The renditions' files, side by side; one progress across both.
-        let total = videoPlan.segments.count + (audioPlan?.segments.count ?? 0)
+        // 4–5. The renditions' files, side by side; one progress across them all.
+        let total = videoPlan.segments.count + audioPlans.reduce(0) { $0 + $1.plan.segments.count }
         let counter = ProgressCounter(total: total, report: onProgress)
         let videoPlaylist = try await downloadRendition(
             videoPlan, prefix: "", folder: episodeFolder, headers: headers, counter: counter)
 
         // 6. Generate Local Manifest — self-contained, cleartext, init referenced via EXT-X-MAP.
         let manifestName = "playlist.m3u8"
-        if let audioPlan, let choice {
-            let videoName = "video.m3u8", audioName = "audio.m3u8"
-            let audioPlaylist = try await downloadRendition(
-                audioPlan, prefix: "a_", folder: episodeFolder, headers: headers, counter: counter)
+        if !audioPlans.isEmpty, let choice {
+            let videoName = "video.m3u8"
+            var localAudio: [HLSLocalAudio] = []
+            for (index, entry) in audioPlans.enumerated() {
+                // The first keeps the names a one-language download always had.
+                let prefix = index == 0 ? "a_" : "a\(index)_"
+                let audioName = index == 0 ? "audio.m3u8" : "audio_\(index).m3u8"
+                let audioPlaylist = try await downloadRendition(
+                    entry.plan, prefix: prefix, folder: episodeFolder, headers: headers, counter: counter)
+                try audioPlaylist.write(to: episodeFolder.appendingPathComponent(audioName), atomically: true, encoding: .utf8)
+                localAudio.append(HLSLocalAudio(playlist: audioName, name: entry.rendition.name,
+                                                language: entry.rendition.language,
+                                                isDefault: entry.rendition.url == choice.audio))
+            }
             try videoPlaylist.write(to: episodeFolder.appendingPathComponent(videoName), atomically: true, encoding: .utf8)
-            try audioPlaylist.write(to: episodeFolder.appendingPathComponent(audioName), atomically: true, encoding: .utf8)
             let master = HLSManifestParser.localMasterManifest(
-                videoPlaylist: videoName, audioPlaylist: audioName,
+                videoPlaylist: videoName, audio: localAudio,
                 bandwidth: choice.bandwidth, codecs: choice.codecs)
             try master.write(to: episodeFolder.appendingPathComponent(manifestName), atomically: true, encoding: .utf8)
         } else {

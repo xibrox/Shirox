@@ -154,6 +154,11 @@ final class ScrambledPlaylistTests: XCTestCase {
         """, baseURL: base))
         XCTAssertEqual(choice.video.absoluteString, "https://cdn.test/m/hi.m3u8")
         XCTAssertEqual(choice.audio?.absoluteString, "https://cdn.test/m/ja.m3u8")
+        // Every language of the variant's group, for the download to keep; not the other group's.
+        XCTAssertEqual(choice.audioRenditions, [
+            HLSAudioRendition(url: URL(string: "https://cdn.test/m/en.m3u8")!, name: "English", language: nil, isDefault: false),
+            HLSAudioRendition(url: URL(string: "https://cdn.test/m/ja.m3u8")!, name: "Japanese", language: nil, isDefault: true),
+        ])
         XCTAssertEqual(choice.bandwidth, 3_000_000)
         XCTAssertEqual(choice.codecs, "avc1.640028,mp4a.40.2")
     }
@@ -167,16 +172,20 @@ final class ScrambledPlaylistTests: XCTestCase {
         v.m3u8
         """, baseURL: base))
         XCTAssertNil(muxed.audio)
+        XCTAssertTrue(muxed.audioRenditions.isEmpty)
         let plain = try XCTUnwrap(HLSManifestParser.selectBestVariantChoice("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nv.m3u8", baseURL: base))
         XCTAssertNil(plain.audio)
         XCTAssertNil(HLSManifestParser.selectBestVariantChoice("#EXTM3U\n#EXTINF:4,\nseg.ts", baseURL: base))
     }
 
-    func testTheLocalMasterNamesBothPlaylists() {
-        let master = HLSManifestParser.localMasterManifest(videoPlaylist: "video.m3u8", audioPlaylist: "audio.m3u8",
-                                                           bandwidth: 900_000, codecs: "avc1.42e01e,mp4a.40.2")
-        XCTAssertTrue(master.contains("#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\""))
-        XCTAssertTrue(master.contains("URI=\"audio.m3u8\""))
+    func testTheLocalMasterNamesEveryPlaylist() {
+        let master = HLSManifestParser.localMasterManifest(
+            videoPlaylist: "video.m3u8",
+            audio: [HLSLocalAudio(playlist: "audio.m3u8", name: "Hindi", language: "hi", isDefault: false),
+                    HLSLocalAudio(playlist: "audio_1.m3u8", name: "Japanese", language: "ja", isDefault: true)],
+            bandwidth: 900_000, codecs: "avc1.42e01e,mp4a.40.2")
+        XCTAssertTrue(master.contains(#"#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Hindi",LANGUAGE="hi",DEFAULT=NO,AUTOSELECT=YES,URI="audio.m3u8""#))
+        XCTAssertTrue(master.contains(#"#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Japanese",LANGUAGE="ja",DEFAULT=YES,AUTOSELECT=YES,URI="audio_1.m3u8""#))
         XCTAssertTrue(master.contains("#EXT-X-STREAM-INF:BANDWIDTH=900000,AUDIO=\"audio\",CODECS=\"avc1.42e01e,mp4a.40.2\"\nvideo.m3u8"))
         let audio = HLSManifestParser.localManifest(durations: [4, 2], segmentExtension: "aac", initFileName: nil,
                                                     segmentPrefix: "a_seg_")

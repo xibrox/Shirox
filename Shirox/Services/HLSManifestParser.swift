@@ -37,13 +37,35 @@ struct HLSInitSegment: Equatable {
     let key: HLSKey?
 }
 
-/// The variant a download takes from a master playlist, and the audio rendition it plays with
-/// when the audio comes separately (`AUDIO="group"` naming an `#EXT-X-MEDIA:TYPE=AUDIO`).
+/// One language of a stream's separate audio (`#EXT-X-MEDIA:TYPE=AUDIO` with a URI).
+struct HLSAudioRendition: Equatable {
+    let url: URL
+    let name: String
+    let language: String?
+    let isDefault: Bool
+}
+
+/// The variant a download takes from a master playlist, and the audio renditions it plays with
+/// when the audio comes separately (`AUDIO="group"` naming `#EXT-X-MEDIA:TYPE=AUDIO` entries).
 struct HLSVariantChoice: Equatable {
     let video: URL
-    let audio: URL?
+    /// Every rendition of the variant's audio group, in the playlist's order.
+    let audioRenditions: [HLSAudioRendition]
     let bandwidth: Int
     let codecs: String?
+
+    /// The rendition played by default: the group's `DEFAULT=YES` one, else its first.
+    var audio: URL? {
+        (audioRenditions.first { $0.isDefault } ?? audioRenditions.first)?.url
+    }
+}
+
+/// A downloaded audio rendition, as the local master playlist names it.
+struct HLSLocalAudio: Equatable {
+    let playlist: String
+    let name: String
+    let language: String?
+    let isDefault: Bool
 }
 
 /// A self-contained plan for downloading one media playlist offline.
@@ -87,9 +109,9 @@ enum HLSManifestParser {
         return best
     }
 
-    /// The highest-`BANDWIDTH` variant, with the audio rendition of its `AUDIO` group — the
-    /// group's `DEFAULT=YES` one, else its first that has a URI. A rendition without a URI is
-    /// muxed into the video and needs nothing separate. Nil for a media playlist.
+    /// The highest-`BANDWIDTH` variant, with every audio rendition of its `AUDIO` group that has
+    /// a URI. A rendition without one is muxed into the video and needs nothing separate. Nil for
+    /// a media playlist.
     /// - Parameter quality: which variant to take — "highest", "lowest", or a height such as
     ///   "720". A height takes that rung, else the best one below it, else the smallest; the
     ///   rule the player's Preferred Quality uses. Downloads always took the highest, so a phone
@@ -125,31 +147,44 @@ enum HLSManifestParser {
             }
         }()
         guard let best = picked else { return nil }
-        var audio: URL?
+        var audio: [HLSAudioRendition] = []
         if let group = best.attrs["AUDIO"] {
-            let renditions = lines.filter { $0.hasPrefix("#EXT-X-MEDIA:") }
+            var seen = Set<URL>()
+            audio = lines.filter { $0.hasPrefix("#EXT-X-MEDIA:") }
                 .map { parseAttributes(String($0.dropFirst("#EXT-X-MEDIA:".count))) }
-                .filter { $0["TYPE"] == "AUDIO" && $0["GROUP-ID"] == group && $0["URI"] != nil }
-            let pick = renditions.first { $0["DEFAULT"] == "YES" } ?? renditions.first
-            audio = pick?["URI"].flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
+                .filter { $0["TYPE"] == "AUDIO" && $0["GROUP-ID"] == group }
+                .compactMap { attrs in
+                    guard let url = attrs["URI"].flatMap({ URL(string: $0, relativeTo: baseURL)?.absoluteURL }),
+                          seen.insert(url).inserted else { return nil }
+                    return HLSAudioRendition(url: url, name: attrs["NAME"] ?? "Audio",
+                                             language: attrs["LANGUAGE"], isDefault: attrs["DEFAULT"] == "YES")
+                }
         }
-        return HLSVariantChoice(video: best.url, audio: audio, bandwidth: best.bandwidth, codecs: best.attrs["CODECS"])
+        return HLSVariantChoice(video: best.url, audioRenditions: audio, bandwidth: best.bandwidth,
+                                codecs: best.attrs["CODECS"])
     }
 
-    /// The local master playlist for a download whose audio came separately: one variant, one
-    /// audio rendition, both local media playlists.
-    static func localMasterManifest(videoPlaylist: String, audioPlaylist: String,
+    /// The local master playlist for a download whose audio came separately: one variant, and
+    /// each downloaded audio rendition under its own name and language, for the player's audio
+    /// menu. Exactly one is the default: the source's, else the first.
+    static func localMasterManifest(videoPlaylist: String, audio: [HLSLocalAudio],
                                     bandwidth: Int, codecs: String?) -> String {
         var inf = "#EXT-X-STREAM-INF:BANDWIDTH=\(max(bandwidth, 1)),AUDIO=\"audio\""
         if let codecs { inf += ",CODECS=\"\(codecs)\"" }
-        return """
-        #EXTM3U
-        #EXT-X-VERSION:7
-        #EXT-X-INDEPENDENT-SEGMENTS
-        #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Audio",DEFAULT=YES,AUTOSELECT=YES,URI="\(audioPlaylist)"
-        \(inf)
-        \(videoPlaylist)
-        """
+        let defaultIndex = audio.firstIndex { $0.isDefault } ?? 0
+        let media = audio.enumerated().map { index, rendition in
+            var line = "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\",NAME=\"\(quoted(rendition.name))\""
+            if let language = rendition.language { line += ",LANGUAGE=\"\(quoted(language))\"" }
+            line += index == defaultIndex ? ",DEFAULT=YES,AUTOSELECT=YES" : ",DEFAULT=NO,AUTOSELECT=YES"
+            return line + ",URI=\"\(rendition.playlist)\""
+        }
+        return (["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS"] + media + [inf, videoPlaylist])
+            .joined(separator: "\n")
+    }
+
+    /// A quoted-string attribute can't hold a quote or a line break.
+    private static func quoted(_ value: String) -> String {
+        value.replacingOccurrences(of: "\"", with: "'").components(separatedBy: .newlines).joined(separator: " ")
     }
 
     /// Parse a media playlist into a download plan, capturing the fMP4 init segment
