@@ -13,6 +13,11 @@ struct ModuleListView: View {
     @State private var isAddingLocalModule = false
     @State private var isAddingJellyfinModule = false
     @FocusState private var isTextFieldFocused: Bool
+    @State private var isCheckingAll = false
+    /// Set after Check All finds broken modules, to offer removing them.
+    @State private var offerRemovingBroken = false
+    /// A module just added whose check failed, to keep or remove.
+    @State private var failedNewModule: (module: ModuleDefinition, step: ModuleCheckStep, reason: String)?
 
     private let localFilesModuleURL = "https://raw.githubusercontent.com/xibrox/local-files-module/refs/heads/main/local.json"
     private let jellyfinModuleURL = "https://raw.githubusercontent.com/xibrox/jellyfin-module/refs/heads/main/jellyfin.json"
@@ -82,6 +87,12 @@ struct ModuleListView: View {
                                 .contextMenu {
                                     seanimeDubAction(module)
                                     shareModuleActions(module)
+                                    Button {
+                                        Task { await moduleManager.check(module) }
+                                    } label: {
+                                        Label("Check Again", systemImage: "checkmark.shield")
+                                    }
+                                    .disabled(moduleManager.checking.contains(module.id))
                                     Button(role: .destructive) {
                                         removeModule(module)
                                     } label: {
@@ -137,15 +148,93 @@ struct ModuleListView: View {
                     }
                     .disabled(moduleManager.modules.isEmpty || isRefreshing)
                 }
+                ToolbarItem(placement: .automatic) {
+                    // Runs every module through a search, episodes and a stream.
+                    Button {
+                        Task {
+                            isCheckingAll = true
+                            await moduleManager.checkAll()
+                            isCheckingAll = false
+                            offerRemovingBroken = !moduleManager.brokenModules.isEmpty
+                        }
+                    } label: {
+                        if isCheckingAll {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "checkmark.shield")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                    }
+                    .accessibilityLabel("Check All Modules")
+                    .disabled(moduleManager.modules.isEmpty || isCheckingAll)
+                }
                 #if os(iOS)
                 ToolbarItem(placement: .automatic) {
                     EditButton()
                 }
                 #endif
             }
+            .confirmationDialog(
+                brokenTitle,
+                isPresented: $offerRemovingBroken,
+                titleVisibility: .visible
+            ) {
+                Button("Remove \(moduleManager.brokenModules.count == 1 ? "It" : "Them")", role: .destructive) {
+                    moduleManager.brokenModules.forEach(removeModule)
+                }
+                Button("Keep", role: .cancel) {}
+            } message: {
+                Text(moduleManager.brokenModules.map(\.sourceName).joined(separator: ", "))
+            }
+            .alert(
+                "This module may not work",
+                isPresented: Binding(get: { failedNewModule != nil }, set: { if !$0 { failedNewModule = nil } }),
+                presenting: failedNewModule
+            ) { failed in
+                Button("Remove", role: .destructive) { removeModule(failed.module) }
+                Button("Keep", role: .cancel) {}
+            } message: { failed in
+                Text("\(failed.module.sourceName) was added, but a test run failed at \(failed.step.label.lowercased()): \(failed.reason). It may be broken or made for another app.")
+            }
         .onChangeOf(moduleURL) { _ in
             addModuleError = nil
             moduleManager.errorMessage = nil
+        }
+    }
+
+    private var brokenTitle: String {
+        let count = moduleManager.brokenModules.count
+        return count == 1 ? "1 module didn't work" : "\(count) modules didn't work"
+    }
+
+    /// The module's last check, under its name.
+    @ViewBuilder
+    private func checkStatus(_ module: ModuleDefinition) -> some View {
+        if moduleManager.checking.contains(module.id) {
+            HStack(spacing: 4) {
+                ProgressView().controlSize(.mini)
+                Text("Checking…")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+            switch moduleManager.checkResults[module.id] {
+            case .passed:
+                Label("Works", systemImage: "checkmark.seal.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            case .failed(let step, let reason):
+                Label("\(step.label) failed: \(reason)", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+            case .needsVerification:
+                Label("Asks for a Cloudflare check", systemImage: "shield.lefthalf.filled")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case .skipped, .none:
+                EmptyView()
+            }
         }
     }
 
@@ -472,6 +561,7 @@ struct ModuleListView: View {
                                 .background(Color.secondary.opacity(0.15), in: Capsule())
                         }
                     }
+                    checkStatus(module)
                 }
                 Spacer()
                 if isActive {
@@ -583,6 +673,7 @@ struct ModuleListView: View {
                         #if os(iOS)
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         #endif
+                        checkNewModule()
                     } else {
                         addModuleError = moduleManager.errorMessage
                         #if os(iOS)
@@ -590,6 +681,18 @@ struct ModuleListView: View {
                         #endif
                     }
                 }
+            }
+        }
+    }
+
+    /// Tests a module just added, and warns when it doesn't get as far as a stream.
+    private func checkNewModule() {
+        guard let id = moduleManager.lastAddedModuleID,
+              let module = moduleManager.modules.first(where: { $0.id == id }) else { return }
+        Task {
+            if case .failed(let step, let reason) = await moduleManager.check(module),
+               moduleManager.modules.contains(where: { $0.id == id }) {
+                failedNewModule = (module, step, reason)
             }
         }
     }

@@ -21,6 +21,13 @@ final class ModuleManager: ObservableObject {
     @Published var moduleReadyId: String? = nil
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// The last check of each module, by id (see ``ModuleCheck``).
+    @Published private(set) var checkResults: [String: ModuleCheckResult] = [:]
+    /// Modules being checked now.
+    @Published private(set) var checking: Set<String> = []
+    /// The module the last successful add installed, for the add screen to check.
+    private(set) var lastAddedModuleID: String?
+    private let checkResultsKey = "moduleCheckResults"
 
     /// Megabytes of scripts, kept out of UserDefaults (see `StoredFile`).
     private let storage = StoredFile(name: "modules.json", legacyKey: "savedModules")
@@ -28,6 +35,50 @@ final class ModuleManager: ObservableObject {
 
     private init() {
         loadFromStorage()
+        if let data = UserDefaults.standard.data(forKey: checkResultsKey),
+           let saved = try? JSONDecoder().decode([String: ModuleCheckResult].self, from: data) {
+            checkResults = saved
+        }
+    }
+
+    // MARK: - Check
+
+    /// Runs `module` through a search, episodes and a stream, and keeps the result.
+    @discardableResult
+    func check(_ module: ModuleDefinition) async -> ModuleCheckResult {
+        checking.insert(module.id)
+        let result = await ModuleCheck.check(module)
+        checking.remove(module.id)
+        Logger.shared.log("[ModuleCheck] \(module.sourceName): \(result)", type: result.isFailure ? "Error" : "Info")
+        checkResults[module.id] = result
+        persistCheckResults()
+        return result
+    }
+
+    /// Checks every module, a few at a time.
+    func checkAll() async {
+        let pending = modules
+        await withTaskGroup(of: Void.self) { group in
+            var started = 0
+            for module in pending {
+                if started >= 3 { await group.next() }
+                group.addTask { await self.check(module) }
+                started += 1
+            }
+        }
+    }
+
+    /// The modules whose last check failed.
+    var brokenModules: [ModuleDefinition] {
+        modules.filter { checkResults[$0.id]?.isFailure == true }
+    }
+
+    private func persistCheckResults() {
+        let known = Set(modules.map(\.id))
+        let kept = checkResults.filter { known.contains($0.key) }
+        if let data = try? JSONEncoder().encode(kept) {
+            UserDefaults.standard.set(data, forKey: checkResultsKey)
+        }
     }
 
     // MARK: - Add Module
@@ -35,6 +86,7 @@ final class ModuleManager: ObservableObject {
     func addModule(from jsonURL: URL) async {
         isLoading = true
         errorMessage = nil
+        lastAddedModuleID = nil
         do {
             let (data, response) = try await URLSession.shared.data(from: jsonURL)
             var module: ModuleDefinition
@@ -62,6 +114,9 @@ final class ModuleManager: ObservableObject {
             }
             modules.append(module)
             saveToStorage()
+            lastAddedModuleID = module.id
+            // A new version is checked afresh.
+            checkResults.removeValue(forKey: module.id)
 
             // Auto-select if it's the first module
             if activeModule == nil {
@@ -90,6 +145,8 @@ final class ModuleManager: ObservableObject {
 
     func removeModule(_ module: ModuleDefinition) {
         modules.removeAll { $0.id == module.id }
+        checkResults.removeValue(forKey: module.id)
+        persistCheckResults()
         if activeModule?.id == module.id {
             activeModule = nil
         }

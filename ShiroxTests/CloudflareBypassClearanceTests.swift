@@ -54,4 +54,21 @@ final class CloudflareBypassClearanceTests: XCTestCase {
         // "Verify Cloudflare" affordance — a poster load is not a stream load.
         XCTAssertNil(manager.pendingVerificationURL)
     }
+
+    /// Reported: a site that puts its challenge only on detail pages could never be verified,
+    /// as the window opened the front page.
+    func testTheChallengeIsSolvedOnTheWalledPage() {
+        let detail = URL(string: "https://site.example/movie/123-title")!
+        XCTAssertEqual(CloudflareBypassManager.challengePage(for: detail), detail)
+        XCTAssertEqual(CloudflareBypassManager.challengePage(for: URL(string: "https://cdn.site.example/v/master.m3u8")!),
+                       URL(string: "https://cdn.site.example/")!, "a stream can't show a challenge")
+    }
+
+    @MainActor
+    func testAModuleCheckPassesOnlyOnAWebStream() {
+        func stream(_ s: String) -> StreamResult { StreamResult(title: "x", url: URL(string: s)!, headers: [:]) }
+        XCTAssertTrue(ModuleCheck.verdict([stream("about:blank"), stream("https://cdn.example/a.m3u8")]))
+        XCTAssertFalse(ModuleCheck.verdict([stream("about:blank"), stream("file:///tmp/x.mp4")]))
+        XCTAssertFalse(ModuleCheck.verdict([]))
+    }
 }
