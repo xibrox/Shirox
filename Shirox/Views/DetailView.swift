@@ -1775,6 +1775,10 @@ struct DetailView: View {
                     aniListID: vm.aniListID ?? aniListID,
                     moduleId: effectiveModuleId,
                     mediaTitle: detail.title)
+                // Each episode's season within the list, for marking the episodes around it.
+                let runByHref: [String: [EpisodeLink]] = Dictionary(
+                    ContinueWatchingManager.episodeRuns(detail.episodes).flatMap { run in run.map { ($0.href, run) } },
+                    uniquingKeysWith: { first, _ in first })
 
                 LazyVStack(spacing: 8) {
                     ForEach(displayedEpisodes) { episode in
@@ -1796,6 +1800,7 @@ struct DetailView: View {
                             isAiring: vm.aniListMedia.map { $0.status == "RELEASING" },
                             numberIsAmbiguous: numberIsAmbiguous,
                             showUsesHrefTracking: showUsesHrefTracking,
+                            seasonEpisodes: runByHref[episode.href],
                             onTap: sel ? {
                                 // Block selecting an in-progress download — nothing useful
                                 // to do with it from the batch bar. Completed downloads
@@ -1840,6 +1845,7 @@ struct DetailView: View {
                             isAiring: vm.aniListMedia.map { $0.status == "RELEASING" },
                             numberIsAmbiguous: numberIsAmbiguous,
                             showUsesHrefTracking: showUsesHrefTracking,
+                            seasonEpisodes: runByHref[episode.href],
                             onTap: { tapEpisode(episode) },
                             onTryOtherStream: { vm.loadStreams(for: episode) }
                         )
@@ -2174,6 +2180,8 @@ private struct ModuleEpisodeRowContainer: View {
     var numberIsAmbiguous: Bool = false
     /// True when the user has completed/marked any episode of this show in-app.
     var showUsesHrefTracking: Bool = false
+    /// The episode's season run in the list (see `ContinueWatchingManager.episodeRuns`).
+    var seasonEpisodes: [EpisodeLink]? = nil
     let onTap: () -> Void
     var onDownload: (() -> Void)? = nil
     var onTryOtherStream: (() -> Void)? = nil
@@ -2204,7 +2212,8 @@ private struct ModuleEpisodeRowContainer: View {
             isAiring: isAiring,
             currentAniListProgress: aniListProgress,
             currentMALProgress: nil,
-            currentAniListStatus: aniListStatus
+            currentAniListStatus: aniListStatus,
+            seasonEpisodes: seasonEpisodes
         )
     }
 

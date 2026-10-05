@@ -121,4 +121,41 @@ final class ContinueWatchingResetTests: XCTestCase {
         // A baseline already taken is kept.
         XCTAssertEqual(TrackerResetFloor.adding([1], to: TrackerResetFloor(baseline: 7, episodes: [2])).baseline, 7)
     }
+
+    // MARK: - Marking on a list where numbers repeat
+
+    private func eps(_ numbers: [Int], tag: String) -> [EpisodeLink] {
+        numbers.map { EpisodeLink(number: Double($0), href: "/\(tag)/\($0)") }
+    }
+
+    func testAListIsCutWhereItsNumberingStartsOver() {
+        let flat = eps([1, 2, 3], tag: "s1") + eps([1, 2], tag: "s2")
+        XCTAssertEqual(ContinueWatchingManager.episodeRuns(flat).map { $0.map(\.href) },
+                       [["/s1/1", "/s1/2", "/s1/3"], ["/s2/1", "/s2/2"]])
+        let subDub = [eps([1], tag: "sub"), eps([1], tag: "dub"), eps([2], tag: "sub"), eps([2], tag: "dub")].flatMap { $0 }
+        XCTAssertEqual(ContinueWatchingManager.episodeRuns(subDub).count, 1)
+        XCTAssertEqual(ContinueWatchingManager.episodeRuns(eps([3, 2, 1], tag: "desc")).first?.map(\.href),
+                       ["/desc/1", "/desc/2", "/desc/3"])
+    }
+
+    /// Reported: marking new episodes unmarked earlier ones. On a list where numbers repeat, an
+    /// episode is watched only by its href, and marking gave only the tapped episode one.
+    func testMarkingAnEpisodeKeepsTheEarlierOnesOfItsSeasonWatched() async {
+        let title = "Repeat Test \(UUID().uuidString)"
+        let season2 = eps([1, 2, 3, 4, 5], tag: "s2-\(title)")
+        cw.markWatched(upThrough: 5, aniListID: nil, moduleId: "mod-repeat", mediaTitle: title,
+                       episodeHref: season2[4].href, seasonEpisodes: season2)
+        for episode in season2 {
+            XCTAssertTrue(cw.isWatchedHref(aniListID: nil, moduleId: "mod-repeat", mediaTitle: title,
+                                           episodeHref: episode.href), "\(episode.href)")
+        }
+        // Unmarking 3 takes 3 to 5 with it, by href too.
+        _ = await cw.markEpisode(3, asWatched: false, context: MarkContext(
+            aniListID: nil, malID: nil, moduleId: "mod-repeat", mediaTitle: title, imageUrl: nil,
+            totalEpisodes: nil, availableEpisodes: nil, detailHref: nil,
+            episodeHref: season2[2].href, seasonEpisodes: season2))
+        let still = season2.map { cw.isWatchedHref(aniListID: nil, moduleId: "mod-repeat", mediaTitle: title, episodeHref: $0.href) }
+        XCTAssertEqual(still, [true, true, false, false, false])
+        cw.resetProgress(aniListID: nil, moduleId: "mod-repeat", mediaTitle: title)
+    }
 }

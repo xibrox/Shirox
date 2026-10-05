@@ -17,6 +17,10 @@ struct MarkContext {
     var currentMALProgress: Int? = nil
     var currentAniListStatus: MediaListStatus? = nil
     var currentMALStatus: MediaListStatus? = nil
+    /// The run of episodes the tapped one belongs to in its list — its season on a list that
+    /// restarts numbering (see `ContinueWatchingManager.episodeRuns`). Marking or unmarking
+    /// carries to the ones before or after it there.
+    var seasonEpisodes: [EpisodeLink]? = nil
 }
 
 enum MarkResult {

@@ -581,7 +581,8 @@ struct SimklTrackWrite: Equatable {
     func markWatched(upThrough episodeNumber: Int,
                      aniListID: Int?, moduleId: String?, mediaTitle: String,
                      imageUrl: String? = nil, totalEpisodes: Int? = nil, availableEpisodes: Int? = nil,
-                     isAiring: Bool? = nil, detailHref: String? = nil, episodeHref: String? = nil) {
+                     isAiring: Bool? = nil, detailHref: String? = nil, episodeHref: String? = nil,
+                     seasonEpisodes: [EpisodeLink]? = nil) {
         guard episodeNumber > 0 else { return }
 
         // 1. Mark episodes 1...episodeNumber as watched
@@ -591,9 +592,15 @@ struct SimklTrackWrite: Equatable {
                 watchedKeys.insert(key)
             }
         }
-        // Record the season-unique href for the tapped episode (only its href is known here).
+        // Record the season-unique href for the tapped episode, and for the ones before it in
+        // its season. On a list where numbers repeat, an episode counts as watched only by its
+        // href; with the tapped one's alone, every mark made the earlier episodes look unwatched.
         insertWatchedHref(aniListID: aniListID, moduleId: moduleId,
                           mediaTitle: mediaTitle, episodeHref: episodeHref)
+        for earlier in Self.episodes(in: seasonEpisodes, through: episodeNumber) {
+            insertWatchedHref(aniListID: aniListID, moduleId: moduleId,
+                              mediaTitle: mediaTitle, episodeHref: earlier.href)
+        }
         
         var arr = items
         let ref = arr.first(where: {
@@ -652,7 +659,8 @@ struct SimklTrackWrite: Equatable {
                 mediaTitle: context.mediaTitle, imageUrl: context.imageUrl,
                 totalEpisodes: context.totalEpisodes, availableEpisodes: context.availableEpisodes,
                 isAiring: context.isAiring,
-                detailHref: context.detailHref, episodeHref: context.episodeHref
+                detailHref: context.detailHref, episodeHref: context.episodeHref,
+                seasonEpisodes: context.seasonEpisodes
             )
             await pushRemoteProgress(ep: ep, context: context)
             return .applied
@@ -761,8 +769,38 @@ struct SimklTrackWrite: Equatable {
         }
         if !keysAbove.isEmpty {
             watchedKeys.subtract(keysAbove)
-            persist()
         }
+        // The later episodes of its season by href too: their href markers kept them looking
+        // watched after the numbers above were cleared.
+        for later in (context.seasonEpisodes ?? []) where Int(later.number) >= ep {
+            removeWatchedHref(aniListID: context.aniListID, moduleId: context.moduleId,
+                              mediaTitle: context.mediaTitle, episodeHref: later.href)
+        }
+        persist()
+    }
+
+    /// `run`'s episodes numbered 1 through `number`.
+    nonisolated static func episodes(in run: [EpisodeLink]?, through number: Int) -> [EpisodeLink] {
+        (run ?? []).filter { let n = Int($0.number); return n >= 1 && n <= number }
+    }
+
+    /// A show's episode list cut where its numbering starts over: one run per season on a list
+    /// of every season (1…12, 1…12), one run for a list with sub and dub entries side by side
+    /// (1, 1, 2, 2…). A list counting down is read from its end.
+    nonisolated static func episodeRuns(_ episodes: [EpisodeLink]) -> [[EpisodeLink]] {
+        guard let first = episodes.first, let last = episodes.last else { return [] }
+        let ordered = first.number > last.number ? Array(episodes.reversed()) : episodes
+        var runs: [[EpisodeLink]] = []
+        var current: [EpisodeLink] = []
+        for episode in ordered {
+            if let previous = current.last, episode.number < previous.number {
+                runs.append(current)
+                current = []
+            }
+            current.append(episode)
+        }
+        if !current.isEmpty { runs.append(current) }
+        return runs
     }
 
     // MARK: - Private Helpers
