@@ -200,6 +200,8 @@ struct PlayerView: View {
     @State private var isBuffering = false
     /// The audio tracks the stream offers, refreshed when the engine finds them.
     @State private var audioOptions: [PlaybackAudioOption] = []
+    /// The show's remembered audio track was looked for in the file playing now.
+    @State private var audioRestoredForItem = false
     private var bufferProgress: Double {
         get { clock.bufferProgress }
         nonmutating set { clock.bufferProgress = newValue }
@@ -2083,6 +2085,7 @@ struct PlayerView: View {
     private func setupPlayer() {
         engine?.stop()
         audioOptions = []
+        audioRestoredForItem = false
         embeddedSubtitles = []
         embeddedSubtitleDefault = nil
         pickedEmbeddedSubtitle = nil
@@ -2441,9 +2444,22 @@ struct PlayerView: View {
             guard let mpv = engine as? MPVEngine else { return }
             embeddedSubtitles = mpv.subtitleOptions
             embeddedSubtitleDefault = mpv.defaultSubtitleOption
+            // The track inside the file picked on an earlier episode, unless one's been picked here.
+            if pickedEmbeddedSubtitle == nil, !subtitlePickedByUser,
+               let id = TrackPreferences.embeddedTrack(rememberedTracks?.subtitle, in: mpv.subtitleOptions) {
+                pickedEmbeddedSubtitle = id
+            }
         }
         events.audioOptionsChanged = {
             audioOptions = engine?.audioOptions ?? []
+            // Once per file, the audio picked on an earlier episode — not over a pick made in this one.
+            guard !audioRestoredForItem, let engine, !engine.audioOptions.isEmpty else { return }
+            audioRestoredForItem = true
+            if let id = TrackPreferences.audioToRestore(rememberedTracks?.audio, options: engine.audioOptions,
+                                                        selected: engine.selectedAudioOption) {
+                engine.selectAudioOption(id)
+                audioOptions = engine.audioOptions
+            }
         }
         return events
     }
@@ -2504,6 +2520,13 @@ struct PlayerView: View {
     /// coming in over the network after a quickly read imported file used to replace it, so the
     /// import looked ignored.
     private func loadSubtitles() {
+        // The track picked on an earlier episode of the show, when this one has it too.
+        if selectedSubtitleTrack == nil, pickedEmbeddedSubtitle == nil,
+           let remembered = TrackPreferences.externalTrack(rememberedTracks?.subtitle, in: subtitleTracks ?? []) {
+            subtitlePickedByUser = true
+            selectedSubtitleTrack = remembered
+            return
+        }
         if let track = selectedSubtitleTrack {
             Task {
                 do {
@@ -3220,6 +3243,7 @@ struct PlayerView: View {
         // never noticed at all. The engine attaches them with every load. The audio tracks it
         // finds come back through `audioOptionsChanged`.
         engine?.load(playbackSource(for: next, prefersJapaneseAudio: false))
+        audioRestoredForItem = false
         watchOpeningIfLeftToFinish()
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
@@ -3323,6 +3347,7 @@ struct PlayerView: View {
             currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: nextAvailableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, episodeHref: episodeHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil, simklTitle: ctx.simklTitle)
         }
         audioOptions = []
+        audioRestoredForItem = false
         hlsQualities = []
         selectedQualityBandwidth = nil
         let qualityURL = next.url
@@ -3379,7 +3404,10 @@ struct PlayerView: View {
         guard let engine else { return [] }
         let selected = engine.selectedAudioOption
         return engine.audioOptions.map { option in
-            PlayerMenuItem(title: option.title, isOn: option.id == selected) { engine.selectAudioOption(option.id) }
+            PlayerMenuItem(title: option.title, isOn: option.id == selected) {
+                engine.selectAudioOption(option.id)
+                TrackPreferences.rememberAudio(option.title, for: trackPreferenceKey)
+            }
         }
     }
 
@@ -3434,18 +3462,36 @@ struct PlayerView: View {
         var tracks = subtitleTracks ?? []
         tracks.append(track)
         subtitleTracks = tracks
-        pickSubtitleTrack(track)
+        // An imported file is this episode's alone; the next has its own.
+        pickSubtitleTrack(track, remembering: false)
     }
 
-    /// The viewer chose a downloadable track, or Default (nil).
-    private func pickSubtitleTrack(_ track: SubtitleTrack?) {
+    /// The viewer chose a downloadable track, or Default (nil). The show's next episodes start
+    /// on the same one, by name.
+    private func pickSubtitleTrack(_ track: SubtitleTrack?, remembering: Bool = true) {
         pickedEmbeddedSubtitle = nil
         subtitlePickedByUser = track != nil
         selectedSubtitleTrack = track
+        if remembering {
+            TrackPreferences.rememberSubtitle(track.map { .external($0.title) }, for: trackPreferenceKey)
+        }
     }
 
     private func pickEmbeddedSubtitle(_ id: Int) {
         pickedEmbeddedSubtitle = id
+        if let title = embeddedSubtitles.first(where: { $0.id == id })?.title {
+            TrackPreferences.rememberSubtitle(.embedded(title), for: trackPreferenceKey)
+        }
+    }
+
+    /// The show the tracks picked here are remembered for.
+    private var trackPreferenceKey: String? {
+        TrackPreferences.showKey(for: currentContext)
+    }
+
+    /// What was picked on this show's earlier episodes.
+    private var rememberedTracks: TrackChoice? {
+        TrackPreferences.choice(for: trackPreferenceKey)
     }
 
     /// The downloadable track on screen, if one is.
