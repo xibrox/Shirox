@@ -862,11 +862,16 @@ final class DownloadManager: NSObject, ObservableObject {
     /// the media and fed back to URLSession on resume.
     func pause(_ item: DownloadItem) {
         guard item.state == .downloading || item.state == .pending else { return }
+        stop(item, as: .paused)
+    }
 
+    /// Stops a download keeping what it has fetched, leaving it in `state`: `.paused` until the
+    /// user resumes it, or `.pending` to carry on by itself once a slot frees.
+    private func stop(_ item: DownloadItem, as state: DownloadState) {
         if item.isHLS {
             hlsTasks[item.id]?.cancel()
             hlsTasks.removeValue(forKey: item.id)
-            updateState(item.id, .paused)
+            updateState(item.id, state)
             refreshDownloadKeepAlive()
             processQueue()
             return
@@ -875,14 +880,14 @@ final class DownloadManager: NSObject, ObservableObject {
         let id = item.id
         let target = resumeDataURL(for: id)
         guard let taskID = item.taskIdentifier else {
-            updateState(id, .paused)
+            updateState(id, state)
             processQueue()
             return
         }
         urlSession.getAllTasks { tasks in
             guard let task = tasks.first(where: { $0.taskIdentifier == taskID }) as? URLSessionDownloadTask else {
                 Task { @MainActor in
-                    self.updateState(id, .paused)
+                    self.updateState(id, state)
                     self.refreshDownloadKeepAlive()
                     self.processQueue()
                 }
@@ -892,7 +897,7 @@ final class DownloadManager: NSObject, ObservableObject {
             task.cancel(byProducingResumeData: { data in
                 if let data { try? data.write(to: target, options: .atomic) }
                 Task { @MainActor in
-                    self.updateState(id, .paused)
+                    self.updateState(id, state)
                     self.refreshDownloadKeepAlive()
                     self.processQueue()
                 }
@@ -1142,6 +1147,48 @@ final class DownloadManager: NSObject, ObservableObject {
         }
     }
     
+    // MARK: - Priority
+
+    /// Downloads moved to the front, so making room for one never stops another.
+    private var prioritized: Set<UUID> = []
+
+    /// "Download Next": a waiting or paused download goes to the head of the queue. When every
+    /// slot is taken it doesn't wait for one: the running download with the furthest to go
+    /// (most often a movie) is stopped, keeping what it has, and carries on once a slot frees.
+    func prioritize(_ item: DownloadItem) {
+        guard let current = items.first(where: { $0.id == item.id }),
+              current.state == .pending || current.state == .paused else { return }
+        prioritized = prioritized.filter { id in items.contains { $0.id == id && $0.state != .completed } }
+        prioritized.insert(current.id)
+        items = Self.movingToFront(current.id, in: items)
+        if let idx = items.firstIndex(where: { $0.id == current.id }) { items[idx].state = .pending }
+        persist()
+
+        let running = items.filter { $0.state == .downloading }
+        // One still waiting on its stream link can't start yet; stopping another for it would
+        // only leave a slot empty.
+        if current.streamURL != nil, running.count >= maxConcurrentDownloads,
+           let yielding = Self.downloadToYield(running: running, keeping: prioritized) {
+            stop(yielding, as: .pending)
+        } else {
+            processQueue()
+        }
+    }
+
+    /// `items` with `id` first. The queue starts waiting downloads in this order.
+    nonisolated static func movingToFront(_ id: UUID, in items: [DownloadItem]) -> [DownloadItem] {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return items }
+        var reordered = items
+        reordered.insert(reordered.remove(at: index), at: 0)
+        return reordered
+    }
+
+    /// The running download to stop for a prioritized one: the least far along, as that one has
+    /// the most left, and never one that was itself prioritized. nil when all of them were.
+    nonisolated static func downloadToYield(running: [DownloadItem], keeping prioritized: Set<UUID>) -> DownloadItem? {
+        running.filter { !prioritized.contains($0.id) }.min { $0.progress < $1.progress }
+    }
+
     // MARK: - Queue Processing
     
     private func processQueue() {
@@ -1260,7 +1307,15 @@ final class DownloadManager: NSObject, ObservableObject {
         Self.requestHeaders(for: streamURL, streamHeaders: item.headers)
             .forEach { req.setValue($1, forHTTPHeaderField: $0) }
 
-        let task = urlSession.downloadTask(with: req)
+        // A download stopped to make room for a prioritized one left its resume data behind.
+        let resumeURL = resumeDataURL(for: item.id)
+        let task: URLSessionDownloadTask
+        if let data = try? Data(contentsOf: resumeURL) {
+            try? FileManager.default.removeItem(at: resumeURL)
+            task = urlSession.downloadTask(withResumeData: data)
+        } else {
+            task = urlSession.downloadTask(with: req)
+        }
         task.taskDescription = item.id.uuidString
         if let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx].taskIdentifier = task.taskIdentifier

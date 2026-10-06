@@ -397,8 +397,19 @@ struct DownloadsView: View {
                                 }
                                 .tint(.orange)
                             }
+                            if item.state == .pending {
+                                Button { dm.prioritize(item) } label: {
+                                    Label("Download Next", systemImage: "arrow.up.to.line")
+                                }
+                                .tint(.indigo)
+                            }
                         }
                         .contextMenu {
+                            if item.state != .downloading {
+                                Button { dm.prioritize(item) } label: {
+                                    Label("Download Next", systemImage: "arrow.up.to.line")
+                                }
+                            }
                             if item.state == .paused {
                                 Button { dm.resumeDownload(item) } label: { Label("Resume", systemImage: "play.fill") }
                             } else {
