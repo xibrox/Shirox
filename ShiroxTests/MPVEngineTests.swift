@@ -233,6 +233,24 @@ final class MPVEngineTests: XCTestCase {
         XCTAssertEqual(engine.selectedAudioOption, 1, "on the low variant")
     }
 
+    /// The saved quality usually arrives once the stream is already playing, and a cap on
+    /// another variant reopens it. The audio rendition put on before then is still on after.
+    func testAnAudioRenditionPickedBeforeAReopenStaysOn() async throws {
+        let server = try await HLSServer.twoVariantsTwoLanguages()
+        defer { server.stop() }
+        await loadReady(server.url(of: "/master.m3u8"), cappedAt: nil)
+        let english = try XCTUnwrap(engine.audioOptions.first { $0.title == "English" })
+        engine.selectAudioOption(english.id)
+        let reopened = expectation(description: "reopened")
+        reopened.assertForOverFulfill = false
+        engine.events.itemReady = { reopened.fulfill() }
+        engine.setPeakBitRate(600_000)
+        await fulfillment(of: [reopened], timeout: 10)
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertEqual(server.fetches(of: "/low.m3u8"), 2, "reopened on the low variant")
+        XCTAssertEqual(engine.selectedAudioOption, english.id)
+    }
+
     // MARK: - Routing
 
     /// Stands in for the proxy: sends every source to a local file, and records what it was asked.
@@ -398,6 +416,34 @@ final class HLSServer {
             "/high.wav": silentWAV(seconds: 2),
         ])
     }
+
+    /// Two variants of a 2 s 16×16 black picture, at 500 and 1000 kb/s, sharing two audio
+    /// renditions, Japanese and English, as a dubbed show's stream does. The segment is ffmpeg's
+    /// `-f lavfi -i color=c=black:s=16x16:r=2:d=2,format=yuv420p -c:v libx264 -profile:v main
+    /// -g 4 -bf 0 -f mpegts`.
+    static func twoVariantsTwoLanguages() async throws -> HLSServer {
+        let media = { (segment: String) in
+            "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n"
+                + "#EXTINF:2.0,\n\(segment)\n#EXT-X-ENDLIST\n"
+        }
+        return try await start(files: [
+            "/master.m3u8": Data(("#EXTM3U\n"
+                + "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aud\",NAME=\"Japanese\",LANGUAGE=\"ja\",DEFAULT=YES,URI=\"ja.m3u8\"\n"
+                + "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aud\",NAME=\"English\",LANGUAGE=\"en\",URI=\"en.m3u8\"\n"
+                + "#EXT-X-STREAM-INF:BANDWIDTH=500000,AUDIO=\"aud\"\nlow.m3u8\n"
+                + "#EXT-X-STREAM-INF:BANDWIDTH=1000000,AUDIO=\"aud\"\nhigh.m3u8\n").utf8),
+            "/low.m3u8": Data(media("low.ts").utf8),
+            "/high.m3u8": Data(media("high.ts").utf8),
+            "/ja.m3u8": Data(media("ja.wav").utf8),
+            "/en.m3u8": Data(media("en.wav").utf8),
+            "/low.ts": blackSegment,
+            "/high.ts": blackSegment,
+            "/ja.wav": silentWAV(seconds: 2),
+            "/en.wav": silentWAV(seconds: 2),
+        ])
+    }
+
+    static let blackSegment = Data(base64Encoded: "R0AREABC8CUAAcEAAP8B/wAB/IAUSBIBBkZGbXBlZwlTZXJ2aWNlMDF3fEPK//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9HQAAQAACwDQABwQAAAAHwACqxBLL//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////0dQABAAArASAAHBAADhAPAAG+EA8AAVvU1W////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////R0EAMAdQAAB7DH4AAAAB4AAAgIAFIQAH2GEAAAABCfAAAAABZ01ACtkewEQAAAMABAAAAwAQPEiZIAAAAAFo68PLIAAAAQYF//9p3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE2NCByMzEwOCAzMWUxOWY5IC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAyMyAtIGh0dHA6Ly93d3cudmlkZW9sYW5HAQARLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0xIHJlZj0zIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDE6MHgxMTEgbWU9aGV4IHN1Ym1lPTcgcHN5PTEgcHN5X3JkPTEuMDA6MC4wMCBtaXhlZF9yZWY9MSBtZV9yYW5nZT0xNiBjaHJvbWFfbWU9MSB0cmVsbGlzPTEgOHg4ZGN0PTAgY3FtPTAgZGVhZHpvbmU9MjEsMUcBABIxIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PS0yIHRocmVhZHM9MSBsb29rYWhlYWRfdGhyZWFkcz0xIHNsaWNlZF90aHJlYWRzPTAgbnI9MCBkZWNpbWF0ZT0xIGludGVybGFjZWQ9MCBibHVyYXlfY29tcGF0PTAgY29uc3RyYWluZWRfaW50cmE9MCBiZnJhbWVzPTAgd2VpZ2h0cD0yIGtleWludD00IGtleWludF9tRwEAMx8A////////////////////////////////////////aW49MSBzY2VuZWN1dD00MCBpbnRyYV9yZWZyZXNoPTAgcmNfbG9va2FoZWFkPTQgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAABZYiEBT/+98dPwKbq3CdHQBERAELwJQABwQAA/wH/AAH8gBRIEgEGRkZtcGVnCVNlcnZpY2UwMXd8Q8r//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////0dAABEAALANAAHBAAAAAfAAKrEEsv//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////R1AAEQACsBIAAcEAAOEA8AAb4QDwABW9TVb///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9HQQA0lxAAANLwfgD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAHgAACAgAUhAAs38QAAAAEJ8AAAAAFBmjsQU//+8EdAERIAQvAlAAHBAAD/Af8AAfyAFEgSAQZGRm1wZWcJU2VydmljZTAxd3xDyv//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////R0AAEgAAsA0AAcEAAAAB8AAqsQSy//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9HUAASAAKwEgABwQAA4QDwABvhAPAAFb1NVv///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////0dBADWUEAABKtR+AP///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wAAAeAAAICABSEADZeBAAAAAQnwAAAAAUGaTwhkymEFP/7xR0AREwBC8CUAAcEAAP8B/wAB/IAUSBIBBkZGbXBlZwlTZXJ2aWNlMDF3fEPK//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9HQAATAACwDQABwQAAAAHwACqxBLL//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////0dQABMAArASAAHBAADhAPAAG+EA8AAVvU1W////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////R0EANpMQAAGCuH4A//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAHgAACAgAUhAA/3EQAAAAEJ8AAAAAFBmnJ4Q8mUwIJf/uA=")!
 
     func url(of path: String) -> URL {
         URL(string: "http://127.0.0.1:\(listener.port!.rawValue)\(path)")!

@@ -218,8 +218,9 @@ struct PlayerView: View {
     @State private var isBuffering = false
     /// The audio tracks the stream offers, refreshed when the engine finds them.
     @State private var audioOptions: [PlaybackAudioOption] = []
-    /// The show's remembered audio track was looked for in the file playing now.
-    @State private var audioRestoredForItem = false
+    /// The audio track picked in this player, by name. Over the show's remembered one, and put
+    /// back whenever the engine lists its tracks again.
+    @State private var pickedAudioTitle: String?
     private var bufferProgress: Double {
         get { clock.bufferProgress }
         nonmutating set { clock.bufferProgress = newValue }
@@ -2120,7 +2121,6 @@ struct PlayerView: View {
     private func setupPlayer() {
         engine?.stop()
         audioOptions = []
-        audioRestoredForItem = false
         embeddedSubtitles = []
         embeddedSubtitleDefault = nil
         pickedEmbeddedSubtitle = nil
@@ -2490,11 +2490,11 @@ struct PlayerView: View {
         }
         events.audioOptionsChanged = {
             audioOptions = engine?.audioOptions ?? []
-            // Once per file, the audio picked on an earlier episode — not over a pick made in this one.
-            guard !audioRestoredForItem, let engine, !engine.audioOptions.isEmpty else { return }
-            audioRestoredForItem = true
-            if let id = TrackPreferences.audioToRestore(rememberedTracks?.audio, options: engine.audioOptions,
-                                                        selected: engine.selectedAudioOption) {
+            // The track picked here, else the show's remembered one, whenever the engine lists
+            // the tracks of what it opens: a new episode, a recovered stream, a quality switch.
+            guard let engine, !engine.audioOptions.isEmpty else { return }
+            if let id = TrackPreferences.audioToRestore(pickedAudioTitle ?? rememberedTracks?.audio,
+                                                        options: engine.audioOptions) {
                 engine.selectAudioOption(id)
                 audioOptions = engine.audioOptions
             }
@@ -3285,7 +3285,6 @@ struct PlayerView: View {
         // never noticed at all. The engine attaches them with every load. The audio tracks it
         // finds come back through `audioOptionsChanged`.
         engine?.load(playbackSource(for: next, prefersJapaneseAudio: false))
-        audioRestoredForItem = false
         watchOpeningIfLeftToFinish()
         subtitleTracks = next.allSubtitles ?? subtitleTracks
         currentStream = next
@@ -3390,7 +3389,6 @@ struct PlayerView: View {
             currentContext = PlayerContext(mediaTitle: ctx.mediaTitle, episodeNumber: episodeNumber, episodeTitle: nil, imageUrl: ctx.imageUrl, aniListID: ctx.aniListID, malID: ctx.malID, moduleId: ctx.moduleId, totalEpisodes: ctx.totalEpisodes, availableEpisodes: nextAvailableEpisodes, isAiring: ctx.isAiring, resumeFrom: nil, detailHref: ctx.detailHref, episodeHref: episodeHref, streamTitle: ctx.streamTitle, workingDetailHref: ctx.workingDetailHref, thumbnailUrl: nil, simklTitle: ctx.simklTitle)
         }
         audioOptions = []
-        audioRestoredForItem = false
         hlsQualities = []
         selectedQualityBandwidth = nil
         let qualityURL = next.url
@@ -3449,7 +3447,8 @@ struct PlayerView: View {
         return engine.audioOptions.map { option in
             PlayerMenuItem(title: option.title, isOn: option.id == selected) {
                 engine.selectAudioOption(option.id)
-                TrackPreferences.rememberAudio(option.title, for: trackPreferenceKey)
+                pickedAudioTitle = option.title
+                TrackPreferences.rememberAudio(option.title, for: trackPreferenceKeys)
             }
         }
     }
@@ -3516,25 +3515,25 @@ struct PlayerView: View {
         subtitlePickedByUser = track != nil
         selectedSubtitleTrack = track
         if remembering {
-            TrackPreferences.rememberSubtitle(track.map { .external($0.title) }, for: trackPreferenceKey)
+            TrackPreferences.rememberSubtitle(track.map { .external($0.title) }, for: trackPreferenceKeys)
         }
     }
 
     private func pickEmbeddedSubtitle(_ id: Int) {
         pickedEmbeddedSubtitle = id
         if let title = embeddedSubtitles.first(where: { $0.id == id })?.title {
-            TrackPreferences.rememberSubtitle(.embedded(title), for: trackPreferenceKey)
+            TrackPreferences.rememberSubtitle(.embedded(title), for: trackPreferenceKeys)
         }
     }
 
-    /// The show the tracks picked here are remembered for.
-    private var trackPreferenceKey: String? {
-        TrackPreferences.showKey(for: currentContext)
+    /// The names of the show the tracks picked here are remembered for.
+    private var trackPreferenceKeys: [String] {
+        TrackPreferences.showKeys(for: currentContext)
     }
 
     /// What was picked on this show's earlier episodes.
     private var rememberedTracks: TrackChoice? {
-        TrackPreferences.choice(for: trackPreferenceKey)
+        TrackPreferences.choice(for: trackPreferenceKeys)
     }
 
     /// The downloadable track on screen, if one is.
