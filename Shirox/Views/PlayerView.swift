@@ -930,6 +930,42 @@ struct PlayerView: View {
     @ViewBuilder
     private func interactionLayer(engine: any PlaybackEngine) -> some View {
         ZStack {
+            #if os(iOS)
+            // These two put their recognisers on the window and take no touches themselves, so
+            // they sit under the tap view. On top, iOS 16's SwiftUI handed every touch outside
+            // the centre button to their wrapper views, and a tap on the video never reached
+            // the view that shows the controls. Only the middle (a SwiftUI button) did anything.
+            SpeedBoostOverlay(
+                isLocked: isLocked,
+                moveTolerance: CGFloat(speedBoostTolerance),
+                onBegan: {
+                    if !castManager.isConnected {
+                        if playerHoldAction == "saveFrame" {
+                            saveCurrentFrame(from: engine)
+                        } else {
+                            isSpeedBoosted = true
+                            engine.rate = 2.0
+                            // Hide the controls (title, gradients, play/pause) so the
+                            // 2× badge sits cleanly at the top by itself while boosting.
+                            setControlsVisible(false)
+                        }
+                    }
+                },
+                onEnded: {
+                    if isSpeedBoosted {
+                        isSpeedBoosted = false
+                        engine.rate = isPlaying ? Float(playbackSpeed) : 0
+                    }
+                }
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            TwoFingerTapOverlay(isLocked: isLocked, onTap: togglePlayPause)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            #endif
+
             PlayerDoubleTapSeek(
                 onSingleTap: {
                     toggleControls()
@@ -955,34 +991,6 @@ struct PlayerView: View {
                 }
                 .padding(.top, isPad ? 110 : 90)
             }
-
-            SpeedBoostOverlay(
-                isLocked: isLocked,
-                moveTolerance: CGFloat(speedBoostTolerance),
-                onBegan: {
-                    if !castManager.isConnected {
-                        if playerHoldAction == "saveFrame" {
-                            saveCurrentFrame(from: engine)
-                        } else {
-                            isSpeedBoosted = true
-                            engine.rate = 2.0
-                            // Hide the controls (title, gradients, play/pause) so the
-                            // 2× badge sits cleanly at the top by itself while boosting.
-                            setControlsVisible(false)
-                        }
-                    }
-                },
-                onEnded: {
-                    if isSpeedBoosted {
-                        isSpeedBoosted = false
-                        engine.rate = isPlaying ? Float(playbackSpeed) : 0
-                    }
-                }
-            )
-            .ignoresSafeArea()
-
-            TwoFingerTapOverlay(isLocked: isLocked, onTap: togglePlayPause)
-                .ignoresSafeArea()
             #endif
 
             if isLoadingNextEpisode || isRefetchingStream {
