@@ -306,7 +306,10 @@ struct UpcomingCalendarView: View {
                 if vm.usesSimkl {
                     SimklKindMenu(kind: $vm.simklKind) { "Upcoming \($0.simklKindTitle)" }
                 } else {
+                    // A Mac shows the navigation title already, at the toolbar's leading edge.
+                    #if !os(macOS)
                     Text("Upcoming").font(.headline)
+                    #endif
                 }
             }
             ToolbarItem(placement: .primaryAction) {
