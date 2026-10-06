@@ -302,6 +302,13 @@ import Combine
             let merged = Self.mergedTracking(
                 existingProgress: existing?.progress, existingStatus: existing?.status,
                 watchedEpisode: watchedCount, totalEpisodes: item.totalEpisodes, isAiring: item.isAiring)
+            // Runs on every launch: an entry it has nothing new for keeps its "updated" time,
+            // which a re-save set to now — every title read "1 second ago" and the
+            // recently-updated order was lost.
+            if let existing, existing.status == merged.status, existing.progress == merged.progress,
+               existing.localSource != nil || source == nil {
+                continue
+            }
             // Preserve the user's score and any manually-chosen status (dropped/paused).
             // Pass the score in the active format so upsert keeps the canonical value.
             upsert(media: existing?.media ?? media, status: merged.status, progress: merged.progress,
@@ -343,7 +350,7 @@ import Combine
     // MARK: - Persistence
 
     private static var fileURL: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let dir = AppDirectories.applicationSupport
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent(Keys.fileName)
     }
