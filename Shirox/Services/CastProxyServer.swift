@@ -66,6 +66,11 @@ final class CastProxyServer: @unchecked Sendable {
     /// Subtitles handed to an AirPlay receiver as a WebVTT rendition (see ``AirPlaySubtitles``),
     /// by id. Only the latest is kept: one video plays at a time.
     private var subtitleSessions: [String: SubtitleSession] = [:]
+    /// AES-128 keys fetched for audio segments being evened out (see ``AudioSegmentRepair``),
+    /// by URL: a stream uses one or a few, and fetching one per segment would double requests.
+    private var segmentKeys: [URL: Data] = [:]
+    /// Hosts whose audio has had its timestamps evened out this run, logged once each.
+    private var repairedHosts: Set<String> = []
 
     private struct SubtitleSession {
         var cues: [SubtitleCue]
@@ -463,6 +468,21 @@ final class CastProxyServer: @unchecked Sendable {
         }
 
         let loopback = Self.isLoopback(hostHeader: head.value(for: "host"))
+        let items = query?.queryItems ?? []
+        // An alternate-audio playlist (`ar`) names its segments for evening out; such a segment
+        // (`fx`) carries its key and IV (`fk`, `fiv`) when it's encrypted. Only a whole segment
+        // is rewritten: a ranged request is passed through as it is.
+        let isAudioPlaylist = items.contains { $0.name == "ar" }
+        let repairPlan = RepairPlanBox()
+        var segmentRepair: ProxyExchangeRegistry.SegmentRepair?
+        if items.contains(where: { $0.name == "fx" }), head.wantsBody, head.value(for: "range") == nil {
+            let keyURL = items.first(where: { $0.name == "fk" })?.value.flatMap(URL.init(string:))
+            let iv = items.first(where: { $0.name == "fiv" })?.value.flatMap(Self.bytes(hex:))
+            let crypto = keyURL.flatMap { key in iv.map { AudioSegmentRepair.Crypto(key: key, iv: $0) } }
+            let host = target.host ?? "?"
+            segmentRepair = .init(crypto: crypto, key: { [weak self] url in await self?.segmentKey(url) },
+                                  repaired: { [weak self] in self?.noteRepaired(host: host) })
+        }
         // AirPlay subtitles: `s` on the stream's own URL (add the rendition), `sp` on the
         // playlists it names (find the first segment, for the timing).
         let subtitlesID = query?.queryItems?.first(where: { $0.name == "s" })?.value
@@ -484,21 +504,71 @@ final class CastProxyServer: @unchecked Sendable {
                             rewriteManifestFrom: target,
                             playlistKey: playlistKey,
                             finish: finish,
-                            proxy: { [weak self] url, isPlaylist in
-                                self?.mintNested(url, isPlaylist: isPlaylist, playlistKey: playlistKey,
-                                                 probeID: probeID, loopback: loopback)
+                            prepare: isAudioPlaylist ? { text in
+                                repairPlan.plan = AudioSegmentRepair.plan(mediaPlaylist: text, baseURL: target)
+                            } : nil,
+                            segmentRepair: segmentRepair,
+                            proxy: { [weak self] url, resource in
+                                self?.mintNested(url, resource: resource, playlistKey: playlistKey,
+                                                 probeID: probeID, loopback: loopback,
+                                                 repair: repairPlan.plan?[url])
                             })
     }
 
+    /// The repair plan of the audio playlist being rewritten, filled in before its URLs are.
+    private final class RepairPlanBox: @unchecked Sendable {
+        var plan: [URL: AudioSegmentRepair.Crypto?]?
+    }
+
+    /// `hex` as bytes; nil unless it's an even run of hex digits.
+    static func bytes(hex: String) -> Data? {
+        let digits = Array(hex.utf8)
+        guard digits.count % 2 == 0 else { return nil }
+        var out = Data(capacity: digits.count / 2)
+        for i in stride(from: 0, to: digits.count, by: 2) {
+            guard let byte = UInt8(String(decoding: digits[i..<i + 2], as: UTF8.self), radix: 16) else { return nil }
+            out.append(byte)
+        }
+        return out
+    }
+
+    /// An audio segment's AES-128 key, fetched once with the stream's headers.
+    private func segmentKey(_ url: URL) async -> Data? {
+        if let cached = stateQueue.sync(execute: { segmentKeys[url] }) { return cached }
+        var request = URLRequest(url: url)
+        currentHeaders().forEach { request.setValue($1, forHTTPHeaderField: $0) }
+        guard let (data, response) = try? await upstream.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode ?? 200 < 400, data.count == 16 else { return nil }
+        stateQueue.sync { segmentKeys[url] = data }
+        return data
+    }
+
+    private func noteRepaired(host: String) {
+        let first = stateQueue.sync { repairedHosts.insert(host).inserted }
+        if first { Logger.shared.log("[CastProxy] Evening out audio timestamps from \(host)", type: "Stream") }
+    }
+
     /// A URL a playlist names, minted back through the proxy: playlists keep the stream's key
-    /// and the subtitle probe, segments and keys need neither.
-    private func mintNested(_ url: URL, isPlaylist: Bool, playlistKey: String?, probeID: String?,
-                            loopback: Bool) -> URL? {
+    /// and the subtitle probe, segments and keys need neither. An audio rendition is marked so
+    /// its segments are minted for evening out (`repair`: nil for any other URL, `.some(nil)`
+    /// for a segment in the clear).
+    private func mintNested(_ url: URL, resource: CastManifestRewriter.Resource, playlistKey: String?,
+                            probeID: String?, loopback: Bool,
+                            repair: AudioSegmentRepair.Crypto??) -> URL? {
         stateQueue.sync {
             let host = loopback ? "127.0.0.1" : (cachedIP ?? Self.currentLocalIP())
             guard let host else { return nil }
-            return mintLocked(url, host: host, playlistKey: isPlaylist ? playlistKey : nil,
-                              extra: isPlaylist ? probeID.map { [URLQueryItem(name: "sp", value: $0)] } ?? [] : [])
+            var extra: [URLQueryItem] = []
+            if resource.isPlaylist, let probeID { extra.append(URLQueryItem(name: "sp", value: probeID)) }
+            if resource == .audioPlaylist { extra.append(URLQueryItem(name: "ar", value: "1")) }
+            if case .some(let crypto) = repair {
+                extra.append(URLQueryItem(name: "fx", value: "1"))
+                if let crypto {
+                    extra.append(URLQueryItem(name: "fk", value: crypto.key.absoluteString))
+                    extra.append(URLQueryItem(name: "fiv", value: crypto.iv.map { String(format: "%02x", $0) }.joined()))
+                }
+            }
+            return mintLocked(url, host: host, playlistKey: resource.isPlaylist ? playlistKey : nil, extra: extra)
         }
     }
 
@@ -528,8 +598,8 @@ final class CastProxyServer: @unchecked Sendable {
         if original.contains("#EXT-X-STREAM-INF") {
             return AirPlaySubtitles.inject(into: rewritten, mediaTag: tag)
         }
-        guard let media = mintNested(target, isPlaylist: true, playlistKey: playlistKey,
-                                     probeID: subtitlesID, loopback: loopback) else { return rewritten }
+        guard let media = mintNested(target, resource: .playlist, playlistKey: playlistKey,
+                                     probeID: subtitlesID, loopback: loopback, repair: nil) else { return rewritten }
         return AirPlaySubtitles.wrap(mediaPlaylistURL: media.absoluteString, mediaTag: tag)
     }
 
@@ -828,22 +898,36 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
         let playlistKey: String?
         /// Last say over a rewritten manifest: (as fetched, rewritten) → served.
         let finishManifest: ((String, String) -> String)?
-        let proxy: (URL, Bool) -> URL?
+        let proxy: (URL, CastManifestRewriter.Resource) -> URL?
+        let prepare: ((String) -> Void)?
+        let segmentRepair: SegmentRepair?
         var isManifest = false
+        /// A segment held whole to be evened out before it's sent.
+        var isRepairing = false
         var manifestBuffer = Data()
         var headerSent = false
         var failed = false
         var finish: ((Void) -> Void)?
 
         init(connection: ProxyConnection, wantsBody: Bool, manifestBase: URL, playlistKey: String?,
-             finish: ((String, String) -> String)?, proxy: @escaping (URL, Bool) -> URL?) {
+             finish: ((String, String) -> String)?, prepare: ((String) -> Void)?,
+             segmentRepair: SegmentRepair?, proxy: @escaping (URL, CastManifestRewriter.Resource) -> URL?) {
             self.finishManifest = finish
+            self.prepare = prepare
+            self.segmentRepair = segmentRepair
             self.connection = connection
             self.wantsBody = wantsBody
             self.manifestBase = manifestBase
             self.playlistKey = playlistKey
             self.proxy = proxy
         }
+    }
+
+    /// How to even out an audio segment's timestamps (see ``AudioSegmentRepair``).
+    struct SegmentRepair {
+        let crypto: AudioSegmentRepair.Crypto?
+        let key: (URL) async -> Data?
+        let repaired: () -> Void
     }
 
     private let lock = NSLock()
@@ -857,10 +941,13 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
              rewriteManifestFrom base: URL,
              playlistKey: String? = nil,
              finish: ((String, String) -> String)? = nil,
-             proxy: @escaping (URL, Bool) -> URL?) async {
+             prepare: ((String) -> Void)? = nil,
+             segmentRepair: SegmentRepair? = nil,
+             proxy: @escaping (URL, CastManifestRewriter.Resource) -> URL?) async {
         let task = session.dataTask(with: request)
         let exchange = Exchange(connection: connection, wantsBody: wantsBody, manifestBase: base,
-                                playlistKey: playlistKey, finish: finish, proxy: proxy)
+                                playlistKey: playlistKey, finish: finish, prepare: prepare,
+                                segmentRepair: segmentRepair, proxy: proxy)
         lock.lock(); active[task.taskIdentifier] = exchange; lock.unlock()
 
         await withCheckedContinuation { continuation in
@@ -907,6 +994,12 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
             completionHandler(.allow)
             return
         }
+        if exchange.segmentRepair != nil, (200..<300).contains(http?.statusCode ?? 200) {
+            // Held whole until it's evened out; the head goes with it.
+            exchange.isRepairing = true
+            completionHandler(.allow)
+            return
+        }
 
         // Pass the upstream's own status and framing through untouched: a 206 with its
         // Content-Range is exactly what lets the receiver seek.
@@ -933,7 +1026,7 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
         guard let exchange = exchange(for: dataTask), !exchange.failed else { return }
         guard exchange.wantsBody else { return }
 
-        if exchange.isManifest {
+        if exchange.isManifest || exchange.isRepairing {
             exchange.manifestBuffer.append(data)
             return
         }
@@ -946,6 +1039,27 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let exchange = exchange(for: task) else { complete(task); return }
+        if exchange.isRepairing, error == nil, !exchange.failed, let repair = exchange.segmentRepair {
+            // Answered once it's evened out: the request isn't done until then, so the
+            // connection reads no next request before this one's body is written.
+            let original = exchange.manifestBuffer
+            Task {
+                var key: Data?
+                if let crypto = repair.crypto { key = await repair.key(crypto.key) }
+                let fixed = AudioSegmentRepair.repaired(original, crypto: repair.crypto, key: key)
+                if fixed != nil { repair.repaired() }
+                let body = fixed ?? original
+                var head = "HTTP/1.1 200 OK\r\n"
+                head += "Content-Type: video/mp2t\r\n"
+                head += "Content-Length: \(body.count)\r\n"
+                head += "Access-Control-Allow-Origin: *\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n"
+                if exchange.connection.writeBlocking(Data(head.utf8)) {
+                    _ = exchange.connection.writeBlocking(body)
+                }
+                self.complete(task)
+            }
+            return
+        }
         defer { complete(task) }
 
         if exchange.failed { exchange.connection.close(); return }
@@ -972,9 +1086,10 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
             Logger.shared.log("[CastProxy] Couldn't unscramble a playlist from \(exchange.manifestBase.host ?? "?") with the module's key", type: "Error")
         }
         if let text {
+            exchange.prepare?(text)
             let rewritten = CastManifestRewriter.rewrite(text,
                                                          baseURL: exchange.manifestBase,
-                                                         proxy: exchange.proxy)
+                                                         resource: exchange.proxy)
             body = Data((exchange.finishManifest?(text, rewritten) ?? rewritten).utf8)
         } else {
             body = exchange.manifestBuffer

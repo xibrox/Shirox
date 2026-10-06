@@ -305,6 +305,28 @@ enum HLSManifestParser {
         return buffer
     }
 
+    /// AES-128-CBC encrypt with PKCS7 padding: the inverse of `decryptAES128CBC`.
+    static func encryptAES128CBC(_ data: Data, key: Data, iv: Data) -> Data? {
+        guard key.count == kCCKeySizeAES128, iv.count == kCCBlockSizeAES128, !data.isEmpty else { return nil }
+        let bufferSize = data.count + kCCBlockSizeAES128
+        var buffer = Data(count: bufferSize)
+        var encryptedCount = 0
+        let status = buffer.withUnsafeMutableBytes { bufferPtr in
+            data.withUnsafeBytes { dataPtr in
+                key.withUnsafeBytes { keyPtr in
+                    iv.withUnsafeBytes { ivPtr in
+                        CCCrypt(CCOperation(kCCEncrypt), CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionPKCS7Padding),
+                                keyPtr.baseAddress, key.count, ivPtr.baseAddress,
+                                dataPtr.baseAddress, data.count, bufferPtr.baseAddress, bufferSize, &encryptedCount)
+                    }
+                }
+            }
+        }
+        guard status == kCCSuccess else { return nil }
+        buffer.removeSubrange(encryptedCount..<buffer.count)
+        return buffer
+    }
+
     /// The 16-byte big-endian IV derived from a media sequence number — HLS's default when
     /// `#EXT-X-KEY` carries no explicit `IV`.
     static func defaultIV(forMediaSequence seq: Int) -> [UInt8] {

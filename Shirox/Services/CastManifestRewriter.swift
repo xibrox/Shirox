@@ -50,23 +50,46 @@ enum CastManifestRewriter {
     /// - Parameter proxy: maps an origin URL to its proxied form; a `nil` return leaves that
     ///   URL untouched rather than dropping the line.
     static func rewrite(_ manifest: String, baseURL: URL, proxy: (URL) -> URL?) -> String {
-        rewrite(manifest, baseURL: baseURL) { url, _ in proxy(url) }
+        rewrite(manifest, baseURL: baseURL, resource: { url, _ in proxy(url) })
     }
 
     /// Rewrites every fetchable URL in `manifest` through `proxy`, telling it which of them are
     /// playlists themselves: a master playlist's variants and its `#EXT-X-MEDIA` /
     /// `#EXT-X-I-FRAME-STREAM-INF` renditions. Segments, keys and init maps are not.
     static func rewrite(_ manifest: String, baseURL: URL, proxy: (URL, _ isPlaylist: Bool) -> URL?) -> String {
+        rewrite(manifest, baseURL: baseURL, resource: { url, resource in proxy(url, resource.isPlaylist) })
+    }
+
+    /// What a URL in a manifest is.
+    enum Resource: Equatable {
+        /// A variant, or a subtitle or I-frame rendition.
+        case playlist
+        /// An `#EXT-X-MEDIA:TYPE=AUDIO` rendition: its segments are audio alone.
+        case audioPlaylist
+        /// A media segment, key or init map.
+        case other
+
+        var isPlaylist: Bool { self != .other }
+    }
+
+    /// Rewrites every fetchable URL in `manifest` through `proxy`, telling it what each is.
+    static func rewrite(_ manifest: String, baseURL: URL, resource proxy: (URL, Resource) -> URL?) -> String {
         let isMaster = manifest.contains("#EXT-X-STREAM-INF") || manifest.contains("#EXT-X-MEDIA:")
         return manifest.components(separatedBy: .newlines).map { line -> String in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { return line }
             if trimmed.hasPrefix("#") {
-                let isPlaylist = trimmed.hasPrefix("#EXT-X-MEDIA:") || trimmed.hasPrefix("#EXT-X-I-FRAME-STREAM-INF:")
-                return rewriteTag(line, baseURL: baseURL) { proxy($0, isPlaylist) }
+                let resource: Resource
+                if trimmed.hasPrefix("#EXT-X-MEDIA:") {
+                    resource = trimmed.range(of: "(?<=[:,])TYPE=AUDIO(?=,|$)", options: .regularExpression) != nil
+                        ? .audioPlaylist : .playlist
+                } else {
+                    resource = trimmed.hasPrefix("#EXT-X-I-FRAME-STREAM-INF:") ? .playlist : .other
+                }
+                return rewriteTag(line, baseURL: baseURL) { proxy($0, resource) }
             }
             guard let resolved = resolve(trimmed, relativeTo: baseURL),
-                  let proxied = proxy(resolved, isMaster) else { return line }
+                  let proxied = proxy(resolved, isMaster ? .playlist : .other) else { return line }
             return proxied.absoluteString
         }.joined(separator: "\n")
     }
