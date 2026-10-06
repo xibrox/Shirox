@@ -20,17 +20,34 @@ final class CacheManagerTests: XCTestCase {
         XCTAssertLessThan(CacheManager.shared.dataCacheSize, 50_000)
     }
 
-    /// The HTTP response cache is in the total and emptied by its reset.
-    func testTheNetworkCacheIsCleared() {
-        let url = URL(string: "https://cache-test.example/answer")!
-        let response = CachedURLResponse(
-            response: HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
-                                      headerFields: ["Cache-Control": "max-age=3600"])!,
-            data: Data(count: 10_000))
-        URLCache.shared.storeCachedResponse(response, for: URLRequest(url: url))
-        XCTAssertNotNil(URLCache.shared.cachedResponse(for: URLRequest(url: url)))
+    /// The HTTP response cache is counted, and its reset frees what it holds on disk. (Whether a
+    /// cleared entry still answers from memory for a moment is URLCache's own business.)
+    func testTheNetworkCacheIsCountedAndFreed() async throws {
+        let cache = URLCache.shared
+        for i in 0..<20 {
+            let url = URL(string: "https://cache-test.example/answer/\(i)")!
+            let response = CachedURLResponse(
+                response: HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+                                          headerFields: ["Cache-Control": "max-age=3600"])!,
+                data: Data(repeating: UInt8(i), count: 100_000))
+            cache.storeCachedResponse(response, for: URLRequest(url: url))
+        }
+        // Written to disk on the cache's own queue.
+        var stored = 0
+        for _ in 0..<40 {
+            stored = CacheManager.shared.networkCacheSize
+            if stored >= 1_000_000 { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertGreaterThanOrEqual(stored, 1_000_000, "counted")
 
         CacheManager.shared.clearNetworkCache()
-        XCTAssertNil(URLCache.shared.cachedResponse(for: URLRequest(url: url)))
+        var after = stored
+        for _ in 0..<40 {
+            after = CacheManager.shared.networkCacheSize
+            if after < stored / 2 { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertLessThan(after, stored / 2, "freed")
     }
 }

@@ -146,7 +146,10 @@ final class CacheManager: ObservableObject {
     }
 
     func clearNetworkCache() {
+        // removeAllCachedResponses alone sometimes left an entry answering for a moment; the
+        // dated removal takes what it missed.
         URLCache.shared.removeAllCachedResponses()
+        URLCache.shared.removeCachedResponses(since: .distantPast)
     }
 
     func clearDataCaches() {
