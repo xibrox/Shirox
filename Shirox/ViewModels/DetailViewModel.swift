@@ -497,8 +497,19 @@ final class DetailViewModel: ObservableObject {
             }
         }()
 
+        // A fresh link for the episode on screen when the one playing dies mid-episode (an
+        // expired CDN token after a phone call, a seek back into segments no longer served).
+        // Playing from this page passed none, so the player had nothing to recover with: it
+        // froze where the stream died. The Continue button and the AniList page already did.
+        let onStreamExpired: StreamRefetchLoader = { [weak self] episodeNumber, episodeHref in
+            guard let self, let episodes = self.detail?.episodes,
+                  let episode = EpisodeNavigator.resolve(href: episodeHref, orNumber: episodeNumber, in: episodes)
+            else { return [] }
+            return try await self.fetchStreams(for: episode)
+        }
+
         #if os(iOS)
-        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
+        PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onStreamExpired: onStreamExpired, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
         #elseif os(macOS)
         MacPlayerWindowManager.shared.open(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
         #endif

@@ -51,6 +51,21 @@ extension Animation {
 
 // MARK: - Player View
 
+/// Whether the viewer means the video to be playing, apart from what the engine reports: a
+/// stream that dies stops the engine, which reads the same as a pause. Kept out of view state,
+/// as it's written every tick.
+final class ViewerPlayIntent {
+    /// When the clock last moved forward.
+    var clockMovedAt = Date.distantPast
+    /// When the viewer last paused.
+    var pausedAt = Date.distantPast
+
+    /// Playing until moments ago, and not paused since: the engine stopped on its own.
+    func wasPlaying(now: Date = Date(), within window: TimeInterval = 15) -> Bool {
+        now.timeIntervalSince(clockMovedAt) <= window && pausedAt < clockMovedAt
+    }
+}
+
 private final class CompletionBox {
     var context: PlayerContext?
     /// A Simkl movie or show finished unrated, to rate once the player closes.
@@ -154,6 +169,7 @@ struct PlayerView: View {
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @State private var didTrackEpisode = false
     @State private var completionBox = CompletionBox()
+    @State private var playbackIntent = ViewerPlayIntent()
 
     // Multi-stream / Next episode state
     @State private var currentStream: StreamResult
@@ -1463,7 +1479,7 @@ struct PlayerView: View {
     /// hard crash or swipe-away loses at most ~10s. Works for both local and cast,
     /// since `currentTime` mirrors the active source's position.
     private func saveProgressIfDue() {
-        guard duration > 0, abs(currentTime - lastSavedSeconds) >= 10 else { return }
+        guard duration > 0, abs(currentTime - lastSavedSeconds) >= 10, !isAwaitingResume else { return }
         lastSavedSeconds = currentTime
         saveProgress()
     }
@@ -1480,8 +1496,14 @@ struct PlayerView: View {
         saveProgress()
     }
 
+    /// A resume seek is still to come (launch, or a recovery reopening the stream): the clock
+    /// reads from 0 until it lands, and that isn't where the viewer is.
+    private var isAwaitingResume: Bool {
+        currentContext?.resumeFrom != nil && !didSeekToResume
+    }
+
     private func saveProgress() {
-        guard let context = currentContext, duration > 0 else { return }
+        guard let context = currentContext, duration > 0, !isAwaitingResume else { return }
         // A dead item reports position 0 while `duration` is still the stale real value, so a
         // save triggered on the way out of a failure (or by the swap that follows one) wrote
         // watchedSeconds: 0 over a genuinely watched episode — the "came back and ep 207 shows
@@ -1874,6 +1896,7 @@ struct PlayerView: View {
         }
         guard let engine else { return }
         if intent == .pause {
+            playbackIntent.pausedAt = Date()
             engine.pause()
             isPlaying = false
         } else {
@@ -2338,6 +2361,9 @@ struct PlayerView: View {
         }
         events.tick = {
             guard !isScrubbing, let engine else { return }
+            if engine.currentTime > currentTime + 0.05, engine.timeControl == .playing {
+                playbackIntent.clockMovedAt = Date()
+            }
             currentTime = engine.currentTime
             if let d = engine.duration, d != duration { duration = d }
             if duration > 0 {
@@ -2892,27 +2918,31 @@ struct PlayerView: View {
         // swapStream unconditionally force-plays (rate up, isPlaying = true), so capture the
         // user's intent now — a recovery triggered while paused must stay paused, not start
         // playing on its own when the user returns to the app.
-        let wasPlaying = isPlaying
+        // A dead stream has already stopped the engine, so `isPlaying` reads like a pause: the
+        // recovered episode then sat paused where it had resumed, the viewer never having
+        // paused it. Playing until moments ago and not paused since counts as playing.
+        let wasPlaying = isPlaying || (playbackIntent.wasPlaying() && !pausedForInactive)
         Logger.shared.log("[StallRecovery] Refetching stream, will resume at \(resumeAt)s", type: "Player")
+        let episodeBefore = currentContext?.episodeNumber
         await refetchStream() // swaps in a fresh item, resets currentTime to 0
-        // Wait for the fresh item to become ready, then restore position.
-        for _ in 0..<40 {
-            try? await Task.sleep(nanoseconds: 150_000_000)
-            if Task.isCancelled { return }
-            if engine?.isItemReady == true {
-                await engine?.seek(to: resumeAt, precision: .exact)
-                if wasPlaying {
-                    engine?.playImmediately(atRate: Float(playbackSpeed))
-                } else {
-                    engine?.pause()
-                    isPlaying = false
-                }
-                currentTime = resumeAt
-                Logger.shared.log("[StallRecovery] Resumed at \(resumeAt)s after refetch", type: "Player")
-                return
-            }
+        // A refetch that moved to another episode (none should) doesn't take this one's position.
+        guard currentContext?.episodeNumber == episodeBefore else { return }
+        // The fresh item resumes where the dead one stopped however long it takes to open: the
+        // first tick that knows its duration seeks there, as on launch, and nothing is saved
+        // until then. A fixed six-second wait dropped the seek on a slow connection; the episode
+        // restarted at 0:00 and its first save then wrote that over the real position — the
+        // "came back and the episode shows no progress" report.
+        if var context = currentContext {
+            context.resumeFrom = resumeAt
+            currentContext = context
         }
-        Logger.shared.log("[StallRecovery] Refetched item never became ready", type: "Error")
+        didSeekToResume = false
+        lastSavedSeconds = resumeAt
+        if !wasPlaying {
+            engine?.pause()
+            isPlaying = false
+        }
+        Logger.shared.log("[StallRecovery] Resuming at \(resumeAt)s once the refetched stream opens", type: "Player")
     }
 
     /// Central recovery dispatcher for every "playback wedged" trigger (foreground return, stall
