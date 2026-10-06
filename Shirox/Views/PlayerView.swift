@@ -1662,7 +1662,7 @@ struct PlayerView: View {
                 // handing over: every format and subtitle style, and no reload.
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
                 guard engine is MPVEngine, Self.isAirPlayRouteActive, !castManager.isConnected,
-                      !ExternalDisplay.shared.isConnected else { return }
+                      !externalDisplayConnected else { return }
                 guard AirPlayRouting.handsMPVToNative(url: currentStream.url, avPlayerFailedIt: fellBackToMPV) else {
                     // Nothing else can play it, so the receiver gets the sound only.
                     Logger.shared.log("[AirPlay] MPV-only stream; the receiver gets the sound. Screen Mirroring shows the picture.", type: "Stream")
@@ -1772,8 +1772,11 @@ struct PlayerView: View {
                               clock: clock, settings: subtitleSettings)
         ))
     }
+
+    private var externalDisplayConnected: Bool { externalDisplay.isConnected }
     #else
     private var mpvOnExternalDisplay: Bool { false }
+    private var externalDisplayConnected: Bool { false }
     #endif
 
     /// Reloads the stream at the current position on the same AVPlayer — for a route or

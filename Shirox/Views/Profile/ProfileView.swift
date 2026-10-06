@@ -112,8 +112,9 @@ struct ProfileView: View {
                     .accessibilityLabel("Log Out")
                 }
             }
-            if !isPushed {
-                ToolbarItem(placement: .confirmationAction) {
+            // An `if` around the item needs iOS 16; one inside it doesn't.
+            ToolbarItem(placement: .confirmationAction) {
+                if !isPushed {
                     Button("Done") { dismiss() }
                 }
             }
