@@ -94,7 +94,7 @@ struct BatchDownloadModulePickerView: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
     }
@@ -505,7 +505,7 @@ private struct BatchSearchResultsPickerSheet: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
     }

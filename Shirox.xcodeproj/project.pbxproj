@@ -451,6 +451,7 @@
 		1F04849669244CD077701190 /* SubtitleLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2063F643CA2437FD3A6B2F7F /* SubtitleLoaderTests.swift */; };
 		1F1EEAEF0D210E5ADE27A915 /* SimklLibraryReadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE9A37F2AF92184D9A24B5A /* SimklLibraryReadTests.swift */; };
 		1F4B1AD2CC04E8B6F5BF995D /* SimklWriteQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D9BBDAAE6189B464E64BBC5 /* SimklWriteQueue.swift */; };
+		1FC014736B3551069DE889AC /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E38625953CEB8CB390672D8 /* Toast.swift */; };
 		20B7EA26094D8953DC45E3F7 /* SimklTitleCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3015516B8F0B96AC14DEACE4 /* SimklTitleCatalogTests.swift */; };
 		217A6412F78995A7A5F5F4B0 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E87688CB577983F43E550D /* OnboardingView.swift */; };
 		21A14B5A00FF0B538691E91D /* NotificationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88804D3B352FD28723122E3 /* NotificationBadge.swift */; };
@@ -820,6 +821,7 @@
 		A05FBBC4521D380C9FD9BEA1 /* PlayerAssOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A08E27B4A688BE98644F700 /* PlayerAssOverlay.swift */; };
 		A06C948886D47E15E4842DF6 /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = C333924C8E6D85D22BFA180C /* MPVKit */; };
 		A0722750ED30A028878FF395 /* MALMangaLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BAE193514A5E83E81EF31B8 /* MALMangaLibraryService.swift */; };
+		A0AAF44F25DB6F1025EF1C11 /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E38625953CEB8CB390672D8 /* Toast.swift */; };
 		A116F1F16FA3F31588F7D0B7 /* SimklPlayTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D916039C879C3C82C435886 /* SimklPlayTracker.swift */; };
 		A147502B402E4F1121420096 /* PendingWrite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5A6BA34DDCEF8AFDF2E059 /* PendingWrite.swift */; };
 		A1DCD2213941F4A33E837E37 /* ViewerPlayIntentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D027FAEA3BB907E2677817 /* ViewerPlayIntentTests.swift */; };
@@ -1066,6 +1068,7 @@
 		FB157A299403D6BF6BC1D083 /* LibrarySyncPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9970B31153A18CDD095323FB /* LibrarySyncPlanner.swift */; };
 		FB1F41A3B622DF404AFB0D61 /* SearchBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C581970F3C23C369DD7CA074 /* SearchBrowseView.swift */; };
 		FB270DEEDEA846171283493B /* MangaPageHeaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77146386C120B4AA3400F4DD /* MangaPageHeaders.swift */; };
+		FB5A4E863E0B76F8D0EDB5CA /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E38625953CEB8CB390672D8 /* Toast.swift */; };
 		FCB3E2BB0BB80870BB440E86 /* AniListThrottle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 685D06D87E62A9D2A9907F5C /* AniListThrottle.swift */; };
 		FCE3980671F64CF38B707BFA /* LocalPlaybackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E548862288E04B9EA60BBCF3 /* LocalPlaybackCoordinator.swift */; };
 		FD2680D743E0545E4EDAD21C /* SimklCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D13B1910CD76238778905D3 /* SimklCatalogTests.swift */; };
@@ -1250,6 +1253,7 @@
 		1CB8A8F0110FE40FEBB15188 /* TSAudioTimestampsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSAudioTimestampsTests.swift; sourceTree = "<group>"; };
 		1D13B1910CD76238778905D3 /* SimklCatalogTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SimklCatalogTests.swift; sourceTree = "<group>"; };
 		1E34560A4389A43C74BE3D1C /* SimklModuleTracking.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SimklModuleTracking.swift; sourceTree = "<group>"; };
+		1E38625953CEB8CB390672D8 /* Toast.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Toast.swift; sourceTree = "<group>"; };
 		1E508610E714E87932D182B3 /* PlayerAssOverlayTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlayerAssOverlayTests.swift; sourceTree = "<group>"; };
 		1E8C2D959A901D1DA465C7F4 /* JellyfinCoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JellyfinCoreTests.swift; sourceTree = "<group>"; };
 		1FB508B47E45CCA9A0D55958 /* AniListMangaMappingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AniListMangaMappingTests.swift; sourceTree = "<group>"; };
@@ -1946,6 +1950,7 @@
 				E8C16892D7318AC9921F236D /* SimklAnimeEditSheet.swift */,
 				994DF732D9DE948DA9C01ABA /* MediaDetailsSheet.swift */,
 				79589A2A89DDE986D3CF0875 /* TabBarMenu.swift */,
+				1E38625953CEB8CB390672D8 /* Toast.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -2983,6 +2988,7 @@
 				41405FF76F2493C3FDEEEAE5 /* AniListTitleMatcher.swift in Sources */,
 				72BF12E3C8B27A9D432103DD /* ModuleCheck.swift in Sources */,
 				37A3DF15BF733721F9379C84 /* TSAudioTimestamps.swift in Sources */,
+				A0AAF44F25DB6F1025EF1C11 /* Toast.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3278,6 +3284,7 @@
 				95F9D77FBAE0537D2A04B03E /* AniListTitleMatcher.swift in Sources */,
 				64D0DDD8872973962405FD38 /* ModuleCheck.swift in Sources */,
 				2F08CC4F2A0F14878722B080 /* TSAudioTimestamps.swift in Sources */,
+				1FC014736B3551069DE889AC /* Toast.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3575,6 +3582,7 @@
 				FECEF509C95789FD2DAC0D9C /* AniListTitleMatcher.swift in Sources */,
 				DE658B715449EFD6BD256DAD /* ModuleCheck.swift in Sources */,
 				C5D564B2D3E7413582AC7697 /* TSAudioTimestamps.swift in Sources */,
+				FB5A4E863E0B76F8D0EDB5CA /* Toast.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

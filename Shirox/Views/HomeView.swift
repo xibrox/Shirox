@@ -150,10 +150,12 @@ struct HomeView: View {
                                 }
                             }
                             Group {
-                                #if os(iOS)
+                                #if !os(tvOS)
                                 if !continueWatching.items.isEmpty {
                                     ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
                                 }
+                                #endif
+                                #if os(iOS)
                                 if !mangaProgress.items.isEmpty {
                                     ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext,
                                                            detailItem: $readingDetail)
@@ -205,7 +207,12 @@ struct HomeView: View {
                     // overlapping the time looked like. The hero can be absent for ordinary
                     // reasons: a provider that doesn't fill Trending, or an outage on the
                     // endpoint behind it.
+                    #if os(macOS)
+                    // The leading inset is the sidebar on a Mac; only the toolbar is let over the hero.
+                    .ignoresSafeArea(edges: heroItems.isEmpty ? [] : [.top])
+                    #else
                     .ignoresSafeArea(edges: heroItems.isEmpty ? [] : [.top, .leading])
+                    #endif
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: isLoadingEmpty)
@@ -255,7 +262,11 @@ struct HomeView: View {
             #endif
         }
         .toolbarBackgroundHidden()
+        #if !os(macOS)
+        // Content that ignores the leading safe area pads itself back by it; a Mac's Home keeps
+        // that safe area (it's the sidebar), so there's nothing to pad.
         .observeSafeAreaLeading($leadingInset)
+        #endif
         .task(id: homeSourceID) { await loadCurrent() }
         .onChangeOf(pagePosition) { if let position = $0 { lastPagePosition = position } }
         .onAppear {
@@ -290,6 +301,20 @@ private struct HomeToolbar: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
+        #if os(macOS)
+        // Spelled out: the shared `some ToolbarContent` items below crash a native Mac build at
+        // launch ("failed to demangle witness … does not conform to protocol ToolbarContent").
+        content.toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: openCalendar) { Label("Upcoming", systemImage: "calendar") }
+                    .help("Upcoming episodes")
+            }
+            if discovery.usesSimkl {
+                ToolbarItem(placement: .navigation) { SimklKindMenu(kind: $kind) }
+            }
+            ToolbarItem(placement: .primaryAction) { ProviderMenuButton() }
+        }
+        #else
         if #available(iOS 16, macOS 13, tvOS 16, *) {
             // Left out, not left empty: from iOS 26 an empty item still draws its glass.
             content.toolbar {
@@ -314,6 +339,7 @@ private struct HomeToolbar: ViewModifier {
                 providerItem
             }
         }
+        #endif
     }
 
     private var calendarItem: some ToolbarContent {
@@ -647,9 +673,13 @@ private struct HeroPager: View {
 // MARK: - macOS Featured Carousel (lightweight, no TabView with 2000 items)
 
 #if os(macOS) || targetEnvironment(macCatalyst)
+/// Home's hero in a Mac window: a wide banner as tall as the window allows without pushing the
+/// rows out of sight, the title and its details over the lower left, arrows at the sides while
+/// the pointer is on it. It turns by itself every few seconds, but not under the pointer.
 private struct MacFeaturedCarousel: View {
     let items: [Media]
     @State private var currentIndex = 0
+    @State private var isHovering = false
     @State private var timer: Timer?
 
     private var displayItems: [Media] { Array(items.prefix(8)) }
@@ -662,111 +692,161 @@ private struct MacFeaturedCarousel: View {
         #endif
     }
 
+    /// A third of a wide window, more of a narrow one, within limits either way.
+    static func height(forWidth width: CGFloat) -> CGFloat {
+        min(max(width * 0.42, 340), 540)
+    }
+
     var body: some View {
         GeometryReader { geo in
-            let cardHeight = geo.size.width * (9.0 / 16.0)
-            ZStack(alignment: .bottom) {
-                if !displayItems.isEmpty {
+            let height = Self.height(forWidth: geo.size.width)
+            ZStack(alignment: .bottomLeading) {
+                if displayItems.indices.contains(currentIndex) {
                     let media = displayItems[currentIndex]
-                    ZStack(alignment: .bottomLeading) {
-                        // Banner background
-                        Group {
-                            // Banners are the single heaviest asset on this screen — full
-                            // width, one per hero card — so Data Saver drops them for the
-                            // gradient the app already falls back to when a title has none.
-                            if let bannerUrl = media.bannerImage, !DataSaver.isEnabled {
-                                CachedAsyncImage(urlString: bannerUrl)
-                            } else {
-                                LinearGradient(
-                                    colors: [Color.gray.opacity(0.6), Color.gray.opacity(0.3)],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            }
-                        }
-                        .frame(width: geo.size.width, height: cardHeight)
+                    artwork(for: media)
+                        .frame(width: geo.size.width, height: height)
                         .clipped()
+                        .id(media.uniqueId)
+                        .transition(.opacity)
 
-                        // Gradient overlay
-                        CurvedGradientShadow(height: min(cardHeight * 0.65, 240), color: platformBackground, style: .prominent)
+                    // Darkens the left, where the text sits, and fades the foot into the page.
+                    LinearGradient(colors: [.black.opacity(0.65), .black.opacity(0.25), .clear],
+                                   startPoint: .leading, endPoint: .trailing)
+                        .frame(width: min(geo.size.width, 760))
+                        .allowsHitTesting(false)
+                    LinearGradient(colors: [.clear, platformBackground.opacity(0.6), platformBackground],
+                                   startPoint: .center, endPoint: .bottom)
+                        .allowsHitTesting(false)
 
-                        // Cover + text + watch button
-                        HStack(alignment: .bottom, spacing: 12) {
-                            CachedAsyncImage(urlString: media.coverImage.thumb ?? "")
-                                .frame(width: 80, height: 120)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .shadow(radius: 4)
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                TVDBTitleLogoView(media: media, maxHeight: 80, maxWidth: 280, alignment: .leading)
-                                    .id(media.uniqueId)
-
-                                if let desc = media.plainDescription, !desc.isEmpty {
-                                    Text(desc)
-                                        .font(.caption)
-                                        .foregroundStyle(.white.opacity(0.8))
-                                        .lineLimit(2)
-                                }
-
-                                HStack(spacing: 8) {
-                                    if let score = media.averageScore {
-                                        Label("\(score)%", systemImage: "star.fill")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.yellow)
-                                    }
-                                    if let genres = media.genres, !genres.isEmpty {
-                                        ForEach(genres.prefix(2), id: \.self) { genre in
-                                            Text(genre)
-                                                .font(.caption2.weight(.medium))
-                                                .foregroundStyle(.white)
-                                                .padding(.horizontal, 7)
-                                                .padding(.vertical, 3)
-                                                .background(Color.white.opacity(0.15), in: Capsule())
-                                        }
-                                    }
-                                }
-
-                                NavigationLink {
-                                    MediaDestination(media: media)
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "play.fill").font(.footnote.weight(.semibold))
-                                        Text("Watch").fontWeight(.semibold)
-                                    }
-                                    .foregroundStyle(platformBackground)
-                                    .frame(width: 110, height: 36)
-                                    .background(Color.primary, in: RoundedRectangle(cornerRadius: 10))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.leading, 16)
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 14)
-                    }
-                    .frame(width: geo.size.width, height: cardHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .transition(.opacity)
-                    .id(currentIndex)
+                    details(for: media)
+                        .id("details-\(media.uniqueId)")
+                        .transition(.opacity)
+                        // Clear of the arrow on the left.
+                        .padding(.leading, displayItems.count > 1 ? 76 : 32)
+                        .padding(.bottom, 36)
+                        .padding(.trailing, 32)
                 }
 
-                PageIndicator(numberOfPages: displayItems.count, currentPage: currentIndex)
-                    .padding(.bottom, 6)
+                if displayItems.count > 1 {
+                    arrows
+                        .frame(width: geo.size.width, height: height)
+                        .opacity(isHovering ? 1 : 0)
+
+                    PageIndicator(numberOfPages: displayItems.count, currentPage: currentIndex)
+                        .frame(width: geo.size.width)
+                        .padding(.bottom, 12)
+                }
             }
-            .frame(width: geo.size.width, height: cardHeight)
+            .frame(width: geo.size.width, height: height)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.2)) { isHovering = hovering }
+            }
         }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(16/9, contentMode: .fit)
+        .modifier(MacHeroHeight())
         .onAppear { startTimer() }
         .onDisappear { stopTimer() }
+        .onChangeOf(items.map(\.uniqueId)) { _ in
+            if currentIndex >= displayItems.count { currentIndex = 0 }
+        }
+    }
+
+    @ViewBuilder
+    private func artwork(for media: Media) -> some View {
+        // Banners are the single heaviest asset on this screen, so Data Saver drops them for a
+        // plain gradient.
+        if DataSaver.isEnabled {
+            LinearGradient(colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.2)],
+                           startPoint: .top, endPoint: .bottom)
+        } else {
+            TVDBPosterImage(media: media, type: .fanart)
+        }
+    }
+
+    private func details(for media: Media) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TVDBTitleLogoView(media: media, maxHeight: 110, maxWidth: 420, alignment: .leading)
+                .shadow(color: .black.opacity(0.35), radius: 8, y: 2)
+
+            HStack(spacing: 8) {
+                if let score = media.averageScore {
+                    Label("\(score)%", systemImage: "star.fill")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.yellow)
+                }
+                ForEach((media.genres ?? []).prefix(3), id: \.self) { genre in
+                    Text(genre)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.18), in: Capsule())
+                }
+            }
+
+            if let desc = media.plainDescription, !desc.isEmpty {
+                Text(desc)
+                    .font(.callout)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(3)
+                    .frame(maxWidth: 560, alignment: .leading)
+            }
+
+            NavigationLink {
+                MediaDestination(media: media)
+            } label: {
+                Label("Watch", systemImage: "play.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 18)
+                    .frame(height: 36)
+                    .background(Color.white, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+        .environment(\.colorScheme, .dark)
+    }
+
+    private var arrows: some View {
+        HStack {
+            arrow("chevron.left", help: "Previous") { step(-1) }
+            Spacer()
+            arrow("chevron.right", help: "Next") { step(1) }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func arrow(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(.ultraThinMaterial, in: Circle())
+                .environment(\.colorScheme, .dark)
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private func step(_ delta: Int) {
+        guard !displayItems.isEmpty else { return }
+        withAnimation(.easeInOut(duration: 0.35)) {
+            currentIndex = (currentIndex + delta + displayItems.count) % displayItems.count
+        }
+        startTimer()
     }
 
     private func startTimer() {
-        guard displayItems.count > 1 else { return }
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 0.4)) {
-                currentIndex = (currentIndex + 1) % displayItems.count
+        guard displayItems.count > 1 else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 7, repeats: true) { _ in
+            Task { @MainActor in
+                guard !isHovering else { return }
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    currentIndex = (currentIndex + 1) % max(displayItems.count, 1)
+                }
             }
         }
     }
@@ -774,6 +854,23 @@ private struct MacFeaturedCarousel: View {
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
+    }
+}
+
+/// Gives the hero its height from the width it's offered, which a GeometryReader alone can't.
+private struct MacHeroHeight: ViewModifier {
+    @State private var width: CGFloat = 1000
+
+    func body(content: Content) -> some View {
+        content
+            .frame(height: MacFeaturedCarousel.height(forWidth: width))
+            .background {
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { width = geo.size.width }
+                        .onChangeOf(geo.size.width) { width = $0 }
+                }
+            }
     }
 }
 #endif

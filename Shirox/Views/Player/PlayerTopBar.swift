@@ -36,7 +36,10 @@ struct PlayerTopBar: View {
                 .frame(height: isPad ? 56 : 44) // match dismiss button height
 
             HStack(alignment: .top) {
-                // Dismiss button (left)
+                // Dismiss button (left). A Mac's player window has its own close button there.
+                #if os(macOS)
+                Color.clear.frame(width: 56, height: 44)
+                #else
                 if showDismiss {
                     Button(action: onDismiss) {
                         Image(systemName: "xmark")
@@ -50,6 +53,7 @@ struct PlayerTopBar: View {
                 } else {
                     Color.clear.frame(width: isPad ? 56 : 44, height: isPad ? 56 : 44)
                 }
+                #endif
 
                 Spacer()
 
@@ -72,7 +76,12 @@ struct PlayerTopBar: View {
             }
         }
         .padding(.horizontal, isPad ? 30 : 20)
+        #if os(macOS)
+        // Level with the window's buttons, which sit in the title bar's 28 points.
+        .padding(.top, 6)
+        #else
         .padding(.top, isPad ? topPadding + 10 : topPadding)
+        #endif
         .padding(.bottom, 16)
         .onPreferenceChange(PlayerTopBarTrailingWidthKey.self) { trailingWidth = $0 }
     }

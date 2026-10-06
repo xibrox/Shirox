@@ -112,8 +112,20 @@ struct ProviderMenuButton: View {
     private func cachedIcon(_ type: ProviderType) -> Image? {
         guard let data = CachedAsyncImage.cachedImageData(for: type.iconURL) else { return nil }
         #if os(macOS)
+        // A menu, in the toolbar or out of it, draws an image at its own size, whatever frame
+        // the view asks for: the provider's 230 px logo filled the toolbar.
         guard let img = NSImage(data: data) else { return nil }
-        return Image(nsImage: img)
+        let side: CGFloat = 18
+        let sized = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4).addClip()
+            if type == .simkl {
+                NSColor.white.setFill()
+                rect.fill()
+            }
+            img.draw(in: rect)
+            return true
+        }
+        return Image(nsImage: sized)
         #else
         guard let img = UIImage(data: data) else { return nil }
         // Simkl's icon is a dark tile with a see-through "S", invisible on a dark menu; it sits
@@ -153,6 +165,12 @@ struct ProviderMenuButton: View {
                 Button { discovery.chooseSimkl() } label: { label(.simkl) }
             }
         } label: {
+            #if os(macOS)
+            Label { Text(shown.displayName) } icon: {
+                cachedIcon(shown) ?? Image(systemName: "sparkles.tv")
+            }
+            .labelStyle(.titleAndIcon)
+            #else
             HStack(spacing: 6) {
                 CachedAsyncImage(urlString: shown.iconURL)
                     .frame(width: 20, height: 20)
@@ -163,7 +181,11 @@ struct ProviderMenuButton: View {
                 Image(systemName: "chevron.down").font(.caption2)
             }
             .foregroundStyle(.primary)
+            #endif
         }
+        #if os(macOS)
+        .help("Where Home and Search come from")
+        #endif
         .background(iconWarmer)
     }
 }

@@ -553,8 +553,8 @@ enum ContinueWatchingResume {
             }
             return
         }
+        #endif
 
         PlayerPresenter.shared.presentPlayer(stream: stream, streams: storedStreams, context: context, onWatchNext: onWatchNext, onStreamExpired: onExpired, onSequelNeeded: SequelResolver.loader(aniListID: item.aniListID, moduleId: item.moduleId))
-        #endif
     }
 }

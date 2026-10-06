@@ -124,6 +124,15 @@ extension View {
             self
         }
     }
+
+    @ViewBuilder
+    func navigationSplitViewColumnWidthIfAvailable(min: CGFloat, ideal: CGFloat, max: CGFloat) -> some View {
+        if #available(iOS 16, macOS 13, *) {
+            self.navigationSplitViewColumnWidth(min: min, ideal: ideal, max: max)
+        } else {
+            self
+        }
+    }
 }
 
 // MARK: - onChange compat
@@ -289,3 +298,11 @@ extension View {
     }
 }
 
+
+extension View {
+    /// A sheet's size on a Mac: room for a list of sources or a form without scrolling straight
+    /// away. Sheets open at the ideal size.
+    func macSheetFrame() -> some View {
+        frame(minWidth: 560, idealWidth: 640, maxWidth: .infinity, minHeight: 520, idealHeight: 720, maxHeight: .infinity)
+    }
+}

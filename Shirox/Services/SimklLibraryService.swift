@@ -76,7 +76,7 @@ final class SimklLibraryService {
     }
 
     private lazy var queue = SimklWriteQueue(
-        storeURL: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        storeURL: AppDirectories.applicationSupport
             .appendingPathComponent("simkl-write-queue.json")
     ) { [weak self] body in
         guard let self else { return Data() }

@@ -129,7 +129,7 @@ struct ProfileView: View {
             if !availableTabs.contains(selectedTab) { selectedTab = .activity }
         }
         #if !os(iOS)
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
         #endif
         .confirmationDialog("Log out of \(activeProviderType == .mal ? "MyAnimeList" : "AniList")?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) {

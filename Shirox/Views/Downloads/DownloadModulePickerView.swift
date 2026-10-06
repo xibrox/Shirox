@@ -81,7 +81,7 @@ struct DownloadModulePickerView: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
     }
@@ -496,7 +496,7 @@ private struct SearchResultsPickerSheet: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
     }

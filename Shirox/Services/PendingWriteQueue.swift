@@ -16,7 +16,7 @@ final class PendingWriteQueue {
     private var isFlushing = false
     private var retryTask: Task<Void, Never>?
 
-    init(directory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0],
+    init(directory: URL = AppDirectories.applicationSupport,
          sink: PendingWriteSink? = nil,
          cacheStore: LibraryCacheStore = .shared,
          maxAttempts: Int = 50) {

@@ -31,7 +31,7 @@ final class LocalPlaybackCoordinator: ObservableObject {
 
     /// `Application Support/LocalImports/` — created on demand.
     static var importsDirectory: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let dir = AppDirectories.applicationSupport
             .appendingPathComponent("LocalImports", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir

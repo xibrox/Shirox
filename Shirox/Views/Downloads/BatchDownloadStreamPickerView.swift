@@ -80,7 +80,7 @@ struct BatchDownloadStreamPickerView: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
         .task { await loadStreams() }

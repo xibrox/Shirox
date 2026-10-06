@@ -25,7 +25,7 @@ final class LibraryCacheStore {
 
     /// `directory` is injectable so tests use a throwaway temp dir instead of the shared
     /// Application Support store. App code always uses `.shared`.
-    init(directory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]) {
+    init(directory: URL = AppDirectories.applicationSupport) {
         self.directory = directory
         load()
     }

@@ -54,11 +54,7 @@ final class JellyfinPlaybackCoordinator {
 
             let onWatchNext = makeWatchNextLoader(for: item)
 
-            #if os(iOS)
             PlayerPresenter.shared.presentPlayer(stream: stream, context: context, onWatchNext: onWatchNext)
-            #elseif os(macOS)
-            MacPlayerWindowManager.shared.open(stream: stream, streams: [], context: context, onWatchNext: onWatchNext)
-            #endif
         } catch {
             Logger.shared.log("[Jellyfin] play failed: \(error)", type: "Error")
         }

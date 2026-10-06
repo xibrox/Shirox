@@ -508,10 +508,6 @@ final class DetailViewModel: ObservableObject {
             return try await self.fetchStreams(for: episode)
         }
 
-        #if os(iOS)
         PlayerPresenter.shared.presentPlayer(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onStreamExpired: onStreamExpired, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
-        #elseif os(macOS)
-        MacPlayerWindowManager.shared.open(stream: stream, streams: streamOptions, context: context, onWatchNext: watchNextLoader, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced, onFinished: onFinished)
-        #endif
     }
 }

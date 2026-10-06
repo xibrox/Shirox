@@ -32,7 +32,7 @@ final class ProfileCacheStore {
     private var snapshots: [String: Snapshot] = [:]
 
     /// `directory` is injectable so tests use a throwaway temp dir. App code always uses `.shared`.
-    init(directory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]) {
+    init(directory: URL = AppDirectories.applicationSupport) {
         self.directory = directory
         load()
     }

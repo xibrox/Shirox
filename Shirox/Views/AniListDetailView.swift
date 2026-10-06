@@ -553,7 +553,7 @@ struct AniListDetailView: View {
 
                 #else
 
-                .frame(minWidth: 480, minHeight: 360)
+                .macSheetFrame()
 
                 #endif
                 .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
@@ -600,7 +600,7 @@ struct AniListDetailView: View {
                 #if os(iOS)
                 .adaptivePresentationDetents([.medium, .large])
                 #else
-                .frame(minWidth: 480, minHeight: 360)
+                .macSheetFrame()
                 #endif
                 .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
             }
@@ -636,7 +636,7 @@ struct AniListDetailView: View {
                 #if os(iOS)
                 .adaptivePresentationDetents([.medium, .large])
                 #else
-                .frame(minWidth: 480, minHeight: 360)
+                .macSheetFrame()
                 #endif
                 .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
             }
@@ -1990,7 +1990,7 @@ struct AniListMatchingSearchView: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
         #endif

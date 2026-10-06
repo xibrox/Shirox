@@ -45,6 +45,21 @@ struct SettingsNavRow: View {
 
 // MARK: - Root Settings View
 
+/// A settings page's sections: grouped on a Mac, as System Settings is, where a List draws one
+/// flat full-width column; a List everywhere else.
+struct SettingsList<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        #if os(macOS)
+        Form { content }
+            .formStyle(.grouped)
+        #else
+        List { content }
+        #endif
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject private var aniListAuth = AniListAuthManager.shared
     @ObservedObject private var malAuth = MALAuthManager.shared
@@ -167,143 +182,14 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    NavigationLink {
-                        AccountsSettingsView()
-                    } label: {
-                        HStack(spacing: 14) {
-                            accountAvatar
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(accountDisplayName)
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                Text(accountSubtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-
-                Section {
-                    NavigationLink {
-                        PlayerSettingsView()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "play.tv",
-                            title: "Player",
-                            subtitle: playerSubtitle
-                        )
-                    }
-
-                    #if os(iOS)
-                    NavigationLink {
-                        ReaderSettingsView()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "book",
-                            title: "Reader"
-                        )
-                    }
-                    #endif
-
-                    NavigationLink {
-                        ModulesSettingsView()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "puzzlepiece.extension",
-                            title: "Modules",
-                            subtitle: modulesSubtitle
-                        )
-                    }
-                }
-
-                Section {
-                    NavigationLink {
-                        LibrarySettingsView()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "books.vertical",
-                            title: "Library",
-                            subtitle: "Lists & Matching"
-                        )
-                    }
-
-                    NavigationLink {
-                        DownloadsSettingsView()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "arrow.down.circle",
-                            title: "Downloads"
-                        )
-                    }
-
-                    #if os(iOS)
-                    NavigationLink {
-                        StorageSettingsView()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "internaldrive",
-                            title: "Storage & Cache",
-                            subtitle: totalUsage > 0 ? Self.formattedBytes(totalUsage) : nil
-                        )
-                    }
-                    #endif
-                }
-
-                #if os(iOS)
-                Section {
-                    NavigationLink {
-                        BackupSettingsView()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "arrow.up.arrow.down.circle",
-                            title: "Backup & Restore"
-                        )
-                    }
-
-                    NavigationLink {
-                        SettingsViewLogger()
-                    } label: {
-                        SettingsNavRow(
-                            icon: "terminal",
-                            title: "App Logs"
-                        )
-                    }
-                }
+            Group {
+                #if os(macOS)
+                // Grouped, as the Mac's own settings are; a List there draws one long flat column.
+                Form { sections }
+                    .formStyle(.grouped)
+                #else
+                List { sections }
                 #endif
-
-                Section {
-                    ForEach([LegalPage.imprint, .privacy, .contributors, .licenses], id: \.title) { page in
-                        NavigationLink {
-                            LegalWebView(page: page)
-                        } label: {
-                            Text(page.title)
-                        }
-                    }
-
-                    // TMDB's terms ask for its logo and this notice in an About or Credits section.
-                    VStack(alignment: .leading, spacing: 8) {
-                        Image("TMDBLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 12)
-                            .accessibilityLabel("TMDB")
-                        Text("This application uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-
-                    LabeledContent("Version") {
-                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
-                        let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
-                        Text("\(version) (\(build))")
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
             .softScrollEdges()
             .navigationTitle("Settings")
@@ -317,6 +203,148 @@ struct SettingsView: View {
             }
             #endif
         }
+    }
+
+    @ViewBuilder
+    private var sections: some View {
+            Section {
+                NavigationLink {
+                    AccountsSettingsView()
+                } label: {
+                    HStack(spacing: 14) {
+                        accountAvatar
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(accountDisplayName)
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Text(accountSubtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    PlayerSettingsView()
+                } label: {
+                    SettingsNavRow(
+                        icon: "play.tv",
+                        title: "Player",
+                        subtitle: playerSubtitle
+                    )
+                }
+
+                #if os(iOS)
+                NavigationLink {
+                    ReaderSettingsView()
+                } label: {
+                    SettingsNavRow(
+                        icon: "book",
+                        title: "Reader"
+                    )
+                }
+                #endif
+
+                NavigationLink {
+                    ModulesSettingsView()
+                } label: {
+                    SettingsNavRow(
+                        icon: "puzzlepiece.extension",
+                        title: "Modules",
+                        subtitle: modulesSubtitle
+                    )
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    LibrarySettingsView()
+                } label: {
+                    SettingsNavRow(
+                        icon: "books.vertical",
+                        title: "Library",
+                        subtitle: "Lists & Matching"
+                    )
+                }
+
+                #if !os(macOS)
+                NavigationLink {
+                    DownloadsSettingsView()
+                } label: {
+                    SettingsNavRow(
+                        icon: "arrow.down.circle",
+                        title: "Downloads"
+                    )
+                }
+                #endif
+
+                #if os(iOS)
+                NavigationLink {
+                    StorageSettingsView()
+                } label: {
+                    SettingsNavRow(
+                        icon: "internaldrive",
+                        title: "Storage & Cache",
+                        subtitle: totalUsage > 0 ? Self.formattedBytes(totalUsage) : nil
+                    )
+                }
+                #endif
+            }
+
+            Section {
+                #if os(iOS)
+                NavigationLink {
+                    BackupSettingsView()
+                } label: {
+                    SettingsNavRow(
+                        icon: "arrow.up.arrow.down.circle",
+                        title: "Backup & Restore"
+                    )
+                }
+                #endif
+
+                NavigationLink {
+                    SettingsViewLogger()
+                } label: {
+                    SettingsNavRow(
+                        icon: "terminal",
+                        title: "App Logs"
+                    )
+                }
+            }
+
+            Section {
+                ForEach([LegalPage.imprint, .privacy, .contributors, .licenses], id: \.title) { page in
+                    NavigationLink {
+                        LegalWebView(page: page)
+                    } label: {
+                        Text(page.title)
+                    }
+                }
+
+                // TMDB's terms ask for its logo and this notice in an About or Credits section.
+                VStack(alignment: .leading, spacing: 8) {
+                    Image("TMDBLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 12)
+                        .accessibilityLabel("TMDB")
+                    Text("This application uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+
+                LabeledContent("Version") {
+                    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                    let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                    Text("\(version) (\(build))")
+                        .foregroundStyle(.secondary)
+                }
+            }
     }
 
     static func formattedBytes(_ bytes: Int) -> String {
@@ -364,7 +392,7 @@ struct AccountsSettingsView: View {
     private var signedInSides: [LibrarySide] { librarySync.signedInSides }
 
     var body: some View {
-        List {
+        SettingsList {
             ProvidersSettingsSection()
 
             if aniListAuth.isLoggedIn || malAuth.isLoggedIn || simklAuth.isLoggedIn {
@@ -563,6 +591,14 @@ struct AccountsSettingsView: View {
 // MARK: - Player Settings
 
 struct PlayerSettingsView: View {
+    fileprivate static var isMac: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
     @AppStorage("forceLandscape") private var forceLandscape = false
     @AppStorage("autoRotateForcedLandscape") private var autoRotateForcedLandscape = false
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
@@ -582,8 +618,10 @@ struct PlayerSettingsView: View {
     private let longOptions  = [30, 60, 85, 90, 120, 150, 180]
 
     var body: some View {
-        List {
+        SettingsList {
             Section("Display & Style") {
+                // A phone's: a Mac's player is a window.
+                #if !os(macOS)
                 Toggle("Force Landscape Mode", isOn: $forceLandscape)
                     .tint(.secondary)
                     #if os(iOS)
@@ -591,8 +629,9 @@ struct PlayerSettingsView: View {
                         PlayerPresenter.shared.resetToAppOrientation(shouldRotate: true)
                     }
                     #endif
+                #endif
 
-                if forceLandscape {
+                if forceLandscape, !Self.isMac {
                     Toggle("Auto-Rotate in Landscape", isOn: $autoRotateForcedLandscape)
                         .tint(.secondary)
                     Text("Turns the player to the other landscape side even with Rotation Lock on in Control Center.")
@@ -627,7 +666,7 @@ struct PlayerSettingsView: View {
                 #endif
             }
 
-            Section("Playback Quality & Gestures") {
+            Section(Self.isMac ? "Playback Quality" : "Playback Quality & Gestures") {
                 Picker("Preferred Quality", selection: $preferredQuality) {
                     Text("Auto").tag("auto")
                     Text("Highest").tag("highest")
@@ -640,6 +679,8 @@ struct PlayerSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                // Holding a finger on the video; there's no such gesture with a pointer.
+                #if !os(macOS)
                 Picker("Hold Action", selection: $playerHoldAction) {
                     Text("2× Speed").tag("speed")
                     Text("Save Frame to Photos").tag("saveFrame")
@@ -653,6 +694,7 @@ struct PlayerSettingsView: View {
                 Text("How far your finger may drift before a hold is recognized. Raise it if the hold action keeps cancelling.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                #endif
 
                 #if os(iOS)
                 Toggle("Pause for Control Center", isOn: $pauseWhenInactive)
@@ -775,7 +817,7 @@ struct ModulesSettingsView: View {
     @ObservedObject private var providerManager = ProviderManager.shared
 
     var body: some View {
-        List {
+        SettingsList {
             Section {
                 NavigationLink {
                     ModuleListView()
@@ -848,7 +890,7 @@ struct LibrarySettingsView: View {
     }
 
     var body: some View {
-        List {
+        SettingsList {
             Section {
                 NavigationLink {
                     LibraryListOrderView()
@@ -1316,7 +1358,50 @@ enum AppDirectories {
         #endif
     }()
 
+    /// Where the app keeps its own files: modules, caches, the local library. The system's
+    /// Application Support on iOS, which is the app's alone. An unsandboxed Mac app shares
+    /// `~/Library/Application Support` with every other app, so there it's a Shirox folder.
+    static let applicationSupport: URL = {
+        let fm = FileManager.default
+        let root = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        #if os(macOS) || targetEnvironment(macCatalyst)
+        let base = root.appendingPathComponent("Shirox", isDirectory: true)
+        try? fm.createDirectory(at: base, withIntermediateDirectories: true)
+        moveOutOfSharedSupportOnce(from: root, to: base)
+        return base
+        #else
+        try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+        #endif
+    }()
+
     #if os(macOS) || targetEnvironment(macCatalyst)
+    /// Files earlier Mac builds left loose in `~/Library/Application Support`.
+    private static let looseSupportFiles = [
+        "modules.json", "id-mappings.json", "id-media-mappings.json", "id-tvdb-groups.json",
+        "local_library.json", "pending-writes.json", "library-cache.json", "profile-cache.json",
+        "home-cache.json", "simkl-write-queue.json", "LocalImports",
+    ]
+
+    /// Moves them into the Shirox folder, once. `modules.json` is a common name, so it goes only
+    /// when it holds Shirox modules.
+    private static func moveOutOfSharedSupportOnce(from root: URL, to base: URL) {
+        let key = "movedFilesIntoSupportFolder"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        let fm = FileManager.default
+        for name in looseSupportFiles {
+            let from = root.appendingPathComponent(name)
+            let to = base.appendingPathComponent(name)
+            guard fm.fileExists(atPath: from.path), !fm.fileExists(atPath: to.path) else { continue }
+            if name == "modules.json" {
+                guard let data = try? Data(contentsOf: from),
+                      String(decoding: data.prefix(4096), as: UTF8.self).contains("scriptContent") else { continue }
+            }
+            try? fm.moveItem(at: from, to: to)
+        }
+    }
+
     /// Brings downloads and their manifests over from `~/Documents`, where earlier Mac builds
     /// kept them. Once only, whatever happens: if macOS is told not to allow it, the app
     /// doesn't keep asking.
@@ -1460,6 +1545,9 @@ struct SettingsViewLogger: View {
                         let text = entries.map { "[\($0.type)] \($0.message)" }.joined(separator: "\n")
                         #if os(iOS)
                         UIPasteboard.general.string = text
+                        #elseif os(macOS)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(text, forType: .string)
                         #endif
                     } label: {
                         Label("Copy to Clipboard", systemImage: "doc.on.doc")
@@ -1498,7 +1586,7 @@ struct SettingsViewLoggerFilter: View {
     @ObservedObject var viewModel = LogFilterViewModel.shared
 
     var body: some View {
-        List {
+        SettingsList {
             Section(header: Text("Log Types"), footer: Text("Choose which log categories to record. Debug and HTMLStrings can be very verbose.")) {
                 ForEach($viewModel.filters) { $filter in
                     Toggle(isOn: $filter.isEnabled) {

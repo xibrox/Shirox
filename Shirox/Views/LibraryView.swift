@@ -25,7 +25,12 @@ struct LibraryView: View {
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
     /// Posters in a grid instead of rows.
+    #if os(macOS)
+    // Posters suit a window; rows were made for a phone's width.
+    @AppStorage("libraryGridLayout") private var gridLayout = true
+    #else
     @AppStorage("libraryGridLayout") private var gridLayout = false
+    #endif
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The title a grid card opened: cards share a List row, so they navigate from code.
     @State private var gridDestination: LibraryEntry?

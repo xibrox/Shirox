@@ -14,7 +14,7 @@ struct StoredFile {
     ///   - legacyKey: where UserDefaults held this before, moved over the first time it's loaded.
     ///   - directory: Application Support, unless a test says otherwise.
     init(name: String, legacyKey: String? = nil,
-         directory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0],
+         directory: URL = AppDirectories.applicationSupport,
          defaults: UserDefaults = .standard) {
         url = directory.appendingPathComponent(name)
         self.legacyKey = legacyKey

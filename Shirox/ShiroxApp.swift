@@ -155,6 +155,9 @@ struct ShiroxApp: App {
             RootTabView()
                 .environmentObject(moduleManager)
                 .tint(.primary)
+                #if os(macOS)
+                .frame(minWidth: 900, minHeight: 600)
+                #endif
                 // First run: the app ships with no sources, so every tab is empty until one is
                 // connected. Onboarding says so and wires up the two things that fix it.
                 //
@@ -190,13 +193,32 @@ struct ShiroxApp: App {
                     }
                 }
         }
+        #if os(macOS)
+        .defaultSize(width: 1320, height: 860)
+        #endif
         #if targetEnvironment(macCatalyst) || os(macOS)
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Settings") {
+                Button("Settings…") {
                     NotificationCenter.default.post(name: .openSettingsTab, object: nil)
                 }
                 .keyboardShortcut(",", modifiers: .command)
+            }
+            // View ▸ Home, Search, Library…, each with ⌘ and its place in the sidebar.
+            CommandGroup(before: .sidebar) {
+                ForEach(SidebarTab.available.filter { $0 != .settings }, id: \.self) { tab in
+                    Button(tab.label) {
+                        NotificationCenter.default.post(name: .selectSidebarTab, object: tab)
+                    }
+                    .keyboardShortcut(tab.shortcut ?? " ", modifiers: .command)
+                }
+                Divider()
+            }
+            CommandGroup(after: .textEditing) {
+                Button("Find") {
+                    NotificationCenter.default.post(name: .selectSidebarTab, object: SidebarTab.search)
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
         }
         #endif
@@ -204,8 +226,17 @@ struct ShiroxApp: App {
 }
 
 #if targetEnvironment(macCatalyst) || os(macOS)
-enum SidebarTab: CaseIterable {
-    case home, library, downloads, settings, search
+enum SidebarTab: Int, CaseIterable, Hashable {
+    case home, search, library, downloads, settings
+
+    /// What the sidebar lists: downloading isn't built for the native Mac app.
+    static var available: [SidebarTab] {
+        #if os(macOS)
+        allCases.filter { $0 != .downloads }
+        #else
+        allCases
+        #endif
+    }
 
     var label: String {
         switch self {
@@ -219,65 +250,44 @@ enum SidebarTab: CaseIterable {
 
     var icon: String {
         switch self {
-        case .home:      return "house.fill"
-        case .library:   return "books.vertical.fill"
-        case .downloads: return "arrow.down.circle.fill"
-        case .settings:  return "gearshape.fill"
+        case .home:      return "house"
+        case .library:   return "books.vertical"
+        case .downloads: return "arrow.down.circle"
+        case .settings:  return "gearshape"
         case .search:    return "magnifyingglass"
         }
     }
-}
 
-private struct MacSidebarRow: View {
-    let tab: SidebarTab
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 20))
-                    .frame(width: 24)
-                Text(tab.label)
-                    .font(.body.weight(.medium))
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .foregroundStyle(isSelected ? .white : .secondary)
-            .background(
-                Capsule()
-                    .fill(isSelected ? Color.primary : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+    /// ⌘1, ⌘2… in the order the sidebar lists them.
+    var shortcut: KeyEquivalent? {
+        guard let index = Self.available.firstIndex(of: self), index < 9 else { return nil }
+        return KeyEquivalent(Character(String(index + 1)))
     }
 }
 
+/// The app's sections, as a Mac sidebar lists them: the system's own selection and highlight.
 private struct MacSidebarView: View {
     @Binding var selection: SidebarTab
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Shirox")
-                .font(.title2.bold())
-                .padding(.horizontal, 16)
-                .padding(.top, 20)
-                .padding(.bottom, 12)
-
-            ForEach(SidebarTab.allCases, id: \.self) { tab in
-                MacSidebarRow(tab: tab, isSelected: selection == tab) {
-                    selection = tab
+        List(selection: Binding<SidebarTab?>(get: { selection }, set: { if let tab = $0 { selection = tab } })) {
+            Section {
+                ForEach(SidebarTab.available.filter { $0 != .settings }, id: \.self) { tab in
+                    Label(tab.label, systemImage: tab.icon).tag(tab)
                 }
-                .padding(.horizontal, 8)
             }
-
-            Spacer()
+            Section {
+                Label(SidebarTab.settings.label, systemImage: SidebarTab.settings.icon).tag(SidebarTab.settings)
+            }
         }
-        .navigationSplitViewColumnWidthIfAvailable(220)
+        .listStyle(.sidebar)
+        .navigationSplitViewColumnWidthIfAvailable(min: 180, ideal: 210, max: 280)
     }
+}
+
+extension Notification.Name {
+    /// A sidebar section picked from the menu bar; `object` is its `SidebarTab`.
+    static let selectSidebarTab = Notification.Name("SelectSidebarTab")
 }
 #endif
 
@@ -286,8 +296,10 @@ private struct MacSidebarView: View {
 private struct RootTabView: View {
     @EnvironmentObject private var moduleManager: ModuleManager
     @ObservedObject private var cfManager = CloudflareBypassManager.shared
-    #if os(iOS)
+    #if !os(tvOS)
     @ObservedObject private var playerPresenter = PlayerPresenter.shared
+    #endif
+    #if os(iOS)
     @ObservedObject private var quickActions = QuickActionManager.shared
     #endif
     @State private var selectedTab = 0
@@ -342,17 +354,17 @@ private struct RootTabView: View {
                     }
                 }
                 #elseif os(macOS)
-                    NavigationSplitView {
-                        MacSidebarView(selection: $sidebarTab)
-                    } detail: {
-                        switch sidebarTab {
-                        case .home:      HomeView()
-                        case .library:   LibraryView()
-                        case .settings:  SettingsView()
-                        case .search:    SearchView()
-                        default: EmptyView()
-                        }
+                NavigationSplitView {
+                    MacSidebarView(selection: $sidebarTab)
+                } detail: {
+                    switch sidebarTab {
+                    case .home:                 HomeView()
+                    case .search:               SearchView()
+                    case .library:              LibraryView()
+                    case .settings:             SettingsView()
+                    case .downloads:            HomeView()
                     }
+                }
                 #else
                 TabView(selection: $selectedTab) {
                     Tab("Home", systemImage: "house.fill", value: 0) {
@@ -412,8 +424,13 @@ private struct RootTabView: View {
             await ContinueWatchingManager.shared.syncWithAniList()
             await ContinueWatchingManager.shared.syncWithMAL()
         }
+        #if targetEnvironment(macCatalyst) || os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: .selectSidebarTab)) { note in
+            if let tab = note.object as? SidebarTab { sidebarTab = tab }
+        }
+        #endif
         .onReceive(NotificationCenter.default.publisher(for: .openSettingsTab)) { _ in
-            #if targetEnvironment(macCatalyst)
+            #if targetEnvironment(macCatalyst) || os(macOS)
             sidebarTab = .settings
             #else
             selectedTab = 3
@@ -446,7 +463,7 @@ private struct RootTabView: View {
         .onAppear { routePendingQuickAction() }
         .onChange(of: quickActions.pending) { _ in routePendingQuickAction() }
         #endif
-        #if os(iOS)
+        #if !os(tvOS)
         .sheet(isPresented: Binding(
             get: { playerPresenter.pendingRatingContext != nil },
             set: { if !$0 { playerPresenter.pendingRatingContext = nil } }

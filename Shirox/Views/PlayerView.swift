@@ -501,11 +501,11 @@ struct PlayerView: View {
             Logger.shared.log("[Rating] PlayerView.onDisappear: completionBox.context=\(completionBox.context != nil ? "set" : "nil")", type: "Debug")
             if let ctx = completionBox.context {
                 Logger.shared.log("[Rating] PlayerView.onDisappear: requesting rating prompt for ep=\(ctx.episodeNumber)", type: "Debug")
-                #if os(iOS)
+                #if !os(tvOS)
                 PlayerPresenter.shared.presentRatingPromptIfNeeded(context: ctx)
                 #endif
             }
-            #if os(iOS)
+            #if !os(tvOS)
             if let request = completionBox.simklRating {
                 PlayerPresenter.shared.presentSimklRatingPrompt(request)
             }
@@ -2071,6 +2071,10 @@ struct PlayerView: View {
         withAnimation(visible ? .playerControlsIn : .playerControlsOut) {
             showControls = visible
         }
+        #if os(macOS)
+        // The window's own buttons come and go with the rest of the controls.
+        MacPlayerWindowManager.shared.setWindowButtonsVisible(visible)
+        #endif
     }
 
     private func toggleControls() {
@@ -3617,6 +3621,9 @@ private extension View {
                 .onKeyPress(.rightArrow) { skip(Double(skipShort)); scheduleHide(); return .handled }
                 .onKeyPress(KeyEquivalent("j")) { skip(-Double(skipLong)); scheduleHide(); return .handled }
                 .onKeyPress(KeyEquivalent("l")) { skip(Double(skipLong)); scheduleHide(); return .handled }
+                #if os(macOS)
+                .onKeyPress(KeyEquivalent("f")) { NSApp.keyWindow?.toggleFullScreen(nil); return .handled }
+                #endif
         } else {
             self
         }
@@ -3647,28 +3654,37 @@ struct MacVideoPlayerView: NSViewRepresentable {
 
 // MARK: - macOS Player Window Manager
 
+/// The player's own window on a Mac: one at a time, sized and placed where the last one was,
+/// and torn down when it closes so nothing keeps playing behind it.
 @MainActor
-final class MacPlayerWindowManager {
+final class MacPlayerWindowManager: NSObject, NSWindowDelegate {
     static let shared = MacPlayerWindowManager()
     private var playerWindow: NSWindow?
 
-    private init() {}
+    private override init() {}
 
-    func open(stream: StreamResult, streams: [StreamResult], context: PlayerContext, onWatchNext: WatchNextLoader?, onSequelNeeded: SequelLoader? = nil, onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil) {
-        playerWindow?.close()
+    func open(stream: StreamResult, streams: [StreamResult], context: PlayerContext?, onWatchNext: WatchNextLoader?,
+              onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil,
+              onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil) {
+        // Reuse the frame of a window already up, so the next episode opens where this one was.
+        let previousFrame = playerWindow?.frame
+        let wasFullScreen = playerWindow?.styleMask.contains(.fullScreen) ?? false
+        closeCurrent()
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 960, height: 540),
-            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            contentRect: NSRect(x: 0, y: 0, width: 1280, height: 720),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
+        window.title = Self.title(for: context, stream: stream)
         window.backgroundColor = .black
         window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.fullScreenPrimary]
-        window.minSize = NSSize(width: 640, height: 360)
+        window.collectionBehavior = [.fullScreenPrimary, .managed]
+        window.contentMinSize = NSSize(width: 640, height: 360)
+        window.delegate = self
 
         let playerView = PlayerView(
             stream: stream,
@@ -3676,15 +3692,58 @@ final class MacPlayerWindowManager {
             customDismiss: { [weak window] in window?.close() },
             context: context,
             onWatchNext: onWatchNext,
+            onStreamExpired: onStreamExpired,
             onSequelNeeded: onSequelNeeded,
             onSequelAdvanced: onSequelAdvanced,
             onFinished: onFinished
         )
 
         window.contentView = NSHostingView(rootView: playerView)
-        window.center()
+        if let previousFrame, !wasFullScreen {
+            window.setFrame(previousFrame, display: false)
+        } else if !window.setFrameUsingName(Self.frameName) {
+            window.center()
+        }
+        window.setFrameAutosaveName(Self.frameName)
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        if wasFullScreen { window.toggleFullScreen(nil) }
         playerWindow = window
+    }
+
+    private static let frameName = "ShiroxPlayerWindow"
+
+    /// "Frieren · Episode 3", for the Window menu and Mission Control.
+    private static func title(for context: PlayerContext?, stream: StreamResult) -> String {
+        guard let context else { return stream.title }
+        return "\(context.mediaTitle) · Episode \(context.episodeNumber)"
+    }
+
+    /// Shows or hides the close, minimise and zoom buttons, which otherwise sit over the picture.
+    func setWindowButtonsVisible(_ visible: Bool) {
+        guard let window = playerWindow else { return }
+        let buttons: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = visible ? 0.15 : 0.35
+            for type in buttons {
+                window.standardWindowButton(type)?.animator().alphaValue = visible ? 1 : 0
+            }
+        }
+    }
+
+    private func closeCurrent() {
+        guard let window = playerWindow else { return }
+        window.delegate = nil
+        window.close()
+        window.contentView = nil
+        playerWindow = nil
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === playerWindow else { return }
+        // Drops the player view, which stops playback and saves the position on its way out.
+        window.contentView = nil
+        playerWindow = nil
     }
 }
 #endif

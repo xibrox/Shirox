@@ -85,7 +85,7 @@ struct ModuleStreamPickerView: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
     }
@@ -778,7 +778,7 @@ private struct SearchResultsPickerSheet: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
     }
@@ -847,7 +847,7 @@ private struct ModuleStreamSelectionView: View {
 
         #else
 
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
 
         #endif
     }

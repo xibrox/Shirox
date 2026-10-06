@@ -102,7 +102,7 @@ struct ActivityDetailView: View {
             AniListDetailView(mediaId: mid)
         }
         #if !os(iOS)
-        .frame(minWidth: 480, minHeight: 360)
+        .macSheetFrame()
         #endif
         .alert("Delete Activity?", isPresented: $confirmDeleteActivity) {
             Button("Delete", role: .destructive) {
@@ -132,7 +132,7 @@ struct ActivityDetailView: View {
 
                 #else
 
-                .frame(minWidth: 480, minHeight: 360)
+                .macSheetFrame()
 
                 #endif
                 .zoomingOut(of: likesZoomID, in: likesZoom)
@@ -144,7 +144,7 @@ struct ActivityDetailView: View {
 
                 #else
 
-                .frame(minWidth: 480, minHeight: 360)
+                .macSheetFrame()
 
                 #endif
         }

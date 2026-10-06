@@ -227,11 +227,7 @@ final class AniListDetailViewModel: ObservableObject {
             }
         }()
 
-        #if os(iOS)
         PlayerPresenter.shared.presentPlayer(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
-        #elseif os(macOS)
-        MacPlayerWindowManager.shared.open(stream: stream, streams: pendingStreams, context: context, onWatchNext: onWatchNext, onSequelNeeded: onSequelNeeded, onSequelAdvanced: onSequelAdvanced)
-        #endif
         selectedEpisodeNumber = nil
     }
 
