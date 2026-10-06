@@ -1089,12 +1089,30 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     func reconnectPendingTasks() {
-        // HLS Swift Tasks don't survive app kill — reset them to pending so they restart.
-        for (idx, item) in items.enumerated() where item.state == .downloading && item.isHLS {
-            items[idx].state = .pending
+        // HLS downloads run in the app, and die with it. They used to be told apart by their
+        // finished file's name, which only exists once one completes, so one interrupted
+        // half-way stayed "downloading" forever, at 0%, and held a download slot.
+        let autoResume = UserDefaults.standard.bool(forKey: "autoResumeDownloads")
+        for (idx, item) in items.enumerated() {
+            guard let (state, error) = Self.launchState(of: item, autoResume: autoResume) else { continue }
+            items[idx].state = state
+            items[idx].error = error
         }
         persist()
         processQueue()
+    }
+
+    /// What a download a previous run left behind becomes at launch: nil when it stays as it is.
+    /// One the app was fetching itself (HLS) is parked as failed, to retry, as other interrupted
+    /// downloads are — nothing big starts unasked at launch — unless Auto-Resume Interrupted is
+    /// on. A plain file download carries on in the system's background session.
+    nonisolated static func launchState(of item: DownloadItem, autoResume: Bool) -> (DownloadState, String?)? {
+        guard item.state == .downloading else { return nil }
+        let inApp = item.isHLS || item.playlistKey != nil
+            || item.streamURL?.pathExtension.lowercased() == "m3u8"
+            || item.taskIdentifier == nil
+        guard inApp else { return nil }
+        return autoResume ? (.pending, nil) : (.failed, "Interrupted when the app closed")
     }
 
     private func reconnectBackgroundTasks() {
