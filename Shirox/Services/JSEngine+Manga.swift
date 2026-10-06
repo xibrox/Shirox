@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import JavaScriptCore
 
 // MARK: - Manga bridge (Luna-style modules)
 //

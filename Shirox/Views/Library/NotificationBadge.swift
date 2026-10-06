@@ -11,6 +11,8 @@ private struct NotificationBadgeModifier: ViewModifier {
     private var badgeStroke: Color {
         #if os(iOS)
         Color(.systemBackground)
+        #elseif os(tvOS)
+        Color.black
         #else
         Color(.windowBackgroundColor)
         #endif

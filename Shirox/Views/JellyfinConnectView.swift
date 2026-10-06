@@ -73,7 +73,9 @@ struct JellyfinConnectView: View {
 
     private func field(_ prompt: String, text: Binding<String>) -> some View {
         TextField(prompt, text: text)
+            #if !os(tvOS)
             .textFieldStyle(.roundedBorder)
+            #endif
             .autocorrectionDisabled()
             #if os(iOS)
             .textInputAutocapitalization(.never)
@@ -82,7 +84,9 @@ struct JellyfinConnectView: View {
 
     private func secureField(_ prompt: String, text: Binding<String>) -> some View {
         SecureField(prompt, text: text)
+            #if !os(tvOS)
             .textFieldStyle(.roundedBorder)
+            #endif
     }
 
     private func connect() {

@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// What the Search tab shows before you've typed anything.

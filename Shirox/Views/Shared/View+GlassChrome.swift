@@ -43,7 +43,7 @@ extension View {
         tint: Color?,
         off: some ShapeStyle
     ) -> some View {
-        if enabled, #available(iOS 26.0, macOS 26.0, *) {
+        if enabled, #available(iOS 26.0, macOS 26.0, tvOS 26.0, *) {
             // Unlike a background fill, glass is not hit-testable content: without an
             // explicit content shape only the label's drawn pixels receive taps, and
             // everything else falls through to the layer below (in the player, the

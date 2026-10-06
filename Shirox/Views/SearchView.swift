@@ -272,6 +272,7 @@ struct SearchView: View {
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.2), value: pendingVideoURL)
+        #if !os(tvOS)
         .fileImporter(isPresented: $showFileImporter,
                       allowedContentTypes: importPhase == .subtitle ? subtitleContentTypes : videoContentTypes,
                       allowsMultipleSelection: false) { result in
@@ -291,6 +292,7 @@ struct SearchView: View {
                 playStaged(subtitle: LocalPlaybackCoordinator.shared.importSubtitle(from: url))
             }
         }
+        #endif
     }
 
     /// Launches the staged video with an optional subtitle, then resets the staged state.

@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// The Simkl browse grid's rules: the genres to offer, and the grid for one.

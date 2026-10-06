@@ -797,6 +797,7 @@ struct PlayerView: View {
             )
             .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
         }
+        #if !os(tvOS)
         .fileImporter(isPresented: $showSubtitleImporter,
                       allowedContentTypes: PlayerSubtitleSettingsView.subtitleTypes,
                       allowsMultipleSelection: false) { result in
@@ -805,6 +806,7 @@ struct PlayerView: View {
                 addImportedSubtitle(keptWithDownload(track) ?? track)
             }
         }
+        #endif
         .onChangeOf(selectedSubtitleTrack) { loadSubtitles() }
         // What mpv draws follows who's drawing, and the viewer's settings.
         .onChangeOf(subtitleRoute) { _ in

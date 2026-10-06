@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Shared rename/delete coordination for on-device collections. Drives the rename

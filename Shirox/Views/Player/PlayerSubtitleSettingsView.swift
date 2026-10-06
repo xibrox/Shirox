@@ -163,6 +163,8 @@ struct PlayerSubtitleSettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            // tvOS has no document picker, nor files to pick.
+            #if !os(tvOS)
             .fileImporter(isPresented: $showImporter,
                           allowedContentTypes: Self.subtitleTypes,
                           allowsMultipleSelection: false) { result in
@@ -172,6 +174,7 @@ struct PlayerSubtitleSettingsView: View {
                     dismiss()
                 }
             }
+            #endif
         }
     }
 

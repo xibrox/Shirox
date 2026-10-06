@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// Layer A: removes NSFW module search results. A tight static keyword list is the

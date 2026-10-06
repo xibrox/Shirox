@@ -814,7 +814,9 @@ struct LibraryView: View {
                 } label: {
                     Label("Search Simkl for “\(request.query)”", systemImage: "magnifyingglass")
                 }
+                #if !os(tvOS)
                 .listRowSeparator(.hidden)
+                #endif
             }
             #else
             entryRows
@@ -824,7 +826,9 @@ struct LibraryView: View {
                 } label: {
                     Label("Search Simkl for “\(request.query)”", systemImage: "magnifyingglass")
                 }
+                #if !os(tvOS)
                 .listRowSeparator(.hidden)
+                #endif
             }
             #endif
         }
@@ -966,7 +970,9 @@ struct LibraryView: View {
                 }
             }
             .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            #if !os(tvOS)
             .listRowSeparator(.hidden)
+            #endif
             .listRowBackground(Color.clear)
         }
     }
