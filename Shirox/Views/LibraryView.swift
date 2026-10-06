@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 enum LibrarySortOrder: String, CaseIterable, Identifiable {
     case score      = "My Rating"
@@ -310,8 +311,12 @@ struct LibraryView: View {
     }
 
     private func signIn(to type: ProviderType) {
+        #if !os(tvOS)
         #if os(iOS)
         guard let window = presentationWindow else { return }
+        #else
+        guard let window = keyPresentationAnchor() else { return }
+        #endif
         if type == .mal {
             MALAuthManager.shared.login(presentationAnchor: window)
         } else {

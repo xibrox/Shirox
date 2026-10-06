@@ -226,9 +226,7 @@ final class LocalPlaybackCoordinator: ObservableObject {
             // player immediately would be dropped (UIKit can't present over a VC that
             // is mid-dismiss). Wait for the dismissal to finish first.
             try? await Task.sleep(nanoseconds: 350_000_000)
-            #if os(iOS)
             PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
-            #endif
         }
     }
 

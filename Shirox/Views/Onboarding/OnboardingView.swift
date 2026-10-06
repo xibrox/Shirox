@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 /// First-run setup.
 ///
@@ -235,6 +236,9 @@ struct OnboardingView: View {
         #if os(iOS)
         guard let presentationWindow else { return }
         aniListAuth.login(presentationAnchor: presentationWindow)
+        #elseif os(macOS)
+        guard let window = keyPresentationAnchor() else { return }
+        aniListAuth.login(presentationAnchor: window)
         #endif
     }
 

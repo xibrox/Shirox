@@ -48,7 +48,11 @@ struct SearchView: View {
     }
 
     private var columns: [GridItem] {
+        #if os(macOS)
+        PosterGrid.columns
+        #else
         Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+        #endif
     }
 
     private var usingModule: Bool { moduleManager.activeModule != nil }

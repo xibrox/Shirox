@@ -306,3 +306,11 @@ extension View {
         frame(minWidth: 560, idealWidth: 640, maxWidth: .infinity, minHeight: 520, idealHeight: 720, maxHeight: .infinity)
     }
 }
+
+#if os(macOS)
+enum PosterGrid {
+    /// A poster grid's columns in a Mac window: as many as it fits. A fixed four made each
+    /// poster half the window tall.
+    static let columns = [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 14)]
+}
+#endif

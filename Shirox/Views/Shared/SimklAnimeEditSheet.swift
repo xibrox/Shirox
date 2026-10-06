@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 /// An anime page's title, to edit on Simkl: the page's media and its ids on each tracker.

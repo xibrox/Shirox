@@ -59,9 +59,11 @@ struct DetailView: View {
     @State private var showLibraryEdit = false
     @State private var showAniListEdit = false
     @State private var showMALEdit = false
-    #if os(iOS)
+    #if !os(tvOS)
     /// The title being edited on Simkl.
     @State private var simklEdit: SimklEditTarget?
+    #endif
+    #if os(iOS)
     @State private var isSelectionMode = false
     @State private var selectedEpisodeNumbers: Set<Int> = []
     @State private var showBatchDeleteConfirmation = false
@@ -163,7 +165,7 @@ struct DetailView: View {
                 } else {
                     BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
                 }
-                #else
+                #elseif !os(macOS)
                 BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
                 #endif
             }
@@ -181,13 +183,16 @@ struct DetailView: View {
                 heroSection
                 VStack(alignment: .leading, spacing: 0) {
                     metadataSection(detail: detail).padding(.top, 12)
-                    #if os(iOS)
+                    #if !os(tvOS)
                     VStack(alignment: .leading, spacing: 16) {
                         synopsisSection(detail: detail).padding(.top, 16)
                         actionBar(detail: detail).padding(.horizontal, 16).padding(.bottom, 8)
+                            #if os(macOS)
+                            .frame(maxWidth: 520, alignment: .leading)
+                            #endif
                     }
                     #endif
-                    #if !os(iOS)
+                    #if os(tvOS)
                     tabSelector.padding(.top, 8)
                     #endif
                     if selectedTab == 0 && !isSingleEpisode(detail) {
@@ -225,6 +230,20 @@ struct DetailView: View {
                 ModuleWebsiteButton(href: vm.detailHref ?? item.href, moduleId: effectiveModuleId,
                                     trackers: TrackerWebLinks.links(anilist: vm.aniListID, mal: malID, simkl: pageSimklID))
             }
+        }
+        #elseif os(macOS)
+        // In the window's toolbar on a Mac, where a button floating over the episode list
+        // covered the play buttons under the pointer.
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                ModuleWebsiteButton(href: vm.detailHref ?? item.href, moduleId: effectiveModuleId,
+                                    trackers: TrackerWebLinks.links(anilist: vm.aniListID, mal: malID, simkl: pageSimklID))
+                detailToolbarButton
+                BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource, style: .toolbar)
+            }
+        }
+        .adaptiveSheet(item: $simklEdit) { target in
+            SimklAnimeEditSheet(target: target)
         }
         #endif
         .navigationDestinationCompat(item: $sequelSearchItem) { item in
@@ -600,7 +619,7 @@ struct DetailView: View {
         )
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private func actionBar(detail: MediaDetail) -> some View {
         HStack(spacing: 12) {
             watchButton(detail: detail)
@@ -613,6 +632,9 @@ struct DetailView: View {
                     circleIconButton(icon: selectedTab == 0 ? "person.3.fill" : "list.bullet", isActive: selectedTab == 1, size: 16)
                 }
                 .buttonStyle(.plain)
+                .help(selectedTab == 0 ? "Show related titles" : "Show episodes")
+                // Picks episodes to download, which only iOS does.
+                #if os(iOS)
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         isSelectionMode.toggle()
@@ -622,6 +644,7 @@ struct DetailView: View {
                     circleIconButton(icon: isSelectionMode ? "checkmark.circle.fill" : "checkmark.circle", isActive: isSelectionMode, size: 20)
                 }
                 .buttonStyle(.plain)
+                #endif
             }
         }
     }
@@ -644,7 +667,7 @@ struct DetailView: View {
         detail.episodes.count == 1 && !showsOfflineEpisodes(detail)
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ViewBuilder
     private func watchButton(detail: MediaDetail) -> some View {
         let item = continueWatchingItem(for: detail)
@@ -654,12 +677,16 @@ struct DetailView: View {
             ? (continuing ? "Continue" : "Watch")
             : continuing ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
         let activeModule = effectiveModuleId
+        #if os(iOS)
         let downloadedTarget = DownloadManager.shared.items.first {
             $0.mediaTitle == detail.title
                 && $0.moduleId == activeModule
                 && $0.episodeNumber == nextEp
                 && $0.state == .completed
         }
+        #else
+        let downloadedTarget: Never? = nil
+        #endif
         let targetEpisode = detail.episodes.first(where: { Int($0.number) == nextEp }) ?? detail.episodes.first
         let hasProgress = continueWatching.items.contains {
             ($0.aniListID != nil ? $0.aniListID == (vm.aniListID ?? aniListID)
@@ -668,9 +695,13 @@ struct DetailView: View {
 
         Button {
             // Prefer the local file when the target episode is already downloaded.
+            #if os(iOS)
             if let downloadedTarget {
                 playDownloaded(downloadedTarget)
-            } else if let item {
+                return
+            }
+            #endif
+            if let item {
                 resumeWatching(item: item)
             } else if let first = detail.episodes.first(where: { Int($0.number) == nextEp }) ?? detail.episodes.first,
                       !first.href.isEmpty {
@@ -699,17 +730,21 @@ struct DetailView: View {
                 Button { vm.loadStreams(for: targetEpisode) } label: {
                     Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
                 }
+                #if os(iOS)
                 if downloadedTarget == nil {
                     Button { vm.loadDownloadStreams(for: targetEpisode) } label: {
                         Label("Download Episode", systemImage: "arrow.down.circle")
                     }
                 }
+                #endif
             }
+            #if os(iOS)
             if let downloadedTarget {
                 Button(role: .destructive) { DownloadManager.shared.remove(downloadedTarget) } label: {
                     Label("Delete Download", systemImage: "trash")
                 }
             }
+            #endif
             if hasProgress {
                 Divider()
                 Button(role: .destructive) {
@@ -744,6 +779,7 @@ struct DetailView: View {
         .buttonStyle(.plain)
     }
 
+    #if os(iOS)
     @ViewBuilder
     private func selectionModeButton() -> some View {
         Button {
@@ -767,6 +803,7 @@ struct DetailView: View {
         }
         .buttonStyle(.plain)
     }
+    #endif
 
     private func tapEpisode(_ episode: EpisodeLink) {
         let moduleId = effectiveModuleId
@@ -775,6 +812,7 @@ struct DetailView: View {
         let epNum = Int(episode.number)
 
         // Prefer the local file when this episode is already downloaded.
+        #if os(iOS)
         if let downloaded = DownloadManager.shared.items.first(where: {
             $0.mediaTitle == currentTitle
                 && $0.moduleId == moduleId
@@ -784,6 +822,7 @@ struct DetailView: View {
             playDownloaded(downloaded)
             return
         }
+        #endif
 
         let cwItem = continueWatching.items.first { cw in
             let showMatches = resolvedAniListID != nil
@@ -878,13 +917,11 @@ struct DetailView: View {
     }
     #else
 
-    private func tapEpisode(_ episode: EpisodeLink) {
-        // TODO: implement
-    }
+    private func tapEpisode(_ episode: EpisodeLink) {}
 
     #endif
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// The title to edit on Simkl, once it's matched to AniList or MyAnimeList.
     private var simklEditTarget: SimklEditTarget? {
         guard vm.aniListID != nil || malID != nil else { return nil }
@@ -1267,7 +1304,11 @@ struct DetailView: View {
                     return 4
                     #endif
                 }()
+                #if os(macOS)
+                let columns = PosterGrid.columns
+                #else
                 let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+                #endif
 
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(relations) { edge in
@@ -1531,6 +1572,7 @@ struct DetailView: View {
                         .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .help(isReversed ? "Newest episodes first — show oldest first" : "Oldest episodes first — show newest first")
                 .padding(.trailing, 4)
 
                 #if os(iOS)
@@ -1889,6 +1931,7 @@ struct DetailView: View {
                         .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .help(isReversed ? "Newest episodes first — show oldest first" : "Oldest episodes first — show newest first")
                 .padding(.trailing, 4)
 
                 if continueWatching.hasProgress(

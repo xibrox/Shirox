@@ -11,12 +11,16 @@ struct SimklListView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var columns: [GridItem] {
+        #if os(macOS)
+        return PosterGrid.columns
+        #else
         #if os(iOS)
         let count = sizeClass == .regular ? 4 : 2
         #else
         let count = 4
         #endif
         return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
+        #endif
     }
 
     var body: some View {

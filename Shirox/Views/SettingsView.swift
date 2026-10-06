@@ -45,6 +45,21 @@ struct SettingsNavRow: View {
 
 // MARK: - Root Settings View
 
+#if !os(tvOS)
+/// The window a sign-in sheet hangs from: the app's key window, or nil when there's none.
+@MainActor
+func keyPresentationAnchor() -> ASPresentationAnchor? {
+    #if os(macOS)
+    return NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow
+    #else
+    return UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .flatMap { $0.windows }
+        .first { $0.isKeyWindow }
+    #endif
+}
+#endif
+
 /// A settings page's sections: grouped on a Mac, as System Settings is, where a List draws one
 /// flat full-width column; a List everywhere else.
 struct SettingsList<Content: View>: View {
@@ -1898,7 +1913,7 @@ private struct ProvidersSettingsSection: View {
                             .background(Color.accentColor.opacity(0.1), in: Capsule())
                             .buttonStyle(.plain)
                         }
-                        #if os(iOS)
+                        #if !os(tvOS)
                         providerAuthButton(for: provider.providerType)
                         #endif
                     }
@@ -1924,7 +1939,7 @@ private struct ProvidersSettingsSection: View {
         #endif
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ViewBuilder
     private func providerAuthButton(for type: ProviderType) -> some View {
         let isLoggedIn = type == .anilist ? aniListAuth.isLoggedIn : malAuth.isLoggedIn
@@ -1932,7 +1947,12 @@ private struct ProvidersSettingsSection: View {
             if isLoggedIn {
                 if type == .anilist { aniListAuth.logout() } else { malAuth.logout() }
             } else {
-                if let window = presentationWindow {
+                #if os(iOS)
+                let anchor = presentationWindow
+                #else
+                let anchor = keyPresentationAnchor()
+                #endif
+                if let window = anchor {
                     if type == .anilist {
                         aniListAuth.login(presentationAnchor: window)
                     } else {

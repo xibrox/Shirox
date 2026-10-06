@@ -157,6 +157,9 @@ struct ShiroxApp: App {
                 .tint(.primary)
                 #if os(macOS)
                 .frame(minWidth: 900, minHeight: 600)
+                // A video opened from outside goes to the window that's already up; SwiftUI
+                // otherwise opens a new one for every file.
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
                 #endif
                 // First run: the app ships with no sources, so every tab is empty until one is
                 // connected. Onboarding says so and wires up the two things that fix it.
@@ -214,6 +217,12 @@ struct ShiroxApp: App {
                 }
                 Divider()
             }
+            #if os(macOS)
+            CommandGroup(after: .newItem) {
+                Button("Open Video…") { MacOpenVideo.choose() }
+                    .keyboardShortcut("o", modifiers: .command)
+            }
+            #endif
             CommandGroup(after: .textEditing) {
                 Button("Find") {
                     NotificationCenter.default.post(name: .selectSidebarTab, object: SidebarTab.search)
@@ -288,6 +297,37 @@ private struct MacSidebarView: View {
 extension Notification.Name {
     /// A sidebar section picked from the menu bar; `object` is its `SidebarTab`.
     static let selectSidebarTab = Notification.Name("SelectSidebarTab")
+}
+#endif
+
+#if os(macOS)
+import UniformTypeIdentifiers
+
+/// File ▸ Open Video…: a video on disk, played where it is. iOS copies a picked file into the
+/// app's storage because the picker's access to it is fleeting; an unsandboxed Mac app can read
+/// it in place, and a copy of a film would double the space it takes.
+@MainActor
+enum MacOpenVideo {
+    static func choose() {
+        let panel = NSOpenPanel()
+        panel.title = "Open Video"
+        panel.prompt = "Play"
+        panel.allowedContentTypes = [.movie, .video, .mpeg4Movie, .quickTimeMovie]
+            + ["mkv", "webm", "avi", "flv", "ts"].compactMap { UTType(filenameExtension: $0) }
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        play(url)
+    }
+
+    static func isVideo(_ url: URL) -> Bool {
+        guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+        return type.conforms(to: .movie) || type.conforms(to: .video)
+            || ["mkv", "webm", "avi", "flv", "ts"].contains(url.pathExtension.lowercased())
+    }
+
+    static func play(_ url: URL) {
+        LocalPlaybackCoordinator.shared.launch(videoURL: url, subtitle: nil, resumeFrom: nil)
+    }
 }
 #endif
 
@@ -414,6 +454,13 @@ private struct RootTabView: View {
             }
         }
         .onOpenURL { url in
+            #if os(macOS)
+            // A video opened with Shirox from Finder, or dropped on its Dock icon.
+            if url.isFileURL {
+                MacOpenVideo.play(url)
+                return
+            }
+            #endif
             guard url.scheme == "shirox" else { return }
             AniListAuthManager.shared.handleCallback(url: url)
         }
@@ -424,6 +471,14 @@ private struct RootTabView: View {
             await ContinueWatchingManager.shared.syncWithAniList()
             await ContinueWatchingManager.shared.syncWithMAL()
         }
+        #if os(macOS)
+        // A video file dragged into the window plays.
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first(where: \.isFileURL), MacOpenVideo.isVideo(url) else { return false }
+            MacOpenVideo.play(url)
+            return true
+        }
+        #endif
         #if targetEnvironment(macCatalyst) || os(macOS)
         .onReceive(NotificationCenter.default.publisher(for: .selectSidebarTab)) { note in
             if let tab = note.object as? SidebarTab { sidebarTab = tab }

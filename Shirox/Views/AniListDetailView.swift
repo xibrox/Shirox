@@ -41,9 +41,11 @@ struct AniListDetailView: View {
     @ObservedObject private var simklAuth = SimklAuthManager.shared
     /// The Details sheet: following, full synopsis, trailer.
     @State private var showDetailsSheet = false
-    #if os(iOS)
+    #if !os(tvOS)
     /// The title being edited on Simkl.
     @State private var simklEdit: SimklEditTarget?
+    #endif
+    #if os(iOS)
     @State private var pendingDownloadEpisodeNumber: DownloadEpisodeItem? = nil
     @State private var isSelectionMode = false
     /// Which of the two download buttons the batch sheet grows out of.
@@ -115,7 +117,7 @@ struct AniListDetailView: View {
             ?? SimklCatalog.cachedAnimeSimklID(mal: pageMALID, anilist: pageAniListID)
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private var simklEditTarget: SimklEditTarget? {
         guard let media = vm.media else { return nil }
         return SimklEditTarget(media: media, mal: pageMALID, anilist: pageAniListID, simkl: pageSimklID)
@@ -190,7 +192,7 @@ struct AniListDetailView: View {
         .scrollAwareNavTitle(vm.media?.title.displayTitle ?? ""))
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ViewBuilder private var editToolbarButton: some View {
         if isReverseDualAvailable {
             Menu {
@@ -318,7 +320,7 @@ struct AniListDetailView: View {
                 } else {
                     BookmarkButton(media: vm.media)
                 }
-                #else
+                #elseif !os(macOS)
                 BookmarkButton(media: vm.media)
                 #endif
             }
@@ -344,6 +346,24 @@ struct AniListDetailView: View {
         .adaptiveSheet(item: $simklEdit) { target in
             SimklAnimeEditSheet(target: target)
                 .zoomingOut(of: "edit", in: sheetZoom)
+        }
+        #elseif os(macOS)
+        // On a Mac these sit in the window's toolbar: a button floating over the episode list
+        // covered the play buttons under the pointer.
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if let media = vm.media {
+                    let cw = continueWatchingItem(for: media)
+                    ModuleWebsiteButton(href: cw?.detailHref, moduleId: cw?.moduleId,
+                                        trackers: TrackerWebLinks.links(anilist: pageAniListID, mal: pageMALID,
+                                                                        simkl: pageSimklID))
+                }
+                editToolbarButton
+                BookmarkButton(media: vm.media, style: .toolbar)
+            }
+        }
+        .adaptiveSheet(item: $simklEdit) { target in
+            SimklAnimeEditSheet(target: target)
         }
         #endif
         .navigationDestinationCompat(item: $sequelMediaId) { id in
@@ -809,7 +829,7 @@ struct AniListDetailView: View {
                             }
                     }
 
-                    #if os(iOS)
+                    #if !os(tvOS)
                     HStack(spacing: 10) {
                         watchButton(media: media)
 
@@ -836,7 +856,10 @@ struct AniListDetailView: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .help(selectedTab == 0 ? "Show related titles" : "Show episodes")
 
+                        // Picks episodes to download, which only iOS does.
+                        #if os(iOS)
                         if (media.episodes ?? 0) > 0 || media.status == "RELEASING" {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -862,14 +885,19 @@ struct AniListDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        #endif
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
                     .padding(.bottom, 8)
+                    #if os(macOS)
+                    // A phone-width button stretched across a window reads as a bar, not a button.
+                    .frame(maxWidth: 520, alignment: .leading)
+                    #endif
                     #endif
 
-                    #if !os(iOS)
+                    #if os(tvOS)
                     tabSelector
                         .padding(.top, 8)
                     #endif
@@ -1261,6 +1289,7 @@ struct AniListDetailView: View {
                         .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .help(isReversed ? "Newest episodes first — show oldest first" : "Oldest episodes first — show newest first")
                 .padding(.trailing, 4)
 
                 // Reset progress button (only when not in selection mode)
@@ -1513,6 +1542,10 @@ struct AniListDetailView: View {
             Text("Relations").tag(1)
         }
         .pickerStyle(.segmented)
+        .labelsHidden()
+        #if os(macOS)
+        .fixedSize()
+        #endif
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
@@ -1540,7 +1573,11 @@ struct AniListDetailView: View {
                 return 4
                 #endif
             }()
+            #if os(macOS)
+            let columns = PosterGrid.columns
+            #else
             let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+            #endif
 
             VStack(alignment: .leading, spacing: 16) {
                 LazyVGrid(columns: columns, spacing: 12) {
@@ -1564,6 +1601,12 @@ struct AniListDetailView: View {
 // MARK: - Synopsis
 struct SynopsisSection: View {
     let text: String
+
+    /// The text with its blank lines taken out: AniList's `<br>` runs became empty lines that
+    /// used up the four the preview has, leaving a gap where the synopsis should go on.
+    static func preview(of text: String) -> String {
+        text.replacingOccurrences(of: #"\s*\n\s*"#, with: "\n", options: .regularExpression)
+    }
     /// Opens the full details instead of expanding the text in place.
     var onMore: (() -> Void)? = nil
     @State private var expanded = false
@@ -1576,7 +1619,7 @@ struct SynopsisSection: View {
             }
             .padding(.horizontal, 16)
 
-            Text(text)
+            Text(expanded ? text : Self.preview(of: text))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(expanded ? nil : 4)

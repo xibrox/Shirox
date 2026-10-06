@@ -3654,6 +3654,20 @@ struct MacVideoPlayerView: NSViewRepresentable {
 
 // MARK: - macOS Player Window Manager
 
+/// The player's window. Its close and minimise buttons fade out with the controls, and AppKit
+/// won't perform a button that's faded out: ⌘W and ⌘M did nothing while the video played.
+final class PlayerWindow: NSWindow {
+    override func performClose(_ sender: Any?) { close() }
+    override func performMiniaturize(_ sender: Any?) { miniaturize(sender) }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        switch item.action {
+        case #selector(performClose(_:)), #selector(performMiniaturize(_:)): return true
+        default: return super.validateUserInterfaceItem(item)
+        }
+    }
+}
+
 /// The player's own window on a Mac: one at a time, sized and placed where the last one was,
 /// and torn down when it closes so nothing keeps playing behind it.
 @MainActor
@@ -3671,7 +3685,7 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate {
         let wasFullScreen = playerWindow?.styleMask.contains(.fullScreen) ?? false
         closeCurrent()
 
-        let window = NSWindow(
+        let window = PlayerWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 720),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,

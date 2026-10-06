@@ -95,8 +95,8 @@ extension View {
                     Clipboard.copy(description)
                     #if os(iOS)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    ToastManager.shared.show(message: "Description copied", type: .success, duration: 1.6)
                     #endif
+                    ToastManager.shared.show(message: "Description copied", type: .success, duration: 1.6)
                 } label: {
                     Label("Copy Description", systemImage: "doc.on.doc")
                 }

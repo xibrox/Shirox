@@ -6,6 +6,14 @@ import SwiftUI
 struct BookmarkButton: View {
     let media: Media?
     var localSource: LocalSource? = nil
+    var style: Style = .floating
+
+    enum Style {
+        /// The round button floating in a detail screen's corner.
+        case floating
+        /// A plain toolbar item, as a Mac window's toolbar has.
+        case toolbar
+    }
 
     @ObservedObject private var local = LocalLibraryManager.shared
     @State private var showCollections = false
@@ -19,10 +27,25 @@ struct BookmarkButton: View {
 
     var body: some View {
         if let media {
-            Button {
-                local.bookmark(media: media, localSource: localSource)   // idempotent: Planning if new
-                showCollections = true
-            } label: {
+            button(for: media)
+                .help(isSaved ? "In your library — change its collections" : "Save to your library")
+                .zoomSource("collections", in: collectionsZoom, cornerRadius: 26)
+                .adaptiveSheet(isPresented: $showCollections) {
+                    LocalCollectionPickerSheet(media: media, localSource: localSource)
+                        .zoomingOut(of: "collections", in: collectionsZoom)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func button(for media: Media) -> some View {
+        let action = {
+            local.bookmark(media: media, localSource: localSource)   // idempotent: Planning if new
+            showCollections = true
+        }
+        switch style {
+        case .floating:
+            Button(action: action) {
                 Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(isSaved ? Color.accentColor : .primary)
@@ -32,10 +55,9 @@ struct BookmarkButton: View {
                     .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 3)
             }
             .buttonStyle(.plain)
-            .zoomSource("collections", in: collectionsZoom, cornerRadius: 26)
-            .adaptiveSheet(isPresented: $showCollections) {
-                LocalCollectionPickerSheet(media: media, localSource: localSource)
-                    .zoomingOut(of: "collections", in: collectionsZoom)
+        case .toolbar:
+            Button(action: action) {
+                Label(isSaved ? "Saved" : "Save", systemImage: isSaved ? "bookmark.fill" : "bookmark")
             }
         }
     }
