@@ -166,7 +166,7 @@ final class DetailViewModel: ObservableObject {
         }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Offline mode: hydrate from a persisted snapshot. No network calls are issued.
     /// Episodes are emitted as `EpisodeLink` with empty href (offline mode never resolves them).
     func loadOffline(snapshot: DownloadedMediaSnapshot) {
@@ -400,7 +400,7 @@ final class DetailViewModel: ObservableObject {
     }
 
     func downloadWithSelectedStream(_ stream: StreamResult) {
-        #if os(iOS)
+        #if !os(tvOS)
         guard let episode = pendingEpisode, let detail = detail else { return }
 
         let ctx = DownloadContext(

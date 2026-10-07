@@ -232,7 +232,7 @@ final class AniListDetailViewModel: ObservableObject {
     }
 
     func downloadWithSelectedStream(_ stream: StreamResult) {
-        #if os(iOS)
+        #if !os(tvOS)
         guard let (episodeLink, epNum) = pendingDownloadEpisode,
               let module = pendingDownloadModule,
               let media = pendingDownloadMedia else { return }

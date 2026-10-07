@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import Foundation
 import Combine
 import CryptoKit

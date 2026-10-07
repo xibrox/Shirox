@@ -1,6 +1,6 @@
 import Combine
 
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 struct DownloadRowView: View {

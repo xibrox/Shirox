@@ -1522,6 +1522,7 @@
 		DB3570B7715FA894013532F2 /* TMDBLogoTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TMDBLogoTests.swift; sourceTree = "<group>"; };
 		DDE30B9763346F02AE6DEFBB /* AssRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AssRenderer.swift; sourceTree = "<group>"; };
 		DDE58B7E7C2B8B8181779721 /* HLSQualityFetchTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HLSQualityFetchTests.swift; sourceTree = "<group>"; };
+		DE2E2EEC12DA73A04F1181AE /* Info-macOS.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "Info-macOS.plist"; sourceTree = "<group>"; };
 		DE497D28BD37BD64210898B9 /* ManageCollectionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ManageCollectionsView.swift; sourceTree = "<group>"; };
 		DED767F1E614FFA030840F80 /* MangaTrackingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MangaTrackingTests.swift; sourceTree = "<group>"; };
 		DF82054A977EBBA7E707802F /* SimklDiscoverMedia.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SimklDiscoverMedia.swift; sourceTree = "<group>"; };
@@ -2012,6 +2013,7 @@
 				4BE8F22DF8EF4BBAC15BAB79 /* ShiroxApp.swift */,
 				0F6021362F71CCC800CEC66D /* shirox-icon.icon */,
 				4774A640D5D4477765CAEF00 /* Resources */,
+				DE2E2EEC12DA73A04F1181AE /* Info-macOS.plist */,
 			);
 			path = Shirox;
 			sourceTree = "<group>";
@@ -3814,7 +3816,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 118;
 				DEAD_CODE_STRIPPING = YES;
-				INFOPLIST_FILE = Shirox/Info.plist;
+				INFOPLIST_FILE = "Shirox/Info-macOS.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -3929,7 +3931,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 118;
 				DEAD_CODE_STRIPPING = YES;
-				INFOPLIST_FILE = Shirox/Info.plist;
+				INFOPLIST_FILE = "Shirox/Info-macOS.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

@@ -1,7 +1,9 @@
-#if os(iOS)
+#if !os(tvOS)
 import Foundation
 import Combine
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @MainActor
 final class MangaDownloadManager: ObservableObject {
@@ -334,22 +336,26 @@ final class MangaDownloadManager: ObservableObject {
     private static let keepAliveReason = "manga-downloads"
 
     private func observeAppLifecycle() {
+        #if os(iOS)
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshKeepAlive(backgrounded: true) }
         }
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshKeepAlive(backgrounded: false); self?.processQueue() }
         }
+        #endif
     }
 
     private var isBackgrounded = false
     private func refreshKeepAlive(backgrounded: Bool? = nil) {
         if let backgrounded { isBackgrounded = backgrounded }
+        #if os(iOS)
         if isBackgrounded && !chapterTasks.isEmpty {
             BackgroundKeepAlive.shared.acquire(Self.keepAliveReason)
         } else {
             BackgroundKeepAlive.shared.release(Self.keepAliveReason)
         }
+        #endif
     }
 
     // MARK: - Persistence

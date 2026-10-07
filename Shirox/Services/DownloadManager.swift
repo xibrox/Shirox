@@ -1,8 +1,11 @@
-#if os(iOS)
+#if !os(tvOS)
 import Foundation
 import Combine
 import AVFoundation
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 import UserNotifications
 
 struct DownloadContext {
@@ -73,7 +76,9 @@ final class DownloadManager: NSObject, ObservableObject {
     /// Which start of an item's HLS task is current, so a cancelled run finishing late can't
     /// evict the entry of the run that replaced it.
     private var hlsTaskTokens: [UUID: UUID] = [:]
+    #if os(iOS)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    #endif
     private var backgroundCompletionHandler: (() -> Void)?
     private var isBackgrounded = false
     private static let keepAliveReason = "hls-downloads"
@@ -127,15 +132,19 @@ final class DownloadManager: NSObject, ObservableObject {
     @AppStorage("hasRequestedDownloadNotifications")
     private var hasRequestedNotificationPermission = false
 
+    /// A Mac app keeps running in the background, so only iOS has to hold on to its downloads.
     private func observeAppLifecycle() {
+        #if os(iOS)
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.handleEnterBackground() }
         }
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.handleEnterForeground() }
         }
+        #endif
     }
 
+    #if os(iOS)
     private func handleEnterBackground() {
         isBackgrounded = true
         guard !hlsTasks.isEmpty else { return }
@@ -167,6 +176,7 @@ final class DownloadManager: NSObject, ObservableObject {
         refreshDownloadKeepAlive()   // releases — foregrounded app isn't suspended, no keep-alive needed
         processQueue()
     }
+    #endif
 
     private func pauseAllHLSTasks() {
         for (id, task) in hlsTasks {
@@ -188,11 +198,13 @@ final class DownloadManager: NSObject, ObservableObject {
     /// HLS download is active so the app can suspend and stop draining battery. Idempotent and
     /// reason-counted, so it coexists with the casting keep-alive.
     private func refreshDownloadKeepAlive() {
+        #if os(iOS)
         if backgroundDownloadsEnabled && isBackgrounded && !hlsTasks.isEmpty {
             BackgroundKeepAlive.shared.acquire(Self.keepAliveReason)
         } else {
             BackgroundKeepAlive.shared.release(Self.keepAliveReason)
         }
+        #endif
     }
 
     // MARK: - Public API
@@ -1174,8 +1186,13 @@ final class DownloadManager: NSObject, ObservableObject {
             items[idx].completedAt = Date()
             persist()
 
+            #if os(iOS)
             let appState = UIApplication.shared.applicationState
-            if appState == .background || appState == .inactive {
+            let inBackground = appState == .background || appState == .inactive
+            #else
+            let inBackground = !NSApplication.shared.isActive
+            #endif
+            if inBackground {
                 sendCompletionNotification(item: item)
             } else {
                 ToastManager.shared.show(message: "Download finished: \(item.mediaTitle) - Ep \(item.episodeNumber)", type: .success)

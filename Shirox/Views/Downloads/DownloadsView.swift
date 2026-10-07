@@ -1,6 +1,6 @@
 import Combine
 
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 struct DownloadsView: View {
@@ -310,7 +310,11 @@ struct DownloadsView: View {
                         if showsManga { mangaSections }
                     }
                     .softScrollEdges()
+                    #if os(iOS)
                     .listStyle(.insetGrouped)
+                    #else
+                    .listStyle(.inset)
+                    #endif
                     .searchable(text: $searchText, prompt: "Search downloads")
                     .animation(.default, value: kindFilter)
                 }
@@ -993,14 +997,14 @@ private struct SortToolbar: ViewModifier {
             // Left out, not left empty: from iOS 26 an empty item still draws its glass.
             content.toolbar {
                 if isShown {
-                    ToolbarItem(placement: .topBarTrailing) { menu }
+                    ToolbarItem(placement: .primaryAction) { menu }
                 }
             }
         } else {
             // A bare `if` in a toolbar builder needs iOS 16; before it, the condition lives
             // inside the item.
             content.toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     if isShown { menu }
                 }
             }

@@ -1,6 +1,6 @@
 import Combine
 
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 // MARK: - VM Store
@@ -53,9 +53,15 @@ struct DownloadModulePickerView: View {
                 }
             }
             .softScrollEdges()
+            #if os(iOS)
             .listStyle(.insetGrouped)
+            #else
+            .listStyle(.inset)
+            #endif
             .navigationTitle("Download Episode \(episodeNumber)")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { onDismiss() }
@@ -489,7 +495,9 @@ private struct SearchResultsPickerSheet: View {
             }
             .softScrollEdges()
             .navigationTitle(module.sourceName)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
         #if os(iOS)
         .adaptivePresentationDetents([.medium, .large])

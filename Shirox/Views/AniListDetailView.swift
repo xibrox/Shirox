@@ -1,7 +1,7 @@
 import SwiftUI
 import AVKit
 
-#if os(iOS)
+#if !os(tvOS)
 private struct DownloadEpisodeItem: Identifiable {
     let id = UUID()
     let episodeNumber: Int
@@ -45,7 +45,7 @@ struct AniListDetailView: View {
     /// The title being edited on Simkl.
     @State private var simklEdit: SimklEditTarget?
     #endif
-    #if os(iOS)
+    #if !os(tvOS)
     @State private var pendingDownloadEpisodeNumber: DownloadEpisodeItem? = nil
     @State private var isSelectionMode = false
     /// Which of the two download buttons the batch sheet grows out of.
@@ -308,7 +308,7 @@ struct AniListDetailView: View {
         AnyView(navTitled
         .overlay(alignment: .bottomTrailing) {
             Group {
-                #if os(iOS)
+                #if !os(tvOS)
                 if isSelectionMode {
                     FloatingDownloadButton(count: selectedEpisodeNumbers.count) {
                         batchDownloadZoomID = "batchDownloadFloating"
@@ -318,7 +318,10 @@ struct AniListDetailView: View {
                     .zoomSource("batchDownloadFloating", in: sheetZoom)
                     .transition(.scale.combined(with: .opacity))
                 } else {
+                    // On a Mac, Save sits in the window's toolbar.
+                    #if os(iOS)
                     BookmarkButton(media: vm.media)
+                    #endif
                 }
                 #elseif !os(macOS)
                 BookmarkButton(media: vm.media)
@@ -326,7 +329,7 @@ struct AniListDetailView: View {
             }
             .padding(.trailing, 16)
             .padding(.bottom, 24)
-            #if os(iOS)
+            #if !os(tvOS)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSelectionMode)
             #endif
         }
@@ -489,7 +492,7 @@ struct AniListDetailView: View {
                 }
             )
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .adaptiveSheet(item: $pendingDownloadEpisodeNumber) { item in
             let media = vm.media!
             DownloadModulePickerView(
@@ -858,8 +861,8 @@ struct AniListDetailView: View {
                         .buttonStyle(.plain)
                         .help(selectedTab == 0 ? "Show related titles" : "Show episodes")
 
-                        // Picks episodes to download, which only iOS does.
-                        #if os(iOS)
+                        // Picks episodes to download.
+                        #if !os(tvOS)
                         if (media.episodes ?? 0) > 0 || media.status == "RELEASING" {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -1004,7 +1007,7 @@ struct AniListDetailView: View {
                 Button { vm.watchEpisode(nextEp) } label: {
                     Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
                 }
-                #if os(iOS)
+                #if !os(tvOS)
                 Button { pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: nextEp) } label: {
                     Label("Download Episode", systemImage: "arrow.down.circle")
                 }
@@ -1258,7 +1261,7 @@ struct AniListDetailView: View {
                     HStack(spacing: 8) {
                         Text("Episodes")
                             .font(.title3.weight(.bold))
-                        #if os(iOS)
+                        #if !os(tvOS)
                         if !isSelectionMode {
                             Text("\(totalEpisodes)")
                                 .font(.caption.weight(.bold))
@@ -1293,7 +1296,7 @@ struct AniListDetailView: View {
                 .padding(.trailing, 4)
 
                 // Reset progress button (only when not in selection mode)
-                #if os(iOS)
+                #if !os(tvOS)
                 if !isSelectionMode {
                     if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
                         Button {
@@ -1379,7 +1382,7 @@ struct AniListDetailView: View {
             }
 
             // Selection Bar (when selection mode is active)
-            #if os(iOS)
+            #if !os(tvOS)
             if isSelectionMode {
                 HStack {
                     if let window = clampedRange(totalEpisodes: totalEpisodes) {
@@ -1453,7 +1456,7 @@ struct AniListDetailView: View {
                     
                     LazyVStack(spacing: 8) {
                         ForEach(sortedRange, id: \.self) { ep in
-                            #if os(iOS)
+                            #if !os(tvOS)
                             let sel = isSelectionMode
                             let selected = selectedEpisodeNumbers.contains(ep)
                             AniListEpisodeRowContainer(
@@ -1665,7 +1668,7 @@ private struct AniListEpisodeRowContainer: View {
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ObservedObject private var downloadManager = DownloadManager.shared
     #endif
 
@@ -1691,7 +1694,7 @@ private struct AniListEpisodeRowContainer: View {
     }
 
     private var downloadState: DownloadState? {
-        #if os(iOS)
+        #if !os(tvOS)
             downloadManager.items.first {
                 $0.aniListID == mediaId && $0.episodeNumber == ep 
             }?.state

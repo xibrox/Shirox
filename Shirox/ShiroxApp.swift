@@ -148,6 +148,11 @@ struct ShiroxApp: App {
         #if os(iOS)
         configureGlobalBarAppearances()
         #endif
+        #if os(macOS)
+        // What iOS's app delegate does at launch: pick up downloads left mid-way.
+        DownloadManager.shared.reconnectPendingTasks()
+        _ = MangaDownloadManager.shared
+        #endif
     }
 
     var body: some Scene {
@@ -238,14 +243,8 @@ struct ShiroxApp: App {
 enum SidebarTab: Int, CaseIterable, Hashable {
     case home, search, library, downloads, settings
 
-    /// What the sidebar lists: downloading isn't built for the native Mac app.
-    static var available: [SidebarTab] {
-        #if os(macOS)
-        allCases.filter { $0 != .downloads }
-        #else
-        allCases
-        #endif
-    }
+    /// What the sidebar lists.
+    static var available: [SidebarTab] { allCases }
 
     var label: String {
         switch self {
@@ -402,7 +401,7 @@ private struct RootTabView: View {
                     case .search:               SearchView()
                     case .library:              LibraryView()
                     case .settings:             SettingsView()
-                    case .downloads:            HomeView()
+                    case .downloads:            DownloadsView()
                     }
                 }
                 #else

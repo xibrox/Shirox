@@ -527,7 +527,7 @@ enum ContinueWatchingResume {
 
         let storedStreams = item.allStreams?.compactMap { $0.asStreamResult } ?? []
 
-        #if os(iOS)
+        #if !os(tvOS)
         // Downloaded episodes saved a local URL: a file:// (MP4) or a 127.0.0.1 proxy URL
         // (HLS). The HLS proxy only works while DownloadManager's server is running, which
         // this path never starts — so replaying the stored URL fails and the onStreamExpired

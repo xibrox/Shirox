@@ -1405,7 +1405,7 @@ struct PlayerView: View {
     /// AVPlayer would end the episode the viewer is still watching. `didTrackEpisode` is the
     /// same signal that marked it watched, so this only ever removes something already counted.
     private func autoDeleteWatchedDownloadIfEnabled() {
-        #if os(iOS)
+        #if !os(tvOS)
         guard didTrackEpisode,
               UserDefaults.standard.bool(forKey: "autoDeleteWatched"),
               let ctx = currentContext else { return }
@@ -2757,7 +2757,7 @@ struct PlayerView: View {
     /// proxy is restarted before AVPlayer gets a new item — otherwise the new connections die too.
     @MainActor
     private func resolveLocalStream() async -> StreamResult? {
-        #if os(iOS)
+        #if !os(tvOS)
         let url = currentStream.url
         if url.host == "127.0.0.1" || url.host == "localhost" {
             await HLSProxyServer.shared.restartAndWait(headers: ["User-Agent": URLSession.randomUserAgent])
@@ -3105,7 +3105,7 @@ struct PlayerView: View {
             }
         }
 
-        #if os(iOS)
+        #if !os(tvOS)
         // Offline / loader-unavailable fallback: play a downloaded next episode if one
         // exists. Best-effort by number (epNum + 1) — we couldn't resolve the real next
         // href, so on multi-season shows this may match another season's same-numbered copy.
@@ -3134,7 +3134,7 @@ struct PlayerView: View {
     @MainActor
     private func applyWatchNextResult(_ result: (streams: [StreamResult], episodeNumber: Int, episodeHref: String?)) async {
         Logger.shared.log("[PlayerView] Got \(result.streams.count) streams for episode \(result.episodeNumber)", type: "Debug")
-        #if os(iOS)
+        #if !os(tvOS)
         if let ctx = currentContext,
            let download = DownloadManager.shared.downloadItem(
                 forEpisodeHref: result.episodeHref,
@@ -3499,7 +3499,7 @@ struct PlayerView: View {
     /// next time. nil when this isn't a download (or it couldn't be kept), and the session copy
     /// is used.
     private func keptWithDownload(_ track: SubtitleTrack) -> SubtitleTrack? {
-        #if os(iOS)
+        #if !os(tvOS)
         guard isLocalPlayback, currentContext?.isLocalPlayback != true, let ctx = currentContext,
               let download = DownloadManager.shared.downloadItem(
                 forEpisodeHref: ctx.episodeHref, aniListID: ctx.aniListID, moduleId: ctx.moduleId,
@@ -3730,6 +3730,8 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate {
     /// "Frieren · Episode 3", for the Window menu and Mission Control.
     private static func title(for context: PlayerContext?, stream: StreamResult) -> String {
         guard let context else { return stream.title }
+        // A film has one "episode"; it's just the film.
+        if context.totalEpisodes == 1 || context.availableEpisodes == 1 { return context.mediaTitle }
         return "\(context.mediaTitle) · Episode \(context.episodeNumber)"
     }
 

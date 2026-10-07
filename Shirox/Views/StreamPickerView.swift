@@ -73,7 +73,9 @@ struct StreamPickerView: View {
     }
 
     private var episodeTitle: String {
-        vm.selectedEpisode.map { "Episode \($0.displayNumber)" } ?? "Select Stream"
+        // A film is a one-item list; "Episode 1" over its streams read oddly.
+        if let detail = vm.detail, detail.episodes.count == 1, !detail.title.isEmpty { return detail.title }
+        return vm.selectedEpisode.map { "Episode \($0.displayNumber)" } ?? "Select Stream"
     }
 }
 

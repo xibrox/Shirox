@@ -34,7 +34,7 @@ struct MangaDetailView: View {
     @Namespace private var sheetZoom
     @State private var leadingInset: CGFloat = 0
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ObservedObject private var mangaDownloads = MangaDownloadManager.shared
     @State private var isSelectionMode = false
     @State private var selectedChapterHrefs: Set<String> = []
@@ -60,7 +60,7 @@ struct MangaDetailView: View {
     // Cross-platform bridges to the iOS-only selection/download state, so the
     // (non-guarded) chapter list compiles on macOS where that state is absent.
     private var chapterRowSelectionMode: Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         return isSelectionMode
         #else
         return false
@@ -68,7 +68,7 @@ struct MangaDetailView: View {
     }
 
     private func selectedChapterHrefsContains(_ href: String) -> Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         return selectedChapterHrefs.contains(href)
         #else
         return false
@@ -76,7 +76,7 @@ struct MangaDetailView: View {
     }
 
     private func mangaDownloadState(for chapter: MangaChapter) -> MangaDownloadState? {
-        #if os(iOS)
+        #if !os(tvOS)
         return mangaDownloads.item(forChapterHref: chapter.href)?.state
         #else
         return nil
@@ -215,7 +215,7 @@ struct MangaDetailView: View {
                 }
             }
         }
-        #if os(iOS)
+        #if !os(tvOS)
         .task(id: [mangaAniListID, mangaMALID].map { $0.map(String.init) ?? "-" }.joined()) {
             if anilistAuth.isLoggedIn, let aid = mangaAniListID {
                 if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid, type: .manga) {
@@ -323,11 +323,16 @@ struct MangaDetailView: View {
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
                         #elseif os(macOS)
-                        readButton(detail)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                            .padding(.top, synopsis.isEmpty ? 16 : 0)
-                            .frame(maxWidth: 520, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 0) {
+                            readButton(detail)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 8)
+                                .padding(.top, synopsis.isEmpty ? 16 : 0)
+                            libraryControls(detail)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 8)
+                        }
+                        .frame(maxWidth: 520, alignment: .leading)
                         #endif
                     }
                     if let edges = vm.enrichment?.relations?.edges {
@@ -535,7 +540,7 @@ struct MangaDetailView: View {
     }
     #endif
 
-    #if os(iOS)
+    #if !os(tvOS)
     // MARK: - Reading-list editor (mirrors DetailView's per-service controls)
 
     private var mangaAniListID: Int? { vm.enrichment?.isManga == true ? vm.enrichment?.id : vm.match?.aniListID }
@@ -592,7 +597,7 @@ struct MangaDetailView: View {
     /// delete updates in place and an emptied manga collapses); online uses the
     /// module's list.
     private func liveChapters(for detail: MangaDetail) -> [MangaChapter] {
-        #if os(iOS)
+        #if !os(tvOS)
         if offlineChapters != nil {
             return mangaDownloads.downloadedChapters(forMangaHref: item.href)
         }
@@ -600,7 +605,7 @@ struct MangaDetailView: View {
         return detail.chapters
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     private var downloadedItemsForThisManga: [MangaDownloadItem] {
         mangaDownloads.items.filter { $0.mangaHref == item.href }
     }
@@ -622,7 +627,7 @@ struct MangaDetailView: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    #if os(iOS)
+                    #if !os(tvOS)
                     // A visible way to delete what's downloaded. It was only behind a swipe or
                     // a long press on the Downloads tab, or select mode here, and people
                     // reported there was no way at all.
@@ -677,7 +682,7 @@ struct MangaDetailView: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
 
-            #if os(iOS)
+            #if !os(tvOS)
             if isSelectionMode {
                 let completedHrefs = Set(mangaDownloads.items.filter { $0.state == .completed }.map { $0.chapterHref })
                 let toDownload = MangaDownloadPlanning.pendingDownloadCount(
@@ -749,7 +754,7 @@ struct MangaDetailView: View {
                                     totalPages: lastRead?.totalPages ?? 0)
                                 : nil,
                             onTap: {
-                                #if os(iOS)
+                                #if !os(tvOS)
                                 if isSelectionMode {
                                     if selectedChapterHrefs.contains(chapter.href) {
                                         selectedChapterHrefs.remove(chapter.href)
@@ -759,8 +764,6 @@ struct MangaDetailView: View {
                                 } else {
                                     openChapter(chapter, detail: readableDetail(detail))
                                 }
-                                #elseif os(macOS)
-                                openChapter(chapter, detail: readableDetail(detail))
                                 #endif
                             },
                             onMarkRead: {
@@ -774,13 +777,13 @@ struct MangaDetailView: View {
                             isSelectionMode: chapterRowSelectionMode,
                             isSelected: selectedChapterHrefsContains(chapter.href),
                             downloadState: mangaDownloadState(for: chapter),
-                            onDownload: offlineChapters == nil && Self.downloadsChapters ? {
-                                #if os(iOS)
+                            onDownload: offlineChapters == nil ? {
+                                #if !os(tvOS)
                                 mangaDownloads.download(chapter: chapter, context: downloadContext(detail))
                                 #endif
                             } : nil,
                             onDeleteDownload: {
-                                #if os(iOS)
+                                #if !os(tvOS)
                                 if let it = mangaDownloads.item(forChapterHref: chapter.href) { mangaDownloads.remove(it) }
                                 #endif
                             }
@@ -790,15 +793,6 @@ struct MangaDetailView: View {
                 .padding(.horizontal, 16)
             }
         }
-    }
-
-    /// Chapters download on iOS only; elsewhere the row offers no button for it.
-    private static var downloadsChapters: Bool {
-        #if os(iOS)
-        true
-        #else
-        false
-        #endif
     }
 
     // MARK: - Reader launching

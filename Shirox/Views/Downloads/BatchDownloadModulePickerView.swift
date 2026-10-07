@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 // MARK: - Sheet
@@ -38,9 +38,15 @@ struct BatchDownloadModulePickerView: View {
                 }
             }
             .softScrollEdges()
+            #if os(iOS)
             .listStyle(.insetGrouped)
+            #else
+            .listStyle(.inset)
+            #endif
             .navigationTitle("Download \(episodeNumbers.count) Episode\(episodeNumbers.count == 1 ? "" : "s")")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { onDismiss() }
@@ -498,7 +504,9 @@ private struct BatchSearchResultsPickerSheet: View {
             }
             .softScrollEdges()
             .navigationTitle(module.sourceName)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
         #if os(iOS)
         .adaptivePresentationDetents([.medium, .large])

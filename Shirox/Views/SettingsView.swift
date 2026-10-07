@@ -82,7 +82,7 @@ struct SettingsView: View {
     @ObservedObject private var providerManager = ProviderManager.shared
     @EnvironmentObject private var moduleManager: ModuleManager
     @AppStorage("preferredQuality") private var preferredQuality: String = "auto"
-    #if os(iOS)
+    #if !os(tvOS)
     @State private var totalUsage = 0
     #endif
 
@@ -216,6 +216,10 @@ struct SettingsView: View {
                     totalUsage = await CacheManager.shared.totalDiskUsage
                 }
             }
+            #elseif os(macOS)
+            .onAppear {
+                Task { totalUsage = await CacheManager.shared.totalDiskUsage }
+            }
             #endif
         }
     }
@@ -285,7 +289,6 @@ struct SettingsView: View {
                     )
                 }
 
-                #if !os(macOS)
                 NavigationLink {
                     DownloadsSettingsView()
                 } label: {
@@ -294,9 +297,8 @@ struct SettingsView: View {
                         title: "Downloads"
                     )
                 }
-                #endif
 
-                #if os(iOS)
+                #if !os(tvOS)
                 NavigationLink {
                     StorageSettingsView()
                 } label: {
@@ -1050,13 +1052,13 @@ struct DownloadsSettingsView: View {
     @AppStorage("autoResumeDownloads") private var autoResumeDownloads = false
     @AppStorage("autoDeleteWatched") private var autoDeleteWatched = false
     @AppStorage("downloadQuality") private var downloadQuality = "highest"
-    #if os(iOS)
+    #if !os(tvOS)
     @State private var downloadsSize = 0
     @State private var showDeleteDownloadsConfirmation = false
     #endif
 
     var body: some View {
-        List {
+        SettingsList {
             Section("Downloads") {
                 Picker("Download Quality", selection: $downloadQuality) {
                     Text("Best").tag("highest")
@@ -1081,7 +1083,7 @@ struct DownloadsSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            #if os(iOS)
+            #if !os(tvOS)
             Section {
                 Button(role: .destructive) {
                     showDeleteDownloadsConfirmation = true
@@ -1102,6 +1104,8 @@ struct DownloadsSettingsView: View {
         .navigationTitle("Downloads")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
+        #if !os(tvOS)
         .alert("Delete All Downloads?", isPresented: $showDeleteDownloadsConfirmation) {
             Button("Delete", role: .destructive) {
                 DownloadManager.shared.removeAll(DownloadManager.shared.items)
@@ -1121,7 +1125,7 @@ struct DownloadsSettingsView: View {
 
 // MARK: - Storage & Cache Settings
 
-#if os(iOS)
+#if !os(tvOS)
 struct StorageSettingsView: View {
     @AppStorage(DataSaver.key) private var dataSaverEnabled = false
     @State private var imageCacheSize = 0
@@ -1140,7 +1144,7 @@ struct StorageSettingsView: View {
     @State private var showDeleteDownloadsConfirmation = false
 
     var body: some View {
-        List {
+        SettingsList {
             Section("Data") {
                 Toggle("Data Saver", isOn: $dataSaverEnabled)
                     .tint(.secondary)
@@ -1316,7 +1320,9 @@ struct StorageSettingsView: View {
         }
         .softScrollEdges()
         .navigationTitle("Storage & Cache")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .alert("Reset Watch Progress?", isPresented: $showResetCWConfirmation) {
             Button("Reset", role: .destructive) {
                 CacheManager.shared.clearContinueWatching()

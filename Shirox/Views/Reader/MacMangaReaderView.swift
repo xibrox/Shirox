@@ -315,7 +315,13 @@ struct MacMangaReaderView: View {
         pageTops.tops = [:]
         topPage = 0
         do {
-            let result = try await JSEngine.shared.mangaImages(url: chapter.href)
+            // A downloaded chapter reads from disk.
+            let result: [String]
+            if let local = MangaDownloadManager.shared.localPages(forChapterHref: chapter.href) {
+                result = local
+            } else {
+                result = try await JSEngine.shared.mangaImages(url: chapter.href)
+            }
             guard !Task.isCancelled else { return }
             if result.isEmpty {
                 loadError = "No pages found"

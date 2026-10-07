@@ -17,7 +17,7 @@ struct DetailView: View {
     /// download opened showing Anikoto, and its progress and sort order were keyed to Anikoto too.
     private var effectiveModuleId: String? { moduleId ?? ModuleManager.shared.activeModule?.id }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Download state for one episode of the title on screen — matched by its unique href, or
     /// by (title, number, module) for items saved before hrefs were recorded.
     ///
@@ -63,7 +63,7 @@ struct DetailView: View {
     /// The title being edited on Simkl.
     @State private var simklEdit: SimklEditTarget?
     #endif
-    #if os(iOS)
+    #if !os(tvOS)
     @State private var isSelectionMode = false
     @State private var selectedEpisodeNumbers: Set<Int> = []
     @State private var showBatchDeleteConfirmation = false
@@ -135,7 +135,7 @@ struct DetailView: View {
         }
         .overlay(alignment: .bottomTrailing) {
             Group {
-                #if os(iOS)
+                #if !os(tvOS)
                 // Not on the downloaded-only list: picking there is for deleting.
                 if isSelectionMode, let detail = vm.detail, !showsOfflineEpisodes(detail) {
                     FloatingDownloadButton(count: downloadableSelectionCount(detail)) {
@@ -163,7 +163,10 @@ struct DetailView: View {
                         }
                     }
                 } else {
+                    // On a Mac, Save sits in the window's toolbar.
+                    #if os(iOS)
                     BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
+                    #endif
                 }
                 #elseif !os(macOS)
                 BookmarkButton(media: bookmarkMedia, localSource: bookmarkSource)
@@ -171,7 +174,7 @@ struct DetailView: View {
             }
             .padding(.trailing, 16)
             .padding(.bottom, 24)
-            #if os(iOS)
+            #if !os(tvOS)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSelectionMode)
             #endif
         }
@@ -212,6 +215,158 @@ struct DetailView: View {
     }
 
     var body: some View {
+        withDownloadSheets(withEditSheets(page))
+    }
+
+    /// The download pickers, apart from the page's own long modifier chain, which the type
+    /// checker gave up on with them in it.
+    @ViewBuilder
+    private func withDownloadSheets<Content: View>(_ content: Content) -> some View {
+        #if !os(tvOS)
+        content
+        .adaptiveSheet(isPresented: $vm.showDownloadStreamPicker) {
+            DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
+                vm.downloadWithSelectedStream(stream)
+            }
+        }
+        .adaptiveSheet(isPresented: $showBatchDownloadPicker) {
+            if let detail = vm.detail {
+                BatchDownloadStreamPickerView(
+                    mediaTitle: item.title,
+                    imageUrl: detail.image,
+                    aniListID: vm.aniListID,
+                    moduleId: effectiveModuleId,
+                    episodes: detail.episodes,
+                    episodeNumbers: Array(selectedEpisodeNumbers).sorted(),
+                    onDismiss: {
+                        showBatchDownloadPicker = false
+                        isSelectionMode = false
+                        selectedEpisodeNumbers.removeAll()
+                    }
+                )
+                .zoomingOut(of: batchDownloadZoomID, in: sheetZoom)
+            }
+        }
+
+        #else
+        content
+        #endif
+    }
+
+    /// The library editors, apart from the page's modifier chain for the type checker's sake.
+    private func withEditSheets<Content: View>(_ content: Content) -> some View {
+        content
+        .adaptiveSheet(isPresented: $showLibraryEdit) {
+            libraryEditSheet
+                .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
+        }
+        .adaptiveSheet(isPresented: $showAniListEdit) {
+            if let aid = vm.aniListID, let detail = vm.detail {
+                let tempMedia = Media(
+                    id: aid, idMal: malID, provider: .anilist,
+                    title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
+                    coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+                    bannerImage: nil, description: detail.description,
+                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+                    status: "FINISHED", averageScore: nil, genres: nil,
+                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                    relations: nil, type: nil, format: nil
+                )
+                LibraryEntryEditSheet(
+                    entry: existingEntry,
+                    media: tempMedia,
+                    onSave: { status, progress, score in
+                        if status == .completed {
+                            ContinueWatchingManager.shared.resetProgress(aniListID: aid, moduleId: nil, mediaTitle: detail.title)
+                        } else if progress > 0 {
+                            ContinueWatchingManager.shared.markWatched(
+                                upThrough: progress, aniListID: aid,
+                                moduleId: effectiveModuleId,
+                                mediaTitle: detail.title, imageUrl: detail.image,
+                                totalEpisodes: detail.episodes.count,
+                                availableEpisodes: detail.episodes.count,
+                                detailHref: vm.detailHref
+                            )
+                        }
+                        Task {
+                            try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: status, progress: progress, score: score)
+                            if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
+                                existingEntry = AniListProvider.shared.mapEntry(raw)
+                            }
+                        }
+                    },
+                    onDelete: existingEntry != nil ? {
+                        if let entryId = existingEntry?.id {
+                            existingEntry = nil
+                            Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
+                        }
+                    } : nil
+                )
+                #if os(iOS)
+                .adaptivePresentationDetents([.medium, .large])
+                #else
+                .macSheetFrame()
+                #endif
+                .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
+            }
+        }
+        .adaptiveSheet(isPresented: $showMALEdit) {
+            if let mid = malID, let detail = vm.detail {
+                let tempMedia = Media(
+                    id: mid, idMal: mid, provider: .mal,
+                    title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
+                    coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
+                    bannerImage: nil, description: detail.description,
+                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
+                    status: nil, averageScore: nil, genres: nil,
+                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
+                    relations: nil, type: nil, format: nil
+                )
+                LibraryEntryEditSheet(
+                    entry: existingMALEntry,
+                    media: tempMedia,
+                    onSave: { status, progress, score in
+                        Task {
+                            try? await MALProvider.shared.updateEntry(mediaId: mid, status: status, progress: progress, score: score)
+                            existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: mid)
+                        }
+                    },
+                    onDelete: existingMALEntry != nil ? {
+                        existingMALEntry = nil
+                        Task { try? await MALProvider.shared.deleteEntry(entryId: mid) }
+                    } : nil
+                )
+                #if os(iOS)
+                .adaptivePresentationDetents([.medium, .large])
+                #else
+                .macSheetFrame()
+                #endif
+                .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
+            }
+        }
+        .adaptiveSheet(isPresented: $showMatchingSearch) {
+            TrackingLinksView(
+                page: .module(title: item.title, moduleKey: linkModuleKey, aniListID: vm.aniListID),
+                initialSide: .anilist,
+                moduleEpisodeCount: vm.detail?.episodes.count ?? 0,
+                onAniListMatch: { aid in
+                    if let aid {
+                        vm.setAniListMatch(aid)
+                        AniListMappingManager.shared.saveMapping(title: item.title, aniListID: aid)
+                    } else {
+                        vm.setAniListMatch(nil)
+                        AniListMappingManager.shared.removeMapping(title: item.title)
+                    }
+                },
+                onChange: {
+                    Task { await reloadLinkedIDs() }
+                    rememberEpisodesIfLinked()
+                })
+            .zoomingOut(of: linksZoomID, in: sheetZoom, fromToolbar: linksZoomID == "edit")
+        }
+    }
+
+    private var page: some View {
         mainContent
         .observeSafeAreaLeading($leadingInset)
         #if os(iOS)
@@ -232,6 +387,7 @@ struct DetailView: View {
             }
         }
         #elseif os(macOS)
+        .navigationTitle(vm.detail?.title ?? item.title)
         // In the window's toolbar on a Mac, where a button floating over the episode list
         // covered the play buttons under the pointer.
         .toolbar {
@@ -250,7 +406,7 @@ struct DetailView: View {
             DetailView(item: item)
         }
         .onAppear {
-            #if os(iOS)
+            #if !os(tvOS)
             if let snap = offlineSnapshot {
                 vm.loadOffline(snapshot: snap)
             }
@@ -341,145 +497,11 @@ struct DetailView: View {
         }) {
             StreamPickerView(vm: vm)
         }
-        #if os(iOS)
-        .adaptiveSheet(isPresented: $vm.showDownloadStreamPicker) {
-            DownloadStreamPickerView(streams: vm.pendingStreams) { stream in
-                vm.downloadWithSelectedStream(stream)
-            }
-        }
-        #endif
         .onReceive(NotificationCenter.default.publisher(for: AniListEntryExtrasChange.notification)) { note in
             guard let change = note.object as? AniListEntryExtrasChange else { return }
             existingEntry = change.apply(to: existingEntry)
         }
-        .adaptiveSheet(isPresented: $showLibraryEdit) {
-            libraryEditSheet
-                .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
-        }
-        .adaptiveSheet(isPresented: $showAniListEdit) {
-            if let aid = vm.aniListID, let detail = vm.detail {
-                let tempMedia = Media(
-                    id: aid, idMal: malID, provider: .anilist,
-                    title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
-                    coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
-                    bannerImage: nil, description: detail.description,
-                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
-                    status: "FINISHED", averageScore: nil, genres: nil,
-                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
-                    relations: nil, type: nil, format: nil
-                )
-                LibraryEntryEditSheet(
-                    entry: existingEntry,
-                    media: tempMedia,
-                    onSave: { status, progress, score in
-                        if status == .completed {
-                            ContinueWatchingManager.shared.resetProgress(aniListID: aid, moduleId: nil, mediaTitle: detail.title)
-                        } else if progress > 0 {
-                            ContinueWatchingManager.shared.markWatched(
-                                upThrough: progress, aniListID: aid,
-                                moduleId: effectiveModuleId,
-                                mediaTitle: detail.title, imageUrl: detail.image,
-                                totalEpisodes: detail.episodes.count,
-                                availableEpisodes: detail.episodes.count,
-                                detailHref: vm.detailHref
-                            )
-                        }
-                        Task {
-                            try? await AniListLibraryService.shared.updateEntry(mediaId: aid, status: status, progress: progress, score: score)
-                            if let raw = try? await AniListLibraryService.shared.fetchEntry(mediaId: aid) {
-                                existingEntry = AniListProvider.shared.mapEntry(raw)
-                            }
-                        }
-                    },
-                    onDelete: existingEntry != nil ? {
-                        if let entryId = existingEntry?.id {
-                            existingEntry = nil
-                            Task { try? await AniListLibraryService.shared.deleteEntry(entryId: entryId) }
-                        }
-                    } : nil
-                )
-                #if os(iOS)
-                .adaptivePresentationDetents([.medium, .large])
-                #else
-                .macSheetFrame()
-                #endif
-                .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
-            }
-        }
-        .adaptiveSheet(isPresented: $showMALEdit) {
-            if let mid = malID, let detail = vm.detail {
-                let tempMedia = Media(
-                    id: mid, idMal: mid, provider: .mal,
-                    title: MediaTitle(romaji: detail.title, english: detail.title, native: nil),
-                    coverImage: MediaCoverImage(large: detail.image, extraLarge: detail.image),
-                    bannerImage: nil, description: detail.description,
-                    episodes: detail.episodes.count > 0 ? detail.episodes.count : nil,
-                    status: nil, averageScore: nil, genres: nil,
-                    season: nil, seasonYear: nil, nextAiringEpisode: nil,
-                    relations: nil, type: nil, format: nil
-                )
-                LibraryEntryEditSheet(
-                    entry: existingMALEntry,
-                    media: tempMedia,
-                    onSave: { status, progress, score in
-                        Task {
-                            try? await MALProvider.shared.updateEntry(mediaId: mid, status: status, progress: progress, score: score)
-                            existingMALEntry = try? await MALProvider.shared.fetchEntry(mediaId: mid)
-                        }
-                    },
-                    onDelete: existingMALEntry != nil ? {
-                        existingMALEntry = nil
-                        Task { try? await MALProvider.shared.deleteEntry(entryId: mid) }
-                    } : nil
-                )
-                #if os(iOS)
-                .adaptivePresentationDetents([.medium, .large])
-                #else
-                .macSheetFrame()
-                #endif
-                .zoomingOut(of: "edit", in: sheetZoom, fromToolbar: true)
-            }
-        }
-        #if os(iOS)
-        .adaptiveSheet(isPresented: $showBatchDownloadPicker) {
-            if let detail = vm.detail {
-                BatchDownloadStreamPickerView(
-                    mediaTitle: item.title,
-                    imageUrl: detail.image,
-                    aniListID: vm.aniListID,
-                    moduleId: effectiveModuleId,
-                    episodes: detail.episodes,
-                    episodeNumbers: Array(selectedEpisodeNumbers).sorted(),
-                    onDismiss: {
-                        showBatchDownloadPicker = false
-                        isSelectionMode = false
-                        selectedEpisodeNumbers.removeAll()
-                    }
-                )
-                .zoomingOut(of: batchDownloadZoomID, in: sheetZoom)
-            }
-        }
-        #endif
-        .adaptiveSheet(isPresented: $showMatchingSearch) {
-            TrackingLinksView(
-                page: .module(title: item.title, moduleKey: linkModuleKey, aniListID: vm.aniListID),
-                initialSide: .anilist,
-                moduleEpisodeCount: vm.detail?.episodes.count ?? 0,
-                onAniListMatch: { aid in
-                    if let aid {
-                        vm.setAniListMatch(aid)
-                        AniListMappingManager.shared.saveMapping(title: item.title, aniListID: aid)
-                    } else {
-                        vm.setAniListMatch(nil)
-                        AniListMappingManager.shared.removeMapping(title: item.title)
-                    }
-                },
-                onChange: {
-                    Task { await reloadLinkedIDs() }
-                    rememberEpisodesIfLinked()
-                })
-            .zoomingOut(of: linksZoomID, in: sheetZoom, fromToolbar: linksZoomID == "edit")
-        }
+
     }
 
     // MARK: - Continue Watching Helpers
@@ -633,8 +655,8 @@ struct DetailView: View {
                 }
                 .buttonStyle(.plain)
                 .help(selectedTab == 0 ? "Show related titles" : "Show episodes")
-                // Picks episodes to download, which only iOS does.
-                #if os(iOS)
+                // Picks episodes to download.
+                #if !os(tvOS)
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         isSelectionMode.toggle()
@@ -677,7 +699,7 @@ struct DetailView: View {
             ? (continuing ? "Continue" : "Watch")
             : continuing ? "Continue Ep \(nextEp)" : "Watch Ep \(nextEp)"
         let activeModule = effectiveModuleId
-        #if os(iOS)
+        #if !os(tvOS)
         let downloadedTarget = DownloadManager.shared.items.first {
             $0.mediaTitle == detail.title
                 && $0.moduleId == activeModule
@@ -695,7 +717,7 @@ struct DetailView: View {
 
         Button {
             // Prefer the local file when the target episode is already downloaded.
-            #if os(iOS)
+            #if !os(tvOS)
             if let downloadedTarget {
                 playDownloaded(downloadedTarget)
                 return
@@ -730,7 +752,7 @@ struct DetailView: View {
                 Button { vm.loadStreams(for: targetEpisode) } label: {
                     Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
                 }
-                #if os(iOS)
+                #if !os(tvOS)
                 if downloadedTarget == nil {
                     Button { vm.loadDownloadStreams(for: targetEpisode) } label: {
                         Label("Download Episode", systemImage: "arrow.down.circle")
@@ -738,7 +760,7 @@ struct DetailView: View {
                 }
                 #endif
             }
-            #if os(iOS)
+            #if !os(tvOS)
             if let downloadedTarget {
                 Button(role: .destructive) { DownloadManager.shared.remove(downloadedTarget) } label: {
                     Label("Delete Download", systemImage: "trash")
@@ -779,7 +801,7 @@ struct DetailView: View {
         .buttonStyle(.plain)
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ViewBuilder
     private func selectionModeButton() -> some View {
         Button {
@@ -812,7 +834,7 @@ struct DetailView: View {
         let epNum = Int(episode.number)
 
         // Prefer the local file when this episode is already downloaded.
-        #if os(iOS)
+        #if !os(tvOS)
         if let downloaded = DownloadManager.shared.items.first(where: {
             $0.mediaTitle == currentTitle
                 && $0.moduleId == moduleId
@@ -1112,7 +1134,7 @@ struct DetailView: View {
     /// when available so the hero shows a true banner image instead of repeating
     /// the floating poster.
     private var heroBannerURL: String {
-        #if os(iOS)
+        #if !os(tvOS)
         if let snap = offlineSnapshot, let banner = snap.bannerFile {
             return DownloadedMediaSnapshotStore.shared
                 .localFileURL(in: snap, relative: banner).absoluteString
@@ -1475,7 +1497,7 @@ struct DetailView: View {
         offlineSnapshot != nil && detail.episodes.allSatisfy { $0.href.isEmpty }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Picked episodes on the downloaded-only list — what the floating delete button removes.
     private func selectedOfflineDownloads() -> [DownloadItem] {
         guard let snap = offlineSnapshot else { return [] }
@@ -1520,7 +1542,7 @@ struct DetailView: View {
     }
 
     private func episodeList(detail: MediaDetail) -> AnyView {
-        #if os(iOS)
+        #if !os(tvOS)
         if let captured = offlineSnapshot, showsOfflineEpisodes(detail) {
             // Read the freshest copy from the store so re-enriched titles/thumbnails
             // render live (the captured value is stale once reenrichIfStale runs).
@@ -1542,7 +1564,7 @@ struct DetailView: View {
                 HStack(spacing: 8) {
                     Text("Episodes")
                         .font(.title3.weight(.bold))
-                    #if os(iOS)
+                    #if !os(tvOS)
                     if !isSelectionMode {
                         Text("\(detail.episodes.count)")
                             .font(.caption.weight(.bold))
@@ -1575,7 +1597,7 @@ struct DetailView: View {
                 .help(isReversed ? "Newest episodes first — show oldest first" : "Oldest episodes first — show newest first")
                 .padding(.trailing, 4)
 
-                #if os(iOS)
+                #if !os(tvOS)
                 if !isSelectionMode {
                     if continueWatching.hasProgress(aniListID: vm.aniListID ?? aniListID, moduleId: effectiveModuleId, mediaTitle: detail.title) {
                         Button {
@@ -1703,7 +1725,7 @@ struct DetailView: View {
             }
 
             // Selection Bar (unchanged, uses .primary)
-            #if os(iOS)
+            #if !os(tvOS)
             if isSelectionMode {
                 HStack {
                     let currentRangeEpisodes: [EpisodeLink] = episodesInSelectedRange(visibleEpisodes)
@@ -1826,7 +1848,7 @@ struct DetailView: View {
                     ForEach(displayedEpisodes) { episode in
                         let epNum = Int(episode.number)
                         let numberIsAmbiguous = (episodeNumberCounts[epNum] ?? 0) > 1
-                        #if os(iOS)
+                        #if !os(tvOS)
                         let sel = isSelectionMode
                         let selected = selectedEpisodeNumbers.contains(epNum)
                         ModuleEpisodeRowContainer(
@@ -1899,7 +1921,7 @@ struct DetailView: View {
         }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ViewBuilder
     private func offlineEpisodesSection(detail: MediaDetail, snapshot: DownloadedMediaSnapshot) -> some View {
         let dm = DownloadManager.shared
@@ -2232,7 +2254,7 @@ private struct ModuleEpisodeRowContainer: View {
     var isSelected: Bool = false
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
-    #if os(iOS)
+    #if !os(tvOS)
     @ObservedObject private var downloadManager = DownloadManager.shared
     #endif
 
@@ -2261,7 +2283,7 @@ private struct ModuleEpisodeRowContainer: View {
     }
 
     private var downloadState: DownloadState? {
-        #if os(iOS)
+        #if !os(tvOS)
             downloadManager.downloadItem(
                 forEpisodeHref: episode.href, aniListID: aniListID,
                 moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum
@@ -2272,7 +2294,7 @@ private struct ModuleEpisodeRowContainer: View {
     }
 
     private var deleteDownloadAction: (() -> Void)? {
-        #if os(iOS)
+        #if !os(tvOS)
         guard let downloaded = downloadManager.downloadItem(
             forEpisodeHref: episode.href, aniListID: aniListID,
             moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum
@@ -2315,7 +2337,7 @@ private struct ModuleEpisodeRowContainer: View {
     /// duplicate TVDB fallback URLs (enrich uses first-occurrence-wins), so for
     /// downloaded series the online and offline views match.
     private var preferredThumbnail: String? {
-        #if os(iOS)
+        #if !os(tvOS)
         let store = DownloadedMediaSnapshotStore.shared
         // Prefer the snapshot's downloaded file when this specific episode has one
         // (keeps the row working offline for downloaded episodes). For episodes the
@@ -2339,7 +2361,7 @@ private struct ModuleEpisodeRowContainer: View {
     /// from disk when the network can't supply it.
     private var preferredTitle: String? {
         if let live = aniMapEpisode?.title, !live.isEmpty { return live }
-        #if os(iOS)
+        #if !os(tvOS)
         if let snap = DownloadedMediaSnapshotStore.shared.snapshot(mediaTitle: mediaTitle, moduleId: moduleId),
            let t = snap.episodes[epNum]?.title, !t.isEmpty {
             return t

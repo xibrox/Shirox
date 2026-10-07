@@ -1,6 +1,6 @@
 import Combine
 
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 struct BatchDownloadStreamPickerView: View {
@@ -63,11 +63,17 @@ struct BatchDownloadStreamPickerView: View {
                         .buttonStyle(.plain)
                     }
                     .softScrollEdges()
+                    #if os(iOS)
                     .listStyle(.insetGrouped)
+                    #else
+                    .listStyle(.inset)
+                    #endif
                 }
             }
             .navigationTitle("Download \(episodeNumbers.count) Episode\(episodeNumbers.count == 1 ? "" : "s")")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { onDismiss() }

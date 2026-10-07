@@ -1,6 +1,6 @@
 import Combine
 
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 struct DownloadStreamPickerView: View {
@@ -19,9 +19,15 @@ struct DownloadStreamPickerView: View {
                 }
             }
             .softScrollEdges()
+            #if os(iOS)
             .listStyle(.insetGrouped)
+            #else
+            .listStyle(.inset)
+            #endif
             .navigationTitle("Select Stream Quality")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
