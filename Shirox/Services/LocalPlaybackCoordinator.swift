@@ -181,6 +181,8 @@ final class LocalPlaybackCoordinator: ObservableObject {
         Task { @MainActor in
             // Run the JS bridge: the module echoes the handle back as a stream result.
             var playURL = videoURL
+            // A Mac plays the file where it lies; there's no handle to hand through a module.
+            #if !os(macOS)
             do {
                 let streams = try await JSEngine.shared.fetchStreams(episodeUrl: handle)
                 if let first = streams.first, let mapped = resolveHandle(first.url.absoluteString) {
@@ -191,6 +193,7 @@ final class LocalPlaybackCoordinator: ObservableObject {
             } catch {
                 Logger.shared.log("[Local] JS bridge failed (\(error)); playing picked URL directly", type: "General")
             }
+            #endif
 
             let stream = StreamResult(
                 title: title,
@@ -208,7 +211,9 @@ final class LocalPlaybackCoordinator: ObservableObject {
                 imageUrl: "",
                 aniListID: nil,
                 malID: nil,
-                moduleId: ModuleManager.shared.activeModule?.id,
+                // Not the active module's: on a Mac it never touches one, and a source here filed
+                // the video under that module in Continue Watching and the Library.
+                moduleId: Self.playsThroughModule ? ModuleManager.shared.activeModule?.id : nil,
                 totalEpisodes: nil,
                 availableEpisodes: nil,
                 isAiring: nil,
@@ -228,6 +233,14 @@ final class LocalPlaybackCoordinator: ObservableObject {
             try? await Task.sleep(nanoseconds: 350_000_000)
             PlayerPresenter.shared.presentPlayer(stream: stream, context: context)
         }
+    }
+
+    private static var playsThroughModule: Bool {
+        #if os(macOS)
+        false
+        #else
+        true
+        #endif
     }
 
     // MARK: - Cleanup

@@ -122,6 +122,14 @@ struct MangaDetailView: View {
         .fullScreenCover(item: $readerContext) { ctx in
             MangaReaderView(context: ctx)
         }
+        #elseif os(macOS)
+        .navigationTitle(vm.detail?.title ?? item.title)
+        // The reader opens in a window of its own.
+        .onChangeOf(readerContext?.id) { _ in
+            guard let ctx = readerContext else { return }
+            MacReaderWindowManager.shared.open(ctx)
+            readerContext = nil
+        }
         #endif
         .toolbarZoomSource("match", in: sheetZoom) {
             if vm.detail != nil { matchToolbarButton }
@@ -314,11 +322,12 @@ struct MangaDetailView: View {
                         libraryControls(detail)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
-                        #else
-                        Text("Reading is available on iOS")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        #elseif os(macOS)
+                        readButton(detail)
                             .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                            .padding(.top, synopsis.isEmpty ? 16 : 0)
+                            .frame(maxWidth: 520, alignment: .leading)
                         #endif
                     }
                     if let edges = vm.enrichment?.relations?.edges {
@@ -499,7 +508,7 @@ struct MangaDetailView: View {
 
     // MARK: - Read button (DetailView's watchButton style)
 
-    #if os(iOS)
+    #if !os(tvOS)
     private func readButton(_ detail: MangaDetail) -> some View {
         let hasProgress = progress.lastRead(for: item.href) != nil
         return Button {
@@ -524,7 +533,9 @@ struct MangaDetailView: View {
         .buttonStyle(.plain)
         .disabled(liveChapters(for: detail).isEmpty)
     }
+    #endif
 
+    #if os(iOS)
     // MARK: - Reading-list editor (mirrors DetailView's per-service controls)
 
     private var mangaAniListID: Int? { vm.enrichment?.isManga == true ? vm.enrichment?.id : vm.match?.aniListID }
@@ -748,6 +759,8 @@ struct MangaDetailView: View {
                                 } else {
                                     openChapter(chapter, detail: readableDetail(detail))
                                 }
+                                #elseif os(macOS)
+                                openChapter(chapter, detail: readableDetail(detail))
                                 #endif
                             },
                             onMarkRead: {
@@ -761,7 +774,7 @@ struct MangaDetailView: View {
                             isSelectionMode: chapterRowSelectionMode,
                             isSelected: selectedChapterHrefsContains(chapter.href),
                             downloadState: mangaDownloadState(for: chapter),
-                            onDownload: offlineChapters == nil ? {
+                            onDownload: offlineChapters == nil && Self.downloadsChapters ? {
                                 #if os(iOS)
                                 mangaDownloads.download(chapter: chapter, context: downloadContext(detail))
                                 #endif
@@ -779,9 +792,18 @@ struct MangaDetailView: View {
         }
     }
 
-    // MARK: - Reader launching (iOS)
+    /// Chapters download on iOS only; elsewhere the row offers no button for it.
+    private static var downloadsChapters: Bool {
+        #if os(iOS)
+        true
+        #else
+        false
+        #endif
+    }
 
-    #if os(iOS)
+    // MARK: - Reader launching
+
+    #if !os(tvOS)
     /// The detail the reader opens on. Offline, that is the chapters still on disk — the list
     /// captured on entry goes stale as chapters are deleted, and the reader would then try to
     /// fetch a removed chapter from the network.
