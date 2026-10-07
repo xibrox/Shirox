@@ -314,3 +314,72 @@ enum PosterGrid {
     static let columns = [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 14)]
 }
 #endif
+
+#if os(macOS)
+/// A row of cards that scrolls sideways, with arrows at its ends while the pointer is over it:
+/// a mouse has no sideways swipe, and without them the rest of the row was out of reach.
+struct MacShelf<Item: Identifiable, Card: View>: View {
+    let items: [Item]
+    var spacing: CGFloat = 12
+    @ViewBuilder let card: (Item) -> Card
+
+    @State private var visible: Set<Int> = []
+    @State private var isHovering = false
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: spacing) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        card(item)
+                            .id(index)
+                            .onAppear { visible.insert(index) }
+                            .onDisappear { visible.remove(index) }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .overlay(alignment: .leading) {
+                if isHovering, let first = visible.min(), first > 0 {
+                    arrow("chevron.left") {
+                        // Back by about a window's worth.
+                        let page = max(1, visible.count - 1)
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            proxy.scrollTo(max(0, first - page), anchor: .leading)
+                        }
+                    }
+                    .padding(.leading, 6)
+                    .transition(.opacity)
+                }
+            }
+            .overlay(alignment: .trailing) {
+                if isHovering, let last = visible.max(), last < items.count - 1 {
+                    arrow("chevron.right") {
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            proxy.scrollTo(last, anchor: .leading)
+                        }
+                    }
+                    .padding(.trailing, 6)
+                    .transition(.opacity)
+                }
+            }
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.15)) { isHovering = hovering }
+            }
+        }
+    }
+
+    private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(width: 36, height: 36)
+                .background(.regularMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+                .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+}
+#endif

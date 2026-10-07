@@ -1,4 +1,4 @@
-#if os(iOS) || targetEnvironment(macCatalyst)
+#if !os(tvOS)
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -27,7 +27,7 @@ struct BackupSettingsView: View {
     }
 
     var body: some View {
-        List {
+        SettingsList {
             exportSection
             importSection
             if let report { reportSection(report) }
@@ -77,7 +77,12 @@ struct BackupSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(includeAccounts ? .orange : .secondary)
 
+            #if os(macOS)
+            // A Mac saves the file where it's told; the share menu there has no "Save".
+            Button("Save Backup…") { saveBackup() }
+            #else
             Button("Create Backup") { createBackup() }
+            #endif
 
             if let exportedURL, #available(iOS 16.0, macOS 13.0, *) {
                 ShareLink(item: exportedURL) {
@@ -86,6 +91,27 @@ struct BackupSettingsView: View {
             }
         }
     }
+
+    #if os(macOS)
+    private func saveBackup() {
+        createBackup()
+        guard let exportedURL else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = exportedURL.lastPathComponent
+        panel.allowedContentTypes = Self.backupContentTypes
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: exportedURL, to: destination)
+            ToastManager.shared.show(message: "Backup saved", type: .success)
+        } catch {
+            exportError = error.localizedDescription
+        }
+    }
+    #endif
 
     private func createBackup() {
         do {

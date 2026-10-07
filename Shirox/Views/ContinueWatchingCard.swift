@@ -62,6 +62,12 @@ struct ContinueWatchingSection: View {
             }
             .padding(.horizontal, 16)
 
+            #if os(macOS)
+            MacShelf(items: items) { item in
+                itemView(for: item)
+                    .frame(width: cardWidth)
+            }
+            #else
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
                     ForEach(items) { item in
@@ -71,6 +77,7 @@ struct ContinueWatchingSection: View {
                 }
                 .padding(.horizontal, 16)
             }
+            #endif
         }
     }
 

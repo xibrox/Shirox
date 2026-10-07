@@ -5,6 +5,8 @@ import Accelerate
 import Libmpv
 #if os(iOS) || os(tvOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 /// The layer mpv draws into, through MoltenVK.
@@ -68,10 +70,10 @@ final class MPVEngine: PlaybackEngine {
     /// What `MPVVideoView` shows.
     let layer = MPVMetalLayer()
 
-    #if os(iOS)
-    private var pendingScreenshots: [UInt64: @MainActor (UIImage?) -> Void] = [:]
+    #if !os(tvOS)
+    private var pendingScreenshots: [UInt64: @MainActor (PlatformImage?) -> Void] = [:]
 
-    func captureCurrentFrame(completion: @escaping @MainActor (UIImage?) -> Void) {
+    func captureCurrentFrame(completion: @escaping @MainActor (PlatformImage?) -> Void) {
         guard isItemReady, !isStopped else { completion(nil); return }
         let reply = nextSeekReply
         nextSeekReply += 1
@@ -96,7 +98,7 @@ final class MPVEngine: PlaybackEngine {
         return true
     }
 
-    private static func image(from pixels: ScreenshotPixels) -> UIImage? {
+    private static func image(from pixels: ScreenshotPixels) -> PlatformImage? {
         guard let provider = CGDataProvider(data: pixels.data as CFData),
               let image = CGImage(width: pixels.width, height: pixels.height,
                                   bitsPerComponent: 8, bitsPerPixel: 32,
@@ -106,7 +108,11 @@ final class MPVEngine: PlaybackEngine {
                                       .union(.byteOrder32Little),
                                   provider: provider, decode: nil,
                                   shouldInterpolate: false, intent: .defaultIntent) else { return nil }
+        #if os(macOS)
+        return NSImage(cgImage: image, size: NSSize(width: pixels.width, height: pixels.height))
+        #else
         return UIImage(cgImage: image)
+        #endif
     }
     #endif
 
@@ -465,7 +471,7 @@ final class MPVEngine: PlaybackEngine {
             tick(force: true)
             tellMetalShown()
         case .commandReply(let reply, let error, let pixels):
-            #if os(iOS)
+            #if !os(tvOS)
             if finishScreenshot(reply: reply, error: error, pixels: pixels) { return }
             #endif
             guard let index = pendingSeeks.firstIndex(where: { $0.reply == reply }) else { return }
@@ -691,7 +697,7 @@ final class MPVEngine: PlaybackEngine {
     func stop() {
         guard !isStopped else { return }
         isStopped = true
-        #if os(iOS)
+        #if !os(tvOS)
         let screenshots = Array(pendingScreenshots.values)
         pendingScreenshots = [:]
         for completion in screenshots { completion(nil) }

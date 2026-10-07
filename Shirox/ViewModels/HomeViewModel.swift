@@ -59,7 +59,7 @@ final class HomeViewModel: ObservableObject {
             // own error view never shows either (it only appears when `trending.isEmpty`), so
             // the failure was completely silent: switching to a provider that's down looked
             // exactly like the switch did nothing at all.
-            #if os(iOS)
+            #if !os(tvOS)
             if !trending.isEmpty {
                 let name = ProviderManager.shared.primary?.providerType.displayName ?? "provider"
                 ToastManager.shared.show(message: "Couldn't load \(name). Showing previous results.",

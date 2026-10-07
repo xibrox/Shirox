@@ -1,4 +1,8 @@
 import AVFoundation
+#if os(macOS)
+import AppKit
+import CoreImage
+#endif
 #if os(iOS)
 import CoreImage
 import UIKit
@@ -122,9 +126,10 @@ final class AVPlayerEngine: PlaybackEngine {
             ? AVURLAsset(url: source.url)
             : AVURLAsset(url: source.url, options: ["AVURLAssetHTTPHeaderFieldsKey": source.headers])
         let item = AVPlayerItem(asset: asset)
-        #if os(iOS)
-        // Only for the hold-to-save-frame action: an output costs a BGRA copy path all along.
-        if UserDefaults.standard.string(forKey: "playerHoldAction") == "saveFrame" {
+        #if os(iOS) || os(macOS)
+        // Only for saving a frame — iOS's hold action, a Mac's S key: an output costs a BGRA
+        // copy path all along.
+        if Self.capturesFrames {
             item.add(AVPlayerItemVideoOutput(pixelBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
             ]))
@@ -264,8 +269,16 @@ final class AVPlayerEngine: PlaybackEngine {
     /// The picture's own size, zero until known.
     var presentationSize: CGSize { player.currentItem?.presentationSize ?? .zero }
 
-    #if os(iOS)
-    func captureCurrentFrame() -> UIImage? {
+    private static var capturesFrames: Bool {
+        #if os(macOS)
+        true
+        #else
+        UserDefaults.standard.string(forKey: "playerHoldAction") == "saveFrame"
+        #endif
+    }
+
+    #if !os(tvOS)
+    func captureCurrentFrame() -> PlatformImage? {
         guard let item = player.currentItem,
               let output = item.outputs.compactMap({ $0 as? AVPlayerItemVideoOutput }).first,
               let buffer = output.copyPixelBuffer(forItemTime: item.currentTime(), itemTimeForDisplay: nil),
@@ -273,7 +286,11 @@ final class AVPlayerEngine: PlaybackEngine {
                                                     from: CGRect(x: 0, y: 0,
                                                                  width: CVPixelBufferGetWidth(buffer),
                                                                  height: CVPixelBufferGetHeight(buffer))) else { return nil }
+        #if os(macOS)
+        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        #else
         return UIImage(cgImage: image)
+        #endif
     }
     #endif
 

@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AVKit
+#endif
 
 struct PlayerTopBar: View {
     let title: String
@@ -8,6 +11,12 @@ struct PlayerTopBar: View {
     var topPadding: CGFloat = 24
     var isLandscape: Bool = true
     var showDismiss: Bool = true
+    #if os(macOS)
+    /// The native engine's player, which AirPlay can take to another screen. Nil on mpv.
+    var airPlayPlayer: AVPlayer? = nil
+    /// Whether the window is the small floating one.
+    var isPictureInPicture = false
+    #endif
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
     /// The right-hand capsule's width. In landscape it lays its buttons out in a row (Cast,
     /// AirPlay, PiP, lock) and is far wider than the dismiss button, so a fixed inset let a
@@ -115,6 +124,21 @@ struct PlayerTopBar: View {
             .buttonStyle(.plain)
         }
         #endif
+        #if os(macOS)
+        if let airPlayPlayer {
+            MacAirPlayButton(player: airPlayPlayer)
+                .frame(width: frameSize, height: frameSize)
+                .help("AirPlay")
+        }
+        Button { onPiP?() } label: {
+            Image(systemName: isPictureInPicture ? "pip.exit" : "pip.enter")
+                .font(.system(size: iconSize, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: frameSize, height: frameSize)
+        }
+        .buttonStyle(.plain)
+        .help(isPictureInPicture ? "Back to the full window (P)" : "Picture in Picture (P)")
+        #else
         Button {
             withAnimation(.easeInOut(duration: 0.2)) { isLocked.toggle() }
         } label: {
@@ -124,12 +148,47 @@ struct PlayerTopBar: View {
                 .frame(width: frameSize, height: frameSize)
         }
         .buttonStyle(.plain)
+        #endif
     }
 }
+
+#if os(macOS)
+/// The system's AirPlay menu, sending the native engine's player to the chosen screen.
+private struct MacAirPlayButton: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.isRoutePickerButtonBordered = false
+        view.setRoutePickerButtonColor(.white, for: .normal)
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ view: AVRoutePickerView, context: Context) {
+        view.player = player
+    }
+}
+#endif
 
 private struct PlayerTopBarTrailingWidthKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
     }
+}
+
+extension PlayerTopBar {
+    /// The Mac's own top-bar buttons: AirPlay for the native engine's player, and Picture in
+    /// Picture. Nothing elsewhere.
+    #if os(macOS)
+    func macPlayerControls(airPlay: AVPlayer?, isPictureInPicture: Bool) -> PlayerTopBar {
+        var bar = self
+        bar.airPlayPlayer = airPlay
+        bar.isPictureInPicture = isPictureInPicture
+        return bar
+    }
+    #else
+    func macPlayerControls(airPlay: Never?, isPictureInPicture: Bool) -> PlayerTopBar { self }
+    #endif
 }

@@ -500,7 +500,7 @@ final class LibrarySyncService: ObservableObject {
         let combined = written.reduce(LibrarySyncSummary()) { $0.adding(summaries[$1]!) }
         lastSummary = combined
         Logger.shared.log("[LibrarySync] \(run.kind.rawValue) \(run.title): \(message)", type: "Provider")
-        #if os(iOS)
+        #if !os(tvOS)
         ToastManager.shared.show(
             message: message,
             type: combined.failed > 0 ? .warning : .success,

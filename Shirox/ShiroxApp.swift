@@ -221,11 +221,32 @@ struct ShiroxApp: App {
                     .keyboardShortcut(tab.shortcut ?? " ", modifiers: .command)
                 }
                 Divider()
+                // A Mac has no pull to refresh.
+                Button("Reload") {
+                    NotificationCenter.default.post(name: .reloadPage, object: nil)
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                Divider()
             }
             #if os(macOS)
             CommandGroup(after: .newItem) {
                 Button("Open Video…") { MacOpenVideo.choose() }
                     .keyboardShortcut("o", modifiers: .command)
+            }
+            // The player window's actions, where a Mac looks for them. Its keys (space, the
+            // arrows, F, S, P) work as well while it's in front.
+            CommandMenu("Playback") {
+                Button("Play/Pause") { MacPlayerCommand.send(.playPause) }
+                    .keyboardShortcut(.space, modifiers: [.option])
+                Button("Skip Back") { MacPlayerCommand.send(.skipBack) }
+                    .keyboardShortcut(.leftArrow, modifiers: [.option])
+                Button("Skip Forward") { MacPlayerCommand.send(.skipForward) }
+                    .keyboardShortcut(.rightArrow, modifiers: [.option])
+                Divider()
+                Button("Picture in Picture") { MacPlayerWindowManager.shared.togglePictureInPicture() }
+                    .keyboardShortcut("p", modifiers: [.command, .option])
+                Button("Save Frame") { MacPlayerCommand.send(.saveFrame) }
+                    .keyboardShortcut("s", modifiers: [.command, .option])
             }
             #endif
             CommandGroup(after: .textEditing) {
@@ -296,6 +317,8 @@ private struct MacSidebarView: View {
 extension Notification.Name {
     /// A sidebar section picked from the menu bar; `object` is its `SidebarTab`.
     static let selectSidebarTab = Notification.Name("SelectSidebarTab")
+    /// View ▸ Reload (⌘R): the page on screen loads again.
+    static let reloadPage = Notification.Name("ReloadPage")
 }
 #endif
 

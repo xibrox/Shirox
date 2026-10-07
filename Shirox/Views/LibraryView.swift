@@ -36,6 +36,9 @@ struct LibraryView: View {
     /// The title a grid card opened: cards share a List row, so they navigate from code.
     @State private var gridDestination: LibraryEntry?
     @State private var gridLinkActive = false
+    #if os(macOS)
+    @State private var libraryWidth: CGFloat = 1000
+    #endif
     @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
 
     #if os(iOS)
@@ -192,6 +195,18 @@ struct LibraryView: View {
         // there's always something to show; sign-in lives in the toolbar + Settings.
         NavigationStack {
             libraryContent
+                #if os(macOS)
+                .background {
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear { libraryWidth = geo.size.width }
+                            .onChangeOf(geo.size.width) { libraryWidth = $0 }
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .reloadPage)) { _ in
+                    Task { await refreshLibrary() }
+                }
+                #endif
         }
     }
 
@@ -873,6 +888,9 @@ struct LibraryView: View {
     private var gridColumns: Int {
         #if os(iOS)
         horizontalSizeClass == .regular ? 6 : 3
+        #elseif os(macOS)
+        // As many ~170-point posters as the window's width holds.
+        max(3, min(10, Int((libraryWidth - 32) / 170)))
         #else
         6
         #endif
@@ -971,7 +989,11 @@ struct LibraryView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { openFromGrid(entry) }
                         .contextMenu {
+                            Button { openFromGrid(entry) } label: { Label("Open", systemImage: "arrow.up.right") }
                             Button { editEntry(entry) } label: { Label("Edit", systemImage: "pencil") }
+                            if let quick = quickProgress(entry) {
+                                Button { Task { await quick.run() } } label: { Label(quick.title, systemImage: quick.icon) }
+                            }
                         }
                 }
                 // Keeps a short last line's posters the same size as the rest.

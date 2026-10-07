@@ -424,7 +424,7 @@ final class LibraryViewModel: ObservableObject {
     /// last check — with the error over it: often the daily limit, which no retry clears before
     /// midnight US Eastern. Everything else shows the error in place of the list.
     private func report(_ error: Error, keepingList: Bool) {
-        #if os(iOS)
+        #if !os(tvOS)
         if keepingList {
             ToastManager.shared.show(message: error.localizedDescription, type: .error)
             return

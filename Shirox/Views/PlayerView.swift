@@ -141,9 +141,13 @@ struct PlayerView: View {
     @State private var autoAdvanceTask: Task<Void, Never>? = nil
     /// Owns the Control Center / lock screen transport registration. Held here so a player
     /// rebuild replaces the handlers instead of stacking a second set on top.
-    #if os(iOS)
+    #if !os(tvOS)
 
     @State private var remoteCommands = RemoteCommandCoordinator()
+    #endif
+    #if os(macOS)
+    /// The Mac player window, whose Picture in Picture state the top bar shows.
+    @ObservedObject private var macWindow = MacPlayerWindowManager.shared
     #endif
     /// Non-nil while playback is routed through `CastProxyServer` for an AirPlay receiver,
     /// which is the only way a header-authenticated stream reaches an Apple TV.
@@ -536,6 +540,8 @@ struct PlayerView: View {
             // Give up audio focus on exit so system music (Spotify/Apple Music)
             // can resume. .notifyOthersOnDeactivation triggers their auto-resume.
             AppAudioSession.deactivate()
+            #elseif os(macOS)
+            MacDisplaySleep.allow()
             #endif
             if MouseCursorManager.isSupported {
                 MouseCursorManager.unhide()
@@ -546,6 +552,10 @@ struct PlayerView: View {
             // The screen stays on while a video plays. AVPlayer's own display-sleep prevention
             // didn't hold on iOS 26 (the screen dimmed mid-episode), and mpv has none at all.
             UIApplication.shared.isIdleTimerDisabled = playing
+            #elseif os(macOS)
+            // Nor does a Mac's display sleep, or its screen saver start, mid-episode — mpv doesn't
+            // stop either by itself.
+            if playing { MacDisplaySleep.prevent() } else { MacDisplaySleep.allow() }
             #endif
             // On a Mac the controls and the pointer go away together while playing and come
             // back on a pause. Not on iPhone or iPad, where a pause from Control Center or a
@@ -849,8 +859,24 @@ struct PlayerView: View {
             skip: { skip(by: $0) },
             scheduleHide: scheduleHide,
             skipShort: skipShort,
-            skipLong: skipLong
+            skipLong: skipLong,
+            saveFrame: {
+                #if os(macOS)
+                if let engine { saveCurrentFrame(from: engine) }
+                #endif
+            }
         )
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: MacPlayerCommand.notification)) { note in
+            guard let raw = note.object as? String, let command = MacPlayerCommand(rawValue: raw) else { return }
+            switch command {
+            case .playPause: togglePlayPause()
+            case .skipBack: skip(by: -Double(skipShort)); scheduleHide()
+            case .skipForward: skip(by: Double(skipShort)); scheduleHide()
+            case .saveFrame: if let engine { saveCurrentFrame(from: engine) }
+            }
+        }
+        #endif
     }
 
     // MARK: - Extracted UI Components
@@ -1021,6 +1047,37 @@ struct PlayerView: View {
         .allowsHitTesting(false)
     }
 
+    #if os(macOS)
+    /// S on a Mac: the frame on screen, as a PNG in Pictures › Shirox.
+    private func saveCurrentFrame(from engine: any PlaybackEngine) {
+        let finish: @MainActor (PlatformImage?) -> Void = { image in
+            guard let image, let tiff = image.tiffRepresentation,
+                  let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+                ToastManager.shared.show(message: "The frame isn't available yet — try again while it plays.", type: .error)
+                return
+            }
+            let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Shirox", isDirectory: true)
+            let stamp = Int(currentTime)
+            let name = "\(currentContext?.mediaTitle ?? currentStream.title) \(stamp / 60)m\(stamp % 60)s.png"
+                .replacingOccurrences(of: "/", with: "-")
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let file = folder.appendingPathComponent(name)
+                try png.write(to: file)
+                ToastManager.shared.show(message: "Frame saved to Pictures › Shirox", type: .success)
+            } catch {
+                ToastManager.shared.show(message: "Couldn't save the frame: \(error.localizedDescription)", type: .error)
+            }
+        }
+        if let mpv = engine as? MPVEngine {
+            mpv.captureCurrentFrame { finish($0) }
+        } else {
+            finish((engine as? AVPlayerEngine)?.captureCurrentFrame())
+        }
+    }
+    #endif
+
     #if os(iOS)
     private func saveCurrentFrame(from engine: any PlaybackEngine) {
         if let mpv = engine as? MPVEngine {
@@ -1157,6 +1214,9 @@ struct PlayerView: View {
             isLocked: $isLocked,
             // MPV's Picture in Picture goes through its software renderer.
             onPiP: {
+                #if os(macOS)
+                MacPlayerWindowManager.shared.togglePictureInPicture()
+                #endif
                 #if os(iOS)
                 if let mpv = engine as? MPVEngine {
                     MPVPictureInPicture.shared.toggle(engine: mpv)
@@ -1168,8 +1228,17 @@ struct PlayerView: View {
             topPadding: topPad,
             isLandscape: isLandscape
         )
+        .macPlayerControls(airPlay: macAirPlayPlayer, isPictureInPicture: macPictureInPicture)
         .buttonStyle(CircularButtonStyle())
     }
+
+    #if os(macOS)
+    private var macAirPlayPlayer: AVPlayer? { (engine as? AVPlayerEngine)?.player }
+    private var macPictureInPicture: Bool { macWindow.isPictureInPicture }
+    #else
+    private var macAirPlayPlayer: Never? { nil }
+    private var macPictureInPicture: Bool { false }
+    #endif
 
     @ViewBuilder
     private func bottomBarView(bottomPad: CGFloat, isLandscape: Bool) -> some View {
@@ -2234,7 +2303,7 @@ struct PlayerView: View {
         }
 
         scheduleHide()
-        #if os(iOS)
+        #if !os(tvOS)
         setupRemoteCommands()
         #endif
     }
@@ -2628,7 +2697,7 @@ struct PlayerView: View {
         }
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// Wires the lock screen / Control Center transport controls.
     ///
     /// The handlers deliberately call the same functions the on-screen buttons do rather than
@@ -2699,6 +2768,10 @@ struct PlayerView: View {
             elapsed: elapsed, rate: rate, time: ProcessInfo.processInfo.systemUptime)
         if PlaybackRouting.nowPlayingNeedsUpdate(last: nowPlaying.sent, next: snapshot) {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            #if os(macOS)
+            // A Mac routes its media keys to the app that says it's playing.
+            MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
+            #endif
             nowPlaying.sent = snapshot
         }
 
@@ -2721,7 +2794,10 @@ struct PlayerView: View {
     private func tearDownNowPlaying() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         nowPlaying.sent = nil
-        #if os(iOS)
+        #if os(macOS)
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
+        #endif
+        #if !os(tvOS)
         remoteCommands.unregister()
         #endif
     }
@@ -3605,7 +3681,8 @@ private extension View {
         skip: @escaping (Double) -> Void,
         scheduleHide: @escaping () -> Void,
         skipShort: Int,
-        skipLong: Int
+        skipLong: Int,
+        saveFrame: @escaping () -> Void = {}
     ) -> some View {
         #if os(iOS)
         // `PlayerHostingController` takes these as key commands.
@@ -3623,6 +3700,8 @@ private extension View {
                 .onKeyPress(KeyEquivalent("l")) { skip(Double(skipLong)); scheduleHide(); return .handled }
                 #if os(macOS)
                 .onKeyPress(KeyEquivalent("f")) { NSApp.keyWindow?.toggleFullScreen(nil); return .handled }
+                .onKeyPress(KeyEquivalent("s")) { saveFrame(); return .handled }
+                .onKeyPress(KeyEquivalent("p")) { MacPlayerWindowManager.shared.togglePictureInPicture(); return .handled }
                 #endif
         } else {
             self
@@ -3652,6 +3731,39 @@ struct MacVideoPlayerView: NSViewRepresentable {
     }
 }
 
+// MARK: - Playback menu (macOS)
+
+/// The Playback menu's commands, for the player on screen.
+enum MacPlayerCommand: String {
+    case playPause, skipBack, skipForward, saveFrame
+
+    static let notification = Notification.Name("MacPlayerCommand")
+
+    static func send(_ command: MacPlayerCommand) {
+        NotificationCenter.default.post(name: notification, object: command.rawValue)
+    }
+}
+
+// MARK: - Display sleep (macOS)
+
+/// Holds the display awake while a video plays.
+@MainActor
+enum MacDisplaySleep {
+    private static var activity: NSObjectProtocol?
+
+    static func prevent() {
+        guard activity == nil else { return }
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: [.idleDisplaySleepDisabled, .userInitiated], reason: "Playing video")
+    }
+
+    static func allow() {
+        guard let activity else { return }
+        ProcessInfo.processInfo.endActivity(activity)
+        Self.activity = nil
+    }
+}
+
 // MARK: - macOS Player Window Manager
 
 /// The player's window. Its close and minimise buttons fade out with the controls, and AppKit
@@ -3671,7 +3783,7 @@ final class PlayerWindow: NSWindow {
 /// The player's own window on a Mac: one at a time, sized and placed where the last one was,
 /// and torn down when it closes so nothing keeps playing behind it.
 @MainActor
-final class MacPlayerWindowManager: NSObject, NSWindowDelegate {
+final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject {
     static let shared = MacPlayerWindowManager()
     private var playerWindow: NSWindow?
 
@@ -3747,7 +3859,40 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate {
         }
     }
 
+    // MARK: Picture in Picture
+
+    /// Whether the window is the small floating one in a corner of the screen.
+    @Published private(set) var isPictureInPicture = false
+    private var frameBeforePictureInPicture: NSRect?
+
+    /// mpv has no Picture in Picture on a Mac, so neither engine uses the system's: the window
+    /// itself shrinks into a corner and stays above other apps, on every Space, until toggled back.
+    func togglePictureInPicture() {
+        guard let window = playerWindow else { return }
+        if window.styleMask.contains(.fullScreen) {
+            window.toggleFullScreen(nil)
+        }
+        if isPictureInPicture {
+            window.level = .normal
+            window.collectionBehavior = [.fullScreenPrimary, .managed]
+            if let frame = frameBeforePictureInPicture { window.setFrame(frame, display: true, animate: true) }
+            isPictureInPicture = false
+        } else {
+            frameBeforePictureInPicture = window.frame
+            let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+            let width: CGFloat = 480
+            let height = width * 9 / 16
+            let frame = NSRect(x: visible.maxX - width - 20, y: visible.minY + 20, width: width, height: height)
+            window.level = .floating
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            window.setFrame(frame, display: true, animate: true)
+            isPictureInPicture = true
+        }
+    }
+
     private func closeCurrent() {
+        isPictureInPicture = false
+        frameBeforePictureInPicture = nil
         guard let window = playerWindow else { return }
         window.delegate = nil
         window.close()
@@ -3760,6 +3905,8 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate {
         // Drops the player view, which stops playback and saves the position on its way out.
         window.contentView = nil
         playerWindow = nil
+        isPictureInPicture = false
+        frameBeforePictureInPicture = nil
     }
 }
 #endif

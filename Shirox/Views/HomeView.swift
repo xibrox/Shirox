@@ -277,6 +277,11 @@ struct HomeView: View {
         .observeSafeAreaLeading($leadingInset)
         #endif
         .task(id: homeSourceID) { await loadCurrent() }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: .reloadPage)) { _ in
+            Task { await performRefresh() }
+        }
+        #endif
         .onChangeOf(pagePosition) { if let position = $0 { lastPagePosition = position } }
         .onAppear {
             #if os(iOS)
@@ -1116,6 +1121,17 @@ private struct AnimeSection<SeeAll: View>: View {
             }
             .padding(.horizontal, 16)
 
+            #if os(macOS)
+            MacShelf(items: items) { media in
+                NavigationLink {
+                    MediaDestination(media: media)
+                } label: {
+                    AniListCardView(media: media)
+                }
+                .buttonStyle(HomePressStyle())
+                .frame(width: cardWidth)
+            }
+            #else
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
                     ForEach(items) { media in
@@ -1130,6 +1146,7 @@ private struct AnimeSection<SeeAll: View>: View {
                 }
                 .padding(.horizontal, 16)
             }
+            #endif
         }
     }
 }

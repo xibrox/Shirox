@@ -312,7 +312,7 @@ struct SettingsView: View {
             }
 
             Section {
-                #if os(iOS)
+                #if !os(tvOS)
                 NavigationLink {
                     BackupSettingsView()
                 } label: {
@@ -1072,8 +1072,11 @@ struct DownloadsSettingsView: View {
                         Text("\(count)").tag(count)
                     }
                 }
+                // A Mac app keeps running in the background; only iOS has to ask to.
+                #if os(iOS)
                 Toggle("Background Downloads", isOn: $backgroundDownloadsEnabled)
                     .tint(.secondary)
+                #endif
                 Toggle("Auto-Resume Interrupted", isOn: $autoResumeDownloads)
                     .tint(.secondary)
                 Toggle("Delete After Watching", isOn: $autoDeleteWatched)

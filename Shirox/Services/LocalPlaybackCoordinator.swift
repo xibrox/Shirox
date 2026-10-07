@@ -40,6 +40,11 @@ final class LocalPlaybackCoordinator: ObservableObject {
     /// Copies a freshly-picked video into persistent storage and returns the stable local URL.
     /// Returns nil if the copy fails (e.g. the picker URL was never accessible).
     func importVideo(from pickedURL: URL) -> URL? {
+        // A Mac reads the file where it lies (see `MacOpenVideo`): a copy of a film would double
+        // the space it takes.
+        #if os(macOS)
+        return pickedURL
+        #else
         let started = pickedURL.startAccessingSecurityScopedResource()
         defer { if started { pickedURL.stopAccessingSecurityScopedResource() } }
         let dest = Self.importsDirectory.appendingPathComponent(UUID().uuidString + "-" + pickedURL.lastPathComponent)
@@ -51,6 +56,7 @@ final class LocalPlaybackCoordinator: ObservableObject {
             Logger.shared.log("[Local] video import copy failed: \(error)", type: "Error")
             return nil
         }
+        #endif
     }
 
     /// The name to show for a local file: its name without the extension, and without the
