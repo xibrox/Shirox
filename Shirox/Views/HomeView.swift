@@ -154,8 +154,6 @@ struct HomeView: View {
                                 if !continueWatching.items.isEmpty {
                                     ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
                                 }
-                                #endif
-                                #if os(iOS)
                                 if !mangaProgress.items.isEmpty {
                                     ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext,
                                                            detailItem: $readingDetail)
@@ -258,6 +256,17 @@ struct HomeView: View {
             }
             .fullScreenCover(item: $readerContext) { ctx in
                 MangaReaderView(context: ctx)
+            }
+            #elseif os(macOS)
+            .navigationDestinationCompat(item: $readingDetail) { item in
+                MangaDetailView(item: SearchItem(title: item.mangaTitle, image: item.coverImage, href: item.mangaHref),
+                                moduleId: item.moduleId.isEmpty ? nil : item.moduleId)
+            }
+            // The reader opens in a window of its own.
+            .onChangeOf(readerContext?.id) { _ in
+                guard let ctx = readerContext else { return }
+                MacReaderWindowManager.shared.open(ctx)
+                readerContext = nil
             }
             #endif
         }

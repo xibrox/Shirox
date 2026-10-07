@@ -1,4 +1,4 @@
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
 
 /// "Continue Reading" row on Home: one card per manga with the last-read
