@@ -371,6 +371,7 @@ struct UpcomingCalendarView: View {
             }
         }
         .padding(.vertical, 2)
+        .fullTitleContextMenu(entry.media.title.displayTitle)
     }
 
     /// "Today" and "Tomorrow" read faster than a date when they apply; everything else gets its

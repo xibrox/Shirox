@@ -489,6 +489,7 @@ struct DownloadsView: View {
                         .tint(.red)
                     }
                     .contextMenu {
+                        FullTitleMenuItems(mediaGroup.mediaTitle)
                         Button(role: .destructive, action: deleteGroup) {
                             Label("Delete \(mediaGroup.items.count) Episode\(mediaGroup.items.count == 1 ? "" : "s")",
                                   systemImage: "trash")
@@ -588,6 +589,7 @@ struct DownloadsView: View {
                         .tint(.red)
                     }
                     .contextMenu {
+                        FullTitleMenuItems(g.mangaTitle)
                         Button(role: .destructive, action: deleteGroup) {
                             Label("Delete \(g.items.count) Chapter\(g.items.count == 1 ? "" : "s")",
                                   systemImage: "trash")

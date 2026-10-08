@@ -636,6 +636,7 @@ private struct ModuleStreamRow: View {
                                 SearchResultCard(item: item)
                             }
                             .buttonStyle(.plain)
+                            .fullTitleContextMenu(item.title)
                         }
                     }
                     .padding(.bottom, 2)
@@ -761,6 +762,7 @@ private struct SearchResultsPickerSheet: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .fullTitleContextMenu(item.title)
                     }
                 }
                 .padding(16)

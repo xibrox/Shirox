@@ -30,7 +30,9 @@ struct CardTitle: View {
     @ViewBuilder
     private var content: some View {
         let shortened = Self.shortenings(of: title)
-        if #available(iOS 16, macOS 13, tvOS 16, *), !shortened.isEmpty {
+        if shortened.isEmpty {
+            Text(title).lineLimit(lineLimit)
+        } else if #available(iOS 16, macOS 13, tvOS 16, *) {
             // The hidden copy sets the room: as many lines as the title needs, up to the limit,
             // across the whole width on offer. `ViewThatFits` then shows the first version whose
             // wrapped height fits in it — the title itself when it fits, else the least-shortened
@@ -47,7 +49,7 @@ struct CardTitle: View {
                     }
                 }
         } else {
-            Text(title).lineLimit(lineLimit)
+            MeasuredCardTitle(title: title, shortened: shortened, lineLimit: lineLimit)
         }
     }
 
@@ -81,5 +83,69 @@ struct CardTitle: View {
             if seen.insert(candidate).inserted { result.append(candidate) }
         }
         return result
+    }
+}
+
+/// `CardTitle` before iOS 16, which has no `ViewThatFits`: measures each version's wrapped height
+/// itself and shows the first that fits. Until the measurements arrive it shows the plain
+/// truncated title, so the worst case is the old behaviour for a frame.
+struct MeasuredCardTitle: View {
+    let title: String
+    let shortened: [String]
+    let lineLimit: Int
+
+    @State private var room: CGFloat = 0
+    @State private var heights: [Int: CGFloat] = [:]
+
+    private var versions: [String] { [title] + shortened }
+
+    private var chosen: String {
+        guard room > 0 else { return title }
+        for (index, version) in versions.enumerated() {
+            if let height = heights[index], height <= room + 0.5 { return version }
+        }
+        return title
+    }
+
+    var body: some View {
+        // Same room as on iOS 16: as many lines as the title needs, up to the limit, full width.
+        Text(title)
+            .lineLimit(lineLimit)
+            .hidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: RoomKey.self, value: geo.size.height)
+            })
+            .overlay(alignment: .topLeading) {
+                Text(chosen).lineLimit(lineLimit)
+            }
+            .background(alignment: .topLeading) {
+                // Every version laid out unclipped at the same width, invisibly, to read its height.
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(versions.enumerated()), id: \.offset) { index, version in
+                        Text(version)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .background(GeometryReader { geo in
+                                Color.clear.preference(key: HeightsKey.self, value: [index: geo.size.height])
+                            })
+                    }
+                }
+                .opacity(0)
+                .accessibilityHidden(true)
+            }
+            .onPreferenceChange(RoomKey.self) { room = $0 }
+            .onPreferenceChange(HeightsKey.self) { heights = $0 }
+    }
+
+    private struct RoomKey: PreferenceKey {
+        static let defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+    }
+
+    private struct HeightsKey: PreferenceKey {
+        static let defaultValue: [Int: CGFloat] = [:]
+        static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
+            value.merge(nextValue()) { $1 }
+        }
     }
 }

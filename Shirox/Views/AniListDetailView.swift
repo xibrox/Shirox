@@ -1884,6 +1884,7 @@ struct RelationCard: View {
             // so without this a card swallows taps meant for its neighbour.
             .contentShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
+            .fullTitleContextMenu(edge.node.title.displayTitle)
     }
 }
 
@@ -2012,6 +2013,7 @@ struct AniListMatchingSearchView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .fullTitleContextMenu(media.title.displayTitle)
                         .listRowBackground(Color.clear)
                         .padding(.vertical, 4)
                     }

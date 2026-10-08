@@ -81,6 +81,7 @@ struct SimklSearchSheet: View {
                     }
                 }
             }
+            .fullTitleContextMenu(item.title ?? "")
             if inLibrary[id] == nil {
                 Menu {
                     ForEach(LibrarySource.simkl.statuses(in: MediaListStatus.allCases, for: kind)) { status in

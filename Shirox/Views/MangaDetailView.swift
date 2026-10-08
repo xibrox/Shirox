@@ -883,6 +883,7 @@ private struct MangaRelationCard: View {
                 .multilineTextAlignment(.leading)
                 .frame(width: 110, alignment: .leading)
         }
+        .fullTitleContextMenu(edge.node.title.displayTitle)
     }
 }
 

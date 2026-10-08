@@ -250,6 +250,7 @@ private struct DownloadModuleRow: View {
                                 SearchResultCard(item: item)
                             }
                             .buttonStyle(.plain)
+                            .fullTitleContextMenu(item.title)
                         }
                     }
                     .padding(.bottom, 2)
@@ -489,6 +490,7 @@ private struct SearchResultsPickerSheet: View {
                                 .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
                         }
                         .buttonStyle(.plain)
+                        .fullTitleContextMenu(item.title)
                     }
                 }
                 .padding(16)

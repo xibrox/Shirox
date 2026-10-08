@@ -71,5 +71,6 @@ private struct WatchOrderCard: View {
                 .foregroundStyle(.primary)
                 .frame(width: 110, alignment: .leading)
         }
+        .fullTitleContextMenu(entry.title ?? "")
     }
 }

@@ -965,6 +965,7 @@ struct LibraryView: View {
         .zoomSource(entry.id, in: sheetZoom)
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 12))
         .contextMenu {
+            FullTitleMenuItems(entry.media.title.displayTitle)
             Button { openFromGrid(entry) } label: { Label("Open", systemImage: "arrow.up.right") }
             Button { editEntry(entry) } label: { Label("Edit", systemImage: "pencil") }
             if let quick = quickProgress(entry) {
@@ -989,6 +990,7 @@ struct LibraryView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { openFromGrid(entry) }
                         .contextMenu {
+                            FullTitleMenuItems(entry.media.title.displayTitle)
                             Button { openFromGrid(entry) } label: { Label("Open", systemImage: "arrow.up.right") }
                             Button { editEntry(entry) } label: { Label("Edit", systemImage: "pencil") }
                             if let quick = quickProgress(entry) {
@@ -1565,6 +1567,7 @@ private struct LibraryRowView: View {
             }
             .buttonStyle(.plain)
         }
+        .fullTitleContextMenu(entry.media.title.displayTitle)
     }
 
     private var progressLabel: String {
