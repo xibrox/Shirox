@@ -123,7 +123,7 @@ Pick a scheme and run:
 | :--- | :--- | :--- |
 | `Shirox_iOS` | iPhone and iPad | iOS 15+ |
 | `Shirox_MacCatalyst` | Mac | macOS 14+ |
-| `Shirox_macOS` | Mac | native macOS, in progress |
+| `Shirox_macOS` | Mac | native macOS 14+ |
 | `Shirox_tvOS` | Apple TV | tvOS, in progress |
 
 Or use the release scripts directly:

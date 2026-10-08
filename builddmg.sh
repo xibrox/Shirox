@@ -14,77 +14,60 @@ fi
 
 cd build
 
-echo "--- Resolving Swift Package Dependencies ---"
+# APP_PATH skips the build and packages an app that's already built.
+if [ -z "$APP_PATH" ]; then
+    echo "--- Resolving Swift Package Dependencies ---"
 
-xcodebuild -resolvePackageDependencies \
-   -project "$PROJECT_PATH" \
-   -scheme "$SCHEME_NAME"
+    xcodebuild -resolvePackageDependencies \
+       -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
+       -scheme "$SCHEME_NAME"
 
-echo "--- Building $APPLICATION_NAME for macOS ---"
+    echo "--- Building $APPLICATION_NAME for macOS ---"
 
-xcodebuild -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
-   -scheme "$SCHEME_NAME" \
-   -configuration Release \
-   -derivedDataPath "$WORKING_LOCATION/build/DerivedDataMac" \
-   -destination 'generic/platform=macOS' \
-   -skipPackagePluginValidation \
-   clean build \
-   CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED="NO"
+    xcodebuild -project "$WORKING_LOCATION/$APPLICATION_NAME.xcodeproj" \
+       -scheme "$SCHEME_NAME" \
+       -configuration Release \
+       -derivedDataPath "$WORKING_LOCATION/build/DerivedDataMac" \
+       -destination 'generic/platform=macOS' \
+       -skipPackagePluginValidation \
+       clean build \
+       CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED="NO"
 
-DD_APP_PATH="$WORKING_LOCATION/build/DerivedDataMac/Build/Products/Release/$APPLICATION_NAME.app"
+    APP_PATH="$WORKING_LOCATION/build/DerivedDataMac/Build/Products/Release/$APPLICATION_NAME.app"
+fi
 
-if [ ! -d "$DD_APP_PATH" ]; then
-    echo "Error: Build failed, .app not found at $DD_APP_PATH"
+if [ ! -d "$APP_PATH" ]; then
+    echo "Error: Build failed, .app not found at $APP_PATH"
     exit 1
 fi
 
+echo "--- Signing (ad hoc) ---"
+
+# Unsigned, a downloaded app on Apple silicon is reported as damaged and won't open at all.
+# Signed ad hoc, it opens after the usual right-click › Open (or `xattr -cr`).
+codesign --force --deep --sign - "$APP_PATH"
+codesign --verify --deep --strict "$APP_PATH"
+
 echo "--- Packaging DMG ---"
 
-DMG_STAGING="$WORKING_LOCATION/build/dmg-staging"
-DMG_TEMP="$WORKING_LOCATION/build/${APPLICATION_NAME}-temp.dmg"
-DMG_FINAL="$WORKING_LOCATION/build/${APPLICATION_NAME}.dmg"
+DMG_FINAL="$WORKING_LOCATION/build/${APPLICATION_NAME}-macOS.dmg"
 
-rm -rf "$DMG_STAGING"
-mkdir -p "$DMG_STAGING"
-cp -R "$DD_APP_PATH" "$DMG_STAGING/"
-ln -s /Applications "$DMG_STAGING/Applications"
+if ! command -v create-dmg &> /dev/null; then
+    echo "--- Installing create-dmg ---"
+    brew install create-dmg
+fi
 
-hdiutil create \
-    -volname "$APPLICATION_NAME" \
-    -srcfolder "$DMG_STAGING" \
-    -ov \
-    -format UDRW \
-    "$DMG_TEMP"
+rm -f "$DMG_FINAL"
 
-MOUNT_DIR=$(hdiutil attach "$DMG_TEMP" -readwrite -nobrowse | awk 'END {print $NF}')
+create-dmg \
+    --volname "$APPLICATION_NAME" \
+    --window-pos 200 120 \
+    --window-size 600 400 \
+    --icon-size 128 \
+    --icon "${APPLICATION_NAME}.app" 150 180 \
+    --hide-extension "${APPLICATION_NAME}.app" \
+    --app-drop-link 430 180 \
+    "$DMG_FINAL" \
+    "$APP_PATH"
 
-osascript << APPLESCRIPT
-tell application "Finder"
-    tell disk "$APPLICATION_NAME"
-        open
-        delay 2
-        set current view of container window to icon view
-        set toolbar visible of container window to false
-        set statusbar visible of container window to false
-        set the bounds of container window to {400, 100, 900, 420}
-        set viewOptions to the icon view options of container window
-        set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 128
-        delay 1
-        set position of item "${APPLICATION_NAME}.app" of container window to {125, 180}
-        set position of item "Applications" of container window to {375, 180}
-        update without registering applications
-        delay 2
-        close
-    end tell
-end tell
-APPLESCRIPT
-
-sync
-hdiutil detach "$MOUNT_DIR"
-
-hdiutil convert "$DMG_TEMP" -format UDZO -o "$DMG_FINAL" -ov
-rm -f "$DMG_TEMP"
-rm -rf "$DMG_STAGING"
-
-echo "--- Success: build/$APPLICATION_NAME.dmg created ---"
+echo "--- Success: build/$APPLICATION_NAME-macOS.dmg created ---"
