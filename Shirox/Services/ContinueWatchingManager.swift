@@ -102,7 +102,7 @@ struct SimklTrackWrite: Equatable {
             return UserDefaults.standard.double(forKey: "watchedPercentage") / 100.0
         }()
         if item.totalSeconds > 0 && item.watchedSeconds / item.totalSeconds >= watchedThreshold {
-            if item.localImportName != nil {
+            if Self.isLocalFile(item) {
                 // A single picked file has no "next episode" to queue. Drop the finished card
                 // (newItems already removed the prior in-progress entry) and reclaim its copies.
                 cleanupLocalImports(for: item)
@@ -823,6 +823,18 @@ struct SimklTrackWrite: Equatable {
                                      in arr: inout [ContinueWatchingItem]) {
         removeAllShowItems(aniListID: item.aniListID, moduleId: item.moduleId,
                            mediaTitle: item.mediaTitle, in: &arr)
+        // A file played where it lies (a Mac's) has no show behind it, so it's its own address:
+        // without this, every play of it left another card.
+        if item.localImportName == nil, Self.isLocalFile(item) {
+            arr.removeAll { $0.streamUrl == item.streamUrl }
+        }
+    }
+
+    /// A video file of its own rather than an episode: an imported copy, or a file opened in
+    /// place. A downloaded episode is a file too, but it belongs to a show, which has its next.
+    static func isLocalFile(_ item: ContinueWatchingItem) -> Bool {
+        if item.localImportName != nil { return true }
+        return item.aniListID == nil && item.moduleId == nil && (URL(string: item.streamUrl)?.isFileURL ?? false)
     }
 
     /// Builds a placeholder (streamUrl: "") for `episodeNumber`.

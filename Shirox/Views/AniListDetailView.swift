@@ -382,7 +382,7 @@ struct AniListDetailView: View {
             watchOrder = await TVDBMappingService.shared.fetchWatchOrder(id: mediaId)
         }
         .task {
-            #if os(iOS)
+            #if !os(tvOS)
             if moduleManager.activeModule?.isManga == true,
                let anime = AnimeModulePreference.pick(active: moduleManager.activeModule, modules: moduleManager.modules) {
                 _ = await moduleManager.selectAndAwaitReady(anime)

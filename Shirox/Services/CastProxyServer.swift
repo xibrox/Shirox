@@ -1,10 +1,12 @@
 import Combine
 
-#if os(iOS)
+#if !os(tvOS)
 import Foundation
 import Network
 import Darwin
+#if os(iOS)
 import UIKit
+#endif
 
 /// Local HTTP proxy bound to every interface (0.0.0.0) so a Chromecast — a separate LAN
 /// device — can reach it, and so an AirPlay receiver can too. It injects the stream's auth
@@ -52,7 +54,9 @@ final class CastProxyServer: @unchecked Sendable {
     private var proxyHeaders: [String: String] = [:]
     private var readyContinuations: [UUID: CheckedContinuation<Bool, Never>] = [:]
     private var connections: [ObjectIdentifier: ProxyConnection] = [:]
+    #if os(iOS)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    #endif
     private var pathMonitor: NWPathMonitor?
     private var cachedIP: String?
     /// Who currently needs the proxy up. Reason-counted because Chromecast and AirPlay
@@ -230,6 +234,11 @@ final class CastProxyServer: @unchecked Sendable {
         startPathMonitorLocked()
 
         let params = NWParameters.tcp
+        #if os(macOS)
+        // On a Mac it serves only the players on this machine, so it listens on loopback alone,
+        // which also keeps the firewall from asking to accept incoming connections.
+        params.acceptLocalOnly = true
+        #endif
         params.allowLocalEndpointReuse = true
 
         do {
@@ -312,6 +321,8 @@ final class CastProxyServer: @unchecked Sendable {
     /// app's `audio` background mode (held by ``BackgroundKeepAlive`` during a cast) is what
     /// provides indefinite runtime; this covers the gap before that takes effect.
     private func beginBackgroundTaskLocked() {
+        // A Mac app keeps running in the background without asking.
+        #if os(iOS)
         // THE BUG: this used to overwrite a live identifier on every start, leaking the
         // previous assertion — iOS eventually stops granting them.
         guard backgroundTaskID == .invalid else { return }
@@ -328,15 +339,18 @@ final class CastProxyServer: @unchecked Sendable {
                 }
             }
         }
+        #endif
     }
 
     private func endBackgroundTask() { stateQueue.async { self.endBackgroundTaskLocked() } }
 
     private func endBackgroundTaskLocked() {
+        #if os(iOS)
         let id = backgroundTaskID
         guard id != .invalid else { return }
         backgroundTaskID = .invalid
         DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(id) }
+        #endif
     }
 
     // MARK: - URL minting

@@ -9,7 +9,7 @@ protocol MPVRouter: AnyObject {
     func release()
 }
 
-#if os(iOS)
+#if !os(tvOS)
 /// Sends remote streams through the app's own proxy.
 ///
 /// FFmpeg, which does mpv's networking, speaks only HTTP/1.1, and some CDNs refuse it: the

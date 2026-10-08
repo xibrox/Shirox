@@ -79,7 +79,7 @@ final class AVPlayerEngine: PlaybackEngine {
 
     func load(_ source: PlaybackSource) {
         loadGeneration += 1
-        #if os(iOS)
+        #if !os(tvOS)
         if let key = source.playlistKey {
             // Scrambled playlists: AVPlayer can't read them, so it plays from the app's proxy,
             // which unscrambles them. The proxy has to be listening before AVPlayer asks.
@@ -105,7 +105,7 @@ final class AVPlayerEngine: PlaybackEngine {
         loadItem(source)
     }
 
-    #if os(iOS)
+    #if !os(tvOS)
     /// One reason for every AVPlayer: only one plays at a time, and a replaced engine's
     /// release mustn't drop the proxy from under its successor — hence the counted holds.
     private static let proxyReason = "avplayer-playlists"
@@ -238,7 +238,7 @@ final class AVPlayerEngine: PlaybackEngine {
 
     func stop() {
         isStopped = true
-        #if os(iOS)
+        #if !os(tvOS)
         releaseProxy()
         #endif
         player.pause()

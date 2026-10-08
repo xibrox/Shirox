@@ -2390,10 +2390,10 @@ struct PlayerView: View {
         watchOpening(of: engine, patience: patience)
     }
 
-    /// On iOS mpv fetches remote streams through the app's proxy: its own HTTP/1.1 networking is
-    /// refused by CDNs that AVPlayer's HTTP/2 gets through (see `MPVProxyRouter`).
+    /// mpv fetches remote streams through the app's proxy: its own HTTP/1.1 networking is refused
+    /// by CDNs that AVPlayer's HTTP/2 gets through (see `MPVProxyRouter`).
     private static func makeMPVEngine() -> MPVEngine {
-        #if os(iOS)
+        #if !os(tvOS)
         MPVEngine(router: MPVProxyRouter())
         #else
         MPVEngine()
