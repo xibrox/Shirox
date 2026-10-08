@@ -102,10 +102,12 @@ struct SearchView: View {
         }
         .adaptiveSheet(isPresented: $showModuleList) {
             NavigationStack {
-                ModuleListView()
+                ModuleListView(showsDone: true)
             }
             .environmentObject(moduleManager)
             .tint(.primary)
+            // A List in a Mac sheet has no size of its own: the sheet showed only its toolbar.
+            .macSheetFrame()
             .zoomingOut(of: "moduleList", in: moduleListZoom, fromToolbar: true)
         }
         #if os(iOS)

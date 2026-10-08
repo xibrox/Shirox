@@ -1,4 +1,5 @@
 import Foundation
+import ObjectiveC
 #if os(macOS)
 import AppKit
 #endif
@@ -31,21 +32,25 @@ enum MouseCursorManager {
         #endif
     }
 
-    /// Hides the mouse cursor if supported and not already hidden.
+    /// Hides the pointer until the mouse next moves, when the system brings it back by itself.
+    /// A plain hide lasted until something unhid it: moving the mouse over a playing video
+    /// left it invisible, and it stayed hidden over other apps too.
     static func hide() {
         guard isSupported, !isHidden else { return }
         #if os(macOS)
-        NSCursor.hide()
-        isHidden = true
+        NSCursor.setHiddenUntilMouseMoves(true)
         #else
-        if let nsCursor = nsCursorClass {
-            nsCursor.perform(Selector(("hide")))
-            isHidden = true
-        }
+        guard let cursorClass = nsCursorClass as? AnyClass else { return }
+        let selector = Selector(("setHiddenUntilMouseMoves:"))
+        guard let method = class_getClassMethod(cursorClass, selector) else { return }
+        typealias SetHidden = @convention(c) (AnyClass, Selector, Bool) -> Void
+        unsafeBitCast(method_getImplementation(method), to: SetHidden.self)(cursorClass, selector, true)
         #endif
+        // Not tracked as hidden: the system shows it again on the next move, with no unhide.
     }
 
-    /// Unhides the mouse cursor if supported and currently hidden.
+    /// Shows the pointer if something hid it outright. `hide()` no longer does; the system
+    /// brings it back on a move.
     static func unhide() {
         guard isHidden else { return }
         #if os(macOS)

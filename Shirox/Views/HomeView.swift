@@ -205,7 +205,7 @@ struct HomeView: View {
                     // overlapping the time looked like. The hero can be absent for ordinary
                     // reasons: a provider that doesn't fill Trending, or an outage on the
                     // endpoint behind it.
-                    #if os(macOS)
+                    #if os(macOS) || targetEnvironment(macCatalyst)
                     // The leading inset is the sidebar on a Mac; only the toolbar is let over the hero.
                     .ignoresSafeArea(edges: heroItems.isEmpty ? [] : [.top])
                     #else
@@ -271,7 +271,7 @@ struct HomeView: View {
             #endif
         }
         .toolbarBackgroundHidden()
-        #if !os(macOS)
+        #if !os(macOS) && !targetEnvironment(macCatalyst)
         // Content that ignores the leading safe area pads itself back by it; a Mac's Home keeps
         // that safe area (it's the sidebar), so there's nothing to pad.
         .observeSafeAreaLeading($leadingInset)

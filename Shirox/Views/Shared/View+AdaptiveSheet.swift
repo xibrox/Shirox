@@ -276,7 +276,8 @@ extension View {
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        self.sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        // Sized on a Mac, where a sheet holding a List otherwise collapses to its toolbar.
+        self.sheet(isPresented: isPresented, onDismiss: onDismiss) { content().macSheetFrame() }
     }
 
     func adaptiveSheet<Item, Content: View>(
@@ -292,7 +293,7 @@ extension View {
             onDismiss: onDismiss
         ) {
             if let value = item.wrappedValue {
-                content(value)
+                content(value).macSheetFrame()
             }
         }
     }
@@ -302,8 +303,14 @@ extension View {
 extension View {
     /// A sheet's size on a Mac: room for a list of sources or a form without scrolling straight
     /// away. Sheets open at the ideal size.
+    /// Nothing elsewhere: a phone's or iPad's sheet sizes itself.
+    @ViewBuilder
     func macSheetFrame() -> some View {
+        #if os(macOS)
         frame(minWidth: 560, idealWidth: 640, maxWidth: .infinity, minHeight: 520, idealHeight: 720, maxHeight: .infinity)
+        #else
+        self
+        #endif
     }
 }
 

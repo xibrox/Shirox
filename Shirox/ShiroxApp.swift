@@ -310,6 +310,10 @@ private struct MacSidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        #if targetEnvironment(macCatalyst)
+        // The app's tint is the label colour, so Catalyst drew the selected row white on white.
+        .tint(Color(uiColor: .systemGray))
+        #endif
         .navigationSplitViewColumnWidthIfAvailable(min: 180, ideal: 210, max: 280)
     }
 }

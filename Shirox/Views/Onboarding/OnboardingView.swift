@@ -117,9 +117,12 @@ struct OnboardingView: View {
         .sheet(isPresented: $showSources) {
             // The real sources screen, not a copy of it: whatever it gains later, onboarding
             // gains too, and there's one code path to keep correct.
-            ModuleListView()
-                .environmentObject(moduleManager)
-                .zoomingOut(of: "sources", in: sourcesZoom)
+            NavigationStack {
+                ModuleListView(showsDone: true)
+            }
+            .environmentObject(moduleManager)
+            .macSheetFrame()
+            .zoomingOut(of: "sources", in: sourcesZoom)
         }
         #if os(iOS)
         .onAppear {

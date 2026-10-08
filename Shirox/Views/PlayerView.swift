@@ -280,6 +280,13 @@ struct PlayerView: View {
     }
 
     @State private var isSpeedBoosted = false
+    /// Space is down and may become a hold; a short press is play/pause.
+    @State private var spaceHoldTask: Task<Void, Never>?
+    /// The 2× now playing came from holding space, which letting go ends.
+    @State private var spaceBoosted = false
+    /// When moving the pointer last brought the controls up, so a stream of moves doesn't
+    /// redo it sixty times a second.
+    @State private var lastPointerActivity = Date.distantPast
     #if os(iOS)
     @State private var showFrameSaveAlert = false
     @State private var frameSaveMessage = ""
@@ -877,6 +884,67 @@ struct PlayerView: View {
             }
         }
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: .playerPointerMoved)) { _ in
+            handlePointerMoved()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .playerSpaceDown)) { _ in
+            guard controlsEnabled, !isLocked else { return }
+            handleSpaceDown()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .playerSpaceUp)) { _ in
+            guard controlsEnabled, !isLocked else { return }
+            handleSpaceUp()
+        }
+    }
+
+    // MARK: - Hold space for 2×
+
+    /// Space held past a moment plays at 2× until it's let go, as holding on the video does on
+    /// a phone; a quick press is still play/pause. Key repeats while held change nothing.
+    private func handleSpaceDown() {
+        guard spaceHoldTask == nil, !spaceBoosted else { return }
+        spaceHoldTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled, spaceHoldTask != nil else { return }
+            beginSpaceSpeedBoost()
+        }
+    }
+
+    private func handleSpaceUp() {
+        let pending = spaceHoldTask
+        spaceHoldTask = nil
+        if spaceBoosted {
+            spaceBoosted = false
+            if isSpeedBoosted {
+                isSpeedBoosted = false
+                engine?.rate = isPlaying ? Float(playbackSpeed) : 0
+            }
+        } else {
+            pending?.cancel()
+            togglePlayPause()
+        }
+    }
+
+    private func beginSpaceSpeedBoost() {
+        // Paused, a hold is just a press: the release plays.
+        guard isPlaying, !castManager.isConnected, let engine else { return }
+        spaceBoosted = true
+        isSpeedBoosted = true
+        engine.rate = 2.0
+        setControlsVisible(false)
+    }
+
+    // MARK: - Pointer
+
+    /// The pointer moved over the player: the controls and the pointer come back, and go
+    /// again once it's been still a while.
+    private func handlePointerMoved() {
+        // While 2× is held the badge has the screen to itself; the pointer comes back alone.
+        guard !isSpeedBoosted else { return }
+        let now = Date()
+        if showControls, now.timeIntervalSince(lastPointerActivity) < 0.4 { return }
+        lastPointerActivity = now
+        handleMouseActivity()
     }
 
     // MARK: - Extracted UI Components
@@ -1007,11 +1075,13 @@ struct PlayerView: View {
             )
             .ignoresSafeArea()
 
-            #if os(iOS)
+            #if !os(tvOS)
             if isSpeedBoosted {
                 speedBoostBadge
             }
+            #endif
 
+            #if os(iOS)
             if isVideoScrubbing {
                 VStack {
                     videoScrubFeedback
@@ -3692,7 +3762,11 @@ private extension View {
             self
                 .focusable()
                 .focusEffectDisabled()
-                .onKeyPress(.space) { togglePlayPause(); return .handled }
+                .onKeyPress(.space, phases: [.down, .up]) { press in
+                    NotificationCenter.default.post(name: press.phase == .up ? .playerSpaceUp : .playerSpaceDown,
+                                                    object: nil)
+                    return .handled
+                }
                 .onKeyPress(KeyEquivalent("k")) { togglePlayPause(); return .handled }
                 .onKeyPress(.leftArrow) { skip(-Double(skipShort)); scheduleHide(); return .handled }
                 .onKeyPress(.rightArrow) { skip(Double(skipShort)); scheduleHide(); return .handled }
@@ -3825,6 +3899,8 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject
         )
 
         window.contentView = NSHostingView(rootView: playerView)
+        window.acceptsMouseMovedEvents = true
+        watchPointer()
         if let previousFrame, !wasFullScreen {
             window.setFrame(previousFrame, display: false)
         } else if !window.setFrameUsingName(Self.frameName) {
@@ -3857,6 +3933,27 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject
                 window.standardWindowButton(type)?.animator().alphaValue = visible ? 1 : 0
             }
         }
+    }
+
+    // MARK: Pointer
+
+    private var pointerMonitor: Any?
+
+    /// Moving the mouse over the player brings its controls and the pointer back: a hover
+    /// handler only hears the pointer come in and go out, not move.
+    private func watchPointer() {
+        guard pointerMonitor == nil else { return }
+        pointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
+            if let window = self?.playerWindow, event.window === window {
+                NotificationCenter.default.post(name: .playerPointerMoved, object: nil)
+            }
+            return event
+        }
+    }
+
+    private func stopWatchingPointer() {
+        if let pointerMonitor { NSEvent.removeMonitor(pointerMonitor) }
+        pointerMonitor = nil
     }
 
     // MARK: Picture in Picture
@@ -3907,6 +4004,7 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject
         playerWindow = nil
         isPictureInPicture = false
         frameBeforePictureInPicture = nil
+        stopWatchingPointer()
     }
 }
 #endif
@@ -4255,6 +4353,47 @@ class PlayerHostingController<Content: View>: UIHostingController<Content> {
         pan.cancelsTouchesInView = false
         pan.delegate = coordinator
         view.addGestureRecognizer(pan)
+        // The pointer anywhere over the player — a Mac's mouse, an iPad's trackpad. On the root
+        // view, so whatever is drawn over the video can't keep it from being seen.
+        let hover = UIHoverGestureRecognizer(target: self, action: #selector(pointerMoved(_:)))
+        hover.cancelsTouchesInView = false
+        view.addGestureRecognizer(hover)
+    }
+
+    @objc private func pointerMoved(_ gr: UIHoverGestureRecognizer) {
+        guard gr.state == .began || gr.state == .changed else { return }
+        NotificationCenter.default.post(name: .playerPointerMoved, object: nil)
+    }
+
+    // Space as presses, not a key command: a command fires on the press alone, and holding
+    // space for 2× needs to know when it's let go.
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        if presses.contains(where: Self.isPlainSpace) {
+            NotificationCenter.default.post(name: .playerSpaceDown, object: nil)
+            return
+        }
+        super.pressesBegan(presses, with: event)
+    }
+
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        if presses.contains(where: Self.isPlainSpace) {
+            NotificationCenter.default.post(name: .playerSpaceUp, object: nil)
+            return
+        }
+        super.pressesEnded(presses, with: event)
+    }
+
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        if presses.contains(where: Self.isPlainSpace) {
+            NotificationCenter.default.post(name: .playerSpaceUp, object: nil)
+            return
+        }
+        super.pressesCancelled(presses, with: event)
+    }
+
+    private static func isPlainSpace(_ press: UIPress) -> Bool {
+        guard let key = press.key else { return false }
+        return key.charactersIgnoringModifiers == " " && key.modifierFlags.intersection([.command, .control, .alternate]).isEmpty
     }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
@@ -4313,7 +4452,8 @@ enum PlayerKey: Equatable {
     /// The Long Skip Duration setting.
     case longBack, longForward
 
-    static let inputs = [" ", "k", UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow, "j", "l"]
+    /// Space isn't one: `PlayerHostingController` takes it as presses, to tell a hold from a tap.
+    static let inputs = ["k", UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow, "j", "l"]
 
     init?(input: String) {
         switch input {
@@ -4399,3 +4539,11 @@ private struct MPVOnExternalDisplayPlaceholder: View {
     }
 }
 #endif
+
+extension Notification.Name {
+    /// The pointer moved over the player (a Mac's mouse, an iPad's trackpad).
+    static let playerPointerMoved = Notification.Name("playerPointerMoved")
+    /// Space went down or up over the player: a press is play/pause, a hold is 2×.
+    static let playerSpaceDown = Notification.Name("playerSpaceDown")
+    static let playerSpaceUp = Notification.Name("playerSpaceUp")
+}

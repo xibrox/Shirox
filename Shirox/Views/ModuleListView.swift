@@ -6,6 +6,8 @@ struct ModuleListView: View {
     @ObservedObject private var discovery = DiscoverySource.shared
     @ObservedObject private var simklAuth = SimklAuthManager.shared
     @Environment(\.dismiss) private var dismiss
+    /// In a sheet, a Done button closes it — a Mac's sheet can't be swiped away.
+    var showsDone = false
     @State private var moduleURL = ""
     @State private var isRefreshing = false
     @State private var isAddingModule = false
@@ -19,6 +21,14 @@ struct ModuleListView: View {
     /// A module just added whose check failed, to keep or remove.
     @State private var failedNewModule: (module: ModuleDefinition, step: ModuleCheckStep, reason: String)?
 
+    private static var localFilesBlurb: String {
+        #if os(macOS) || targetEnvironment(macCatalyst)
+        "Watch video files from your Mac — subtitles, Picture in Picture, and Continue Watching included."
+        #else
+        "Watch videos from your device's Files app — subtitles, AirPlay, PiP, and Continue Watching included."
+        #endif
+    }
+
     private let localFilesModuleURL = "https://raw.githubusercontent.com/xibrox/local-files-module/refs/heads/main/local.json"
     private let jellyfinModuleURL = "https://raw.githubusercontent.com/xibrox/jellyfin-module/refs/heads/main/jellyfin.json"
 
@@ -29,6 +39,9 @@ struct ModuleListView: View {
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                #if !os(tvOS)
+                .listRowSeparator(.hidden)
+                #endif
 
                 if !isLocalModuleInstalled {
                     Section {
@@ -36,6 +49,9 @@ struct ModuleListView: View {
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                #if !os(tvOS)
+                .listRowSeparator(.hidden)
+                #endif
                 }
 
                 if !isJellyfinModuleInstalled {
@@ -44,6 +60,9 @@ struct ModuleListView: View {
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                #if !os(tvOS)
+                .listRowSeparator(.hidden)
+                #endif
                 }
 
                 if let error = addModuleError {
@@ -52,6 +71,9 @@ struct ModuleListView: View {
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                #if !os(tvOS)
+                .listRowSeparator(.hidden)
+                #endif
                 }
 
                 if let error = moduleManager.errorMessage {
@@ -60,6 +82,9 @@ struct ModuleListView: View {
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                #if !os(tvOS)
+                .listRowSeparator(.hidden)
+                #endif
                 }
 
                 Section {
@@ -173,6 +198,11 @@ struct ModuleListView: View {
                     EditButton()
                 }
                 #endif
+                if showsDone {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
             }
             .confirmationDialog(
                 brokenTitle,
@@ -306,7 +336,7 @@ struct ModuleListView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Play Local Files")
                         .font(.headline)
-                    Text("Watch videos from your device's Files app — subtitles, AirPlay, PiP, and Continue Watching included.")
+                    Text(Self.localFilesBlurb)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
