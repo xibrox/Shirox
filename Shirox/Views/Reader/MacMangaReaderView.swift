@@ -4,73 +4,24 @@ import Combine
 import Kingfisher
 import SwiftUI
 
-// MARK: - Window
+// MARK: - Presenting
 
-/// The manga reader on a Mac: a window of its own beside the app, as the player has. One at a
-/// time; opening another chapter or manga reuses it.
+/// The manga reader on a Mac covers the app's window, as the player does, rather than opening
+/// a window of its own. Opening another chapter or manga replaces it.
 @MainActor
-final class MacReaderWindowManager: NSObject, NSWindowDelegate {
+final class MacReaderWindowManager {
     static let shared = MacReaderWindowManager()
-    private var window: NSWindow?
-    private var keyMonitor: Any?
-    /// Keys pressed in the reader's window, for the reader to act on.
+    /// Keys pressed while the reader covers the window, for the reader to act on.
     let keys = PassthroughSubject<MacReaderKey, Never>()
 
-    private override init() {}
-
-    /// The reader's keys come from a monitor on its window: SwiftUI's shortcuts and key
-    /// handlers didn't reach a view hosted in a plain window that nothing in it had focused.
-    private func watchKeys() {
-        guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, let window = self.window, event.window === window,
-                  let key = MacReaderKey(event) else { return event }
-            self.keys.send(key)
-            return nil
-        }
-    }
+    private init() {}
 
     func open(_ context: ReaderContext) {
-        let window = self.window ?? makeWindow()
-        window.title = context.mangaTitle
-        window.contentView = NSHostingView(rootView: MacMangaReaderView(context: context))
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        self.window = window
-        watchKeys()
+        MacPlayerWindowManager.shared.present(AnyView(MacMangaReaderView(context: context)), kind: .reader)
     }
 
-    private static let frameName = "ShiroxReaderWindow"
-
-    private func makeWindow() -> NSWindow {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 1000),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                              backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.titlebarAppearsTransparent = true
-        window.backgroundColor = .black
-        window.contentMinSize = NSSize(width: 480, height: 480)
-        window.collectionBehavior = [.fullScreenPrimary, .managed]
-        window.delegate = self
-        if !window.setFrameUsingName(Self.frameName) {
-            // As tall as the screen allows: pages are portrait.
-            if let screen = NSScreen.main?.visibleFrame {
-                window.setFrame(NSRect(x: screen.midX - 450, y: screen.minY, width: 900, height: screen.height),
-                                display: false)
-            } else {
-                window.center()
-            }
-        }
-        window.setFrameAutosaveName(Self.frameName)
-        return window
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        // Drops the reader, which saves where it was on its way out.
-        window?.contentView = nil
-        window = nil
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
-        keyMonitor = nil
+    func close() {
+        MacPlayerWindowManager.shared.close()
     }
 }
 
@@ -106,6 +57,7 @@ enum MacReaderKey {
 struct MacMangaReaderView: View {
     let context: ReaderContext
 
+    @ObservedObject private var cover = MacPlayerWindowManager.shared
     @State private var chapterIndex: Int
     @State private var pages: [String] = []
     @State private var isLoading = true
@@ -173,6 +125,15 @@ struct MacMangaReaderView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
+            // Back to the app (⌘W, Esc), where the window's own buttons would be.
+            Button { MacReaderWindowManager.shared.close() } label: {
+                Label("Close", systemImage: "xmark")
+                    .labelStyle(.iconOnly)
+                    .fontWeight(.semibold)
+            }
+            .help("Close (Esc)")
+            Divider().frame(height: 16)
+
             Button { go(to: chapterIndex - 1) } label: { Image(systemName: "chevron.left") }
                 .disabled(!hasPrevious)
                 .help("Previous chapter (←)")
@@ -210,7 +171,9 @@ struct MacMangaReaderView: View {
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 16)
-        .frame(height: 38)
+        // Beside the window's buttons and as tall as their title bar, out of full screen.
+        .padding(.leading, cover.isFullScreen ? 0 : 64)
+        .frame(height: cover.isFullScreen ? 38 : 56)
         .background(.bar)
     }
 

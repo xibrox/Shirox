@@ -84,7 +84,7 @@ private struct MacCloudflareBypassView: View {
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Security Check").font(.headline)
-                    Text("Complete the check below. This window closes by itself when it's done.")
+                    Text("Complete the check below. This closes by itself when it's done.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -113,43 +113,44 @@ private struct BypassWebView: NSViewRepresentable {
 }
 
 @MainActor
-final class CloudflareBypassWindowController: NSObject, NSWindowDelegate {
+final class CloudflareBypassWindowController {
     static let shared = CloudflareBypassWindowController()
-    private override init() {}
+    private init() {}
 
-    private var window: NSWindow?
+    private var sheet: NSWindow?
 
+    /// A sheet on the window in front, or on the sheet already open on it: the check can come up
+    /// while a search or a stream list is showing in one.
     func show() {
-        guard window == nil else { return }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 640),
-                              styleMask: [.titled, .closable, .resizable],
-                              backing: .buffered, defer: false)
-        window.title = "Security Check"
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.isReleasedWhenClosed = false
-        window.level = .floating
-        window.contentView = NSHostingView(rootView: MacCloudflareBypassView())
-        window.delegate = self
-        window.center()
-        window.makeKeyAndOrderFront(nil)
+        guard sheet == nil else { return }
+        let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 680),
+                             styleMask: [.titled, .resizable],
+                             backing: .buffered, defer: false)
+        sheet.title = "Security Check"
+        sheet.isReleasedWhenClosed = false
+        sheet.contentMinSize = NSSize(width: 480, height: 520)
+        sheet.contentView = NSHostingView(rootView: MacCloudflareBypassView())
+        self.sheet = sheet
+        guard var parent = NSApp.mainWindow ?? NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else {
+            // No window to attach to: on its own, then.
+            sheet.center()
+            sheet.makeKeyAndOrderFront(nil)
+            return
+        }
+        while let attached = parent.attachedSheet { parent = attached }
+        parent.beginSheet(sheet)
         NSApp.activate(ignoringOtherApps: true)
-        self.window = window
     }
 
     func hide() {
-        guard let window else { return }
-        window.delegate = nil
-        window.close()
-        window.contentView = nil
-        self.window = nil
-    }
-
-    /// Closing the window is cancelling the check.
-    func windowWillClose(_ notification: Notification) {
-        window?.contentView = nil
-        window = nil
-        CloudflareBypassManager.shared.cancelActiveBypass()
+        guard let sheet else { return }
+        self.sheet = nil
+        if let parent = sheet.sheetParent {
+            parent.endSheet(sheet)
+        } else {
+            sheet.close()
+        }
+        sheet.contentView = nil
     }
 }
 #endif

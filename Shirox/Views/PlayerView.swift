@@ -880,6 +880,8 @@ struct PlayerView: View {
             case .playPause: togglePlayPause()
             case .skipBack: skip(by: -Double(skipShort)); scheduleHide()
             case .skipForward: skip(by: Double(skipShort)); scheduleHide()
+            case .longBack: skip(by: -Double(skipLong)); scheduleHide()
+            case .longForward: skip(by: Double(skipLong)); scheduleHide()
             case .saveFrame: if let engine { saveCurrentFrame(from: engine) }
             }
         }
@@ -1274,7 +1276,7 @@ struct PlayerView: View {
         #elseif os(macOS)
         // The same 20 points from every edge. In a window the top bar sits level with the
         // window's own buttons instead, in the title bar's height; full screen has none.
-        return PlayerLayouts(top: macWindow.isFullScreen ? 20 : 8, bottom: 20, horizontal: 0)
+        return PlayerLayouts(top: macWindow.isFullScreen ? 20 : 5, bottom: 20, horizontal: 0)
         #else
         return PlayerLayouts(top: 24, bottom: 24, horizontal: 16)
         #endif
@@ -3782,7 +3784,7 @@ private extension View {
                 .onKeyPress(KeyEquivalent("j")) { skip(-Double(skipLong)); scheduleHide(); return .handled }
                 .onKeyPress(KeyEquivalent("l")) { skip(Double(skipLong)); scheduleHide(); return .handled }
                 #if os(macOS)
-                .onKeyPress(KeyEquivalent("f")) { NSApp.keyWindow?.toggleFullScreen(nil); return .handled }
+                .onKeyPress(KeyEquivalent("f")) { MacPlayerWindowManager.shared.toggleFullScreen(); return .handled }
                 .onKeyPress(KeyEquivalent("s")) { saveFrame(); return .handled }
                 .onKeyPress(KeyEquivalent("p")) { MacPlayerWindowManager.shared.togglePictureInPicture(); return .handled }
                 #endif
@@ -3818,7 +3820,7 @@ struct MacVideoPlayerView: NSViewRepresentable {
 
 /// The Playback menu's commands, for the player on screen.
 enum MacPlayerCommand: String {
-    case playPause, skipBack, skipForward, saveFrame
+    case playPause, skipBack, skipForward, longBack, longForward, saveFrame
 
     static let notification = Notification.Name("MacPlayerCommand")
 
@@ -3851,54 +3853,47 @@ enum MacDisplaySleep {
 
 /// The player's window. Its close and minimise buttons fade out with the controls, and AppKit
 /// won't perform a button that's faded out: ⌘W and ⌘M did nothing while the video played.
-final class PlayerWindow: NSWindow {
-    override func performClose(_ sender: Any?) { close() }
-    override func performMiniaturize(_ sender: Any?) { miniaturize(sender) }
-
-    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        switch item.action {
-        case #selector(performClose(_:)), #selector(performMiniaturize(_:)): return true
-        default: return super.validateUserInterfaceItem(item)
-        }
-    }
-}
-
-/// The player's own window on a Mac: one at a time, sized and placed where the last one was,
-/// and torn down when it closes so nothing keeps playing behind it.
+/// What covers a Mac window's content: the player or the manga reader, shown in the window the
+/// app is in rather than in windows of their own, as a full-screen cover is on iOS.
 @MainActor
-final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject {
+final class MacPlayerWindowManager: NSObject, ObservableObject {
     static let shared = MacPlayerWindowManager()
-    private var playerWindow: NSWindow?
+    private override init() { super.init() }
 
-    private override init() {}
+    enum Kind { case player, reader }
+
+    struct Presentation: Identifiable {
+        let id = UUID()
+        let kind: Kind
+        let view: AnyView
+    }
+
+    @Published private(set) var presentation: Presentation?
+    /// The window it covers, by number, so only that window's content draws it.
+    @Published private(set) var hostWindowNumber: Int?
+    private weak var hostWindow: NSWindow?
+
+    /// Whether the window is the small floating one in a corner of the screen.
+    @Published private(set) var isPictureInPicture = false
+    /// Whether the window fills the screen, where there are no window buttons to line up with.
+    @Published private(set) var isFullScreen = false
+
+    private var fullScreenBeforePresenting = false
+    private var toolbarBeforePresenting: NSToolbar?
+    private var titlebarBeforePresenting: (visibility: NSWindow.TitleVisibility, transparent: Bool, fullSize: Bool)?
+    private var frameBeforePictureInPicture: NSRect?
+    private var levelBeforePictureInPicture: NSWindow.Level = .normal
+    private var behaviorBeforePictureInPicture: NSWindow.CollectionBehavior = []
+    private var monitors: [Any] = []
+    private var observers: [NSObjectProtocol] = []
 
     func open(stream: StreamResult, streams: [StreamResult], context: PlayerContext?, onWatchNext: WatchNextLoader?,
               onStreamExpired: StreamRefetchLoader? = nil, onSequelNeeded: SequelLoader? = nil,
               onSequelAdvanced: ((SequelNavigation) -> Void)? = nil, onFinished: ((PlayerContext) -> Void)? = nil) {
-        // Reuse the frame of a window already up, so the next episode opens where this one was.
-        let previousFrame = playerWindow?.frame
-        let wasFullScreen = playerWindow?.styleMask.contains(.fullScreen) ?? false
-        closeCurrent()
-
-        let window = PlayerWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1280, height: 720),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.title = Self.title(for: context, stream: stream)
-        window.backgroundColor = .black
-        window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.fullScreenPrimary, .managed]
-        window.contentMinSize = NSSize(width: 640, height: 360)
-        window.delegate = self
-
         let playerView = PlayerView(
             stream: stream,
             streams: streams,
-            customDismiss: { [weak window] in window?.close() },
+            customDismiss: { [weak self] in self?.close() },
             context: context,
             onWatchNext: onWatchNext,
             onStreamExpired: onStreamExpired,
@@ -3906,35 +3901,82 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject
             onSequelAdvanced: onSequelAdvanced,
             onFinished: onFinished
         )
+        present(AnyView(playerView), kind: .player)
+    }
 
-        window.contentView = NSHostingView(rootView: playerView)
-        window.acceptsMouseMovedEvents = true
-        watchPointer()
-        if let previousFrame, !wasFullScreen {
-            window.setFrame(previousFrame, display: false)
-        } else if !window.setFrameUsingName(Self.frameName) {
-            window.center()
+    /// Covers the app's window with `view`, replacing whatever covered it.
+    func present(_ view: AnyView, kind: Kind) {
+        // A sheet that asked for this is on its way out; the window under it is the one.
+        // The window already covered, or the one in front (under any sheet that asked for this).
+        let candidate = presentation != nil ? hostWindow : NSApp.mainWindow
+        guard let window = candidate ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else {
+            // No window at all (a video opened from Finder with the app's windows closed):
+            // open one, then cover it.
+            if let item = NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "New Window") {
+                item.menu?.performActionForItem(at: item.menu?.index(of: item) ?? 0)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard NSApp.mainWindow != nil else { return }
+                self?.present(view, kind: kind)
+            }
+            return
         }
-        window.setFrameAutosaveName(Self.frameName)
+        if presentation == nil {
+            fullScreenBeforePresenting = window.styleMask.contains(.fullScreen)
+            titlebarBeforePresenting = (window.titleVisibility, window.titlebarAppearsTransparent,
+                                        window.styleMask.contains(.fullSizeContentView))
+            // The cover reaches the top edge, under the window's buttons, with no title over it.
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.styleMask.insert(.fullSizeContentView)
+            // The app's toolbar gives way to an empty one, which keeps the window's buttons
+            // where they were, level with the cover's close button. Not through SwiftUI, whose
+            // hidden toolbar takes the buttons with it.
+            toolbarBeforePresenting = window.toolbar
+            let empty = NSToolbar(identifier: "ShiroxCover")
+            empty.showsBaselineSeparator = false
+            window.toolbar = empty
+        }
+        presentation = nil
+        hostWindow = window
+        hostWindowNumber = window.windowNumber
+        isFullScreen = window.styleMask.contains(.fullScreen)
+        window.acceptsMouseMovedEvents = true
+        watch(window)
+        presentation = Presentation(kind: kind, view: view)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        if wasFullScreen { window.toggleFullScreen(nil) }
-        playerWindow = window
     }
 
-    private static let frameName = "ShiroxPlayerWindow"
-
-    /// "Frieren · Episode 3", for the Window menu and Mission Control.
-    private static func title(for context: PlayerContext?, stream: StreamResult) -> String {
-        guard let context else { return stream.title }
-        // A film has one "episode"; it's just the film.
-        if context.totalEpisodes == 1 || context.availableEpisodes == 1 { return context.mediaTitle }
-        return "\(context.mediaTitle) · Episode \(context.episodeNumber)"
+    /// Back to the window's own content. The player view going away stops playback and saves
+    /// the position.
+    func close() {
+        guard presentation != nil else { return }
+        if isPictureInPicture { togglePictureInPicture() }
+        if let window = hostWindow {
+            setWindowButtonsVisible(true)
+            if !fullScreenBeforePresenting && window.styleMask.contains(.fullScreen) {
+                window.toggleFullScreen(nil)
+            }
+            if let titlebar = titlebarBeforePresenting {
+                window.titleVisibility = titlebar.visibility
+                window.titlebarAppearsTransparent = titlebar.transparent
+                if !titlebar.fullSize { window.styleMask.remove(.fullSizeContentView) }
+            }
+            titlebarBeforePresenting = nil
+            if let toolbar = toolbarBeforePresenting { window.toolbar = toolbar }
+            toolbarBeforePresenting = nil
+        }
+        presentation = nil
+        hostWindowNumber = nil
+        stopWatching()
     }
+
+    var isPresenting: Bool { presentation != nil }
 
     /// Shows or hides the close, minimise and zoom buttons, which otherwise sit over the picture.
     func setWindowButtonsVisible(_ visible: Bool) {
-        guard let window = playerWindow else { return }
+        guard let window = hostWindow else { return }
         let buttons: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
         NSAnimationContext.runAnimationGroup { context in
             context.duration = visible ? 0.15 : 0.35
@@ -3944,82 +3986,172 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject
         }
     }
 
-    // MARK: Pointer
+    func toggleFullScreen() {
+        hostWindow?.toggleFullScreen(nil)
+    }
 
-    private var pointerMonitor: Any?
+    // MARK: Keys and pointer
 
-    /// Moving the mouse over the player brings its controls and the pointer back: a hover
-    /// handler only hears the pointer come in and go out, not move.
-    private func watchPointer() {
-        guard pointerMonitor == nil else { return }
-        pointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
-            if let window = self?.playerWindow, event.window === window {
+    /// The player's and reader's keys, taken before the window's own views see them: the sidebar
+    /// and lists under the cover would otherwise move their selection on the arrows and space.
+    private func watch(_ window: NSWindow) {
+        guard monitors.isEmpty else { return }
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
+            guard let self, let presentation = self.presentation, event.window === self.hostWindow else { return event }
+            return self.handleKey(event, in: presentation.kind) ? nil : event
+        } as Any)
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] event in
+            if let self, self.presentation?.kind == .player, event.window === self.hostWindow {
                 NotificationCenter.default.post(name: .playerPointerMoved, object: nil)
             }
             return event
-        }
+        } as Any)
+        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didEnterFullScreenNotification,
+                                                                object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.isFullScreen = true }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didExitFullScreenNotification,
+                                                                object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.isFullScreen = false }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification,
+                                                                object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close() }
+        })
     }
 
-    private func stopWatchingPointer() {
-        if let pointerMonitor { NSEvent.removeMonitor(pointerMonitor) }
-        pointerMonitor = nil
+    private func stopWatching() {
+        monitors.forEach { NSEvent.removeMonitor($0) }
+        monitors = []
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
+    }
+
+    /// True when the key was the cover's.
+    private func handleKey(_ event: NSEvent, in kind: Kind) -> Bool {
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        // ⌘W closes the cover, not the window under it.
+        if mods == .command, event.charactersIgnoringModifiers == "w" {
+            if event.type == .keyDown { close() }
+            return true
+        }
+        // Escape leaves full screen first, as everywhere on a Mac, and then closes.
+        if event.keyCode == 53, mods.subtracting(.function).isEmpty {
+            if event.type == .keyDown {
+                if hostWindow?.styleMask.contains(.fullScreen) == true { hostWindow?.toggleFullScreen(nil) } else { close() }
+            }
+            return true
+        }
+        guard mods.intersection([.command, .control, .option]).isEmpty else { return false }
+        switch kind {
+        case .reader:
+            guard event.type == .keyDown, let key = MacReaderKey(event) else { return false }
+            MacReaderWindowManager.shared.keys.send(key)
+            return true
+        case .player:
+            if event.keyCode == 49 {  // space: a press plays or pauses, a hold is 2×
+                if event.type == .keyUp {
+                    NotificationCenter.default.post(name: .playerSpaceUp, object: nil)
+                } else if !event.isARepeat {
+                    NotificationCenter.default.post(name: .playerSpaceDown, object: nil)
+                }
+                return true
+            }
+            guard event.type == .keyDown else { return false }
+            switch (event.keyCode, event.charactersIgnoringModifiers?.lowercased()) {
+            case (123, _): MacPlayerCommand.send(.skipBack)
+            case (124, _): MacPlayerCommand.send(.skipForward)
+            case (_, "k"): MacPlayerCommand.send(.playPause)
+            case (_, "j"): MacPlayerCommand.send(.longBack)
+            case (_, "l"): MacPlayerCommand.send(.longForward)
+            case (_, "f"): toggleFullScreen()
+            case (_, "s"): MacPlayerCommand.send(.saveFrame)
+            case (_, "p"): togglePictureInPicture()
+            default: return false
+            }
+            return true
+        }
     }
 
     // MARK: Picture in Picture
 
-    /// Whether the window is the small floating one in a corner of the screen.
-    @Published private(set) var isPictureInPicture = false
-    /// Whether the player fills the screen, where there are no window buttons to line up with.
-    @Published private(set) var isFullScreen = false
-
-    func windowDidEnterFullScreen(_ notification: Notification) { isFullScreen = true }
-    func windowDidExitFullScreen(_ notification: Notification) { isFullScreen = false }
-    private var frameBeforePictureInPicture: NSRect?
-
     /// mpv has no Picture in Picture on a Mac, so neither engine uses the system's: the window
-    /// itself shrinks into a corner and stays above other apps, on every Space, until toggled back.
+    /// the player covers shrinks into a corner and stays above other apps, on every Space,
+    /// until it's toggled back.
     func togglePictureInPicture() {
-        guard let window = playerWindow else { return }
+        guard let window = hostWindow, presentation?.kind == .player else { return }
         if window.styleMask.contains(.fullScreen) {
             window.toggleFullScreen(nil)
         }
         if isPictureInPicture {
-            window.level = .normal
-            window.collectionBehavior = [.fullScreenPrimary, .managed]
-            if let frame = frameBeforePictureInPicture { window.setFrame(frame, display: true, animate: true) }
+            window.level = levelBeforePictureInPicture
+            window.collectionBehavior = behaviorBeforePictureInPicture
             isPictureInPicture = false
+            if let frame = frameBeforePictureInPicture {
+                DispatchQueue.main.async { window.setFrame(frame, display: true, animate: true) }
+            }
         } else {
             frameBeforePictureInPicture = window.frame
+            levelBeforePictureInPicture = window.level
+            behaviorBeforePictureInPicture = window.collectionBehavior
+            // First, so the window's content lets it be this small.
+            isPictureInPicture = true
             let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
             let width: CGFloat = 480
             let height = width * 9 / 16
             let frame = NSRect(x: visible.maxX - width - 20, y: visible.minY + 20, width: width, height: height)
             window.level = .floating
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            window.setFrame(frame, display: true, animate: true)
-            isPictureInPicture = true
+            DispatchQueue.main.async { window.setFrame(frame, display: true, animate: true) }
         }
     }
+}
 
-    private func closeCurrent() {
-        isPictureInPicture = false
-        frameBeforePictureInPicture = nil
-        guard let window = playerWindow else { return }
-        window.delegate = nil
-        window.close()
-        window.contentView = nil
-        playerWindow = nil
+/// Draws the player or reader over the app's window while one covers it; what's under it stops
+/// taking clicks.
+struct MacWindowCover: ViewModifier {
+    @ObservedObject private var cover = MacPlayerWindowManager.shared
+    @State private var windowNumber: Int?
+
+    func body(content: Content) -> some View {
+        let presentation = windowNumber != nil && windowNumber == cover.hostWindowNumber ? cover.presentation : nil
+        let pictureInPicture = presentation != nil && cover.isPictureInPicture
+        content
+            .allowsHitTesting(presentation == nil)
+            .accessibilityHidden(presentation != nil)
+            .overlay {
+                if let presentation {
+                    presentation.view
+                        .id(presentation.id)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: presentation?.id)
+            // Small enough for Picture in Picture while it's on.
+            .frame(minWidth: pictureInPicture ? 240 : 900, minHeight: pictureInPicture ? 135 : 600)
+            .background(MacHostWindowReader(windowNumber: $windowNumber))
+    }
+}
+
+extension View {
+    func macWindowCover() -> some View { modifier(MacWindowCover()) }
+}
+
+/// The window a view is in, for a cover to know whether it's this one's.
+struct MacHostWindowReader: NSViewRepresentable {
+    @Binding var windowNumber: Int?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { windowNumber = view.window?.windowNumber }
+        return view
     }
 
-    func windowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow, window === playerWindow else { return }
-        // Drops the player view, which stops playback and saves the position on its way out.
-        window.contentView = nil
-        playerWindow = nil
-        isPictureInPicture = false
-        frameBeforePictureInPicture = nil
-        stopWatchingPointer()
-        isFullScreen = false
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if windowNumber != view.window?.windowNumber { windowNumber = view.window?.windowNumber }
+        }
     }
 }
 #endif

@@ -22,6 +22,11 @@ struct PlayerTopBar: View {
     /// AirPlay, PiP, lock) and is far wider than the dismiss button, so a fixed inset let a
     /// long title run underneath it.
     @State private var trailingWidth: CGFloat = 0
+    #if os(macOS)
+    @ObservedObject private var cover = MacPlayerWindowManager.shared
+    /// The window's buttons and the close button beside them.
+    @State private var leadingWidth: CGFloat = 0
+    #endif
 
     private var isPad: Bool {
         #if os(iOS)
@@ -45,9 +50,31 @@ struct PlayerTopBar: View {
                 .frame(height: isPad ? 56 : 44) // match dismiss button height
 
             HStack(alignment: .top) {
-                // Dismiss button (left). A Mac's player window has its own close button there.
+                // Dismiss button (left). On a Mac it follows the window's own buttons, which
+                // close the window rather than the player covering it.
                 #if os(macOS)
-                Color.clear.frame(width: 56, height: 44)
+                HStack(spacing: 0) {
+                    if !cover.isFullScreen {
+                        Color.clear.frame(width: 70)
+                    }
+                    if showDismiss {
+                        Button(action: onDismiss) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 32, height: 32)
+                                .mediaGlassChrome(Circle(), enabled: playerLiquidGlass, off: Color.white.opacity(0.25))
+                                .shadow(color: .black.opacity(0.3), radius: 6)
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Close (Esc)")
+                    }
+                }
+                .frame(height: 44)
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: PlayerTopBarLeadingWidthKey.self, value: proxy.size.width)
+                })
                 #else
                 if showDismiss {
                     Button(action: onDismiss) {
@@ -93,11 +120,18 @@ struct PlayerTopBar: View {
         #endif
         .padding(.bottom, 16)
         .onPreferenceChange(PlayerTopBarTrailingWidthKey.self) { trailingWidth = $0 }
+        #if os(macOS)
+        .onPreferenceChange(PlayerTopBarLeadingWidthKey.self) { leadingWidth = $0 }
+        #endif
     }
 
     /// The title's inset from each edge of the bar: past the wider side's button, plus a gap.
     private var titleInset: CGFloat {
+        #if os(macOS)
+        let dismissWidth = leadingWidth
+        #else
         let dismissWidth: CGFloat = isPad ? 56 : 44
+        #endif
         let gap: CGFloat = isPad ? 28 : 20
         return max(dismissWidth, trailingWidth) + gap
     }
@@ -191,4 +225,11 @@ extension PlayerTopBar {
     #else
     func macPlayerControls(airPlay: Never?, isPictureInPicture: Bool) -> PlayerTopBar { self }
     #endif
+}
+
+private struct PlayerTopBarLeadingWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
 }

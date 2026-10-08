@@ -161,7 +161,8 @@ struct ShiroxApp: App {
                 .environmentObject(moduleManager)
                 .tint(.primary)
                 #if os(macOS)
-                .frame(minWidth: 900, minHeight: 600)
+                // The player and the manga reader cover the window, as on iOS.
+                .macWindowCover()
                 // A video opened from outside goes to the window that's already up; SwiftUI
                 // otherwise opens a new one for every file.
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
