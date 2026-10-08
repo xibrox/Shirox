@@ -9,10 +9,36 @@ on:
 
 env:
  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+ # The release every build lands in. It was "beta", a pre-release named "First".
+ RELEASE_TAG: latest
 
 jobs:
+ prepare-release:
+   name: Prepare release
+   runs-on: ubuntu-latest
+   permissions:
+     contents: write
+   steps:
+     - name: Checkout repository
+       uses: actions/checkout@v6
+
+     # The tag follows main, so the release's source is the commit its builds came from.
+     - name: Move the release tag to this commit
+       run: |
+         git tag -f "$RELEASE_TAG"
+         git push -f origin "refs/tags/$RELEASE_TAG"
+
+     # Made once here, before the builds, which upload to it side by side.
+     - name: Create the release if it's missing
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
+           gh release create "$RELEASE_TAG" --verify-tag --title "Shirox" --notes "Building…" --latest
+
  build-ios:
    name: Build iOS IPA
+   needs: prepare-release
    runs-on: macos-26
    permissions:
      contents: write
@@ -32,12 +58,10 @@ jobs:
          name: Shirox-Nightly-IPA
          path: build/Shirox.ipa
 
-     - name: Upload IPA to beta release
+     - name: Upload IPA to the release
        env:
          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       run: |
-         gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
-         gh release upload beta build/Shirox.ipa --clobber
+       run: gh release upload "$RELEASE_TAG" build/Shirox.ipa --clobber
 
      - name: Update apps.json
        env:
@@ -55,6 +79,7 @@ jobs:
 
  build-catalyst:
    name: Build Mac Catalyst DMG
+   needs: prepare-release
    runs-on: macos-26
    permissions:
      contents: write
@@ -74,15 +99,14 @@ jobs:
          name: Shirox-Nightly-Catalyst-DMG
          path: build/Shirox-Catalyst.dmg
 
-     - name: Upload Catalyst DMG to beta release
+     - name: Upload Catalyst DMG to the release
        env:
          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       run: |
-         gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
-         gh release upload beta build/Shirox-Catalyst.dmg --clobber
+       run: gh release upload "$RELEASE_TAG" build/Shirox-Catalyst.dmg --clobber
 
  build-macos:
    name: Build native macOS DMG
+   needs: prepare-release
    runs-on: macos-26
    permissions:
      contents: write
@@ -102,9 +126,34 @@ jobs:
          name: Shirox-Nightly-macOS-DMG
          path: build/Shirox-macOS.dmg
 
-     - name: Upload macOS DMG to beta release
+     - name: Upload macOS DMG to the release
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: gh release upload "$RELEASE_TAG" build/Shirox-macOS.dmg --clobber
+
+ publish-release:
+   name: Publish release
+   needs: [build-ios, build-catalyst, build-macos]
+   runs-on: ubuntu-latest
+   permissions:
+     contents: write
+   steps:
+     - name: Checkout repository
+       uses: actions/checkout@v6
+
+     # Named and described from apps.json's newest version, a full release rather than a
+     # pre-release, and the one GitHub shows as Latest.
+     - name: Name and publish the release
        env:
          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
        run: |
-         gh release create beta --title "beta" --notes "Latest nightly build" 2>/dev/null || true
-         gh release upload beta build/Shirox-macOS.dmg --clobber
+         VERSION=$(jq -r '.apps[0].versions[0].version' apps.json)
+         BUILD=$(jq -r '.apps[0].versions[0].buildVersion' apps.json)
+         jq -r '.apps[0].versions[0].localizedDescription' apps.json > notes.md
+         printf '\n\n**Downloads:** Shirox.ipa (iPhone, iPad), Shirox-macOS.dmg (Mac), Shirox-Catalyst.dmg (Mac, Catalyst build).\n' >> notes.md
+         gh release edit "$RELEASE_TAG" \
+           --title "Shirox $VERSION ($BUILD)" \
+           --notes-file notes.md \
+           --prerelease=false \
+           --draft=false \
+           --latest
