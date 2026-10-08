@@ -33,6 +33,23 @@ final class ScrambledStreamPlaybackTests: XCTestCase {
         #EXT-X-STREAM-INF:BANDWIDTH=400000,AUDIO="aud"
         video/index.m3u8
         """, key: key), "text/plain")
+        // HD-2: one 2 s TS segment dressed up as a .webp.
+        server.routes["/hd2/master"] = (ScrambledPlaylistTests.scramble("""
+        #EXTM3U
+        #EXT-X-STREAM-INF:BANDWIDTH=200000,CODECS="avc1.4d400a",RESOLUTION=16x16
+        index.m3u8
+        """, key: key), "text/plain")
+        server.routes["/hd2/index.m3u8"] = (ScrambledPlaylistTests.scramble("""
+        #EXTM3U
+        #EXT-X-VERSION:3
+        #EXT-X-TARGETDURATION:2
+        #EXT-X-MEDIA-SEQUENCE:0
+        #EXT-X-PLAYLIST-TYPE:VOD
+        #EXTINF:2.0,
+        seg-0.webp
+        #EXT-X-ENDLIST
+        """, key: key), "text/plain")
+        server.routes["/hd2/seg-0.webp"] = (ScrambledPlaylistTests.disguise(HLSServer.blackSegment), "image/webp")
         for (name, folder) in [("video", video!), ("audio", audio!)] {
             let playlist = try String(contentsOf: folder.appendingPathComponent("playlist.m3u8"), encoding: .utf8)
             server.routes["/\(name)/index.m3u8"] = (ScrambledPlaylistTests.scramble(playlist, key: key), "text/plain")
@@ -76,6 +93,52 @@ final class ScrambledStreamPlaybackTests: XCTestCase {
         let (segment, _) = try await URLSession.shared.data(from: XCTUnwrap(URL(string: segmentLine)))
         XCTAssertEqual(segment, try Data(contentsOf: video.appendingPathComponent("seg_0.m4s")))
         XCTAssertFalse(server.refused.contains { _ in true }, "a request went out without the module's headers")
+    }
+
+    func testADisguisedSegmentComesBackUnwrapped() async throws {
+        let up = await proxy.startAndWait(headers: Self.moduleHeaders, reason: "test")
+        XCTAssertTrue(up)
+        let master = try await text(XCTUnwrap(proxy.loopbackURL(for: server.url("/hd2/master"),
+                                                                playlistKey: ScrambledPlaylistTests.keyString)))
+        let variant = try XCTUnwrap(master.components(separatedBy: "\n").first { $0.hasPrefix("http") })
+        let media = try await text(XCTUnwrap(URL(string: variant)))
+        let segmentLine = try XCTUnwrap(media.components(separatedBy: "\n").first { $0.hasPrefix("http") })
+        var request = URLRequest(url: try XCTUnwrap(URL(string: segmentLine)))
+        request.setValue("bytes=0-", forHTTPHeaderField: "Range")
+        let (segment, response) = try await URLSession.shared.data(for: request)
+        XCTAssertEqual(segment, HLSServer.blackSegment)
+        XCTAssertEqual((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type"), "video/mp2t")
+    }
+
+    /// Reported: HD-2 stalled at 0:00 on both players, its segments arriving as image files.
+    func testAVPlayerPlaysAStreamWithDisguisedSegments() async throws {
+        let engine = AVPlayerEngine()
+        var source = PlaybackSource(url: server.url("/hd2/master"), headers: Self.moduleHeaders)
+        source.playlistKey = ScrambledPlaylistTests.keyString
+        engine.load(source)
+        let item = try await readyItem(engine.player)
+        engine.play()
+        try await waitUntil("playback advances") { engine.player.currentTime().seconds > 0.5 }
+        XCTAssertEqual(item.duration.seconds, 2, accuracy: 0.5)
+        engine.stop()
+    }
+
+    /// Given the proxy's URL as its router would: the router leaves the fixture's loopback
+    /// host alone.
+    func testMPVPlaysAStreamWithDisguisedSegments() async throws {
+        let up = await proxy.startAndWait(headers: Self.moduleHeaders, reason: "test")
+        XCTAssertTrue(up)
+        let url = try XCTUnwrap(proxy.loopbackURL(for: server.url("/hd2/master"),
+                                                  playlistKey: ScrambledPlaylistTests.keyString))
+        let engine = MPVEngine(output: .none)
+        defer { engine.stop() }
+        let ready = expectation(description: "ready")
+        ready.assertForOverFulfill = false
+        engine.events.itemReady = { ready.fulfill() }
+        engine.load(PlaybackSource(url: url))
+        await fulfillment(of: [ready], timeout: 15)
+        engine.play()
+        try await waitUntil("playback advances") { engine.currentTime > 0.5 }
     }
 
     func testAVPlayerPlaysTheScrambledStreamWithItsSeparateAudio() async throws {

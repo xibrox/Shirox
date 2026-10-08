@@ -142,3 +142,36 @@ enum HLSPlaylistCipher {
         return decoded
     }
 }
+
+/// Undoes the segment disguise on the same sites' second server (Re:ANIME HD-2): a segment is
+/// named `.webp`/`.png`, starts with that image format's header, and the transport stream
+/// after it is XORed with a fixed key. The site's hls.js fragment loader strips it before
+/// handing the bytes on; a player that gets them as they are can't demux anything.
+enum HLSSegmentDisguise {
+    private static let key: [UInt8] = [0x9d, 0x2a, 0xf1, 0x47, 0xb3, 0x8e, 0x5c, 0x70,
+                                       0xa6, 0x19, 0xe4, 0x3b, 0xd8, 0x62, 0x0f, 0xc5]
+    private static let png: [UInt8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+
+    /// Whether a segment at `url` may be disguised, so is worth holding whole to look at.
+    static func mayBeDisguised(_ url: URL) -> Bool {
+        ["webp", "png"].contains(url.pathExtension.lowercased())
+    }
+
+    /// The segment inside `data`; `data` itself when it isn't disguised.
+    static func unwrap(_ data: Data) -> Data {
+        let bytes = [UInt8](data)
+        let payload: ArraySlice<UInt8>
+        if bytes.count >= 12, bytes[0..<4] == [0x52, 0x49, 0x46, 0x46][...], bytes[8..<12] == [0x57, 0x45, 0x42, 0x50][...] {
+            payload = bytes[12...]   // "RIFF" … "WEBP"
+        } else if bytes.count >= 8, bytes[0..<8] == png[...] {
+            payload = bytes[8...]
+        } else {
+            return data
+        }
+        // A sync byte up front: the payload is already plain.
+        if payload.first == 0x47 { return Data(payload) }
+        var out = [UInt8](payload)
+        for i in out.indices { out[i] ^= key[i % key.count] }
+        return Data(out)
+    }
+}

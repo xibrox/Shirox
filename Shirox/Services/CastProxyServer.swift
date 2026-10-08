@@ -477,7 +477,10 @@ final class CastProxyServer: @unchecked Sendable {
         // A manifest gets rewritten, which changes its length — so a range over it would be
         // a lie. Manifests are small and never usefully ranged, so ask for the whole thing.
         let expectManifest = playlistKey != nil || target.pathExtension.lowercased() == "m3u8"
-        if !expectManifest, let range = head.value(for: "range") {
+        // A segment dressed up as an image (see HLSSegmentDisguise) is fetched whole and
+        // unwrapped; the unwrapped one is shorter, so a range over it is the same lie.
+        let unwrapsDisguise = !expectManifest && head.wantsBody && HLSSegmentDisguise.mayBeDisguised(target)
+        if !expectManifest, !unwrapsDisguise, let range = head.value(for: "range") {
             request.setValue(range, forHTTPHeaderField: "Range")
         }
 
@@ -489,7 +492,7 @@ final class CastProxyServer: @unchecked Sendable {
         let isAudioPlaylist = items.contains { $0.name == "ar" }
         let repairPlan = RepairPlanBox()
         var segmentRepair: ProxyExchangeRegistry.SegmentRepair?
-        if items.contains(where: { $0.name == "fx" }), head.wantsBody, head.value(for: "range") == nil {
+        if items.contains(where: { $0.name == "fx" }), head.wantsBody, unwrapsDisguise || head.value(for: "range") == nil {
             let keyURL = items.first(where: { $0.name == "fk" })?.value.flatMap(URL.init(string:))
             let iv = items.first(where: { $0.name == "fiv" })?.value.flatMap(Self.bytes(hex:))
             let crypto = keyURL.flatMap { key in iv.map { AudioSegmentRepair.Crypto(key: key, iv: $0) } }
@@ -522,6 +525,7 @@ final class CastProxyServer: @unchecked Sendable {
                                 repairPlan.plan = AudioSegmentRepair.plan(mediaPlaylist: text, baseURL: target)
                             } : nil,
                             segmentRepair: segmentRepair,
+                            unwrapsDisguise: unwrapsDisguise,
                             proxy: { [weak self] url, resource in
                                 self?.mintNested(url, resource: resource, playlistKey: playlistKey,
                                                  probeID: probeID, loopback: loopback,
@@ -915,8 +919,9 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
         let proxy: (URL, CastManifestRewriter.Resource) -> URL?
         let prepare: ((String) -> Void)?
         let segmentRepair: SegmentRepair?
+        let unwrapsDisguise: Bool
         var isManifest = false
-        /// A segment held whole to be evened out before it's sent.
+        /// A segment held whole to be unwrapped or evened out before it's sent.
         var isRepairing = false
         var manifestBuffer = Data()
         var headerSent = false
@@ -925,10 +930,12 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
 
         init(connection: ProxyConnection, wantsBody: Bool, manifestBase: URL, playlistKey: String?,
              finish: ((String, String) -> String)?, prepare: ((String) -> Void)?,
-             segmentRepair: SegmentRepair?, proxy: @escaping (URL, CastManifestRewriter.Resource) -> URL?) {
+             segmentRepair: SegmentRepair?, unwrapsDisguise: Bool,
+             proxy: @escaping (URL, CastManifestRewriter.Resource) -> URL?) {
             self.finishManifest = finish
             self.prepare = prepare
             self.segmentRepair = segmentRepair
+            self.unwrapsDisguise = unwrapsDisguise
             self.connection = connection
             self.wantsBody = wantsBody
             self.manifestBase = manifestBase
@@ -957,11 +964,12 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
              finish: ((String, String) -> String)? = nil,
              prepare: ((String) -> Void)? = nil,
              segmentRepair: SegmentRepair? = nil,
+             unwrapsDisguise: Bool = false,
              proxy: @escaping (URL, CastManifestRewriter.Resource) -> URL?) async {
         let task = session.dataTask(with: request)
         let exchange = Exchange(connection: connection, wantsBody: wantsBody, manifestBase: base,
                                 playlistKey: playlistKey, finish: finish, prepare: prepare,
-                                segmentRepair: segmentRepair, proxy: proxy)
+                                segmentRepair: segmentRepair, unwrapsDisguise: unwrapsDisguise, proxy: proxy)
         lock.lock(); active[task.taskIdentifier] = exchange; lock.unlock()
 
         await withCheckedContinuation { continuation in
@@ -1008,8 +1016,8 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
             completionHandler(.allow)
             return
         }
-        if exchange.segmentRepair != nil, (200..<300).contains(http?.statusCode ?? 200) {
-            // Held whole until it's evened out; the head goes with it.
+        if exchange.segmentRepair != nil || exchange.unwrapsDisguise, (200..<300).contains(http?.statusCode ?? 200) {
+            // Held whole until it's unwrapped or evened out; the head goes with it.
             exchange.isRepairing = true
             completionHandler(.allow)
             return
@@ -1053,15 +1061,20 @@ fileprivate final class ProxyExchangeRegistry: NSObject, URLSessionDataDelegate,
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let exchange = exchange(for: task) else { complete(task); return }
-        if exchange.isRepairing, error == nil, !exchange.failed, let repair = exchange.segmentRepair {
-            // Answered once it's evened out: the request isn't done until then, so the
-            // connection reads no next request before this one's body is written.
-            let original = exchange.manifestBuffer
+        if exchange.isRepairing, error == nil, !exchange.failed {
+            // Answered once it's unwrapped and evened out: the request isn't done until then,
+            // so the connection reads no next request before this one's body is written.
+            let original = exchange.unwrapsDisguise
+                ? HLSSegmentDisguise.unwrap(exchange.manifestBuffer) : exchange.manifestBuffer
+            let repair = exchange.segmentRepair
             Task {
-                var key: Data?
-                if let crypto = repair.crypto { key = await repair.key(crypto.key) }
-                let fixed = AudioSegmentRepair.repaired(original, crypto: repair.crypto, key: key)
-                if fixed != nil { repair.repaired() }
+                var fixed: Data?
+                if let repair {
+                    var key: Data?
+                    if let crypto = repair.crypto { key = await repair.key(crypto.key) }
+                    fixed = AudioSegmentRepair.repaired(original, crypto: repair.crypto, key: key)
+                    if fixed != nil { repair.repaired() }
+                }
                 let body = fixed ?? original
                 var head = "HTTP/1.1 200 OK\r\n"
                 head += "Content-Type: video/mp2t\r\n"

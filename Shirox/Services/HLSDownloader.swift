@@ -30,7 +30,8 @@ actor HLSDownloader {
     /// Returns the path to the manifest file relative to downloadDir.
     ///
     /// - Parameter playlistKey: the stream's playlist key when its playlists are scrambled
-    ///   (see ``HLSPlaylistCipher``); segments never are.
+    ///   (see ``HLSPlaylistCipher``). Segments dressed up as images are unwrapped
+    ///   (see ``HLSSegmentDisguise``).
     func download(
         id: UUID,
         url: URL,
@@ -248,6 +249,7 @@ actor HLSDownloader {
             }
             data = data.subdata(in: range.offset..<end)
         }
+        if HLSSegmentDisguise.mayBeDisguised(url) { data = HLSSegmentDisguise.unwrap(data) }
 
         guard let key, key.method == .aes128, let keyURL = key.url else {
             // Cleartext: a 200 HTML challenge/error page saved as a segment is undecodable and

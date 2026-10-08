@@ -41,6 +41,51 @@ final class ScrambledPlaylistTests: XCTestCase {
         XCTAssertEqual(HLSPlaylistCipher.decode(Data(wrapped.utf8), key: Self.keyString), master)
     }
 
+    // MARK: Disguised segments
+
+    private let segment = Data([0x47, 0x40, 0x11, 0x10, 0x00, 0x42, 0xf0, 0x25]
+                               + [UInt8](repeating: 0xff, count: 180))
+
+    func testAWebPDisguisedSegmentIsUnwrapped() {
+        XCTAssertEqual(HLSSegmentDisguise.unwrap(Self.disguise(segment)), segment)
+    }
+
+    func testAPNGDisguisedSegmentIsUnwrapped() {
+        XCTAssertEqual(HLSSegmentDisguise.unwrap(Self.disguise(segment, as: .png)), segment)
+    }
+
+    func testAPlainSegmentBehindTheHeaderIsOnlyUnwrapped() {
+        let header = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+        XCTAssertEqual(HLSSegmentDisguise.unwrap(header + segment), segment)
+    }
+
+    func testAnUndisguisedSegmentIsLeftAlone() {
+        XCTAssertEqual(HLSSegmentDisguise.unwrap(segment), segment)
+        XCTAssertEqual(HLSSegmentDisguise.unwrap(Data([0x52, 0x49])), Data([0x52, 0x49]))
+    }
+
+    func testOnlyImageNamedSegmentsAreLookedAt() {
+        XCTAssertTrue(HLSSegmentDisguise.mayBeDisguised(URL(string: "https://vault-1.test/s/seg-3.webp")!))
+        XCTAssertTrue(HLSSegmentDisguise.mayBeDisguised(URL(string: "https://vault-1.test/s/seg-3.PNG?t=1")!))
+        XCTAssertFalse(HLSSegmentDisguise.mayBeDisguised(URL(string: "https://cdn.test/s/seg-3.ts")!))
+    }
+
+    enum ImageHeader { case webp, png }
+
+    /// What HD-2 serves: an image header, then the segment XORed with the site's key.
+    static func disguise(_ segment: Data, as header: ImageHeader = .webp) -> Data {
+        let key: [UInt8] = [0x9d, 0x2a, 0xf1, 0x47, 0xb3, 0x8e, 0x5c, 0x70,
+                            0xa6, 0x19, 0xe4, 0x3b, 0xd8, 0x62, 0x0f, 0xc5]
+        let body = Data(segment.enumerated().map { $0.element ^ key[$0.offset % key.count] })
+        switch header {
+        case .webp:
+            let size = UInt32(body.count + 4).littleEndian
+            return Data("RIFF".utf8) + withUnsafeBytes(of: size) { Data($0) } + Data("WEBP".utf8) + body
+        case .png:
+            return Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) + body
+        }
+    }
+
     // MARK: Rewriting
 
     func testOnlyPlaylistsAreMarkedAsPlaylists() {
