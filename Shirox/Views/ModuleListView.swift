@@ -198,12 +198,8 @@ struct ModuleListView: View {
                     EditButton()
                 }
                 #endif
-                if showsDone {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                    }
-                }
             }
+            .modifier(DoneItem(isShown: showsDone) { dismiss() })
             .confirmationDialog(
                 brokenTitle,
                 isPresented: $offerRemovingBroken,
@@ -814,5 +810,31 @@ struct ModuleListView: View {
         #if os(iOS)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
+    }
+}
+
+/// The Done button of a sheet, left out rather than left empty elsewhere: from iOS 26 an
+/// empty item still draws its glass.
+private struct DoneItem: ViewModifier {
+    let isShown: Bool
+    let done: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 16, *) {
+            content.toolbar {
+                if isShown {
+                    ToolbarItem(placement: .confirmationAction) { Button("Done", action: done) }
+                }
+            }
+        } else {
+            // A bare `if` in a toolbar builder needs iOS 16; before it, the condition lives
+            // inside the item.
+            content.toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    if isShown { Button("Done", action: done) }
+                }
+            }
+        }
     }
 }
