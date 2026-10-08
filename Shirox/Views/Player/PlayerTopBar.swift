@@ -28,6 +28,17 @@ struct PlayerTopBar: View {
     @State private var leadingWidth: CGFloat = 0
     #endif
 
+    /// A Mac's row is as tall as a window's title bar, level with the window's buttons in it.
+    private static var compact: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    private var rowHeight: CGFloat { isPad ? 56 : Self.compact ? 32 : 44 }
+
     private var isPad: Bool {
         #if os(iOS)
         return UIDevice.current.userInterfaceIdiom == .pad
@@ -47,7 +58,7 @@ struct PlayerTopBar: View {
                 // Clears the wider of the two sides on both, so the title stays centred and
                 // never runs under either the dismiss button or the right capsule.
                 .padding(.horizontal, titleInset)
-                .frame(height: isPad ? 56 : 44) // match dismiss button height
+                .frame(height: rowHeight) // match dismiss button height
 
             HStack(alignment: .top) {
                 // Dismiss button (left). On a Mac it follows the window's own buttons, which
@@ -60,9 +71,9 @@ struct PlayerTopBar: View {
                     if showDismiss {
                         Button(action: onDismiss) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(.white)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 26, height: 26)
                                 .mediaGlassChrome(Circle(), enabled: playerLiquidGlass, off: Color.white.opacity(0.25))
                                 .shadow(color: .black.opacity(0.3), radius: 6)
                                 .contentShape(Circle())
@@ -71,7 +82,7 @@ struct PlayerTopBar: View {
                         .help("Close (Esc)")
                     }
                 }
-                .frame(height: 44)
+                .frame(height: rowHeight)
                 .background(GeometryReader { proxy in
                     Color.clear.preference(key: PlayerTopBarLeadingWidthKey.self, value: proxy.size.width)
                 })
@@ -97,8 +108,8 @@ struct PlayerTopBar: View {
                 Group {
                     if isLandscape {
                         HStack(spacing: isPad ? 14 : 8) { rightButtons }
-                            .padding(.horizontal, isPad ? 12 : 8)
-                            .padding(.vertical, isPad ? 6 : 4)
+                            .padding(.horizontal, isPad ? 12 : Self.compact ? 6 : 8)
+                            .padding(.vertical, isPad ? 6 : Self.compact ? 3 : 4)
                     } else {
                         VStack(spacing: isPad ? 14 : 8) { rightButtons }
                             .padding(.horizontal, isPad ? 6 : 4)
@@ -113,7 +124,7 @@ struct PlayerTopBar: View {
         }
         .padding(.horizontal, isPad ? 30 : 20)
         #if os(macOS)
-        // Level with the window's buttons in a window, 20 points down in full screen.
+        // Level with the window's buttons in a window, a little way down in full screen.
         .padding(.top, topPadding)
         #else
         .padding(.top, isPad ? topPadding + 10 : topPadding)
@@ -138,8 +149,8 @@ struct PlayerTopBar: View {
 
     @ViewBuilder
     private var rightButtons: some View {
-        let iconSize: CGFloat = isPad ? 20 : 15
-        let frameSize: CGFloat = isPad ? 44 : 32
+        let iconSize: CGFloat = isPad ? 20 : Self.compact ? 13 : 15
+        let frameSize: CGFloat = isPad ? 44 : Self.compact ? 26 : 32
         
         #if os(iOS)
         #if !targetEnvironment(macCatalyst)

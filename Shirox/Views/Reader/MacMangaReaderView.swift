@@ -173,7 +173,7 @@ struct MacMangaReaderView: View {
         .padding(.horizontal, 16)
         // Beside the window's buttons and as tall as their title bar, out of full screen.
         .padding(.leading, cover.isFullScreen ? 0 : 64)
-        .frame(height: cover.isFullScreen ? 38 : 56)
+        .frame(height: cover.isFullScreen ? 38 : 32)
         .background(.bar)
     }
 

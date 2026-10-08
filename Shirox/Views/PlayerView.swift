@@ -1276,7 +1276,7 @@ struct PlayerView: View {
         #elseif os(macOS)
         // The same 20 points from every edge. In a window the top bar sits level with the
         // window's own buttons instead, in the title bar's height; full screen has none.
-        return PlayerLayouts(top: macWindow.isFullScreen ? 20 : 5, bottom: 20, horizontal: 0)
+        return PlayerLayouts(top: macWindow.isFullScreen ? 16 : 0, bottom: 20, horizontal: 0)
         #else
         return PlayerLayouts(top: 24, bottom: 24, horizontal: 16)
         #endif
@@ -3879,12 +3879,17 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
     @Published private(set) var isFullScreen = false
 
     private var fullScreenBeforePresenting = false
-    private var toolbarBeforePresenting: NSToolbar?
+    /// The app's toolbar, hidden while the cover is up, and whether it was showing before.
+    private weak var hiddenToolbar: NSToolbar?
+    private var toolbarWasVisible = false
+    /// From the start of presenting to the end of closing.
+    private var isCovering = false
     private var titlebarBeforePresenting: (visibility: NSWindow.TitleVisibility, transparent: Bool, fullSize: Bool)?
     private var frameBeforePictureInPicture: NSRect?
     private var levelBeforePictureInPicture: NSWindow.Level = .normal
     private var behaviorBeforePictureInPicture: NSWindow.CollectionBehavior = []
     private var monitors: [Any] = []
+    private var toolbarObservations: [NSKeyValueObservation] = []
     private var observers: [NSObjectProtocol] = []
 
     func open(stream: StreamResult, streams: [StreamResult], context: PlayerContext?, onWatchNext: WatchNextLoader?,
@@ -3929,8 +3934,9 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.styleMask.insert(.fullSizeContentView)
-            toolbarBeforePresenting = window.toolbar
-            setCoverToolbar(on: window, fullScreen: window.styleMask.contains(.fullScreen))
+            toolbarWasVisible = window.toolbar?.isVisible ?? false
+            isCovering = true
+            hideToolbar(of: window)
         }
         presentation = nil
         hostWindow = window
@@ -3959,8 +3965,11 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
                 if !titlebar.fullSize { window.styleMask.remove(.fullSizeContentView) }
             }
             titlebarBeforePresenting = nil
-            if let toolbar = toolbarBeforePresenting { window.toolbar = toolbar }
-            toolbarBeforePresenting = nil
+            // The same toolbar, shown again. Never swapped for another: SwiftUI stops filling a
+            // toolbar it has been parted from, and the app's every page lost its toolbar items.
+            isCovering = false
+            if toolbarWasVisible { window.toolbar?.isVisible = true }
+            hiddenToolbar = nil
         }
         presentation = nil
         hostWindowNumber = nil
@@ -3991,6 +4000,12 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
     /// and lists under the cover would otherwise move their selection on the arrows and space.
     private func watch(_ window: NSWindow) {
         guard monitors.isEmpty else { return }
+        // SwiftUI shows its toolbar again, or puts up a new one, now and then while the cover is
+        // up (when a sheet that opened the player goes away, for one). It goes again.
+        toolbarObservations = [window.observe(\.toolbar, options: [.new]) { [weak self] window, _ in
+            DispatchQueue.main.async { self?.hideToolbar(of: window) }
+        }]
+        hideToolbar(of: window)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
             guard let self, let presentation = self.presentation, event.window === self.hostWindow else { return event }
             return self.handleKey(event, in: presentation.kind) ? nil : event
@@ -4001,14 +4016,6 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             }
             return event
         } as Any)
-        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willEnterFullScreenNotification,
-                                                                object: window, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.setCoverToolbar(on: window, fullScreen: true) }
-        })
-        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willExitFullScreenNotification,
-                                                                object: window, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.setCoverToolbar(on: window, fullScreen: false) }
-        })
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didEnterFullScreenNotification,
                                                                 object: window, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.isFullScreen = true }
@@ -4024,25 +4031,28 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
     }
 
     private func stopWatching() {
+        toolbarObservations = []
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors = []
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
     }
 
-    /// The toolbar while the cover is up. In a window, an empty one in place of the app's: it
-    /// keeps the window's buttons where they were, level with the cover's close button (hiding
-    /// the toolbar through SwiftUI takes the buttons with it). In full screen, none: a toolbar
-    /// there is a strip pinned across the top of the screen, over the cover's buttons, with the
-    /// sidebar's backdrop showing through it.
-    private func setCoverToolbar(on window: NSWindow, fullScreen: Bool) {
-        if fullScreen {
-            window.toolbar = nil
-        } else if window.toolbar?.identifier != "ShiroxCover" {
-            let empty = NSToolbar(identifier: "ShiroxCover")
-            empty.showsBaselineSeparator = false
-            window.toolbar = empty
+    /// Hides the window's toolbar while the cover is up: its items would sit over the cover's
+    /// top, and in full screen it's a strip pinned across the top of the screen. Hidden through
+    /// AppKit, not SwiftUI, whose hidden toolbar takes the window's buttons with it.
+    private func hideToolbar(of window: NSWindow) {
+        guard isCovering, let toolbar = window.toolbar else { return }
+        if hiddenToolbar !== toolbar {
+            hiddenToolbar = toolbar
+            toolbarObservations.append(toolbar.observe(\.isVisible, options: [.new]) { [weak self, weak window] toolbar, _ in
+                DispatchQueue.main.async {
+                    guard let self, let window, self.isCovering, toolbar.isVisible else { return }
+                    self.hideToolbar(of: window)
+                }
+            })
         }
+        if toolbar.isVisible { toolbar.isVisible = false }
     }
 
     /// True when the key was the cover's.
@@ -4053,10 +4063,15 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             if event.type == .keyDown { close() }
             return true
         }
-        // Escape leaves full screen first, as everywhere on a Mac, and then closes.
+        // Escape leaves the full screen the player went into first, as everywhere on a Mac, and
+        // then closes. A window that was full screen before the player stays so.
         if event.keyCode == 53, mods.subtracting(.function).isEmpty {
             if event.type == .keyDown {
-                if hostWindow?.styleMask.contains(.fullScreen) == true { hostWindow?.toggleFullScreen(nil) } else { close() }
+                if !fullScreenBeforePresenting, hostWindow?.styleMask.contains(.fullScreen) == true {
+                    hostWindow?.toggleFullScreen(nil)
+                } else {
+                    close()
+                }
             }
             return true
         }
