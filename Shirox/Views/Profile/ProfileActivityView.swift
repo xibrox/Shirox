@@ -255,9 +255,8 @@ struct ProfileActivityView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 6))
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(media?.displayTitle ?? "")
+                                CardTitle(media?.displayTitle ?? "")
                                     .font(.subheadline.weight(.semibold))
-                                    .lineLimit(2)
                                     .multilineTextAlignment(.leading)
                                 Text("\(status.capitalized) \(progress ?? "")")
                                     .font(.caption).foregroundStyle(.secondary)

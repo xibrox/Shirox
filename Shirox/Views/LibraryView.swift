@@ -1427,8 +1427,7 @@ private struct LibraryGridCard: View {
                 // Two lines' room whatever the title, so a row's cards line up below.
                 ZStack(alignment: .topLeading) {
                     Text("A\nA").hidden().accessibilityHidden(true)
-                    Text(entry.media.title.displayTitle)
-                        .lineLimit(2)
+                    CardTitle(entry.media.title.displayTitle)
                         .multilineTextAlignment(.leading)
                 }
                 .font(.caption.weight(.semibold))
@@ -1503,9 +1502,8 @@ private struct LibraryRowView: View {
 
             // Info
             VStack(alignment: .leading, spacing: 5) {
-                Text(entry.media.title.displayTitle)
+                CardTitle(entry.media.title.displayTitle)
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
 
                 Text(progressLabel)
                     .font(.caption)

@@ -20,11 +20,9 @@ struct AnimeCardView: View {
                 }
             )
             .overlay(alignment: .bottomLeading) {
-                Text(item.title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                CardTitle(item.title)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
-                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)

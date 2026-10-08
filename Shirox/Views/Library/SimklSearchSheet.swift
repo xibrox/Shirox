@@ -65,9 +65,8 @@ struct SimklSearchSheet: View {
                         .frame(width: 46, height: 69)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title ?? "Untitled")
+                        CardTitle(item.title ?? "Untitled")
                             .font(.subheadline.weight(.semibold))
-                            .lineLimit(2)
                         HStack(spacing: 6) {
                             if let year = item.year {
                                 Text(String(year)).font(.caption).foregroundStyle(.secondary)

@@ -354,9 +354,8 @@ struct UpcomingCalendarView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(entry.media.title.displayTitle)
+                CardTitle(entry.media.title.displayTitle)
                     .font(.subheadline.weight(.medium))
-                    .lineLimit(2)
                 Text(entry.caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)

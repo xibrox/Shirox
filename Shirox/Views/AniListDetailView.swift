@@ -1860,11 +1860,9 @@ struct RelationCard: View {
                 }
             )
             .overlay(alignment: .bottomLeading) {
-                Text(edge.node.title.displayTitle)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                CardTitle(edge.node.title.displayTitle)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
-                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
@@ -1992,9 +1990,8 @@ struct AniListMatchingSearchView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(media.title.displayTitle)
+                                    CardTitle(media.title.displayTitle)
                                         .font(.subheadline.weight(.bold))
-                                        .lineLimit(2)
                                     
                                     if let score = media.averageScore {
                                         Label("\(score)%", systemImage: "star.fill")

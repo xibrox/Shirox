@@ -451,7 +451,7 @@ private struct BatchSearchResultCard: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-            Text(item.title).font(.caption2.weight(.medium)).lineLimit(2)
+            CardTitle(item.title).font(.caption2.weight(.medium))
                 .frame(width: 72, height: 32, alignment: .topLeading).foregroundStyle(.primary)
         }
         .frame(width: 72)
@@ -482,8 +482,8 @@ private struct BatchSearchResultsPickerSheet: View {
                                     }
                                 )
                                 .overlay(alignment: .bottomLeading) {
-                                    Text(item.title).font(.caption2.weight(.semibold)).foregroundStyle(.white)
-                                        .lineLimit(2).padding(.horizontal, 8).padding(.bottom, 8)
+                                    CardTitle(item.title).font(.caption2.weight(.semibold)).foregroundStyle(.white)
+                                        .padding(.horizontal, 8).padding(.bottom, 8)
                                 }
                                 .overlay(alignment: .topTrailing) {
                                     Text("\(episodeCount) ep\(episodeCount == 1 ? "" : "s")")

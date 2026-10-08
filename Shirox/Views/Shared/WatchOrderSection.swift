@@ -66,10 +66,9 @@ private struct WatchOrderCard: View {
                     .padding(6)
             }
 
-            Text(entry.title ?? "Unknown")
+            CardTitle(entry.title ?? "Unknown")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.primary)
-                .lineLimit(2)
                 .frame(width: 110, alignment: .leading)
         }
     }

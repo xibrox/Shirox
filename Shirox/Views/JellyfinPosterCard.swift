@@ -25,11 +25,9 @@ struct JellyfinPosterCard: View {
                 }
             )
             .overlay(alignment: .bottomLeading) {
-                Text(item.displayTitle)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                CardTitle(item.displayTitle)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
-                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)

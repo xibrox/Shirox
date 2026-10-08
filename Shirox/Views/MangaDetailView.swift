@@ -878,9 +878,9 @@ private struct MangaRelationCard: View {
                         .background(Color.black.opacity(0.4), in: Capsule())
                         .padding(8)
                 }
-            Text(edge.node.title.displayTitle)
-                .font(.caption).fontWeight(.semibold).foregroundStyle(.primary)
-                .lineLimit(2).multilineTextAlignment(.leading)
+            CardTitle(edge.node.title.displayTitle)
+                .font(.caption.weight(.semibold)).foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
                 .frame(width: 110, alignment: .leading)
         }
     }

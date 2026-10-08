@@ -800,10 +800,9 @@ private struct MediaGroupRow: View {
                 .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(mediaTitle)
+                CardTitle(mediaTitle)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
 
                 Text(([ "\(count) \(unit)\(count == 1 ? "" : "s")", rangeLine ].compactMap { $0 } + metadata)
                         .joined(separator: " · "))

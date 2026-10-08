@@ -638,11 +638,9 @@ struct AniListCardView: View {
                 }
             )
             .overlay(alignment: .bottomLeading) {
-                Text(media.title.displayTitle)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                CardTitle(media.title.displayTitle)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
-                    .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
