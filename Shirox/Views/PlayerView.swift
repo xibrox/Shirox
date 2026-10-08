@@ -1271,6 +1271,10 @@ struct PlayerView: View {
             bottom: max(16, uiInsets.bottom + 8),
             horizontal: max(16, isLandscape ? max(uiInsets.left, uiInsets.right) : 0)
         )
+        #elseif os(macOS)
+        // The same 20 points from every edge. In a window the top bar sits level with the
+        // window's own buttons instead, in the title bar's height; full screen has none.
+        return PlayerLayouts(top: macWindow.isFullScreen ? 20 : 8, bottom: 20, horizontal: 0)
         #else
         return PlayerLayouts(top: 24, bottom: 24, horizontal: 16)
         #endif
@@ -3762,9 +3766,14 @@ private extension View {
             self
                 .focusable()
                 .focusEffectDisabled()
-                .onKeyPress(.space, phases: [.down, .up]) { press in
-                    NotificationCenter.default.post(name: press.phase == .up ? .playerSpaceUp : .playerSpaceDown,
-                                                    object: nil)
+                // Every phase, the repeats of a held key included: one left unhandled is the Mac's
+                // alert sound, which played over and over while space was held.
+                .onKeyPress(.space, phases: .all) { press in
+                    switch press.phase {
+                    case .down: NotificationCenter.default.post(name: .playerSpaceDown, object: nil)
+                    case .up: NotificationCenter.default.post(name: .playerSpaceUp, object: nil)
+                    default: break
+                    }
                     return .handled
                 }
                 .onKeyPress(KeyEquivalent("k")) { togglePlayPause(); return .handled }
@@ -3960,6 +3969,11 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject
 
     /// Whether the window is the small floating one in a corner of the screen.
     @Published private(set) var isPictureInPicture = false
+    /// Whether the player fills the screen, where there are no window buttons to line up with.
+    @Published private(set) var isFullScreen = false
+
+    func windowDidEnterFullScreen(_ notification: Notification) { isFullScreen = true }
+    func windowDidExitFullScreen(_ notification: Notification) { isFullScreen = false }
     private var frameBeforePictureInPicture: NSRect?
 
     /// mpv has no Picture in Picture on a Mac, so neither engine uses the system's: the window
@@ -4005,6 +4019,7 @@ final class MacPlayerWindowManager: NSObject, NSWindowDelegate, ObservableObject
         isPictureInPicture = false
         frameBeforePictureInPicture = nil
         stopWatchingPointer()
+        isFullScreen = false
     }
 }
 #endif
@@ -4381,6 +4396,12 @@ class PlayerHostingController<Content: View>: UIHostingController<Content> {
             return
         }
         super.pressesEnded(presses, with: event)
+    }
+
+    // A held key's updates stay here too: let through, an unhandled key is the Mac's alert sound.
+    override func pressesChanged(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        if presses.contains(where: Self.isPlainSpace) { return }
+        super.pressesChanged(presses, with: event)
     }
 
     override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {

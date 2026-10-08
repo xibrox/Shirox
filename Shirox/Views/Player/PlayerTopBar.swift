@@ -86,8 +86,8 @@ struct PlayerTopBar: View {
         }
         .padding(.horizontal, isPad ? 30 : 20)
         #if os(macOS)
-        // Level with the window's buttons, which sit in the title bar's 28 points.
-        .padding(.top, 6)
+        // Level with the window's buttons in a window, 20 points down in full screen.
+        .padding(.top, topPadding)
         #else
         .padding(.top, isPad ? topPadding + 10 : topPadding)
         #endif
