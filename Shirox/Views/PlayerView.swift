@@ -3929,13 +3929,8 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.styleMask.insert(.fullSizeContentView)
-            // The app's toolbar gives way to an empty one, which keeps the window's buttons
-            // where they were, level with the cover's close button. Not through SwiftUI, whose
-            // hidden toolbar takes the buttons with it.
             toolbarBeforePresenting = window.toolbar
-            let empty = NSToolbar(identifier: "ShiroxCover")
-            empty.showsBaselineSeparator = false
-            window.toolbar = empty
+            setCoverToolbar(on: window, fullScreen: window.styleMask.contains(.fullScreen))
         }
         presentation = nil
         hostWindow = window
@@ -4006,6 +4001,14 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             }
             return event
         } as Any)
+        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willEnterFullScreenNotification,
+                                                                object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.setCoverToolbar(on: window, fullScreen: true) }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willExitFullScreenNotification,
+                                                                object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.setCoverToolbar(on: window, fullScreen: false) }
+        })
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didEnterFullScreenNotification,
                                                                 object: window, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.isFullScreen = true }
@@ -4025,6 +4028,21 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
         monitors = []
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
+    }
+
+    /// The toolbar while the cover is up. In a window, an empty one in place of the app's: it
+    /// keeps the window's buttons where they were, level with the cover's close button (hiding
+    /// the toolbar through SwiftUI takes the buttons with it). In full screen, none: a toolbar
+    /// there is a strip pinned across the top of the screen, over the cover's buttons, with the
+    /// sidebar's backdrop showing through it.
+    private func setCoverToolbar(on window: NSWindow, fullScreen: Bool) {
+        if fullScreen {
+            window.toolbar = nil
+        } else if window.toolbar?.identifier != "ShiroxCover" {
+            let empty = NSToolbar(identifier: "ShiroxCover")
+            empty.showsBaselineSeparator = false
+            window.toolbar = empty
+        }
     }
 
     /// True when the key was the cover's.
