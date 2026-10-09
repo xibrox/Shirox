@@ -31,28 +31,45 @@ enum PhotoLibrarySaver {
             PHPhotoLibrary.authorizationStatus(for: .addOnly) == .authorized
         guard canSave else { return .denied }
 
+        let album: PHAssetCollection? = canUseAlbum ? {
+            let options = PHFetchOptions()
+            options.predicate = NSPredicate(format: "title = %@", albumTitle)
+            return PHAssetCollection.fetchAssetCollections(
+                with: .album, subtype: .albumRegular, options: options).firstObject
+        }() : nil
         do {
-            let album: PHAssetCollection? = canUseAlbum ? {
-                let options = PHFetchOptions()
-                options.predicate = NSPredicate(format: "title = %@", albumTitle)
-                return PHAssetCollection.fetchAssetCollections(
-                    with: .album, subtype: .albumRegular, options: options).firstObject
-            }() : nil
-            try PHPhotoLibrary.shared().performChangesAndWait {
-                if canUseAlbum {
-                    let albumRequest = album.flatMap { PHAssetCollectionChangeRequest(for: $0) }
-                        ?? PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: albumTitle)
-                    let asset = PHAssetChangeRequest.creationRequestForAsset(from: image)
-                    if let placeholder = asset.placeholderForCreatedAsset {
-                        albumRequest.addAssets([placeholder] as NSArray)
-                    }
-                } else {
+            do {
+                try add(album: album, canUseAlbum: canUseAlbum) {
                     PHAssetChangeRequest.creationRequestForAsset(from: image)
+                }
+            } catch let error as NSError where error.domain == PHPhotosErrorDomain
+                        && error.code == PHPhotosError.invalidResource.rawValue {
+                // Photos keeps an image in the format it was decoded from and refuses some, WebP
+                // among them, which is what many manga sites serve. The share sheet's copy went
+                // through, as it's re-encoded; so is this one.
+                guard let png = image.pngData() else { throw error }
+                try add(album: album, canUseAlbum: canUseAlbum) {
+                    let request = PHAssetCreationRequest.forAsset()
+                    request.addResource(with: .photo, data: png, options: nil)
+                    return request
                 }
             }
             return canUseAlbum ? .savedToAlbum : .savedToLibrary
         } catch {
             return .failed(error)
+        }
+    }
+
+    private static func add(album: PHAssetCollection?, canUseAlbum: Bool,
+                            asset makeAsset: @escaping () -> PHAssetChangeRequest) throws {
+        try PHPhotoLibrary.shared().performChangesAndWait {
+            let asset = makeAsset()
+            guard canUseAlbum else { return }
+            let albumRequest = album.flatMap { PHAssetCollectionChangeRequest(for: $0) }
+                ?? PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: albumTitle)
+            if let placeholder = asset.placeholderForCreatedAsset {
+                albumRequest.addAssets([placeholder] as NSArray)
+            }
         }
     }
 }

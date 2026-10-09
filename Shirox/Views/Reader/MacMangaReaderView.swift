@@ -1,8 +1,10 @@
 #if os(macOS)
 import AppKit
 import Combine
+import ImageIO
 import Kingfisher
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Presenting
 
@@ -184,7 +186,8 @@ struct MacMangaReaderView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(pages.enumerated()), id: \.offset) { index, url in
-                        MacReaderPage(urlString: url, referer: referer, pageNumber: index + 1)
+                        MacReaderPage(urlString: url, referer: referer, pageNumber: index + 1,
+                                      fileName: "\(context.mangaTitle) ch\(chapter?.displayNumber ?? "") p\(index + 1)")
                             .frame(maxWidth: pageWidth)
                             .id(index)
                             // Each page on screen reports where its top is. A lazy stack doesn't
@@ -349,6 +352,8 @@ private struct MacReaderPage: View {
     let urlString: String
     let referer: String
     let pageNumber: Int
+    /// What a saved copy is called, before its extension.
+    let fileName: String
     @State private var failed = false
     @State private var attempt = 0
 
@@ -373,9 +378,53 @@ private struct MacReaderPage: View {
                 }
                 .resizable()
                 .scaledToFit()
+                .contextMenu {
+                    Button("Save Page to Pictures") { save() }
+                    Button("Copy Page") { copy() }
+                }
                 // A String, so it can't collide with the strip's Int page ids the keys scroll to.
                 .id("\(urlString)#\(attempt)")
         }
+    }
+
+    /// The page as the site sent it, from Kingfisher's disk cache, or the file for a
+    /// downloaded chapter.
+    private func originalData() -> Data? {
+        guard let url = URL(string: urlString) else { return nil }
+        if url.isFileURL { return try? Data(contentsOf: url) }
+        return try? ImageCache.default.diskStorage.value(forKey: url.cacheKey)
+    }
+
+    /// Into Pictures › Shirox, where the player's saved frames go, in the page's own format.
+    private func save() {
+        guard let data = originalData(),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let type = CGImageSourceGetType(source).flatMap({ UTType($0 as String) }) else {
+            ToastManager.shared.show(message: "This page hasn't loaded yet.", type: .error)
+            return
+        }
+        let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Shirox", isDirectory: true)
+        let name = fileName.replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        let file = folder.appendingPathComponent(name)
+            .appendingPathExtension(type.preferredFilenameExtension ?? "png")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: file)
+            ToastManager.shared.show(message: "Page saved to Pictures › Shirox", type: .success)
+        } catch {
+            ToastManager.shared.show(message: "Couldn't save page: \(error.localizedDescription)", type: .error)
+        }
+    }
+
+    private func copy() {
+        guard let data = originalData(), let image = NSImage(data: data) else {
+            ToastManager.shared.show(message: "This page hasn't loaded yet.", type: .error)
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([image])
     }
 
     private func modifier(for url: URL) -> AnyModifier {
