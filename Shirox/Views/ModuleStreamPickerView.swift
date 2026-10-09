@@ -45,7 +45,7 @@ struct ModuleStreamPickerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            ModulePickerRows {
                 ForEach(visibleModules) { module in
                     ModuleStreamRow(
                         module: module,
@@ -60,14 +60,9 @@ struct ModuleStreamPickerView: View {
                         onDismiss()
                         onStreamsLoaded(streams, selectedStream, showHref, availableCount, episodeHref)
                     }
+                    .modulePickerRow()
                 }
             }
-            .softScrollEdges()
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #elseif !os(tvOS)
-            .listStyle(.inset)
-            #endif
 
             .navigationTitle("Watch Episode \(episodeNumber)")
             #if os(iOS)
@@ -672,6 +667,8 @@ private struct ModuleStreamRow: View {
             Image(systemName: "magnifyingglass")
                 .font(.caption).foregroundStyle(.secondary)
             TextField("Search title…", text: $rowVm.searchTitle)
+                // The rounded fill around it is its border.
+                .textFieldStyle(.plain)
                 .font(.caption)
                 .onSubmit { rowVm.reset(); rowVm.startFind() }
         }

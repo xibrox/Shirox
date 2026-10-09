@@ -39,7 +39,7 @@ struct DownloadModulePickerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            ModulePickerRows {
                 ForEach(moduleManager.modules) { module in
                     DownloadModuleRow(
                         module: module,
@@ -50,14 +50,9 @@ struct DownloadModulePickerView: View {
                     ) { streams, episodeHref in
                         streamPickerItem = StreamPickerItem(streams: streams, episodeHref: episodeHref, module: module)
                     }
+                    .modulePickerRow()
                 }
             }
-            .softScrollEdges()
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #else
-            .listStyle(.inset)
-            #endif
             .navigationTitle("Download Episode \(episodeNumber)")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -280,6 +275,8 @@ private struct DownloadModuleRow: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").font(.caption).foregroundStyle(.secondary)
             TextField("Search title…", text: $rowVm.searchTitle)
+                // The rounded fill around it is its border.
+                .textFieldStyle(.plain)
                 .font(.caption)
                 .onSubmit { rowVm.reset(); rowVm.startFind() }
         }

@@ -24,7 +24,7 @@ struct BatchDownloadModulePickerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            ModulePickerRows {
                 ForEach(moduleManager.modules) { module in
                     BatchDownloadModuleRow(
                         module: module,
@@ -35,14 +35,9 @@ struct BatchDownloadModulePickerView: View {
                     ) { streams, searchItem in
                         streamPickerItem = StreamPickerItem(streams: streams, searchItem: searchItem, module: module)
                     }
+                    .modulePickerRow()
                 }
             }
-            .softScrollEdges()
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #else
-            .listStyle(.inset)
-            #endif
             .navigationTitle("Download \(episodeNumbers.count) Episode\(episodeNumbers.count == 1 ? "" : "s")")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -413,6 +408,8 @@ private struct BatchDownloadModuleRow: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").font(.caption).foregroundStyle(.secondary)
             TextField("Search title…", text: $rowVm.searchTitle)
+                // The rounded fill around it is its border.
+                .textFieldStyle(.plain)
                 .font(.caption)
                 .onSubmit { rowVm.reset(); rowVm.startFind() }
         }

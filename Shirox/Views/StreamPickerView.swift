@@ -137,6 +137,48 @@ enum ModulePickerRowLayout {
     static let statusHeight: CGFloat = 16
 }
 
+/// The module picker rows' scrolling list. On a Mac it's a plain stack, not a List, whose rows
+/// are table cells there: on a tester's Mac (macOS 15, it looks like) typing in a row's search
+/// field did nothing, the field showing its cursor while the keys went elsewhere.
+struct ModulePickerRows<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        #if os(macOS)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+        }
+        .softScrollEdges()
+        #else
+        List {
+            content()
+        }
+        .softScrollEdges()
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
+        #endif
+    }
+}
+
+extension View {
+    /// A picker row's padding and separator, which a List gives its rows and the Mac's stack
+    /// doesn't.
+    @ViewBuilder
+    func modulePickerRow() -> some View {
+        #if os(macOS)
+        padding(.vertical, 8)
+            .overlay(alignment: .bottom) { Divider() }
+        #else
+        self
+        #endif
+    }
+}
+
 /// One line saying what the row is doing.
 struct ModulePickerStatusLine: View {
     let text: String
