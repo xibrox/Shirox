@@ -47,12 +47,12 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Shirox uses the local network to discover and cast to Chromecast devices.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Shirox uses device motion to rotate the player between landscape sides.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Shirox saves video frames and manga pages to your Photos library when you ask it to.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Shirox finds or creates a Shirox album to organize saved video frames and manga pages in Photos.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>Shirox uses device motion to rotate the player between landscape sides.</string>
 	<key>TMDBAPIKey</key>
 	<string>$(TMDB_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>

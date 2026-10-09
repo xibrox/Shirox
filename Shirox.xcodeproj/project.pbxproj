@@ -2292,7 +2292,6 @@
 				DDE30B9763346F02AE6DEFBB /* AssRenderer.swift */,
 				0E8B657977876178EDFBEA38 /* TrackPreferences.swift */,
 			);
-			name = Playback;
 			path = Playback;
 			sourceTree = "<group>";
 		};
