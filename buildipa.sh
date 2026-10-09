@@ -16,6 +16,10 @@ fi
 
 cd build
 
+# A fresh ipa every time: zip adds to an existing archive rather than replacing it, so files
+# gone from the app would stay in it, and a run that stopped partway leaves these behind.
+rm -rf "$APPLICATION_NAME.ipa" Payload "$APPLICATION_NAME.app"
+
 echo "--- Resolving Swift Package Dependencies ---"
 
 xcodebuild -resolvePackageDependencies \

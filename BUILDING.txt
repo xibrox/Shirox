@@ -1,0 +1,44 @@
+# iPhone / iPad  ->  build/Shirox.ipa
+cd ~/Developer/Shirox && ./buildipa.sh
+
+
+# Mac, native app  ->  build/Shirox-macOS.dmg
+cd ~/Developer/Shirox && ./builddmg.sh
+
+
+# Mac, Catalyst  ->  build/Shirox-Catalyst.dmg
+cd ~/Developer/Shirox && ./buildcatalyst.sh
+
+
+# Apple TV  ->  build/Shirox-tvos.ipa
+cd ~/Developer/Shirox && ./buildtvos.sh
+
+
+# All four, one after another
+cd ~/Developer/Shirox && ./buildipa.sh && ./builddmg.sh && ./buildcatalyst.sh && ./buildtvos.sh
+
+
+# Open the build folder
+open ~/Developer/Shirox/build
+
+
+# Mac app won't open after downloading ("damaged" / blocked)
+xattr -cr /Applications/Shirox.app
+
+
+# Quick check that everything compiles (debug, no packaging)
+cd ~/Developer/Shirox && xcodebuild -scheme Shirox_iOS -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DDMacDbg build | grep -E 'error:|BUILD'
+cd ~/Developer/Shirox && xcodebuild -scheme Shirox_macOS -destination 'platform=macOS' -derivedDataPath build/DDMacDbg build | grep -E 'error:|BUILD'
+cd ~/Developer/Shirox && xcodebuild -scheme Shirox_tvOS -destination 'generic/platform=tvOS Simulator' -derivedDataPath build/DDMacDbg build | grep -E 'error:|BUILD'
+
+
+# Script says "permission denied"
+cd ~/Developer/Shirox && chmod +x buildipa.sh builddmg.sh buildcatalyst.sh buildtvos.sh
+
+
+# create-dmg missing (needed for the Mac dmgs)
+brew install create-dmg
+
+
+# Strange build errors, or the disk is full: clear the build caches
+rm -rf ~/Developer/Shirox/build/DerivedData*
