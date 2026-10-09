@@ -1374,9 +1374,10 @@ struct PlayerView: View {
                 onNextEpisodeTap: (onWatchNext != nil || onSequelNeeded != nil) && !isLatestAiredEpisode ? { Task { @MainActor in await loadAndAdvance() } } : nil,
                 hasActiveSkipSegment: activeSkipSegment != nil,
                 skipSegments: skipSegments,
-                episodeNumber: currentContext?.episodeNumber,
+                // Picture in Picture has no room for the title: the middle buttons sat on it.
+                episodeNumber: macPictureInPicture ? nil : currentContext?.episodeNumber,
                 tvdbEpisodeTitle: tvdbEpisodeTitle,
-                mediaTitle: currentContext?.mediaTitle,
+                mediaTitle: macPictureInPicture ? nil : currentContext?.mediaTitle,
                 isPortrait: !isLandscape
             )
         }
@@ -4152,17 +4153,28 @@ struct MacWindowCover: ViewModifier {
         content
             .allowsHitTesting(presentation == nil)
             .accessibilityHidden(presentation != nil)
+            // Small enough for Picture in Picture while it's on. The app under the cover can't
+            // get that small, so it runs past the window's edges, clipped, and the cover is laid
+            // out in the window rather than over it: it used to take the app's wider size and
+            // lose its sides.
+            .frame(minWidth: pictureInPicture ? 240 : 900, maxWidth: .infinity,
+                   minHeight: pictureInPicture ? 135 : 600, maxHeight: .infinity)
+            .clipped()
             .overlay {
                 if let presentation {
                     presentation.view
                         .id(presentation.id)
                         .ignoresSafeArea()
                         .transition(.opacity)
+                        // The app's toasts are under the cover, so "Frame saved" and the
+                        // like went unseen; the cover shows its own.
+                        .overlay(alignment: .bottom) {
+                            ToastView()
+                                .allowsHitTesting(false)
+                        }
                 }
             }
             .animation(.easeOut(duration: 0.2), value: presentation?.id)
-            // Small enough for Picture in Picture while it's on.
-            .frame(minWidth: pictureInPicture ? 240 : 900, minHeight: pictureInPicture ? 135 : 600)
             .background(MacHostWindowReader(windowNumber: $windowNumber))
     }
 }
