@@ -308,6 +308,116 @@ final class AniListLibraryService {
         await MainActor.run { AniListEntryExtrasChange(mediaId: mediaId, isPrivate: isPrivate).post() }
     }
 
+    // MARK: - Entry extras (rewatches, dates, custom lists)
+
+    private struct FuzzyDate: Decodable {
+        let year: Int?
+        let month: Int?
+        let day: Int?
+        var date: Date? { LibraryEntryExtras.date(year: year, month: month, day: day) }
+    }
+
+    private struct CustomListFlag: Decodable {
+        let name: String
+        let enabled: Bool
+    }
+
+    /// The editor's extras for a title: its rewatches, dates and custom lists. A title not on
+    /// the list yet gets the account's custom lists, none ticked, so it can be added to them.
+    func fetchExtras(mediaId: Int, type: MediaListType = .anime) async throws -> LibraryEntryExtras {
+        guard let userId = await AniListAuthManager.shared.authenticatedUserId else {
+            throw ProviderError.unauthenticated
+        }
+        let query = """
+        query ($userId: Int, $mediaId: Int) {
+          MediaList(userId: $userId, mediaId: $mediaId, type: \(type.rawValue)) {
+            repeat
+            startedAt { year month day }
+            completedAt { year month day }
+            customLists(asArray: true)
+          }
+        }
+        """
+        struct Response: Decodable {
+            struct ResponseData: Decodable { let MediaList: Entry? }
+            struct Entry: Decodable {
+                let `repeat`: Int?
+                let startedAt: FuzzyDate?
+                let completedAt: FuzzyDate?
+                let customLists: [CustomListFlag]?
+            }
+            let data: ResponseData?
+        }
+        do {
+            let data = try await post(query: query, variables: ["userId": userId, "mediaId": mediaId])
+            if let entry = try JSONDecoder().decode(Response.self, from: data).data?.MediaList {
+                return LibraryEntryExtras(
+                    repeats: entry.repeat ?? 0,
+                    startedAt: entry.startedAt?.date,
+                    completedAt: entry.completedAt?.date,
+                    customLists: (entry.customLists ?? []).map { .init(name: $0.name, isMember: $0.enabled) })
+            }
+        } catch where Self.isNotOnList(error) {}
+        return LibraryEntryExtras(customLists: try await customListNames(userId: userId, type: type)
+            .map { .init(name: $0, isMember: false) })
+    }
+
+    /// The account's custom lists for anime or manga.
+    private func customListNames(userId: Int, type: MediaListType) async throws -> [String] {
+        let list = type == .manga ? "mangaList" : "animeList"
+        let query = """
+        query ($userId: Int) {
+          User(id: $userId) { mediaListOptions { \(list) { customLists } } }
+        }
+        """
+        struct Response: Decodable {
+            struct ResponseData: Decodable { let User: User? }
+            struct User: Decodable { let mediaListOptions: Options? }
+            struct Options: Decodable { let animeList: Lists?; let mangaList: Lists? }
+            struct Lists: Decodable { let customLists: [String]? }
+            let data: ResponseData?
+        }
+        let data = try await post(query: query, variables: ["userId": userId])
+        let options = try JSONDecoder().decode(Response.self, from: data).data?.User?.mediaListOptions
+        return (type == .manga ? options?.mangaList : options?.animeList)?.customLists ?? []
+    }
+
+    /// Writes what changed between `old` and `new`, and nothing else: custom lists are sent as
+    /// the whole set the title belongs to, which would undo a change made elsewhere meanwhile.
+    func saveExtras(mediaId: Int, from old: LibraryEntryExtras, to new: LibraryEntryExtras) async throws {
+        var parameters: [String] = []
+        var arguments: [String] = []
+        var variables: [String: Any] = ["mediaId": mediaId]
+        func fuzzy(_ date: Date?) -> Any {
+            guard let date else { return ["year": NSNull(), "month": NSNull(), "day": NSNull()] }
+            let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+            return ["year": c.year as Any, "month": c.month as Any, "day": c.day as Any]
+        }
+        if new.repeats != old.repeats {
+            parameters.append("$repeat: Int"); arguments.append("repeat: $repeat")
+            variables["repeat"] = new.repeats
+        }
+        if !LibraryEntryExtras.sameDay(new.startedAt, old.startedAt) {
+            parameters.append("$startedAt: FuzzyDateInput"); arguments.append("startedAt: $startedAt")
+            variables["startedAt"] = fuzzy(new.startedAt)
+        }
+        if !LibraryEntryExtras.sameDay(new.completedAt, old.completedAt) {
+            parameters.append("$completedAt: FuzzyDateInput"); arguments.append("completedAt: $completedAt")
+            variables["completedAt"] = fuzzy(new.completedAt)
+        }
+        if new.customLists != old.customLists {
+            parameters.append("$customLists: [String]"); arguments.append("customLists: $customLists")
+            variables["customLists"] = new.customLists.filter(\.isMember).map(\.name)
+        }
+        guard !arguments.isEmpty else { return }
+        let mutation = """
+        mutation ($mediaId: Int, \(parameters.joined(separator: ", "))) {
+          SaveMediaListEntry(mediaId: $mediaId, \(arguments.joined(separator: ", "))) { id }
+        }
+        """
+        _ = try await post(query: mutation, variables: variables)
+    }
+
     // MARK: - Delete entry
 
     func deleteEntry(entryId: Int) async throws {

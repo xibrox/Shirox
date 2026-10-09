@@ -158,3 +158,46 @@ struct LibraryEntry: Identifiable, Codable, Sendable {
         return score
     }
 }
+
+/// The parts of a list entry the editor shows beyond status, progress and score, read from the
+/// service when the editor opens and written back only where they changed.
+struct LibraryEntryExtras: Equatable, Sendable {
+    /// Times watched or read through again.
+    var repeats = 0
+    var startedAt: Date?
+    var completedAt: Date?
+    /// AniList's custom lists, every one the account has, and whether the title is in each.
+    /// MyAnimeList has none, so it stays empty there.
+    var customLists: [CustomListMembership] = []
+
+    struct CustomListMembership: Equatable, Identifiable, Sendable {
+        let name: String
+        var isMember: Bool
+        var id: String { name }
+    }
+
+    /// A day as AniList's and MyAnimeList's dates hold it: year, month and day, no time.
+    static func date(year: Int?, month: Int?, day: Int?) -> Date? {
+        guard let year else { return nil }
+        return Calendar.current.date(from: DateComponents(year: year, month: month ?? 1, day: day ?? 1))
+    }
+
+    /// "2026-10-09", MyAnimeList's form; nil for anything else.
+    static func date(iso text: String?) -> Date? {
+        guard let parts = text?.split(separator: "-").compactMap({ Int($0) }), let year = parts.first else { return nil }
+        return date(year: year, month: parts.count > 1 ? parts[1] : nil, day: parts.count > 2 ? parts[2] : nil)
+    }
+
+    static func isoDay(_ date: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 1, c.day ?? 1)
+    }
+
+    static func sameDay(_ a: Date?, _ b: Date?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case let (a?, b?): return Calendar.current.isDate(a, inSameDayAs: b)
+        default: return false
+        }
+    }
+}

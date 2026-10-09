@@ -141,6 +141,53 @@ final class MALLibraryService {
         try validateResponse(response)
     }
 
+    /// The editor's extras for an anime or manga on MyAnimeList: times rewatched or reread, and
+    /// the start and finish dates. nil when it isn't on the list.
+    func fetchExtras(malId: Int, manga: Bool) async throws -> LibraryEntryExtras? {
+        let repeatField = manga ? "num_times_reread" : "num_times_rewatched"
+        var components = URLComponents(url: base.appendingPathComponent("\(manga ? "manga" : "anime")/\(malId)"),
+                                       resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "fields",
+                                              value: "my_list_status{\(repeatField),start_date,finish_date}")]
+        let (data, response) = try await MALAuthManager.shared.send(url: components.url!)
+        if response.statusCode == 404 { return nil }
+        try validateResponse(response)
+        struct Node: Decodable {
+            struct Status: Decodable {
+                let num_times_rewatched: Int?
+                let num_times_reread: Int?
+                let start_date: String?
+                let finish_date: String?
+            }
+            let my_list_status: Status?
+        }
+        guard let status = try JSONDecoder().decode(Node.self, from: data).my_list_status else { return nil }
+        return LibraryEntryExtras(repeats: (manga ? status.num_times_reread : status.num_times_rewatched) ?? 0,
+                                  startedAt: LibraryEntryExtras.date(iso: status.start_date),
+                                  completedAt: LibraryEntryExtras.date(iso: status.finish_date))
+    }
+
+    /// Writes what changed between `old` and `new`. A cleared date is sent empty.
+    func saveExtras(malId: Int, manga: Bool, from old: LibraryEntryExtras, to new: LibraryEntryExtras) async throws {
+        var fields: [String] = []
+        if new.repeats != old.repeats {
+            fields.append("\(manga ? "num_times_reread" : "num_times_rewatched")=\(new.repeats)")
+        }
+        if !LibraryEntryExtras.sameDay(new.startedAt, old.startedAt) {
+            fields.append("start_date=\(new.startedAt.map(LibraryEntryExtras.isoDay) ?? "")")
+        }
+        if !LibraryEntryExtras.sameDay(new.completedAt, old.completedAt) {
+            fields.append("finish_date=\(new.completedAt.map(LibraryEntryExtras.isoDay) ?? "")")
+        }
+        guard !fields.isEmpty else { return }
+        let url = base.appendingPathComponent("\(manga ? "manga" : "anime")/\(malId)/my_list_status")
+        let (_, response) = try await MALAuthManager.shared.send(
+            url: url, method: "PATCH",
+            body: fields.joined(separator: "&").data(using: .utf8),
+            contentType: "application/x-www-form-urlencoded")
+        try validateResponse(response)
+    }
+
     func deleteEntry(malId: Int) async throws {
         do {
             try await rawDeleteEntry(malId: malId)

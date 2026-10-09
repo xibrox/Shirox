@@ -36,6 +36,12 @@ struct LibraryEntryEditSheet: View {
     @State private var showNewCollection = false
     @State private var newCollectionName = ""
     @StateObject private var editor = CollectionEditor()
+    @ObservedObject private var malAuth = MALAuthManager.shared
+    /// Rewatches, dates and custom lists as the service had them when the sheet opened, and as
+    /// edited. Nil until they've loaded; only what changed between the two is written.
+    @State private var loadedExtras: LibraryEntryExtras?
+    @State private var extras = LibraryEntryExtras()
+    @State private var extrasFailed = false
 
     private var scoreFormat: ScoreFormat {
         if let scoreFormatOverride { return scoreFormatOverride }
@@ -66,6 +72,145 @@ struct LibraryEntryEditSheet: View {
         _score = State(initialValue: entry?.displayScore(in: scoreFormatOverride ?? .point10) ?? 0)
         _isPrivate = State(initialValue: entry?.isPrivate ?? false)
         _notes = State(initialValue: entry?.notes ?? "")
+    }
+
+    private enum ExtrasService { case anilist, mal }
+
+    /// Where rewatches, dates and custom lists are read from and written to: the signed-in
+    /// AniList or MyAnimeList account the entry is on. Not local or Simkl entries.
+    private var extrasService: ExtrasService? {
+        guard scoreFormatOverride == nil else { return nil }
+        switch media.provider {
+        case .anilist where anilistAuth.isLoggedIn: return .anilist
+        case .mal where malAuth.isLoggedIn: return .mal
+        default: return nil
+        }
+    }
+
+    private var isManga: Bool { progressUnit == "chapter" }
+
+    private func loadExtras() async {
+        guard let service = extrasService, loadedExtras == nil else { return }
+        do {
+            let fetched: LibraryEntryExtras
+            switch service {
+            case .anilist:
+                fetched = try await AniListLibraryService.shared.fetchExtras(mediaId: media.id,
+                                                                            type: isManga ? .manga : .anime)
+            case .mal:
+                fetched = try await MALLibraryService.shared.fetchExtras(malId: media.id, manga: isManga)
+                    ?? LibraryEntryExtras()
+            }
+            loadedExtras = fetched
+            extras = fetched
+        } catch {
+            Logger.shared.log("[Library] Couldn't load entry details: \(error)", type: "Error")
+            extrasFailed = true
+        }
+    }
+
+    private func saveExtras() {
+        guard let service = extrasService, let old = loadedExtras, old != extras else { return }
+        let new = extras
+        let id = media.id
+        let manga = isManga
+        Task {
+            // After the entry itself, which may be new: a write of these alone would put the
+            // title on the list with AniList's default status.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            do {
+                switch service {
+                case .anilist: try await AniListLibraryService.shared.saveExtras(mediaId: id, from: old, to: new)
+                case .mal: try await MALLibraryService.shared.saveExtras(malId: id, manga: manga, from: old, to: new)
+                }
+            } catch {
+                Logger.shared.log("[Library] Couldn't save entry details: \(error)", type: "Error")
+                #if !os(tvOS)
+                ToastManager.shared.show(message: "Couldn't save rewatches, dates or lists", type: .error)
+                #endif
+            }
+        }
+    }
+
+    /// Rewatches and the start and finish dates, from the account the entry is on.
+    @ViewBuilder
+    private var detailsSections: some View {
+        if extrasService != nil {
+            if loadedExtras == nil {
+                Section("Details") {
+                    if extrasFailed {
+                        Text("Couldn't load rewatches and dates.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        HStack {
+                            ProgressView().controlSize(.small)
+                            Text("Loading…").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } else {
+                Section("Details") {
+                    #if !os(tvOS)
+                    Stepper(value: $extras.repeats, in: 0...999) {
+                        HStack {
+                            Text(isManga ? "Total Rereads" : "Total Rewatches")
+                            Spacer()
+                            Text("\(extras.repeats)")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    #endif
+                    dateRow("Started", date: $extras.startedAt)
+                    dateRow("Finished", date: $extras.completedAt)
+                }
+                if !extras.customLists.isEmpty {
+                    Section {
+                        ForEach($extras.customLists) { $list in
+                            Button {
+                                list.isMember.toggle()
+                            } label: {
+                                HStack {
+                                    Text(list.name).foregroundStyle(.primary)
+                                    Spacer()
+                                    if list.isMember {
+                                        Image(systemName: "checkmark").foregroundStyle(.tint)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } header: {
+                        Text("Custom Lists")
+                    } footer: {
+                        Text("Make new lists in your list settings on AniList.")
+                    }
+                }
+            }
+        }
+    }
+
+    /// A date that may not be set: a switch to set or clear it, and the day once it's set.
+    @ViewBuilder
+    private func dateRow(_ title: String, date: Binding<Date?>) -> some View {
+        #if os(tvOS)
+        HStack {
+            Text(title)
+            Spacer()
+            Text(date.wrappedValue.map { $0.formatted(date: .abbreviated, time: .omitted) } ?? "—")
+                .foregroundStyle(.secondary)
+        }
+        #else
+        Toggle(title, isOn: Binding(
+            get: { date.wrappedValue != nil },
+            set: { date.wrappedValue = $0 ? Calendar.current.startOfDay(for: .now) : nil }))
+            .tint(.secondary)
+        if let day = date.wrappedValue {
+            DatePicker("\(title) On", selection: Binding(get: { day }, set: { date.wrappedValue = $0 }),
+                       in: ...Date.now, displayedComponents: .date)
+        }
+        #endif
     }
 
     /// Privacy is an AniList feature. Local entries (`scoreFormatOverride` set) and MAL entries
@@ -181,6 +326,7 @@ struct LibraryEntryEditSheet: View {
                     }
                 }
 
+                detailsSections
                 privacySection
                 notesSection
 
@@ -265,6 +411,7 @@ struct LibraryEntryEditSheet: View {
                         }
                         let finalProgress = status == .completed ? (media.episodes ?? progress) : progress
                         onSave(status, finalProgress, score)
+                        saveExtras()
                         // Sent separately from `onSave`, which is the shared write used by both
                         // providers. Only fires when the toggle actually moved.
                         if showsNotes, notesChanged {
@@ -303,10 +450,15 @@ struct LibraryEntryEditSheet: View {
                 }
             }
             .onAppear { normalizeScoreIfNeeded() }
+            .task { await loadExtras() }
             .onChangeOf(anilistAuth.scoreFormat) { normalizeScoreIfNeeded() }
             .onChangeOf(status) { newStatus in
                 if newStatus == .completed, let total = media.episodes {
                     progress = total
+                }
+                // As the services' own editors do: finishing fills in the day it was finished.
+                if newStatus == .completed, loadedExtras != nil, extras.completedAt == nil {
+                    extras.completedAt = Calendar.current.startOfDay(for: .now)
                 }
             }
             .alert("Remove from Library", isPresented: $showDeleteConfirmation) {
