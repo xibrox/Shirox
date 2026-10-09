@@ -837,8 +837,7 @@ private struct MacFeaturedCarousel: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial, in: Circle())
-                .environment(\.colorScheme, .dark)
+                .glassChrome(Circle(), enabled: true, appearance: .dark, off: .ultraThinMaterial)
         }
         .buttonStyle(.plain)
         .help(help)

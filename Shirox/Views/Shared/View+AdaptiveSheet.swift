@@ -382,8 +382,8 @@ struct MacShelf<Item: Identifiable, Card: View>: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.primary)
                 .frame(width: 36, height: 36)
-                .background(.regularMaterial, in: Circle())
-                .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+                // Liquid Glass, as iOS's floating buttons are; a frosted circle before macOS 26.
+                .glassChrome(Circle(), enabled: true, off: .regularMaterial)
                 .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
         }
         .buttonStyle(.plain)

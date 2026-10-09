@@ -17,6 +17,7 @@ struct AnimeCardView: View {
                         endPoint: .bottom
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .hiddenWithCardTitles()
                 }
             )
             .overlay(alignment: .bottomLeading) {
@@ -27,6 +28,7 @@ struct AnimeCardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
+                    .hiddenWithCardTitles()
             }
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)

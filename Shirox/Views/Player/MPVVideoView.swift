@@ -395,6 +395,7 @@ extension MPVPictureInPicture: AVPictureInPictureControllerDelegate {
         MainActor.assumeIsolated {
             isStarting = false
             isActive = true
+            PlayerPresenter.shared.hidePlayerForPictureInPicture()
         }
     }
 
@@ -413,12 +414,18 @@ extension MPVPictureInPicture: AVPictureInPictureControllerDelegate {
     }
 
     nonisolated func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        MainActor.assumeIsolated { finish() }
+        MainActor.assumeIsolated {
+            finish()
+            PlayerPresenter.shared.pictureInPictureDidStop()
+        }
     }
 
+    /// The player's screen, put away while Picture in Picture played, back as it was.
     nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
                                                 restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-        completionHandler(true)
+        MainActor.assumeIsolated {
+            PlayerPresenter.shared.restorePlayerFromPictureInPicture(completion: completionHandler)
+        }
     }
 }
 #endif

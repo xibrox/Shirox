@@ -543,6 +543,51 @@ final class AniListService {
         return (node.episodes, node.nextAiringEpisode?.episode)
     }
 
+    /// Episodes aired so far for the shows among these that are on air, by AniList id and by
+    /// MyAnimeList id. For the library's new-episode badges: only AniList's own list carries
+    /// the airing schedule, so MyAnimeList, Simkl and on-device lists ask for it here. Fifty
+    /// titles a request; a show between seasons or finished isn't in the answer.
+    func airedEpisodes(aniListIDs: [Int], malIDs: [Int]) async -> (byAniList: [Int: Int], byMal: [Int: Int]) {
+        struct Payload: Decodable {
+            struct Results: Decodable { let media: [Node] }
+            struct Node: Decodable {
+                struct Airing: Decodable { let episode: Int }
+                let id: Int
+                let idMal: Int?
+                let nextAiringEpisode: Airing?
+            }
+            let Page: Results?
+        }
+        var byAniList: [Int: Int] = [:]
+        var byMal: [Int: Int] = [:]
+        func run(_ field: String, _ ids: [Int]) async -> [Payload.Node] {
+            let query = """
+            query ($ids: [Int]) {
+              Page(perPage: 50) {
+                media(\(field): $ids, type: ANIME, status: RELEASING) {
+                  id idMal nextAiringEpisode { episode }
+                }
+              }
+            }
+            """
+            guard let data = try? await post(query: query, variables: ["ids": ids]),
+                  let page = (try? JSONDecoder().decode(GraphQLResponse<Payload>.self, from: data))?.data?.Page
+            else { return [] }
+            return page.media
+        }
+        for chunk in stride(from: 0, to: aniListIDs.count, by: 50).map({ Array(aniListIDs[$0..<min($0 + 50, aniListIDs.count)]) }) {
+            for node in await run("id_in", chunk) {
+                if let next = node.nextAiringEpisode?.episode, next > 1 { byAniList[node.id] = next - 1 }
+            }
+        }
+        for chunk in stride(from: 0, to: malIDs.count, by: 50).map({ Array(malIDs[$0..<min($0 + 50, malIDs.count)]) }) {
+            for node in await run("idMal_in", chunk) {
+                if let mal = node.idMal, let next = node.nextAiringEpisode?.episode, next > 1 { byMal[mal] = next - 1 }
+            }
+        }
+        return (byAniList, byMal)
+    }
+
     func detail(id: Int) async throws -> AniListMedia {
         let query = """
         query ($id: Int) {

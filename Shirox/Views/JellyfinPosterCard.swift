@@ -22,6 +22,7 @@ struct JellyfinPosterCard: View {
                         endPoint: .bottom
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .hiddenWithCardTitles()
                 }
             )
             .overlay(alignment: .bottomLeading) {
@@ -32,6 +33,7 @@ struct JellyfinPosterCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
+                    .hiddenWithCardTitles()
             }
             .overlay(alignment: .bottom) {
                 if showProgress, let pct = item.userData?.playedPercentage, pct > 1 {

@@ -149,3 +149,27 @@ struct MeasuredCardTitle: View {
         }
     }
 }
+
+// MARK: - Hiding titles on poster cards
+
+/// The "Hide Titles on Cards" setting. TVDB's posters carry the show's name, so a title drawn
+/// over them says it twice.
+enum CardTitleSetting {
+    static let hiddenKey = "hideCardTitles"
+}
+
+extension View {
+    /// Takes this away when titles on poster cards are hidden: a card's title, or the gradient
+    /// behind it.
+    func hiddenWithCardTitles() -> some View {
+        modifier(HiddenWithCardTitles())
+    }
+}
+
+private struct HiddenWithCardTitles: ViewModifier {
+    @AppStorage(CardTitleSetting.hiddenKey) private var hidden = false
+
+    func body(content: Content) -> some View {
+        if !hidden { content }
+    }
+}

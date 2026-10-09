@@ -74,6 +74,17 @@ final class SubtitleSettingsManager: ObservableObject {
         foregroundColor   = SubtitleSettingsManager.loadColorFromDefaults()
     }
 
+    /// Every setting back to how it ships.
+    func restoreDefaults() {
+        enabled = true
+        fontSize = 24
+        shadowRadius = 2
+        backgroundEnabled = false
+        bottomPadding = 60
+        delaySeconds = 0
+        foregroundColor = .white
+    }
+
     // MARK: - Color Serialization
 
     private func saveColor(_ color: Color) {

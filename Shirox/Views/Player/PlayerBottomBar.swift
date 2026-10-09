@@ -235,20 +235,19 @@ struct PlayerBottomBar: View {
 
     private let speeds: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
-    /// Compact label for the speed button (e.g. "1×", "1.5×").
+    /// Compact label for the speed button (e.g. "1×", "1.25×").
     private var speedLabel: String {
-        let value = Double(playbackSpeed)
-        let formatted = value.truncatingRemainder(dividingBy: 1) == 0
-            ? String(Int(value))
-            : String(format: "%.2g", value)
-        return "\(formatted)×"
+        Self.speedText(playbackSpeed) + "×"
     }
 
-    /// Full label for a speed menu row (e.g. "Normal (1×)", "1.5×").
+    /// Full label for a speed menu row (e.g. "Normal (1×)", "1.25×").
     private func speedMenuLabel(_ speed: Float) -> String {
-        speed == 1.0
-            ? "Normal (1×)"
-            : "\(speed.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(speed)) : String(format: "%.2g", speed))×"
+        speed == 1.0 ? "Normal (1×)" : Self.speedText(speed) + "×"
+    }
+
+    /// "1", "0.75", "1.25": every digit the speed has. "%.2g" made 1.25 read "1.2".
+    static func speedText(_ speed: Float) -> String {
+        String(format: "%g", Double(speed))
     }
 
     /// Rows for the playback-speed menu (checkmark on the current rate).

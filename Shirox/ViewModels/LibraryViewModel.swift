@@ -499,3 +499,106 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 }
+
+// MARK: - New episodes
+
+/// The library's new-episode badges: how many aired episodes of a show on air you're behind,
+/// and whether more have aired since you last opened it.
+@MainActor
+final class NewEpisodeTracker: ObservableObject {
+    static let shared = NewEpisodeTracker()
+
+    /// The badges and the dot, on cards and rows.
+    static let badgesKey = "libraryNewEpisodeBadges"
+    /// The sort menu's "New Episodes First".
+    static let firstKey = "libraryNewEpisodesFirst"
+    private static let seenKey = "libraryNewEpisodeSeen"
+
+    /// Aired counts asked of AniList for lists that don't carry them, by `Media.uniqueId`.
+    @Published private var fetched: [String: Int] = [:]
+    /// The aired count when each show was last opened (or first seen), by `Media.uniqueId`.
+    @Published private var seen: [String: Int]
+    private var lastFetch: [String: Date] = [:]
+    private var fetching = false
+
+    private init() {
+        seen = UserDefaults.standard.dictionary(forKey: Self.seenKey) as? [String: Int] ?? [:]
+    }
+
+    /// Episodes out so far, for an anime that's on air; nil otherwise.
+    func aired(_ entry: LibraryEntry) -> Int? {
+        let media = entry.media
+        guard !media.isManga, media.simklTitleKind == nil else { return nil }
+        if let next = media.nextAiringEpisode?.episode { return next > 1 ? next - 1 : nil }
+        return fetched[media.uniqueId]
+    }
+
+    /// Aired episodes past your progress, for a show you're watching; 0 when there are none.
+    func unwatched(_ entry: LibraryEntry) -> Int {
+        guard entry.status == .current || entry.status == .repeating, let aired = aired(entry) else { return 0 }
+        return max(0, aired - entry.progress)
+    }
+
+    /// More episodes have aired since you last opened the show, and you haven't watched them.
+    func isNewSinceOpened(_ entry: LibraryEntry) -> Bool {
+        guard unwatched(entry) > 0, let aired = aired(entry), let last = seen[entry.media.uniqueId] else { return false }
+        return aired > last
+    }
+
+    /// The show was opened: what's aired so far is no longer new.
+    func markOpened(_ entry: LibraryEntry) {
+        guard let aired = aired(entry), seen[entry.media.uniqueId] != aired else { return }
+        seen[entry.media.uniqueId] = aired
+        save()
+    }
+
+    /// Notes each show's aired count the first time it's seen, so nothing is "new" on first
+    /// launch, and asks AniList for the counts a list doesn't carry.
+    func observe(_ entries: [LibraryEntry]) async {
+        recordFirstSightings(entries)
+        guard !fetching else { return }
+        let stale = Date().addingTimeInterval(-30 * 60)
+        let wanted = entries.filter {
+            ($0.status == .current || $0.status == .repeating) && !$0.media.isManga
+                && $0.media.simklTitleKind == nil && $0.media.nextAiringEpisode == nil
+                && (lastFetch[$0.media.uniqueId] ?? .distantPast) < stale
+        }
+        guard !wanted.isEmpty else { return }
+        var byAniList: [Int: [String]] = [:]
+        var byMal: [Int: [String]] = [:]
+        for entry in wanted {
+            let media = entry.media
+            switch media.provider {
+            case .anilist: byAniList[media.id, default: []].append(media.uniqueId)
+            case .mal, .simkl: byMal[media.idMal ?? media.id, default: []].append(media.uniqueId)
+            default:
+                if let mal = media.idMal { byMal[mal, default: []].append(media.uniqueId) }
+            }
+        }
+        fetching = true
+        defer { fetching = false }
+        let result = await AniListService.shared.airedEpisodes(aniListIDs: Array(byAniList.keys),
+                                                               malIDs: Array(byMal.keys))
+        let now = Date()
+        var updated = fetched
+        for entry in wanted { lastFetch[entry.media.uniqueId] = now; updated[entry.media.uniqueId] = nil }
+        for (id, keys) in byAniList { if let count = result.byAniList[id] { keys.forEach { updated[$0] = count } } }
+        for (id, keys) in byMal { if let count = result.byMal[id] { keys.forEach { updated[$0] = count } } }
+        if updated != fetched { fetched = updated }
+        recordFirstSightings(entries)
+    }
+
+    private func recordFirstSightings(_ entries: [LibraryEntry]) {
+        var changed = false
+        for entry in entries where seen[entry.media.uniqueId] == nil {
+            guard let aired = aired(entry) else { continue }
+            seen[entry.media.uniqueId] = aired
+            changed = true
+        }
+        if changed { save() }
+    }
+
+    private func save() {
+        UserDefaults.standard.set(seen, forKey: Self.seenKey)
+    }
+}

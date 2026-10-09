@@ -1857,6 +1857,7 @@ struct RelationCard: View {
                         endPoint: .bottom
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .hiddenWithCardTitles()
                 }
             )
             .overlay(alignment: .bottomLeading) {
@@ -1867,6 +1868,7 @@ struct RelationCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
+                    .hiddenWithCardTitles()
             }
             .overlay(alignment: .topLeading) {
                 Text(edge.formattedRelation)

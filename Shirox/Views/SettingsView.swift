@@ -256,7 +256,16 @@ struct SettingsView: View {
                     )
                 }
 
-                #if os(iOS)
+                NavigationLink {
+                    SubtitleSettingsPage()
+                } label: {
+                    SettingsNavRow(
+                        icon: "captions.bubble",
+                        title: "Subtitles"
+                    )
+                }
+
+                #if !os(tvOS)
                 NavigationLink {
                     ReaderSettingsView()
                 } label: {
@@ -773,16 +782,146 @@ struct PlayerSettingsView: View {
     }
 }
 
+// MARK: - Subtitle Settings
+
+/// How subtitles look and sit in every video: the same settings the player's subtitle sheet
+/// changes, set here ahead of time. A track's own pick stays in the player.
+struct SubtitleSettingsPage: View {
+    @ObservedObject private var settings = SubtitleSettingsManager.shared
+
+    var body: some View {
+        SettingsList {
+            Section {
+                preview
+                    .listRowInsets(EdgeInsets())
+            }
+
+            Section {
+                Toggle("Show Subtitles", isOn: $settings.enabled)
+                    .tint(.secondary)
+            } footer: {
+                Text("Turns subtitles on or off in every video. The player's subtitles button changes it too.")
+            }
+
+            Section("Appearance") {
+                #if !os(tvOS)
+                ColorPicker("Text Color", selection: $settings.foregroundColor, supportsOpacity: false)
+                #endif
+                Picker("Size", selection: sizeSelection) {
+                    ForEach(PlayerSubtitleMenu.sizes, id: \.points) { size in
+                        Text(size.name).tag(size.points)
+                    }
+                    if !PlayerSubtitleMenu.sizes.contains(where: { $0.points == settings.fontSize }) {
+                        Text("\(Int(settings.fontSize.rounded())) pt").tag(settings.fontSize)
+                    }
+                }
+                #if !os(tvOS)
+                sliderRow("Font Size", value: $settings.fontSize, in: 12...40, step: 1,
+                          text: "\(Int(settings.fontSize))")
+                sliderRow("Shadow", value: $settings.shadowRadius, in: 0...8, step: 0.5,
+                          text: String(format: "%.1f", settings.shadowRadius))
+                #endif
+                Toggle("Background", isOn: $settings.backgroundEnabled)
+                    .tint(.secondary)
+            }
+
+            #if !os(tvOS)
+            Section {
+                sliderRow("Bottom Padding", value: $settings.bottomPadding, in: 20...200, step: 5,
+                          text: "\(Int(settings.bottomPadding))pt")
+            } header: {
+                Text("Position")
+            }
+
+            Section {
+                HStack {
+                    Text("Delay")
+                    Spacer()
+                    Text(PlayerSubtitleMenu.delayLabel(settings.delaySeconds))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                Button("Reset Delay") { settings.delaySeconds = 0 }
+                    .disabled(settings.delaySeconds == 0)
+            } header: {
+                Text("Sync")
+            } footer: {
+                Text("Set while watching, from the subtitles button. It carries over to the next video until you reset it.")
+            }
+            #endif
+
+            Section {
+                Button("Restore Defaults", role: .destructive) { settings.restoreDefaults() }
+            } footer: {
+                Text("Styled (.ass) subtitles keep their own fonts and colours; size and delay still apply.")
+            }
+        }
+        .softScrollEdges()
+        .navigationTitle("Subtitles")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    /// The size presets the player's menu offers, or the slider's own value.
+    private var sizeSelection: Binding<Double> {
+        Binding(get: { settings.fontSize }, set: { settings.fontSize = $0 })
+    }
+
+    /// A line of subtitle over a dark frame, drawn as the player draws it.
+    private var preview: some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(colors: [Color(white: 0.28), Color(white: 0.08)], startPoint: .top, endPoint: .bottom)
+            Text("Did he give you any clues,\nany coordinates, anything?")
+                .font(.system(size: min(settings.fontSize, 32)))
+                .foregroundStyle(settings.foregroundColor)
+                .shadow(color: .black, radius: 0, x: -1, y: 0)
+                .shadow(color: .black, radius: 0, x: 1, y: 0)
+                .shadow(color: .black, radius: 0, x: 0, y: -1)
+                .shadow(color: .black, radius: 0, x: 0, y: 1)
+                .shadow(radius: settings.shadowRadius)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+                .padding(.vertical, settings.backgroundEnabled ? 6 : 0)
+                .background(settings.backgroundEnabled ? RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.6)) : nil)
+                .opacity(settings.enabled ? 1 : 0.3)
+                .padding(.bottom, 18)
+        }
+        .frame(height: 170)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityHidden(true)
+    }
+
+    #if !os(tvOS)
+    private func sliderRow(_ title: String, value: Binding<Double>, in range: ClosedRange<Double>,
+                           step: Double, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(text)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: range, step: step)
+        }
+    }
+    #endif
+}
+
 // MARK: - Reader Settings
 
-#if os(iOS)
+#if !os(tvOS)
 struct ReaderSettingsView: View {
     @AppStorage("readerLiquidGlass") private var readerLiquidGlass = true
     @AppStorage("readerPageCurl") private var readerPageCurl = true
     @AppStorage("readerPortraitOnly") private var readerPortraitOnly = false
 
     var body: some View {
-        List {
+        SettingsList {
+            // A Mac's reader turns pages with a slide; there's no curl to turn off.
+            #if os(iOS)
             Section {
                 Toggle("Page Curl", isOn: $readerPageCurl)
                     .tint(.secondary)
@@ -802,7 +941,8 @@ struct ReaderSettingsView: View {
                     Text("Keep the reader upright. Turn off to read sideways when you turn your phone.")
                 }
             }
-            if #available(iOS 26.0, *) {
+            #endif
+            if #available(iOS 26.0, macOS 26.0, *) {
                 Section {
                     Toggle("Liquid Glass Controls", isOn: $readerLiquidGlass)
                         .tint(.secondary)
@@ -813,14 +953,24 @@ struct ReaderSettingsView: View {
                 }
             } else {
                 Section {
-                    Text("Standard reader controls are active on this iOS version.")
+                    Text("Liquid Glass reader controls need \(Self.systemName) 26.")
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .softScrollEdges()
         .navigationTitle("Reader")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    private static var systemName: String {
+        #if os(macOS)
+        "macOS"
+        #else
+        "iOS"
+        #endif
     }
 }
 #endif
@@ -901,6 +1051,8 @@ struct LibrarySettingsView: View {
     @AppStorage("localAutoTrackEnabled") private var localAutoTrackEnabled = true
     @AppStorage("localScoreFormat") private var localScoreFormatRaw: String = ScoreFormat.point10Decimal.rawValue
     @AppStorage(GooeyRefreshGeometry.settingKey) private var gooeyRefresh = true
+    @AppStorage(NewEpisodeTracker.badgesKey) private var newEpisodeBadges = true
+    @AppStorage(CardTitleSetting.hiddenKey) private var hideCardTitles = false
     @State private var showClearLocalLibrary = false
 
     private var orderedLanguages: [String] {
@@ -915,6 +1067,21 @@ struct LibrarySettingsView: View {
                 } label: {
                     Label("List Order & Custom Lists", systemImage: "list.bullet.indent")
                 }
+            }
+
+            Section {
+                Toggle("New Episode Badges", isOn: $newEpisodeBadges)
+                    .tint(.secondary)
+                Text("Marks shows you're watching that have aired episodes you haven't seen, with a dot for ones that came out since you last opened the show. Sort by New Episodes First from the Library's sort menu.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("Hide Titles on Cards", isOn: $hideCardTitles)
+                    .tint(.secondary)
+                Text("Posters from TVDB carry the show's name, so the title over them says it twice. Hold a card for its full title.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Cards")
             }
 
             #if os(iOS)

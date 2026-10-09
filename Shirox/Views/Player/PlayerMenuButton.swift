@@ -178,10 +178,161 @@ private extension PlayerMenuWeight {
     }
 }
 
-// MARK: - macOS: SwiftUI Menu fallback
+// MARK: - macOS: AppKit-backed native menu
 //
-// macOS pull-down menus don't suffer the same re-render flash, and the player's auto-hide is
-// iOS-only, so a plain SwiftUI `Menu` is sufficient here.
+// An NSMenu rather than a SwiftUI `Menu`: SwiftUI's drew as a pop-up as wide as the bar on a
+// tester's Mac, and left out the checkmark images, so the current value wasn't marked. An
+// NSMenu is sized to its rows and marks them with its own `state`.
+#elseif os(macOS)
+import AppKit
+
+extension Notification.Name {
+    /// A player menu closed, so the controls can hide again.
+    static let playerMenuDidClose = Notification.Name("shirox.playerMenuDidClose")
+}
+
+struct PlayerMenuButton: NSViewRepresentable {
+    let menuTitle: String
+    let label: PlayerMenuLabel
+    /// Rebuilt on every open so checkmarks reflect current state.
+    let elements: () -> [PlayerMenuElement]
+    var onOpen: () -> Void = {}
+
+    init(menuTitle: String, label: PlayerMenuLabel, items: @escaping () -> [PlayerMenuItem],
+         onOpen: @escaping () -> Void = {}) {
+        self.init(menuTitle: menuTitle, label: label,
+                  elements: { items().map(PlayerMenuElement.item) }, onOpen: onOpen)
+    }
+
+    init(menuTitle: String, label: PlayerMenuLabel, elements: @escaping () -> [PlayerMenuElement],
+         onOpen: @escaping () -> Void = {}) {
+        self.menuTitle = menuTitle
+        self.label = label
+        self.elements = elements
+        self.onOpen = onOpen
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(elements: elements, onOpen: onOpen) }
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton(title: "", target: context.coordinator, action: #selector(Coordinator.open(_:)))
+        button.isBordered = false
+        button.bezelStyle = .regularSquare
+        button.imagePosition = .imageOnly
+        button.contentTintColor = .white
+        button.setAccessibilityLabel(menuTitle)
+        button.toolTip = menuTitle
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        context.coordinator.apply(label, to: button)
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        context.coordinator.elements = elements
+        context.coordinator.onOpen = onOpen
+        context.coordinator.apply(label, to: button)
+    }
+
+    final class Coordinator: NSObject {
+        var elements: () -> [PlayerMenuElement]
+        var onOpen: () -> Void
+        /// The rows' actions, by their items' tags.
+        private var actions: [Int: () -> Void] = [:]
+
+        init(elements: @escaping () -> [PlayerMenuElement], onOpen: @escaping () -> Void) {
+            self.elements = elements
+            self.onOpen = onOpen
+        }
+
+        @objc func open(_ sender: NSButton) {
+            actions = [:]
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            add(elements(), to: menu)
+            onOpen()
+            // Under the button, as a pull-down; blocks until the menu closes.
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+            NotificationCenter.default.post(name: .playerMenuDidClose, object: nil)
+        }
+
+        @objc private func performRow(_ item: NSMenuItem) {
+            actions[item.tag]?()
+        }
+
+        private func add(_ elements: [PlayerMenuElement], to menu: NSMenu) {
+            for element in elements {
+                switch element {
+                case .item(let row):
+                    let item = NSMenuItem(title: row.title, action: #selector(performRow(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.state = row.isOn ? .on : .off
+                    item.tag = actions.count
+                    actions[item.tag] = row.action
+                    menu.addItem(item)
+                case let .section(title, children):
+                    if menu.numberOfItems > 0 { menu.addItem(.separator()) }
+                    if let title {
+                        if #available(macOS 14, *) {
+                            menu.addItem(.sectionHeader(title: title))
+                        } else {
+                            let header = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                            header.isEnabled = false
+                            menu.addItem(header)
+                        }
+                    }
+                    add(children, to: menu)
+                    menu.addItem(.separator())
+                case let .submenu(title, value, children):
+                    let item = NSMenuItem(title: value.map { "\(title): \($0)" } ?? title, action: nil, keyEquivalent: "")
+                    let submenu = NSMenu(title: title)
+                    submenu.autoenablesItems = false
+                    add(children, to: submenu)
+                    item.submenu = submenu
+                    menu.addItem(item)
+                }
+            }
+            // A section at either end leaves a separator with nothing beyond it.
+            while menu.items.last?.isSeparatorItem == true { menu.removeItem(at: menu.numberOfItems - 1) }
+            while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }
+            var index = 1
+            while index < menu.numberOfItems {
+                if menu.items[index].isSeparatorItem && menu.items[index - 1].isSeparatorItem {
+                    menu.removeItem(at: index)
+                } else {
+                    index += 1
+                }
+            }
+        }
+
+        func apply(_ label: PlayerMenuLabel, to button: NSButton) {
+            switch label {
+            case let .symbol(name, size, weight):
+                let config = NSImage.SymbolConfiguration(pointSize: size, weight: weight.nsWeight)
+                button.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(config)
+                button.imagePosition = .imageOnly
+                button.attributedTitle = NSAttributedString()
+            case let .text(text, size, weight):
+                button.image = nil
+                button.imagePosition = .noImage
+                button.attributedTitle = NSAttributedString(string: text, attributes: [
+                    .font: NSFont.systemFont(ofSize: size, weight: weight.nsWeight),
+                    .foregroundColor: NSColor.white,
+                ])
+            }
+        }
+    }
+}
+
+private extension PlayerMenuWeight {
+    var nsWeight: NSFont.Weight {
+        switch self { case .medium: return .medium; case .semibold: return .semibold; case .heavy: return .heavy }
+    }
+}
+
+// MARK: - tvOS: SwiftUI Menu
+
 #else
 
 struct PlayerMenuButton: View {
@@ -210,7 +361,6 @@ struct PlayerMenuButton: View {
         } label: {
             labelView
         }
-        .menuStyle(.borderlessButton)
     }
 
     @ViewBuilder private var labelView: some View {

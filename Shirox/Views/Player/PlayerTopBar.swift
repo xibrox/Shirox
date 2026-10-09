@@ -65,7 +65,8 @@ struct PlayerTopBar: View {
                 // close the window rather than the player covering it.
                 #if os(macOS)
                 HStack(spacing: 0) {
-                    if !cover.isFullScreen {
+                    // Room for the window's buttons, which the small Picture in Picture window hides.
+                    if !cover.isFullScreen && !isPictureInPicture {
                         Color.clear.frame(width: 70)
                     }
                     if showDismiss {
@@ -122,11 +123,13 @@ struct PlayerTopBar: View {
                 })
             }
         }
-        .padding(.horizontal, isPad ? 30 : 20)
         #if os(macOS)
-        // Level with the window's buttons in a window, a little way down in full screen.
-        .padding(.top, topPadding)
+        // Level with the window's buttons in a window, a little way down in full screen, and
+        // clear of the small Picture in Picture window's edges, where they sat against the top.
+        .padding(.horizontal, isPictureInPicture ? 10 : 20)
+        .padding(.top, isPictureInPicture ? 10 : topPadding)
         #else
+        .padding(.horizontal, isPad ? 30 : 20)
         .padding(.top, isPad ? topPadding + 10 : topPadding)
         #endif
         .padding(.bottom, 16)

@@ -25,6 +25,8 @@ struct LibraryView: View {
     @State private var searchText = ""
     @AppStorage("librarySortOrder") private var sortOrderRaw: String = LibrarySortOrder.score.rawValue
     @AppStorage("librarySortAscending") private var sortAscending = false
+    @ObservedObject private var newEpisodes = NewEpisodeTracker.shared
+    @AppStorage(NewEpisodeTracker.firstKey) private var newEpisodesFirst = false
     /// Posters in a grid instead of rows.
     #if os(macOS)
     // Posters suit a window; rows were made for a phone's width.
@@ -185,6 +187,13 @@ struct LibraryView: View {
                 return sortAscending ? a < b : a > b
             }
         }
+        if newEpisodesFirst {
+            // Shows with episodes to catch up on lead, each half in the order chosen above.
+            let behind = entries.filter { newEpisodes.unwatched($0) > 0 }
+            if !behind.isEmpty {
+                entries = behind + entries.filter { newEpisodes.unwatched($0) == 0 }
+            }
+        }
         return entries
     }
 
@@ -227,6 +236,11 @@ struct LibraryView: View {
                             }
                         }
                     }
+                }
+            }
+            Section {
+                Toggle(isOn: $newEpisodesFirst) {
+                    Label("New Episodes First", systemImage: "sparkles.tv")
                 }
             }
             Section("Layout") {
@@ -730,8 +744,13 @@ struct LibraryView: View {
         }
     }
 
-    @ViewBuilder
     private func rowDestination(_ entry: LibraryEntry) -> some View {
+        rowDestinationPage(entry)
+            .onAppear { newEpisodes.markOpened(entry) }
+    }
+
+    @ViewBuilder
+    private func rowDestinationPage(_ entry: LibraryEntry) -> some View {
         if let source = entry.localSource, source.kind == .module {
             DetailView(
                 item: SearchItem(
@@ -1116,6 +1135,7 @@ struct LibraryView: View {
         .toolbarZoomSource("sort", in: sheetZoom, placement: toolbarItemPlacement[0]) { sortMenu }
         .toolbarZoomSource("account", in: sheetZoom, placement: toolbarItemPlacement[1]) { accountToolbarItem }
         .task { await vm.autoRefreshIfNeeded() }
+        .task(id: vm.entries.map(\.media.uniqueId)) { await newEpisodes.observe(vm.entries) }
         #if os(iOS)
         .onAppear {
             presentationWindow = UIApplication.shared.connectedScenes
@@ -1422,6 +1442,9 @@ private struct LibraryGridCard: View {
                         .padding(6)
                     }
                 }
+                .overlay(alignment: .topLeading) {
+                    NewEpisodesBadge(entry: entry).padding(6)
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 3)
@@ -1434,6 +1457,7 @@ private struct LibraryGridCard: View {
                 }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.primary)
+                .hiddenWithCardTitles()
                 Text(progressText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -1443,6 +1467,38 @@ private struct LibraryGridCard: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// "+2" on a show you're watching with two aired episodes you haven't, and a red dot when
+/// they came out since you last opened it.
+private struct NewEpisodesBadge: View {
+    let entry: LibraryEntry
+    @ObservedObject private var tracker = NewEpisodeTracker.shared
+    @AppStorage(NewEpisodeTracker.badgesKey) private var enabled = true
+
+    var body: some View {
+        let count = tracker.unwatched(entry)
+        if enabled, count > 0 {
+            let isNew = tracker.isNewSinceOpened(entry)
+            Text("+\(count)")
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .background(Color.blue, in: Capsule())
+                .overlay(alignment: .topTrailing) {
+                    if isNew {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 9, height: 9)
+                            .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                            .offset(x: 3, y: -3)
+                    }
+                }
+                .accessibilityLabel(isNew ? "\(count) new episodes, new since you last opened it"
+                                          : "\(count) episodes to watch")
+        }
     }
 }
 
@@ -1507,9 +1563,12 @@ private struct LibraryRowView: View {
                 CardTitle(entry.media.title.displayTitle)
                     .font(.subheadline.weight(.semibold))
 
-                Text(progressLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(progressLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    NewEpisodesBadge(entry: entry)
+                }
 
                 if let total = entry.media.episodes, total > 0 {
                     ProgressView(value: min(Double(entry.progress), Double(total)), total: Double(total))

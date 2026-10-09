@@ -135,6 +135,12 @@ struct PlayerView: View {
     @State private var duration: Double = 0
     @State private var showControls = true
     @State private var isLocked = false
+    /// The lock button, while locked: shown on a tap and gone again after a few seconds, like
+    /// the controls, instead of sitting over the video the whole time.
+    @State private var lockButtonVisible = false
+    @State private var lockHideTask: Task<Void, Never>? = nil
+    /// Set up already; appearing again is the player coming back from Picture in Picture.
+    @State private var hasAppeared = false
     @State private var isFilled = false
     @State private var isScrubbing = false
     @State private var hideTask: Task<Void, Never>? = nil
@@ -467,6 +473,9 @@ struct PlayerView: View {
             if frame != .zero { skip85ButtonFrame = frame }
         }
         .onAppear {
+            // Back from Picture in Picture, which put the player's screen away and kept it playing.
+            guard !hasAppeared else { return }
+            hasAppeared = true
             // Sync subtitleTracks from currentStream — safer than relying on init-time @State override
             if subtitleTracks == nil, let tracks = currentStream.allSubtitles, !tracks.isEmpty {
                 subtitleTracks = tracks
@@ -509,51 +518,17 @@ struct PlayerView: View {
             }
         }
         .onDisappear {
-            Logger.shared.log("[Rating] PlayerView.onDisappear: completionBox.context=\(completionBox.context != nil ? "set" : "nil")", type: "Debug")
-            if let ctx = completionBox.context {
-                Logger.shared.log("[Rating] PlayerView.onDisappear: requesting rating prompt for ep=\(ctx.episodeNumber)", type: "Debug")
-                #if !os(tvOS)
-                PlayerPresenter.shared.presentRatingPromptIfNeeded(context: ctx)
-                #endif
-            }
-            #if !os(tvOS)
-            if let request = completionBox.simklRating {
-                PlayerPresenter.shared.presentSimklRatingPrompt(request)
-            }
-            #endif
-            hideTask?.cancel()
-            autoAdvanceTask?.cancel()
-            autoAdvanceTask = nil
-            prefetchTask?.cancel()
-            cancelStallWatchdog(resetAttempts: true)
             #if os(iOS)
-            CastProxyServer.shared.stop(reason: "airplay")
-            MPVPictureInPicture.shared.stop()
+            // Put away for Picture in Picture, still playing; it stops when that closes.
+            if PlayerPresenter.shared.isPlayerHiddenForPictureInPicture { return }
             #endif
-            engine?.stop()
-            saveProgress()
-            autoDeleteWatchedDownloadIfEnabled()
-            tearDownNowPlaying()
-            castManager.disconnect()
-            if currentContext?.isLocalPlayback == true {
-                LocalPlaybackCoordinator.shared.releaseAll()
-            }
-            if let jellyfinItemId = JellyfinPlaybackCoordinator.itemId(forStreamURL: currentStream.url)
-                ?? currentContext?.jellyfinItemId {
-                JellyfinService.shared.reportStopped(itemId: jellyfinItemId, positionSeconds: currentTime)
-            }
-            #if os(iOS)
-            UIApplication.shared.isIdleTimerDisabled = false
-            // Give up audio focus on exit so system music (Spotify/Apple Music)
-            // can resume. .notifyOthersOnDeactivation triggers their auto-resume.
-            AppAudioSession.deactivate()
-            #elseif os(macOS)
-            MacDisplaySleep.allow()
-            #endif
-            if MouseCursorManager.isSupported {
-                MouseCursorManager.unhide()
-            }
+            tearDown()
         }
+        #if os(iOS)
+        .onReceive(NotificationCenter.default.publisher(for: .playerClosedInPictureInPicture)) { _ in
+            tearDown()
+        }
+        #endif
         .onChangeOf(isPlaying) { playing in
             #if os(iOS)
             // The screen stays on while a video plays. AVPlayer's own display-sleep prevention
@@ -645,6 +620,15 @@ struct PlayerView: View {
                 await loadAndAdvance()
             }
         }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: .playerMenuDidClose)) { _ in
+            // The Mac's menus are NSMenus, which say when they close; resume the auto-hide that
+            // onMenuOpen suspended.
+            guard overlayActive else { return }
+            overlayActive = false
+            scheduleHide()
+        }
+        #endif
         #if os(iOS)
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
             .receive(on: RunLoop.main)) { _ in
@@ -1066,6 +1050,7 @@ struct PlayerView: View {
 
             PlayerDoubleTapSeek(
                 onSingleTap: {
+                    if isLocked { showLockButton(); return }
                     toggleControls()
                     if showControls { scheduleHide() }
                 },
@@ -1417,9 +1402,28 @@ struct PlayerView: View {
                         .mediaGlassChrome(Circle(), enabled: playerLiquidGlass, off: .ultraThinMaterial)
                 }
                 .buttonStyle(.plain).padding(.leading, isPad ? 30 : 20).padding(.top, isPad ? 30 : 20)
+                .opacity(lockButtonVisible ? 1 : 0)
+                .allowsHitTesting(lockButtonVisible)
                 Spacer()
             }
             Spacer()
+        }
+        .onAppear { showLockButton() }
+        .onDisappear {
+            lockHideTask?.cancel()
+            lockButtonVisible = false
+        }
+    }
+
+    /// Shows the lock button for a few seconds: when the player locks, and on a tap or a mouse
+    /// move while it's locked.
+    private func showLockButton() {
+        withAnimation(.playerControlsIn) { lockButtonVisible = true }
+        lockHideTask?.cancel()
+        lockHideTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.playerControlsOut) { lockButtonVisible = false }
         }
     }
 
@@ -1734,6 +1738,54 @@ struct PlayerView: View {
             item.localSubtitleImportName = subtitleURL.flatMap { LocalPlaybackCoordinator.shared.importName(for: $0) }
         }
         ContinueWatchingManager.shared.save(item)
+    }
+
+    /// Stops playback and lets go of everything the player holds, as it closes.
+    private func tearDown() {
+        Logger.shared.log("[Rating] PlayerView.onDisappear: completionBox.context=\(completionBox.context != nil ? "set" : "nil")", type: "Debug")
+        if let ctx = completionBox.context {
+            Logger.shared.log("[Rating] PlayerView.onDisappear: requesting rating prompt for ep=\(ctx.episodeNumber)", type: "Debug")
+            #if !os(tvOS)
+            PlayerPresenter.shared.presentRatingPromptIfNeeded(context: ctx)
+            #endif
+        }
+        #if !os(tvOS)
+        if let request = completionBox.simklRating {
+            PlayerPresenter.shared.presentSimklRatingPrompt(request)
+        }
+        #endif
+        hideTask?.cancel()
+        autoAdvanceTask?.cancel()
+        autoAdvanceTask = nil
+        prefetchTask?.cancel()
+        cancelStallWatchdog(resetAttempts: true)
+        #if os(iOS)
+        CastProxyServer.shared.stop(reason: "airplay")
+        MPVPictureInPicture.shared.stop()
+        #endif
+        engine?.stop()
+        saveProgress()
+        autoDeleteWatchedDownloadIfEnabled()
+        tearDownNowPlaying()
+        castManager.disconnect()
+        if currentContext?.isLocalPlayback == true {
+            LocalPlaybackCoordinator.shared.releaseAll()
+        }
+        if let jellyfinItemId = JellyfinPlaybackCoordinator.itemId(forStreamURL: currentStream.url)
+            ?? currentContext?.jellyfinItemId {
+            JellyfinService.shared.reportStopped(itemId: jellyfinItemId, positionSeconds: currentTime)
+        }
+        #if os(iOS)
+        UIApplication.shared.isIdleTimerDisabled = false
+        // Give up audio focus on exit so system music (Spotify/Apple Music)
+        // can resume. .notifyOthersOnDeactivation triggers their auto-resume.
+        AppAudioSession.deactivate()
+        #elseif os(macOS)
+        MacDisplaySleep.allow()
+        #endif
+        if MouseCursorManager.isSupported {
+            MouseCursorManager.unhide()
+        }
     }
 
     private func handleDismiss() {
@@ -2256,6 +2308,7 @@ struct PlayerView: View {
     private func handleMouseActivity() {
         guard MouseCursorManager.isSupported else { return }
         MouseCursorManager.unhide()
+        if isLocked { showLockButton(); return }
         setControlsVisible(true)
         if isPlaying {
             scheduleHide()
@@ -3882,6 +3935,9 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
     private var fullScreenBeforePresenting = false
     /// The app's toolbar, hidden while the cover is up, and whether it was showing before.
     private weak var hiddenToolbar: NSToolbar?
+    /// The bars SwiftUI hangs under the toolbar (a tab's search field, with the tab bar in the
+    /// toolbar), hidden with it.
+    private var hiddenAccessories: [NSTitlebarAccessoryViewController] = []
     private var toolbarWasVisible = false
     /// From the start of presenting to the end of closing.
     private var isCovering = false
@@ -3927,6 +3983,9 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             }
             return
         }
+        // Something new opened from the app while the player floats in Picture in Picture: its
+        // window grows back for it.
+        if isPictureInPicture { togglePictureInPicture() }
         if presentation == nil {
             fullScreenBeforePresenting = window.styleMask.contains(.fullScreen)
             titlebarBeforePresenting = (window.titleVisibility, window.titlebarAppearsTransparent,
@@ -3971,6 +4030,8 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             isCovering = false
             if toolbarWasVisible { window.toolbar?.isVisible = true }
             hiddenToolbar = nil
+            hiddenAccessories.forEach { $0.isHidden = false }
+            hiddenAccessories = []
         }
         presentation = nil
         hostWindowNumber = nil
@@ -3982,6 +4043,9 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
     /// Shows or hides the close, minimise and zoom buttons, which otherwise sit over the picture.
     func setWindowButtonsVisible(_ visible: Bool) {
         guard let window = hostWindow else { return }
+        // Never in Picture in Picture: the player's own close button is there, and the window's
+        // took the top-left corner of a window that small.
+        let visible = visible && !isPictureInPicture
         let buttons: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
         NSAnimationContext.runAnimationGroup { context in
             context.duration = visible ? 0.15 : 0.35
@@ -4017,6 +4081,19 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             }
             return event
         } as Any)
+        // SwiftUI puts its toolbar back now and then without a word: when the window shrinks into
+        // Picture in Picture, and when another of the app's windows opens. It goes again.
+        for name in [NSWindow.didResizeNotification, NSWindow.didBecomeKeyNotification,
+                     NSWindow.didResignKeyNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: window,
+                                                                    queue: .main) { [weak self, weak window] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let window else { return }
+                    self.hideToolbar(of: window)
+                    DispatchQueue.main.async { self.hideToolbar(of: window) }
+                }
+            })
+        }
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didEnterFullScreenNotification,
                                                                 object: window, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.isFullScreen = true }
@@ -4043,17 +4120,31 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
     /// top, and in full screen it's a strip pinned across the top of the screen. Hidden through
     /// AppKit, not SwiftUI, whose hidden toolbar takes the window's buttons with it.
     private func hideToolbar(of window: NSWindow) {
-        guard isCovering, let toolbar = window.toolbar else { return }
-        if hiddenToolbar !== toolbar {
-            hiddenToolbar = toolbar
-            toolbarObservations.append(toolbar.observe(\.isVisible, options: [.new]) { [weak self, weak window] toolbar, _ in
+        guard isCovering else { return }
+        if let toolbar = window.toolbar {
+            if hiddenToolbar !== toolbar {
+                hiddenToolbar = toolbar
+                toolbarObservations.append(toolbar.observe(\.isVisible, options: [.new]) { [weak self, weak window] toolbar, _ in
+                    DispatchQueue.main.async {
+                        guard let self, let window, self.isCovering, toolbar.isVisible else { return }
+                        self.hideToolbar(of: window)
+                    }
+                })
+            }
+            if toolbar.isVisible { toolbar.isVisible = false }
+        }
+        for accessory in window.titlebarAccessoryViewControllers where !accessory.isHidden {
+            accessory.isHidden = true
+            guard !hiddenAccessories.contains(where: { $0 === accessory }) else { continue }
+            hiddenAccessories.append(accessory)
+            // SwiftUI shows it again when the page under the cover redraws its search field.
+            toolbarObservations.append(accessory.observe(\.isHidden, options: [.new]) { [weak self, weak window] accessory, _ in
                 DispatchQueue.main.async {
-                    guard let self, let window, self.isCovering, toolbar.isVisible else { return }
+                    guard let self, let window, self.isCovering, !accessory.isHidden else { return }
                     self.hideToolbar(of: window)
                 }
             })
         }
-        if toolbar.isVisible { toolbar.isVisible = false }
     }
 
     /// True when the key was the cover's.
@@ -4121,6 +4212,7 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             window.level = levelBeforePictureInPicture
             window.collectionBehavior = behaviorBeforePictureInPicture
             isPictureInPicture = false
+            setWindowButtonsVisible(true)
             if let frame = frameBeforePictureInPicture {
                 DispatchQueue.main.async { window.setFrame(frame, display: true, animate: true) }
             }
@@ -4130,6 +4222,7 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             behaviorBeforePictureInPicture = window.collectionBehavior
             // First, so the window's content lets it be this small.
             isPictureInPicture = true
+            setWindowButtonsVisible(false)
             let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
             let width: CGFloat = 480
             let height = width * 9 / 16
@@ -4137,6 +4230,36 @@ final class MacPlayerWindowManager: NSObject, ObservableObject {
             window.level = .floating
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             DispatchQueue.main.async { window.setFrame(frame, display: true, animate: true) }
+            openBrowsingWindowIfNeeded(besides: window)
+        }
+    }
+
+    /// The window the player covers is the floating one now, so the app gets a window of its
+    /// own to be used in meanwhile, unless one is open already. The player keeps playing in its
+    /// own, and grows back into it, as it was, when Picture in Picture is turned off.
+    private func openBrowsingWindowIfNeeded(besides window: NSWindow) {
+        let others = NSApp.windows.filter {
+            $0 !== window && $0.isVisible && $0.canBecomeMain && !$0.isMiniaturized
+        }
+        guard others.isEmpty,
+              let item = NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "New Window"),
+              let menu = item.menu else { return }
+        let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
+        let frame = frameBeforePictureInPicture
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            // A window of its own, not a tab beside the floating one.
+            let tabbing = window.tabbingMode
+            window.tabbingMode = .disallowed
+            menu.performActionForItem(at: menu.index(of: item))
+            window.tabbingMode = tabbing
+            // Where the player's window was: cascaded from the small one, it opened half off
+            // the bottom of the screen.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                guard let frame, let opened = NSApp.windows.first(where: {
+                    !existing.contains(ObjectIdentifier($0)) && $0.canBecomeMain
+                }) else { return }
+                opened.setFrame(frame, display: true)
+            }
         }
     }
 }
@@ -4222,6 +4345,8 @@ struct VideoLayerView: UIViewRepresentable {
                 queue: .main
             ) { [weak self] _ in
                 guard let self else { return }
+                // Not while the app is being used under Picture in Picture.
+                guard !MainActor.assumeIsolated({ PlayerPresenter.shared.isPlayerHiddenForPictureInPicture }) else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     self.pipController?.stopPictureInPicture()
                 }
@@ -4232,6 +4357,23 @@ struct VideoLayerView: UIViewRepresentable {
             if let obs = foregroundObserver {
                 NotificationCenter.default.removeObserver(obs)
             }
+        }
+
+        // The player's screen goes while Picture in Picture plays, so the app can be used, and
+        // comes back with it.
+        func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+            DispatchQueue.main.async { PlayerPresenter.shared.hidePlayerForPictureInPicture() }
+        }
+
+        func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+                                        restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
+            DispatchQueue.main.async {
+                PlayerPresenter.shared.restorePlayerFromPictureInPicture(completion: completionHandler)
+            }
+        }
+
+        func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+            DispatchQueue.main.async { PlayerPresenter.shared.pictureInPictureDidStop() }
         }
     }
 

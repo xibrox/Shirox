@@ -44,6 +44,11 @@ final class PlayerPresenter: ObservableObject {
     #if os(iOS)
     private weak var playerVC: UIViewController?
     private var sourceView: UIView?
+    /// The player, held while Picture in Picture plays it with its screen put away so the rest
+    /// of the app can be used. Presented again, as it was, when Picture in Picture restores it.
+    private var pictureInPicturePlayer: UIViewController?
+    /// Between Picture in Picture asking for the player back and it being on screen again.
+    private var isRestoringFromPictureInPicture = false
     /// Last interface orientation observed during a player session via device-orientation notifications.
     private var trackedPlayerOrientation: UIInterfaceOrientation = .portrait
     private var orientationObserver: NSObjectProtocol?
@@ -108,6 +113,8 @@ final class PlayerPresenter: ObservableObject {
         // can never wedge playback shut; a player on its way out falls through to the retry
         // below instead, so relaunching straight after a dismiss still works.
         if let existing = playerVC, existing.viewIfLoaded?.window != nil, !existing.isBeingDismissed { return }
+        // One player at a time: the one playing in Picture in Picture goes for the new one.
+        if pictureInPicturePlayer != nil { closePictureInPicturePlayer() }
 
         // UIKit silently refuses to present on a controller that is still presenting something
         // else — which is exactly what happens when the stream-picker sheet is still animating
@@ -204,6 +211,64 @@ final class PlayerPresenter: ObservableObject {
             self?.playerVC = nil
             self?.sourceView = nil
         }
+    }
+
+    // MARK: - Picture in Picture
+
+    /// Whether the player is playing in Picture in Picture with its screen put away. Its view
+    /// leaves the screen then, and mustn't stop playback for it.
+    var isPlayerHiddenForPictureInPicture: Bool { pictureInPicturePlayer != nil }
+
+    /// Picture in Picture started with the app open: the player's screen goes, the player
+    /// stays, and the app underneath can be used until Picture in Picture hands it back.
+    func hidePlayerForPictureInPicture() {
+        guard pictureInPicturePlayer == nil, UIApplication.shared.applicationState == .active,
+              let player = playerVC, player.presentingViewController != nil, !player.isBeingDismissed else { return }
+        pictureInPicturePlayer = player
+        if trackedPlayerOrientation.isLandscape {
+            UserDefaults.standard.set(trackedPlayerOrientation.rawValue, forKey: "lastLandscapeOrientation")
+        }
+        stopTrackingOrientation()
+        stopLandscapeRotationTracking()
+        orientationLock = .portrait
+        UIView.performWithoutAnimation { refreshSupportedOrientations() }
+        player.dismiss(animated: true)
+    }
+
+    /// Picture in Picture's button back to the app: the same player, still playing, on screen
+    /// again.
+    func restorePlayerFromPictureInPicture(completion: @escaping (Bool) -> Void) {
+        guard let player = pictureInPicturePlayer else { return completion(true) }
+        guard let top = Self.findTopViewController() else { return completion(false) }
+        isRestoringFromPictureInPicture = true
+        let forceLandscape = UserDefaults.standard.bool(forKey: "forceLandscape")
+        orientationLock = forceLandscape ? .landscape : .allButUpsideDown
+        trackedPlayerOrientation = snapshotCurrentOrientation()
+        startTrackingOrientation()
+        if forceLandscape && UserDefaults.standard.bool(forKey: "autoRotateForcedLandscape") {
+            startLandscapeRotationTracking()
+        }
+        player.modalPresentationStyle = .fullScreen
+        top.present(player, animated: true) { [weak self] in
+            self?.pictureInPicturePlayer = nil
+            self?.isRestoringFromPictureInPicture = false
+            completion(true)
+        }
+    }
+
+    /// Picture in Picture ended. Closed with its own button while the player was put away, the
+    /// player closes too, as it would have on screen.
+    func pictureInPictureDidStop() {
+        guard pictureInPicturePlayer != nil, !isRestoringFromPictureInPicture else { return }
+        closePictureInPicturePlayer()
+    }
+
+    private func closePictureInPicturePlayer() {
+        pictureInPicturePlayer = nil
+        playerVC = nil
+        sourceView = nil
+        // The player's view is off screen, so its disappearing never comes; it stops on this.
+        NotificationCenter.default.post(name: .playerClosedInPictureInPicture, object: nil)
     }
 
     /// Called after the player view has already been manually animated off screen (drag-to-dismiss).
@@ -876,3 +941,8 @@ extension CastManager: GCKRequestDelegate {
     }
 }
 #endif
+
+extension Notification.Name {
+    /// The player playing in Picture in Picture, with its screen put away, was closed.
+    static let playerClosedInPictureInPicture = Notification.Name("shirox.playerClosedInPictureInPicture")
+}
