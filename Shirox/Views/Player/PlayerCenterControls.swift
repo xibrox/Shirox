@@ -6,6 +6,12 @@ struct PlayerCenterControls: View {
     var onBackward: () -> Void
     var onPlayPause: () -> Void
     var onForward: () -> Void
+    /// Smaller, for the Mac's Picture in Picture window, where the full size sat on the bars
+    /// above and below.
+    var compact = false
+    /// Off in a Picture in Picture window too short for them beside the bottom buttons; play
+    /// and pause stays.
+    var showsSkipButtons = true
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
 
     private var isPad: Bool {
@@ -17,16 +23,16 @@ struct PlayerCenterControls: View {
     }
 
     var body: some View {
-        HStack(spacing: isPad ? 60 : 40) {
-            backwardButton
+        HStack(spacing: isPad ? 60 : compact ? 24 : 40) {
+            if showsSkipButtons { backwardButton }
             playPauseButton
-            forwardButton
+            if showsSkipButtons { forwardButton }
         }
     }
 
     private var backwardButton: some View {
-        let size: CGFloat = isPad ? 80 : 60
-        let iconSize: CGFloat = isPad ? 44 : 32
+        let size: CGFloat = isPad ? 80 : compact ? 40 : 60
+        let iconSize: CGFloat = isPad ? 44 : compact ? 21 : 32
         return circleButton(size: size, iconSize: iconSize) {
             Image(systemName: "gobackward.\(Int(skipAmount))")
                 .font(.system(size: iconSize))
@@ -34,8 +40,8 @@ struct PlayerCenterControls: View {
     }
 
     private var playPauseButton: some View {
-        let size: CGFloat = isPad ? 100 : 72
-        let iconSize: CGFloat = isPad ? 56 : 40
+        let size: CGFloat = isPad ? 100 : compact ? 50 : 72
+        let iconSize: CGFloat = isPad ? 56 : compact ? 26 : 40
         return circleButton(size: size, iconSize: iconSize) {
             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: iconSize))
@@ -44,8 +50,8 @@ struct PlayerCenterControls: View {
     }
 
     private var forwardButton: some View {
-        let size: CGFloat = isPad ? 80 : 60
-        let iconSize: CGFloat = isPad ? 44 : 32
+        let size: CGFloat = isPad ? 80 : compact ? 40 : 60
+        let iconSize: CGFloat = isPad ? 44 : compact ? 21 : 32
         return circleButton(size: size, iconSize: iconSize) {
             Image(systemName: "goforward.\(Int(skipAmount))")
                 .font(.system(size: iconSize))

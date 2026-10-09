@@ -204,8 +204,10 @@ struct MacMangaReaderView: View {
 
             settingsMenu
         }
+        // In a window, level with the window's buttons, which are moved down to it.
+        .frame(minHeight: 32)
         .padding(.horizontal, 14)
-        .padding(.top, cover.isFullScreen ? 10 : 6)
+        .padding(.top, cover.isFullScreen ? 10 : MacPlayerWindowManager.windowTopRowMidY - 16)
         .padding(.bottom, 22)
         .background(
             LinearGradient(colors: [.black.opacity(0.75), .clear], startPoint: .top, endPoint: .bottom)

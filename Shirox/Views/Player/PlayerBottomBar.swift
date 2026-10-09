@@ -45,6 +45,12 @@ struct PlayerBottomBar: View {
     /// Portrait on a phone: too narrow for the titles, the skip button and the button group
     /// on one row.
     var isPortrait: Bool = false
+    /// How many of the right-hand buttons fit, most useful first; nil for all of them. The
+    /// Mac's Picture in Picture window sets it by its size: in a small one the whole group ran
+    /// into the middle buttons.
+    var buttonLimit: Int? = nil
+    /// Off where the Picture in Picture window is too small for it beside the middle buttons.
+    var showsSkipButton = true
     @AppStorage("playerLiquidGlass") private var playerLiquidGlass = true
 
     private var isPad: Bool {
@@ -80,7 +86,7 @@ struct PlayerBottomBar: View {
                 HStack(alignment: .bottom, spacing: isPad ? 16 : 8) {
                     VStack(alignment: .leading, spacing: isPad ? 10 : 6) {
                         titleBlock
-                        skip85Button
+                        if showsSkipButton { skip85Button }
                     }
                     // Without this the button group wins the width contest and the title collapses
                     // to a few characters even when most of the bar is empty.
@@ -88,7 +94,9 @@ struct PlayerBottomBar: View {
 
                     Spacer(minLength: 8)
 
-                    rightButtonGroup
+                    if !shownButtons.isEmpty {
+                        rightButtonGroup
+                    }
                 }
                 .padding(.horizontal, isPad ? 30 : 20)
             }
@@ -154,13 +162,33 @@ struct PlayerBottomBar: View {
         )
     }
 
+    private enum GroupButton: CaseIterable {
+        // Most useful first: what a small window keeps.
+        case nextEpisode, subtitles, speed, audio, source, quality, fill
+    }
+
+    private var shownButtons: Set<GroupButton> {
+        let available = GroupButton.allCases.filter { button in
+            switch button {
+            case .nextEpisode: return onNextEpisodeTap != nil
+            case .subtitles: return hasSubtitles && subtitleMenu != nil
+            case .speed, .fill: return true
+            case .audio: return audioTrackCount > 1 && audioMenuItems != nil
+            case .source: return streamCount > 1 && sourceMenuItems != nil
+            case .quality: return qualityCount >= 1 && qualityMenuItems != nil
+            }
+        }
+        return Set(available.prefix(max(0, buttonLimit ?? available.count)))
+    }
+
     @ViewBuilder private var rightButtonGroup: some View {
+        let shown = shownButtons
         let buttonWidth: CGFloat = isPad ? 50 : 36
         let height: CGFloat = isPad ? 46 : 34
         let iconSize: CGFloat = isPad ? 20 : 15
 
         HStack(spacing: 0) {
-            if streamCount > 1, let sourceMenuItems {
+            if shown.contains(.source), let sourceMenuItems {
                 PlayerMenuButton(
                     menuTitle: "Source",
                     label: .symbol("list.bullet", size: iconSize, weight: .medium),
@@ -170,7 +198,7 @@ struct PlayerBottomBar: View {
                 .frame(width: buttonWidth, height: height)
                 .contentShape(Rectangle())
             }
-            if qualityCount >= 1, let qualityMenuItems {
+            if shown.contains(.quality), let qualityMenuItems {
                 PlayerMenuButton(
                     menuTitle: "Quality",
                     label: .symbol("4k.tv", size: iconSize, weight: .medium),
@@ -180,7 +208,7 @@ struct PlayerBottomBar: View {
                 .frame(width: buttonWidth, height: height)
                 .contentShape(Rectangle())
             }
-            if audioTrackCount > 1, let audioMenuItems {
+            if shown.contains(.audio), let audioMenuItems {
                 PlayerMenuButton(
                     menuTitle: "Audio",
                     label: .symbol("waveform", size: iconSize, weight: .medium),
@@ -190,7 +218,7 @@ struct PlayerBottomBar: View {
                 .frame(width: buttonWidth, height: height)
                 .contentShape(Rectangle())
             }
-            if hasSubtitles, let subtitleMenu {
+            if shown.contains(.subtitles), let subtitleMenu {
                 PlayerMenuButton(
                     menuTitle: "Subtitles",
                     label: .symbol("captions.bubble.fill", size: iconSize, weight: .medium),
@@ -200,23 +228,27 @@ struct PlayerBottomBar: View {
                 .frame(width: buttonWidth, height: height)
                 .contentShape(Rectangle())
             }
-            Button(action: onFillTap) {
-                Image(systemName: isFilled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: iconSize - 1, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: buttonWidth, height: height)
+            if shown.contains(.fill) {
+                Button(action: onFillTap) {
+                    Image(systemName: isFilled ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: iconSize - 1, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: buttonWidth, height: height)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            PlayerMenuButton(
-                menuTitle: "Playback Speed",
-                label: .text(speedLabel, size: isPad ? 17 : 15, weight: .semibold),
-                items: speedMenuItems,
-                onOpen: onMenuOpen
-            )
-            .frame(height: height)
-            .padding(.horizontal, isPad ? 14 : 10)
-            .contentShape(Rectangle())
-            if let onNextEpisodeTap {
+            if shown.contains(.speed) {
+                PlayerMenuButton(
+                    menuTitle: "Playback Speed",
+                    label: .text(speedLabel, size: isPad ? 17 : 15, weight: .semibold),
+                    items: speedMenuItems,
+                    onOpen: onMenuOpen
+                )
+                .frame(height: height)
+                .padding(.horizontal, isPad ? 14 : 10)
+                .contentShape(Rectangle())
+            }
+            if shown.contains(.nextEpisode), let onNextEpisodeTap {
                 Button(action: onNextEpisodeTap) {
                     Image(systemName: "forward.end.fill")
                         .font(.system(size: iconSize, weight: .medium))

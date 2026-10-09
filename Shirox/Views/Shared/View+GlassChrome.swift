@@ -13,6 +13,11 @@ import SwiftUI
 /// light wash either way.
 private let mediaChromeAppearance: ColorScheme = .dark
 
+#if os(macOS)
+/// The smoke inside the Mac's media chrome when the control has no tint of its own.
+private let mediaChromeSmoke = Color.black.opacity(0.45)
+#endif
+
 extension View {
     /// Liquid Glass on iOS/macOS 26+ when `enabled`; otherwise the caller's
     /// classic `off` background. Below 26 the glass branch is unreachable, so
@@ -73,8 +78,28 @@ extension View {
         tint: Color? = nil,
         off: some ShapeStyle
     ) -> some View {
+        #if os(macOS)
+        // The Mac's glass goes on adapting to what is behind it whatever the appearance, and
+        // more so in a window that isn't key: over a bright frame it went white under the white
+        // symbols, and so did the classic fill. A smoke laid over it, under the symbol, keeps
+        // the control dark over any frame. A tinted control keeps its own colour.
+        smokedForMedia(shape, when: tint == nil)
+            .glassChrome(shape, enabled: enabled, tint: tint, appearance: mediaChromeAppearance, off: off)
+        #else
         glassChrome(shape, enabled: enabled, tint: tint, appearance: mediaChromeAppearance, off: off)
+        #endif
     }
+
+    #if os(macOS)
+    @ViewBuilder
+    fileprivate func smokedForMedia(_ shape: some Shape, when smoked: Bool) -> some View {
+        if smoked {
+            background(shape.fill(mediaChromeSmoke))
+        } else {
+            self
+        }
+    }
+    #endif
 
     /// Wraps the finished chrome so it sits above it in the view tree, which is the
     /// direction environment values travel; applied underneath, neither the glass nor a
