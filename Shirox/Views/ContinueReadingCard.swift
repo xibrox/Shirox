@@ -13,46 +13,31 @@ struct ContinueReadingSection: View {
     /// The manga whose page "View Details" opens. Owned by HomeView, which pushes it from
     /// outside its ScrollView.
     @Binding var detailItem: MangaReadingItem?
+    @Environment(\.cinematicRows) private var cinematic
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Continue Reading")
-                        .font(.title2.weight(.heavy))
-                        .tracking(0.3)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary)
-                        .frame(width: 36, height: 3)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 16)
+            HomeRowHeader(title: "Continue Reading")
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(items) { item in
-                        Button { open(item) } label: {
-                            ContinueReadingCardDisplay(
-                                item: item,
-                                isLoading: loadingHref == item.mangaHref
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .frame(width: 120)
-                        .contextMenu {
-                            Button { openDetails(item) } label: {
-                                Label("View Details", systemImage: "list.bullet.below.rectangle")
-                            }
-                            Button(role: .destructive) {
-                                MangaProgressManager.shared.remove(item)
-                            } label: {
-                                Label("Remove", systemImage: "xmark.circle")
-                            }
-                        }
+            HomeShelf(items: items) { item in
+                Button { open(item) } label: {
+                    ContinueReadingCardDisplay(
+                        item: item,
+                        isLoading: loadingHref == item.mangaHref
+                    )
+                }
+                .buttonStyle(.plain)
+                .frame(width: cinematic ? 150 : 120)
+                .contextMenu {
+                    Button { openDetails(item) } label: {
+                        Label("View Details", systemImage: "list.bullet.below.rectangle")
+                    }
+                    Button(role: .destructive) {
+                        MangaProgressManager.shared.remove(item)
+                    } label: {
+                        Label("Remove", systemImage: "xmark.circle")
                     }
                 }
-                .padding(.horizontal, 16)
             }
         }
     }

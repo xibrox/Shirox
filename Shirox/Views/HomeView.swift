@@ -32,6 +32,14 @@ struct HomeView: View {
     @AppStorage(GooeyRefreshGeometry.settingKey) private var gooeyRefresh = true
     @ObservedObject private var discovery = DiscoverySource.shared
     @StateObject private var simkl = SimklHomeViewModel()
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage(DetailLayoutSetting.cinematicHomeKey) private var cinematicHome = true
+
+    /// The full-window artwork layout, on an iPad or a Mac — while there's a hero to show.
+    private var usesCinematicLayout: Bool {
+        !heroItems.isEmpty
+            && DetailLayoutSetting.usesCinematic(enabled: cinematicHome, horizontalSizeClass: horizontalSizeClass)
+    }
 
     private func performRefresh() async {
         guard !isRefreshing else { return }
@@ -114,6 +122,51 @@ struct HomeView: View {
         }
     }
 
+    /// Continue Watching and Reading, then the source's rows.
+    private var rows: some View {
+        Group {
+            #if !os(tvOS)
+            if !continueWatching.items.isEmpty {
+                ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
+            }
+            if !mangaProgress.items.isEmpty {
+                ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext,
+                                       detailItem: $readingDetail)
+            }
+            #endif
+            // Like the hero: the leaving and arriving rows overlap while they turn.
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 24) {
+                    if discovery.usesSimkl {
+                        ForEach(simkl.layout?.rows ?? []) { row in
+                            AnimeSection(title: row.title, items: row.items) {
+                                SimklListView(list: row.list)
+                            }
+                        }
+                    } else {
+                        if !vm.trending.isEmpty {
+                            AnimeSection(title: "Trending Now", items: vm.trending) { BrowseView(category: .trending) }
+                        }
+                        if !vm.seasonal.isEmpty {
+                            AnimeSection(title: "This Season", items: vm.seasonal) { BrowseView(category: .seasonal) }
+                        }
+                        if !vm.lastSeason.isEmpty {
+                            AnimeSection(title: "Last Season · Complete", items: vm.lastSeason) { BrowseView(category: .lastSeason) }
+                        }
+                        if !vm.popular.isEmpty {
+                            AnimeSection(title: "All-Time Popular", items: vm.popular) { BrowseView(category: .popular) }
+                        }
+                        if !vm.topRated.isEmpty {
+                            AnimeSection(title: "Top Rated", items: vm.topRated) { BrowseView(category: .topRated) }
+                        }
+                    }
+                }
+                .id(homePage)
+                .transition(.pageTurn(step: pageStep))
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -131,6 +184,17 @@ struct HomeView: View {
                             Button("Retry") { Task { await reloadCurrent() } }
                         }
                     }
+                } else if usesCinematicLayout {
+                    // In a ZStack so a switch's leaving and arriving pages overlap.
+                    ZStack {
+                        CinematicHome(items: heroItems, leadingInset: leadingInset,
+                                      onRefresh: { await performRefresh() }) {
+                            rows
+                        }
+                        .id(homePage)
+                        .transition(.pageTurn(step: pageStep))
+                    }
+                    .animation(.spring(response: 0.45, dampingFraction: 0.9), value: homePage)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
@@ -149,47 +213,7 @@ struct HomeView: View {
                                     .transition(.pageTurn(step: pageStep))
                                 }
                             }
-                            Group {
-                                #if !os(tvOS)
-                                if !continueWatching.items.isEmpty {
-                                    ContinueWatchingSection(items: continueWatching.items, navTarget: $cwNavTarget)
-                                }
-                                if !mangaProgress.items.isEmpty {
-                                    ContinueReadingSection(items: mangaProgress.items, readerContext: $readerContext,
-                                                           detailItem: $readingDetail)
-                                }
-                                #endif
-                                // Like the hero: the leaving and arriving rows overlap while they turn.
-                                ZStack(alignment: .topLeading) {
-                                    VStack(alignment: .leading, spacing: 24) {
-                                        if discovery.usesSimkl {
-                                            ForEach(simkl.layout?.rows ?? []) { row in
-                                                AnimeSection(title: row.title, items: row.items) {
-                                                    SimklListView(list: row.list)
-                                                }
-                                            }
-                                        } else {
-                                            if !vm.trending.isEmpty {
-                                                AnimeSection(title: "Trending Now", items: vm.trending) { BrowseView(category: .trending) }
-                                            }
-                                            if !vm.seasonal.isEmpty {
-                                                AnimeSection(title: "This Season", items: vm.seasonal) { BrowseView(category: .seasonal) }
-                                            }
-                                            if !vm.lastSeason.isEmpty {
-                                                AnimeSection(title: "Last Season · Complete", items: vm.lastSeason) { BrowseView(category: .lastSeason) }
-                                            }
-                                            if !vm.popular.isEmpty {
-                                                AnimeSection(title: "All-Time Popular", items: vm.popular) { BrowseView(category: .popular) }
-                                            }
-                                            if !vm.topRated.isEmpty {
-                                                AnimeSection(title: "Top Rated", items: vm.topRated) { BrowseView(category: .topRated) }
-                                            }
-                                        }
-                                    }
-                                    .id(homePage)
-                                    .transition(.pageTurn(step: pageStep))
-                                }
-                            }
+                            rows
                             .padding(.leading, leadingInset)
                         }
                         .animation(.spring(response: 0.45, dampingFraction: 0.9), value: homePage)
@@ -888,6 +912,191 @@ private struct MacHeroHeight: ViewModifier {
 }
 #endif
 
+// MARK: - Cinematic Home (iPad and Mac)
+
+/// Home on an iPad or a Mac: the featured show's artwork fills the window, its title block sits
+/// at the bottom left, and the rows scroll up over it. The featured show turns every few seconds,
+/// or by the arrows or a swipe, and the artwork crossfades with it.
+private struct CinematicHome<Rows: View>: View {
+    let items: [Media]
+    var leadingInset: CGFloat = 0
+    var onRefresh: (@Sendable () async -> Void)? = nil
+    @ViewBuilder let rows: () -> Rows
+
+    @State private var currentIndex = 0
+    @State private var isHovering = false
+    @State private var timer: Timer?
+
+    private var displayItems: [Media] { Array(items.prefix(8)) }
+    private var current: Media? {
+        displayItems.indices.contains(currentIndex) ? displayItems[currentIndex] : displayItems.first
+    }
+
+    var body: some View {
+        // The title block at the foot of the first screen, the rows below it, and the artwork
+        // fading to black as they scroll up over it.
+        CinematicPage(leadingInset: leadingInset, heroFraction: 1, maxDim: 1, onRefresh: onRefresh) {
+            ZStack {
+                if let media = current {
+                    backdrop(for: media)
+                        .id(media.uniqueId)
+                        .transition(.opacity)
+                }
+            }
+        } hero: {
+            if let media = current {
+                hero(for: media)
+            }
+        } rows: {
+            rows()
+        }
+        .background {
+            // Fetches the other shows' artwork and logos ahead of their turn.
+            ZStack {
+                ForEach(displayItems, id: \.uniqueId) { media in
+                    TVDBPosterImage(media: media, type: .fanart)
+                    TVDBTitleLogoView(media: media)
+                }
+            }
+            .frame(width: 1, height: 1)
+            .opacity(0)
+            .allowsHitTesting(false)
+        }
+        .onAppear { startTimer() }
+        .onDisappear { stopTimer() }
+        .onChangeOf(items.map(\.uniqueId)) { _ in
+            if currentIndex >= displayItems.count { currentIndex = 0 }
+        }
+    }
+
+    @ViewBuilder
+    private func backdrop(for media: Media) -> some View {
+        // Banners are the heaviest thing on this screen; Data Saver drops them for a gradient.
+        if DataSaver.isEnabled {
+            LinearGradient(colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.15)],
+                           startPoint: .top, endPoint: .bottom)
+        } else {
+            TVDBPosterImage(media: media, type: .fanart)
+        }
+    }
+
+    private func hero(for media: Media) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // A ZStack, so the leaving and arriving shows' blocks crossfade in place instead of
+            // stacking one above the other for the length of the fade.
+            ZStack(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 16) {
+                    TVDBTitleLogoView(media: media, maxHeight: 150, maxWidth: 460, alignment: .leading,
+                                      fallbackFont: .largeTitle.weight(.heavy))
+                        .frame(maxWidth: 460, alignment: .leading)
+
+                    CinematicMetaLine(media: media)
+
+                    HStack(spacing: 12) {
+                        NavigationLink {
+                            MediaDestination(media: media)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("Watch")
+                                    .font(.system(size: 15, weight: .bold))
+                            }
+                            .foregroundStyle(Color.black)
+                            .padding(.horizontal, 26)
+                            .frame(height: 46)
+                            .background(Color.white, in: Capsule())
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(HomePressStyle())
+                        BookmarkButton(media: media, style: .round)
+                    }
+
+                    if let genres = media.genres, !genres.isEmpty {
+                        HStack(spacing: 8) {
+                            ForEach(genres.prefix(4), id: \.self) { CinematicChip(text: $0) }
+                        }
+                    }
+
+                    if let desc = media.plainDescription, !desc.isEmpty {
+                        Text(SynopsisSection.preview(of: desc))
+                            .font(.callout)
+                            .foregroundStyle(.white.opacity(0.75))
+                            .lineLimit(3)
+                            .lineSpacing(2)
+                            .frame(maxWidth: 560, alignment: .leading)
+                    }
+                }
+                .id(media.uniqueId)
+                .transition(.opacity)
+            }
+
+            if displayItems.count > 1 {
+                HStack(spacing: 12) {
+                    pagerButton("chevron.left", help: "Previous") { step(-1) }
+                    PageIndicator(numberOfPages: displayItems.count, currentPage: currentIndex)
+                    pagerButton("chevron.right", help: "Next") { step(1) }
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(.horizontal, CinematicMetrics.margin)
+        // Clear of the toolbar when the window is short.
+        .padding(.top, 100)
+        .padding(.bottom, 40)
+        .contentShape(Rectangle())
+        #if os(macOS)
+        .onHover { isHovering = $0 }
+        #elseif os(iOS)
+        // A swipe across the title block turns the featured show, as the phone's pager does.
+        .gesture(DragGesture(minimumDistance: 30).onEnded { value in
+            guard abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
+            step(value.translation.width < 0 ? 1 : -1)
+        })
+        #endif
+    }
+
+    private func pagerButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
+    }
+
+    private func step(_ delta: Int) {
+        guard !displayItems.isEmpty else { return }
+        withAnimation(.easeInOut(duration: 0.45)) {
+            currentIndex = (currentIndex + delta + displayItems.count) % displayItems.count
+        }
+        startTimer()
+    }
+
+    private func startTimer() {
+        timer?.invalidate()
+        guard displayItems.count > 1 else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { _ in
+            Task { @MainActor in
+                guard !isHovering else { return }
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    currentIndex = (currentIndex + 1) % max(displayItems.count, 1)
+                }
+            }
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
 // MARK: - Page Indicator (animated pill style)
 
 private struct PageIndicator: View {
@@ -1077,8 +1286,10 @@ private struct AnimeSection<SeeAll: View>: View {
     let items: [Media]
     @ViewBuilder let seeAll: () -> SeeAll
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.cinematicRows) private var cinematic
 
     private var cardWidth: CGFloat {
+        if cinematic { return CinematicMetrics.relationCardWidth }
         #if os(iOS)
         return sizeClass == .regular ? 190 : 155
         #else
@@ -1088,16 +1299,7 @@ private struct AnimeSection<SeeAll: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.title2.weight(.heavy))
-                        .tracking(0.3)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary)
-                        .frame(width: 36, height: 3)
-                }
-                Spacer()
+            HomeRowHeader(title: title) {
                 NavigationLink {
                     seeAll()
                 } label: {
@@ -1118,10 +1320,8 @@ private struct AnimeSection<SeeAll: View>: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
 
-            #if os(macOS)
-            MacShelf(items: items) { media in
+            HomeShelf(items: items) { media in
                 NavigationLink {
                     MediaDestination(media: media)
                 } label: {
@@ -1130,22 +1330,6 @@ private struct AnimeSection<SeeAll: View>: View {
                 .buttonStyle(HomePressStyle())
                 .frame(width: cardWidth)
             }
-            #else
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(items) { media in
-                        NavigationLink {
-                            MediaDestination(media: media)
-                        } label: {
-                            AniListCardView(media: media)
-                        }
-                        .buttonStyle(HomePressStyle())
-                        .frame(width: cardWidth)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-            #endif
         }
     }
 }

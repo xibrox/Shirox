@@ -18,6 +18,14 @@ struct ThumbnailEpisodeRow: View {
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
     var downloadState: DownloadState? = nil
+    var style: Style = .row
+
+    enum Style {
+        /// A full-width row: thumbnail, number and title beside it.
+        case row
+        /// A 16:9 thumbnail with the title under it, for a row that scrolls sideways.
+        case card
+    }
 
     @State private var isDescriptionExpanded = false
 
@@ -34,6 +42,13 @@ struct ThumbnailEpisodeRow: View {
     }
 
     var body: some View {
+        switch style {
+        case .row: rowBody
+        case .card: cardBody
+        }
+    }
+
+    private var rowBody: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
                 if isSelectionMode {
@@ -237,41 +252,164 @@ struct ThumbnailEpisodeRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 14))
         .opacity(isSelectionMode && (downloadState == .downloading || downloadState == .pending) ? 0.5 : 1.0)
         .onTapGesture { onTap() }
-        .contextMenu {
-            if !isSelectionMode {
-                if isComplete {
-                    Button { onMarkUnwatched?() } label: {
-                        Label("Mark as Unwatched", systemImage: "xmark.circle")
-                    }
-                } else {
-                    Button { onMarkWatched?() } label: {
-                        Label("Mark as Watched", systemImage: "checkmark.circle")
-                    }
-                }
-                if let onTryOtherStream {
-                    Divider()
-                    Button { onTryOtherStream() } label: {
-                        Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                }
-                if let onResetProgress, progress != nil {
-                    Divider()
-                    Button(role: .destructive) { onResetProgress() } label: {
-                        Label("Reset Progress", systemImage: "arrow.counterclockwise")
+        .contextMenu { menuItems }
+    }
+
+    private var cardBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Color.secondary.opacity(0.12)
+                .aspectRatio(16/9, contentMode: .fit)
+                .overlay {
+                    if let thumb = thumbnail {
+                        CachedAsyncImage(urlString: thumb)
+                    } else {
+                        Text("\(number)")
+                            .font(.largeTitle.weight(.bold))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                if let onDownload {
-                    Divider()
-                    Button { onDownload() } label: {
-                        Label("Download Episode", systemImage: "arrow.down.circle")
+                .overlay {
+                    if isComplete && !isSelectionMode {
+                        ZStack {
+                            Color.black.opacity(0.5)
+                            Image(systemName: "checkmark")
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(.white)
+                        }
                     }
-                    .disabled(downloadState == .completed || downloadState == .downloading || downloadState == .pending)
                 }
-                if let onDeleteDownload {
-                    Divider()
-                    Button(role: .destructive) { onDeleteDownload() } label: {
-                        Label("Delete Download", systemImage: "trash")
+                .overlay(alignment: .bottom) {
+                    if let p = progress, p > 0, !isComplete, !isSelectionMode {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Rectangle().fill(Color.black.opacity(0.45))
+                                Rectangle().fill(Color.white).frame(width: geo.size.width * p)
+                            }
+                        }
+                        .frame(height: 4)
                     }
+                }
+                .overlay(alignment: .topLeading) {
+                    if let badge = Self.fillerBadge(for: fillerType) {
+                        Text(badge.label)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(badge.tint.opacity(0.85), in: Capsule())
+                            .padding(8)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    Group {
+                        if isSelectionMode {
+                            ZStack {
+                                Circle()
+                                    .fill(isSelected ? Color.white : Color.black.opacity(0.35))
+                                Circle()
+                                    .strokeBorder(Color.white, lineWidth: 2)
+                                if isSelected {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.black)
+                                }
+                            }
+                            .frame(width: 28, height: 28)
+                        } else if let state = downloadState {
+                            cardDownloadBadge(state)
+                        }
+                    }
+                    .padding(8)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(isSelectionMode && isSelected ? Color.primary : Color.white.opacity(0.08),
+                                      lineWidth: isSelectionMode && isSelected ? 3 : 0.5)
+                )
+                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title.flatMap { $0.isEmpty ? nil : $0 } ?? "Episode \(number)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(cardSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 2)
+        }
+        .contentShape(Rectangle())
+        .opacity(isSelectionMode && (downloadState == .downloading || downloadState == .pending) ? 0.5 : 1.0)
+        .onTapGesture { onTap() }
+        .contextMenu { menuItems }
+        #if os(macOS)
+        // The card has no room for the synopsis the row expands to; the pointer gets it instead.
+        .help(episodeDescription ?? "")
+        #endif
+    }
+
+    /// "Episode 3", with the air date when there is one.
+    private var cardSubtitle: String {
+        let hasTitle = !(title ?? "").isEmpty
+        let date = Self.formattedAirdate(airdate)
+        let parts = [hasTitle ? "Episode \(number)" : nil, date].compactMap { $0 }
+        return parts.isEmpty ? " " : parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private func cardDownloadBadge(_ state: DownloadState) -> some View {
+        Group {
+            switch state {
+            case .completed: Image(systemName: "arrow.down.circle.fill")
+            case .downloading: ProgressView().controlSize(.small).tint(.white)
+            case .pending: Image(systemName: "hourglass")
+            case .paused: Image(systemName: "pause.circle.fill")
+            case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
+            }
+        }
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(.white)
+        .frame(width: 28, height: 28)
+        .background(Color.black.opacity(0.5), in: Circle())
+    }
+
+    @ViewBuilder
+    private var menuItems: some View {
+        if !isSelectionMode {
+            if isComplete {
+                Button { onMarkUnwatched?() } label: {
+                    Label("Mark as Unwatched", systemImage: "xmark.circle")
+                }
+            } else {
+                Button { onMarkWatched?() } label: {
+                    Label("Mark as Watched", systemImage: "checkmark.circle")
+                }
+            }
+            if let onTryOtherStream {
+                Divider()
+                Button { onTryOtherStream() } label: {
+                    Label("Change Stream", systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
+            if let onResetProgress, progress != nil {
+                Divider()
+                Button(role: .destructive) { onResetProgress() } label: {
+                    Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                }
+            }
+            if let onDownload {
+                Divider()
+                Button { onDownload() } label: {
+                    Label("Download Episode", systemImage: "arrow.down.circle")
+                }
+                .disabled(downloadState == .completed || downloadState == .downloading || downloadState == .pending)
+            }
+            if let onDeleteDownload {
+                Divider()
+                Button(role: .destructive) { onDeleteDownload() } label: {
+                    Label("Delete Download", systemImage: "trash")
                 }
             }
         }

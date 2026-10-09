@@ -5,6 +5,8 @@ import SwiftUI
 /// AniList id; entries without one render as non-tappable posters. Renders nothing when empty.
 struct WatchOrderSection: View {
     let entries: [TVDBMappingService.AniraMediaEntry]
+    var margin: CGFloat = 16
+    var titleFont: Font = .title3.weight(.bold)
 
     var body: some View {
         if entries.isEmpty {
@@ -12,8 +14,8 @@ struct WatchOrderSection: View {
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Watch Order")
-                    .font(.title3.weight(.bold))
-                    .padding(.horizontal, 16)
+                    .font(titleFont)
+                    .padding(.horizontal, margin)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 12) {
@@ -21,7 +23,7 @@ struct WatchOrderSection: View {
                             WatchOrderCard(order: index + 1, entry: entry)
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, margin)
                 }
             }
             .padding(.top, 8)

@@ -13,6 +13,8 @@ struct BookmarkButton: View {
         case floating
         /// A plain toolbar item, as a Mac window's toolbar has.
         case toolbar
+        /// A smaller round button in a row of them, as the cinematic detail page has.
+        case round
     }
 
     @ObservedObject private var local = LocalLibraryManager.shared
@@ -53,6 +55,16 @@ struct BookmarkButton: View {
                     .background(.ultraThinMaterial, in: Circle())
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 3)
+            }
+            .buttonStyle(.plain)
+        case .round:
+            Button(action: action) {
+                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 46, height: 46)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
             }
             .buttonStyle(.plain)
         case .toolbar:

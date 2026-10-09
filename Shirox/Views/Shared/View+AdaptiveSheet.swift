@@ -328,6 +328,11 @@ enum PosterGrid {
 struct MacShelf<Item: Identifiable, Card: View>: View {
     let items: [Item]
     var spacing: CGFloat = 12
+    var horizontalPadding: CGFloat = 16
+    /// Room above and below for the cards' shadows.
+    var verticalPadding: CGFloat = 0
+    /// The card to open the row on.
+    var initialIndex: Int? = nil
     @ViewBuilder let card: (Item) -> Card
 
     @State private var visible: Set<Int> = []
@@ -339,20 +344,22 @@ struct MacShelf<Item: Identifiable, Card: View>: View {
                 LazyHStack(alignment: .top, spacing: spacing) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         card(item)
-                            .id(index)
+                            .scrollTarget(index, margin: horizontalPadding)
                             .onAppear { visible.insert(index) }
                             .onDisappear { visible.remove(index) }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, horizontalPadding)
+                .padding(.vertical, verticalPadding)
             }
+            .scrollToInitialIndex(initialIndex, with: proxy)
             .overlay(alignment: .leading) {
                 if isHovering, let first = visible.min(), first > 0 {
                     arrow("chevron.left") {
                         // Back by about a window's worth.
                         let page = max(1, visible.count - 1)
                         withAnimation(.easeInOut(duration: 0.35)) {
-                            proxy.scrollTo(max(0, first - page), anchor: .leading)
+                            proxy.scrollTo(ShelfScrollTarget(index: max(0, first - page)), anchor: .leading)
                         }
                     }
                     .padding(.leading, 6)
@@ -363,7 +370,7 @@ struct MacShelf<Item: Identifiable, Card: View>: View {
                 if isHovering, let last = visible.max(), last < items.count - 1 {
                     arrow("chevron.right") {
                         withAnimation(.easeInOut(duration: 0.35)) {
-                            proxy.scrollTo(last, anchor: .leading)
+                            proxy.scrollTo(ShelfScrollTarget(index: last), anchor: .leading)
                         }
                     }
                     .padding(.trailing, 6)

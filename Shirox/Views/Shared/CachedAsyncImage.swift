@@ -337,6 +337,8 @@ struct TVDBTitleLogoView: View {
     var maxHeight: CGFloat = 135
     var maxWidth: CGFloat = 360
     var alignment: Alignment = .center
+    /// The title's size when there's no logo to show.
+    var fallbackFont: Font = .title2.weight(.bold)
 
     @State private var tvdbLogoURL: String?
 
@@ -364,7 +366,7 @@ struct TVDBTitleLogoView: View {
                     .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 3)
             } else {
                 Text(media.title.displayTitle)
-                    .font(.title2.weight(.bold))
+                    .font(fallbackFont)
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(alignment == .leading ? .leading : .center)
                     .lineLimit(2)

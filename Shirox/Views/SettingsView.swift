@@ -1053,6 +1053,8 @@ struct LibrarySettingsView: View {
     @AppStorage(GooeyRefreshGeometry.settingKey) private var gooeyRefresh = true
     @AppStorage(NewEpisodeTracker.badgesKey) private var newEpisodeBadges = true
     @AppStorage(CardTitleSetting.hiddenKey) private var hideCardTitles = false
+    @AppStorage(DetailLayoutSetting.cinematicKey) private var cinematicDetailLayout = true
+    @AppStorage(DetailLayoutSetting.cinematicHomeKey) private var cinematicHomeLayout = true
     @State private var showClearLocalLibrary = false
 
     private var orderedLanguages: [String] {
@@ -1082,6 +1084,19 @@ struct LibrarySettingsView: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Text("Cards")
+            }
+
+            if DetailLayoutSetting.isOffered {
+                Section {
+                    Toggle("Cinematic Home", isOn: $cinematicHomeLayout)
+                        .tint(.secondary)
+                    Toggle("Cinematic Detail Pages", isOn: $cinematicDetailLayout)
+                        .tint(.secondary)
+                } header: {
+                    Text("Layout")
+                } footer: {
+                    Text("The featured show's artwork fills the window, with the rows scrolling up over it. Turn off for Home's banner with the rows under it, and for a show's poster with its episode list.")
+                }
             }
 
             #if os(iOS)

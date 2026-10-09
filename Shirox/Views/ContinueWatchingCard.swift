@@ -42,42 +42,20 @@ struct ContinueWatchingSection: View {
     /// Owned by HomeView so the driving NavigationLink lives outside the ScrollView.
     @Binding var navTarget: ContinueWatchingNavTarget?
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.cinematicRows) private var cinematic
 
     private var cardWidth: CGFloat {
-        sizeClass == .regular ? 260 : 210
+        if cinematic { return CinematicMetrics.episodeCardWidth }
+        return sizeClass == .regular ? 260 : 210
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Continue Watching")
-                        .font(.title2.weight(.heavy))
-                        .tracking(0.3)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary)
-                        .frame(width: 36, height: 3)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-
-            #if os(macOS)
-            MacShelf(items: items) { item in
+            HomeRowHeader(title: "Continue Watching")
+            HomeShelf(items: items) { item in
                 itemView(for: item)
                     .frame(width: cardWidth)
             }
-            #else
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(items) { item in
-                        itemView(for: item)
-                            .frame(width: cardWidth)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-            #endif
         }
     }
 

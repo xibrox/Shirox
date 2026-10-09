@@ -73,6 +73,12 @@ struct AniListDetailView: View {
     @State private var sequelMediaId: Int? = nil
     @State private var watchOrder: [TVDBMappingService.AniraMediaEntry] = []
     @State private var leadingInset: CGFloat = 0
+    @AppStorage(DetailLayoutSetting.cinematicKey) private var cinematicLayout = true
+
+    /// The full-window artwork layout, on an iPad or a Mac.
+    private var usesCinematicLayout: Bool {
+        DetailLayoutSetting.usesCinematic(enabled: cinematicLayout, horizontalSizeClass: horizontalSizeClass)
+    }
 
     private var platformBackground: Color {
         #if os(iOS)
@@ -155,9 +161,29 @@ struct AniListDetailView: View {
 
     @ViewBuilder private var loadedContent: some View {
         if let media = vm.media {
+            #if !os(tvOS)
+            if usesCinematicLayout {
+                cinematicContent(media: media)
+                    // Out here, not on the dark page, so the sheet keeps the app's own look.
+                    .adaptiveSheet(isPresented: $showDetailsSheet) {
+                        MediaDetailsSheet(aniListID: pageAniListID, synopsis: media.plainDescription ?? "")
+                    }
+            } else {
+                content(media: media)
+            }
+            #else
             content(media: media)
+            #endif
         } else if vm.isLoading {
+            #if !os(tvOS)
+            if usesCinematicLayout {
+                CinematicDetailSkeleton(leadingInset: leadingInset)
+            } else {
+                loadingSkeletonView
+            }
+            #else
             loadingSkeletonView
+            #endif
         } else if let error = vm.error {
             ContentUnavailableView(
                 "Couldn't Load",
@@ -318,9 +344,12 @@ struct AniListDetailView: View {
                     .zoomSource("batchDownloadFloating", in: sheetZoom)
                     .transition(.scale.combined(with: .opacity))
                 } else {
-                    // On a Mac, Save sits in the window's toolbar.
+                    // On a Mac, Save sits in the window's toolbar; the cinematic page has it
+                    // beside Play.
                     #if os(iOS)
-                    BookmarkButton(media: vm.media)
+                    if !usesCinematicLayout {
+                        BookmarkButton(media: vm.media)
+                    }
                     #endif
                 }
                 #elseif !os(macOS)
@@ -967,7 +996,9 @@ struct AniListDetailView: View {
     }
 
     @ViewBuilder
-    private func watchButton(media: Media) -> some View {
+    /// - Parameter cinematic: a white capsule sized to its label, as the cinematic page has,
+    ///   instead of a frosted one as wide as the row.
+    private func watchButton(media: Media, cinematic: Bool = false) -> some View {
         let item = continueWatchingItem(for: media)
         let total = media.airedOrAnnouncedEpisodes ?? 0
         let rawNext = item?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
@@ -991,14 +1022,16 @@ struct AniListDetailView: View {
                 Text(label)
                     .font(.system(size: 15, weight: .bold))
             }
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, cinematic ? 26 : 0)
+            .frame(maxWidth: cinematic ? nil : .infinity)
             .frame(height: 46)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(cinematic ? AnyShapeStyle(Color.white) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
             .overlay(
                 Capsule()
-                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(cinematic ? 0 : 0.15), lineWidth: 1)
             )
-            .foregroundStyle(.primary)
+            .foregroundStyle(cinematic ? Color.black : Color.primary)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(total == 0)
@@ -1247,12 +1280,7 @@ struct AniListDetailView: View {
     // MARK: - Episodes
     @ViewBuilder
     private func episodesSection(media: Media) -> some View {
-        let metadataTotal = media.airedOrAnnouncedEpisodes ?? 0
-        let historyEp = continueWatching.items.first(where: { CW in
-            CW.aniListID == media.id || CW.mediaTitle == media.title.searchTitle || CW.mediaTitle == media.title.displayTitle
-        })?.episodeNumber ?? 0
-        
-        let totalEpisodes = max(metadataTotal, resumeEpisodeNumber ?? 0, historyEp)
+        let totalEpisodes = episodeTotal(for: media)
 
         VStack(alignment: .leading, spacing: 12) {
             // Header with Episodes count and action buttons (sort, reset)
@@ -1333,48 +1361,8 @@ struct AniListDetailView: View {
             
             // Range Menu
             if totalEpisodes > 100 {
-                let rangeCount = Int(ceil(Double(totalEpisodes) / 100.0))
-                
                 HStack {
-                    Menu {
-                        ForEach(0..<rangeCount, id: \.self) { index in
-                            let start = index * 100 + 1
-                            let end = min((index + 1) * 100, totalEpisodes)
-                            
-                            Button {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                                    selectedRangeIndex = index
-                                }
-                            } label: {
-                                Text("\(start)-\(end)")
-                                if selectedRangeIndex == index {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "list.number")
-                                .font(.subheadline)
-                            // Same clamp as the list, so the button never advertises a range
-                            // different from the episodes actually shown.
-                            let window = clampedRange(totalEpisodes: totalEpisodes)
-                            Text("\(window?.lowerBound ?? 1)-\(window?.upperBound ?? totalEpisodes)")
-                                .font(.subheadline.weight(.medium))
-                            Image(systemName: "chevron.down")
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-                    .foregroundStyle(.primary)
-                    .buttonStyle(.plain)
-                    
+                    episodeRangeMenu(totalEpisodes: totalEpisodes)
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -1384,58 +1372,10 @@ struct AniListDetailView: View {
             // Selection Bar (when selection mode is active)
             #if !os(tvOS)
             if isSelectionMode {
-                HStack {
-                    if let window = clampedRange(totalEpisodes: totalEpisodes) {
-                        let currentRangeStart = window.lowerBound
-                        let currentRangeEnd = window.upperBound
-                        let rangeEpisodes = Array(window)
-                        let selectableEpisodes = rangeEpisodes.filter { ep in
-                            let state = DownloadManager.shared.items.first { 
-                                $0.aniListID == mediaId && $0.episodeNumber == ep 
-                            }?.state
-                            return state != .completed && state != .downloading && state != .pending
-                        }
-                        
-                        let allInCurrentRangeSelected = !selectableEpisodes.isEmpty && selectableEpisodes.allSatisfy { selectedEpisodeNumbers.contains($0) }
-
-                        // "All", not "Range", to match the identical control on DetailView and
-                        // MangaDetailView — every one of them acts on the visible range.
-                        Button(allInCurrentRangeSelected ? "Deselect All" : "Select All") {
-                            if allInCurrentRangeSelected {
-                                selectableEpisodes.forEach { selectedEpisodeNumbers.remove($0) }
-                            } else {
-                                selectableEpisodes.forEach { selectedEpisodeNumbers.insert($0) }
-                            }
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.primary.opacity(0.1), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
-                    }
-                    
-                    Spacer()
-                    
-                    if !selectedEpisodeNumbers.isEmpty {
-                        Button {
-                            batchDownloadZoomID = "batchDownload"
-                            showBatchDownloadPicker = true
-                        } label: {
-                            Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(platformBackground)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.primary)
-                        .controlSize(.small)
-                        .clipShape(Capsule())
-                        .zoomSource("batchDownload", in: sheetZoom, cornerRadius: 16)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .transition(.move(edge: .top).combined(with: .opacity))
+                selectionBar(totalEpisodes: totalEpisodes)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
             #endif
 
@@ -1456,57 +1396,7 @@ struct AniListDetailView: View {
                     
                     LazyVStack(spacing: 8) {
                         ForEach(sortedRange, id: \.self) { ep in
-                            #if !os(tvOS)
-                            let sel = isSelectionMode
-                            let selected = selectedEpisodeNumbers.contains(ep)
-                            AniListEpisodeRowContainer(
-                                ep: ep,
-                                mediaId: media.id,
-                                provider: media.provider,
-                                mediaTitle: media.title.searchTitle,
-                                coverImage: media.coverImage.thumb,
-                                totalEpisodes: totalEpisodes,
-                                aniListProgress: existingEntry?.progress,
-                                aniListStatus: existingEntry?.status,
-                                isAiring: media.status == "RELEASING",
-                                onTap: sel ? {
-                                    // Prevent selecting if already downloaded or in progress
-                                    let state = DownloadManager.shared.items.first {
-                                        $0.aniListID == mediaId && $0.episodeNumber == ep
-                                    }?.state
-
-                                    if state == .completed || state == .downloading || state == .pending {
-                                        return
-                                    }
-
-                                    if selectedEpisodeNumbers.contains(ep) {
-                                        selectedEpisodeNumbers.remove(ep)
-                                    } else {
-                                        selectedEpisodeNumbers.insert(ep)
-                                    }
-                                } : { tapEpisode(ep, media: media) },
-                                onDownload: sel ? nil : {
-                                    pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep)
-                                },
-                                onTryOtherStream: { vm.watchEpisode(ep) },
-                                isSelectionMode: sel,
-                                isSelected: selected
-                            )
-                            #else
-                            AniListEpisodeRowContainer(
-                                ep: ep,
-                                mediaId: media.id,
-                                provider: media.provider,
-                                mediaTitle: media.title.searchTitle,
-                                coverImage: media.coverImage.thumb,
-                                totalEpisodes: totalEpisodes,
-                                aniListProgress: existingEntry?.progress,
-                                aniListStatus: existingEntry?.status,
-                                isAiring: media.status == "RELEASING",
-                                onTap: { tapEpisode(ep, media: media) },
-                                onTryOtherStream: { vm.watchEpisode(ep) }
-                            )
-                            #endif
+                            episodeItem(ep, media: media, totalEpisodes: totalEpisodes)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -1535,6 +1425,175 @@ struct AniListDetailView: View {
         } message: {
             Text("This will clear all watched history and progress for \(media.title.displayTitle).")
         }
+    }
+
+    /// Episodes to list: what's aired or announced, or further if the user has already watched
+    /// further (a source numbering past AniList's count).
+    private func episodeTotal(for media: Media) -> Int {
+        let metadataTotal = media.airedOrAnnouncedEpisodes ?? 0
+        let historyEp = continueWatching.items.first(where: { CW in
+            CW.aniListID == media.id || CW.mediaTitle == media.title.searchTitle || CW.mediaTitle == media.title.displayTitle
+        })?.episodeNumber ?? 0
+        return max(metadataTotal, resumeEpisodeNumber ?? 0, historyEp)
+    }
+
+    /// Picks which hundred episodes to list, for a show with more than a hundred.
+    @ViewBuilder
+    private func episodeRangeMenu(totalEpisodes: Int) -> some View {
+        let rangeCount = Int(ceil(Double(totalEpisodes) / 100.0))
+        Menu {
+            ForEach(0..<rangeCount, id: \.self) { index in
+                let start = index * 100 + 1
+                let end = min((index + 1) * 100, totalEpisodes)
+                
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        selectedRangeIndex = index
+                    }
+                } label: {
+                    Text("\(start)-\(end)")
+                    if selectedRangeIndex == index {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "list.number")
+                    .font(.subheadline)
+                // Same clamp as the list, so the button never advertises a range
+                // different from the episodes actually shown.
+                let window = clampedRange(totalEpisodes: totalEpisodes)
+                Text("\(window?.lowerBound ?? 1)-\(window?.upperBound ?? totalEpisodes)")
+                    .font(.subheadline.weight(.medium))
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
+    }
+
+    #if !os(tvOS)
+    /// Select All and the Download button, while episodes are being picked for download.
+    @ViewBuilder
+    private func selectionBar(totalEpisodes: Int) -> some View {
+        HStack {
+            if let window = clampedRange(totalEpisodes: totalEpisodes) {
+                let currentRangeStart = window.lowerBound
+                let currentRangeEnd = window.upperBound
+                let rangeEpisodes = Array(window)
+                let selectableEpisodes = rangeEpisodes.filter { ep in
+                    let state = DownloadManager.shared.items.first { 
+                        $0.aniListID == mediaId && $0.episodeNumber == ep 
+                    }?.state
+                    return state != .completed && state != .downloading && state != .pending
+                }
+            
+                let allInCurrentRangeSelected = !selectableEpisodes.isEmpty && selectableEpisodes.allSatisfy { selectedEpisodeNumbers.contains($0) }
+
+                // "All", not "Range", to match the identical control on DetailView and
+                // MangaDetailView — every one of them acts on the visible range.
+                Button(allInCurrentRangeSelected ? "Deselect All" : "Select All") {
+                    if allInCurrentRangeSelected {
+                        selectableEpisodes.forEach { selectedEpisodeNumbers.remove($0) }
+                    } else {
+                        selectableEpisodes.forEach { selectedEpisodeNumbers.insert($0) }
+                    }
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.primary.opacity(0.1), in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5))
+            }
+        
+            Spacer()
+        
+            if !selectedEpisodeNumbers.isEmpty {
+                Button {
+                    batchDownloadZoomID = "batchDownload"
+                    showBatchDownloadPicker = true
+                } label: {
+                    Label("Download \(selectedEpisodeNumbers.count)", systemImage: "arrow.down.circle.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(platformBackground)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.primary)
+                .controlSize(.small)
+                .clipShape(Capsule())
+                .zoomSource("batchDownload", in: sheetZoom, cornerRadius: 16)
+            }
+        }
+    }
+    #endif
+
+    /// One episode, as a list row or a card.
+    @ViewBuilder
+    private func episodeItem(_ ep: Int, media: Media, totalEpisodes: Int,
+                             style: ThumbnailEpisodeRow.Style = .row) -> some View {
+        #if !os(tvOS)
+        let sel = isSelectionMode
+        let selected = selectedEpisodeNumbers.contains(ep)
+        AniListEpisodeRowContainer(
+            ep: ep,
+            mediaId: media.id,
+            provider: media.provider,
+            mediaTitle: media.title.searchTitle,
+            coverImage: media.coverImage.thumb,
+            totalEpisodes: totalEpisodes,
+            aniListProgress: existingEntry?.progress,
+            aniListStatus: existingEntry?.status,
+            isAiring: media.status == "RELEASING",
+            onTap: sel ? {
+                // Prevent selecting if already downloaded or in progress
+                let state = DownloadManager.shared.items.first {
+                    $0.aniListID == mediaId && $0.episodeNumber == ep
+                }?.state
+
+                if state == .completed || state == .downloading || state == .pending {
+                    return
+                }
+
+                if selectedEpisodeNumbers.contains(ep) {
+                    selectedEpisodeNumbers.remove(ep)
+                } else {
+                    selectedEpisodeNumbers.insert(ep)
+                }
+            } : { tapEpisode(ep, media: media) },
+            onDownload: sel ? nil : {
+                pendingDownloadEpisodeNumber = DownloadEpisodeItem(episodeNumber: ep)
+            },
+            onTryOtherStream: { vm.watchEpisode(ep) },
+            isSelectionMode: sel,
+            isSelected: selected,
+            style: style
+        )
+        #else
+        AniListEpisodeRowContainer(
+            ep: ep,
+            mediaId: media.id,
+            provider: media.provider,
+            mediaTitle: media.title.searchTitle,
+            coverImage: media.coverImage.thumb,
+            totalEpisodes: totalEpisodes,
+            aniListProgress: existingEntry?.progress,
+            aniListStatus: existingEntry?.status,
+            isAiring: media.status == "RELEASING",
+            onTap: { tapEpisode(ep, media: media) },
+            onTryOtherStream: { vm.watchEpisode(ep) },
+            style: style
+        )
+        #endif
     }
 
     // MARK: - Tabs
@@ -1601,6 +1660,169 @@ struct AniListDetailView: View {
     }
 }
 
+#if !os(tvOS)
+// MARK: - Cinematic layout
+
+extension AniListDetailView {
+    /// The iPad and Mac page: the artwork fills the window, the title block sits over it, and
+    /// episodes and related titles follow in rows that scroll sideways.
+    @ViewBuilder
+    private func cinematicContent(media: Media) -> some View {
+        CinematicDetailPage(media: media, leadingInset: leadingInset) {
+            cinematicHero(media: media)
+        } rows: {
+            if !isSingleEpisode(media) {
+                cinematicEpisodes(media: media)
+            }
+            WatchOrderSection(entries: watchOrder, margin: CinematicMetrics.margin, titleFont: .title2.weight(.bold))
+            cinematicRelations(media: media)
+        }
+        .alert("Reset Progress", isPresented: $showResetConfirmation) {
+            Button("Reset", role: .destructive) {
+                ContinueWatchingManager.shared.resetProgress(
+                    aniListID: media.id, moduleId: nil, mediaTitle: "")
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear all watched history and progress for \(media.title.displayTitle).")
+        }
+    }
+
+    @ViewBuilder
+    private func cinematicHero(media: Media) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            TVDBTitleLogoView(media: media, maxHeight: 150, maxWidth: 460, alignment: .leading,
+                              fallbackFont: .largeTitle.weight(.heavy))
+                .frame(maxWidth: 460, alignment: .leading)
+                // The logo takes no touches of its own; this gives the title's menu something to hold.
+                .background(Color.black.opacity(0.001))
+                .copyTitleContextMenu(media.title.displayTitle)
+                .heroTitleAnchor(in: "heroScroll")
+
+            CinematicMetaLine(media: media)
+
+            HStack(spacing: 12) {
+                watchButton(media: media, cinematic: true)
+                #if os(iOS)
+                // A Mac has Save in the window's toolbar.
+                BookmarkButton(media: media, style: .round)
+                #endif
+                if !isSingleEpisode(media) && ((media.episodes ?? 0) > 0 || media.status == "RELEASING") {
+                    CinematicCircleButton(
+                        systemImage: isSelectionMode ? "xmark" : "arrow.down",
+                        isOn: isSelectionMode,
+                        help: isSelectionMode ? "Stop picking episodes" : "Pick episodes to download"
+                    ) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            isSelectionMode.toggle()
+                            if !isSelectionMode { selectedEpisodeNumbers.removeAll() }
+                        }
+                    }
+                }
+                if continueWatching.hasProgress(aniListID: media.id, moduleId: nil, mediaTitle: "") {
+                    CinematicCircleButton(systemImage: "arrow.counterclockwise", help: "Reset progress") {
+                        showResetConfirmation = true
+                    }
+                }
+            }
+
+            if let genres = media.genres, !genres.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(genres.prefix(5), id: \.self) { CinematicChip(text: $0) }
+                }
+            }
+
+            if let desc = media.plainDescription, !desc.isEmpty {
+                Text(SynopsisSection.preview(of: desc))
+                    .font(.callout)
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(3)
+                    .lineSpacing(2)
+                    .frame(maxWidth: 560, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { showDetailsSheet = true }
+                    .copyDescriptionContextMenu(desc)
+                    .help("Show full details")
+            }
+        }
+        .padding(.horizontal, CinematicMetrics.margin)
+        // Clear of the navigation bar when the window is short.
+        .padding(.top, 100)
+    }
+
+    /// The episode the Play button would start, for the episode row to open on.
+    private func upNextEpisode(media: Media, totalEpisodes: Int) -> Int {
+        let next = continueWatchingItem(for: media)?.episodeNumber ?? (existingEntry?.progress ?? 0) + 1
+        return next > totalEpisodes ? 1 : next
+    }
+
+    @ViewBuilder
+    private func cinematicEpisodes(media: Media) -> some View {
+        let totalEpisodes = episodeTotal(for: media)
+
+        VStack(alignment: .leading, spacing: 14) {
+            CinematicSectionHeader(title: "Episodes") {
+                if totalEpisodes > 100 {
+                    episodeRangeMenu(totalEpisodes: totalEpisodes)
+                }
+                CinematicCircleButton(
+                    systemImage: isReversed ? "arrow.down" : "arrow.up",
+                    help: isReversed ? "Newest episodes first — show oldest first" : "Oldest episodes first — show newest first"
+                ) { isReversed.toggle() }
+            }
+
+            if isSelectionMode {
+                selectionBar(totalEpisodes: totalEpisodes)
+                    .padding(.horizontal, CinematicMetrics.margin)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if moduleManager.modules.isEmpty {
+                Label("Install a module in the Search tab to watch episodes", systemImage: "puzzlepiece.extension")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, CinematicMetrics.margin)
+            } else if totalEpisodes > 0, let window = clampedRange(totalEpisodes: totalEpisodes) {
+                let range = Array(window)
+                let sorted = isReversed ? Array(range.reversed()) : range
+                let upNext = upNextEpisode(media: media, totalEpisodes: totalEpisodes)
+                CinematicShelf(items: sorted.map { EpisodeNumberItem(id: $0) },
+                               initialIndex: sorted.firstIndex(of: upNext)) { item in
+                    episodeItem(item.id, media: media, totalEpisodes: totalEpisodes, style: .card)
+                        .frame(width: CinematicMetrics.episodeCardWidth)
+                }
+                // A new range or order starts the row over.
+                .id("\(window.lowerBound)-\(isReversed)")
+            } else {
+                Text("Episode count not available")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, CinematicMetrics.margin)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cinematicRelations(media: Media) -> some View {
+        let edges = (media.relations?.edges ?? []).filter { $0.node.type != "MANGA" }
+        if !edges.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                CinematicSectionHeader(title: "Relations")
+                CinematicShelf(items: edges) { edge in
+                    NavigationLink {
+                        AniListDetailView(mediaId: edge.node.id, preloadedMedia: edge.node)
+                    } label: {
+                        RelationCard(edge: edge)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: CinematicMetrics.relationCardWidth)
+                }
+            }
+        }
+    }
+}
+#endif
+
 // MARK: - Synopsis
 struct SynopsisSection: View {
     let text: String
@@ -1666,6 +1888,7 @@ private struct AniListEpisodeRowContainer: View {
     var onTryOtherStream: (() -> Void)? = nil
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
+    var style: ThumbnailEpisodeRow.Style = .row
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
 
     #if !os(tvOS)
@@ -1747,7 +1970,8 @@ private struct AniListEpisodeRowContainer: View {
             onTryOtherStream: onTryOtherStream,
             isSelectionMode: isSelectionMode,
             isSelected: isSelected,
-            downloadState: downloadState
+            downloadState: downloadState,
+            style: style
         )
         .alert(
             "Update tracking progress?",
