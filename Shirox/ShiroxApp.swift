@@ -421,17 +421,26 @@ private struct RootTabView: View {
                     }
                 }
                 #elseif os(macOS)
-                NavigationSplitView {
-                    MacSidebarView(selection: $sidebarTab)
-                } detail: {
-                    switch sidebarTab {
-                    case .home:                 HomeView()
-                    case .search:               SearchView()
-                    case .library:              LibraryView()
-                    case .settings:             SettingsView()
-                    case .downloads:            DownloadsView()
+                // Tabs in the window's toolbar, as iOS has them in its tab bar, rather than a
+                // sidebar taking a column of the window for five rows.
+                TabView(selection: $sidebarTab) {
+                    Tab(SidebarTab.home.label, systemImage: SidebarTab.home.icon, value: SidebarTab.home) {
+                        HomeView()
+                    }
+                    Tab(SidebarTab.search.label, systemImage: SidebarTab.search.icon, value: SidebarTab.search) {
+                        SearchView()
+                    }
+                    Tab(SidebarTab.library.label, systemImage: SidebarTab.library.icon, value: SidebarTab.library) {
+                        LibraryView()
+                    }
+                    Tab(SidebarTab.downloads.label, systemImage: SidebarTab.downloads.icon, value: SidebarTab.downloads) {
+                        DownloadsView()
+                    }
+                    Tab(SidebarTab.settings.label, systemImage: SidebarTab.settings.icon, value: SidebarTab.settings) {
+                        SettingsView()
                     }
                 }
+                .tabViewStyle(.tabBarOnly)
                 #else
                 TabView(selection: $selectedTab) {
                     Tab("Home", systemImage: "house.fill", value: 0) {
