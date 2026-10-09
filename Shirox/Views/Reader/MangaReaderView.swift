@@ -1,7 +1,7 @@
-#if os(iOS)
+#if !os(tvOS)
 import SwiftUI
-import UIKit
-import Kingfisher
+
+// Shared with the Mac's reader.
 
 enum MangaReadingMode: String, CaseIterable, Identifiable {
     case vertical
@@ -26,6 +26,25 @@ enum MangaReadingMode: String, CaseIterable, Identifiable {
         }
     }
 }
+
+// MARK: - Liquid Glass helper
+
+extension View {
+    /// Liquid Glass on iOS 26+, frosted `.ultraThinMaterial` fallback below.
+    /// `tint` gives the glass a colored wash (used for the active auto-scroll
+    /// button); pass `nil` for plain glass.
+    @ViewBuilder
+    func readerGlass(_ shape: some Shape, tint: Color? = nil, enabled: Bool) -> some View {
+        mediaGlassChrome(shape, enabled: enabled, tint: tint,
+                         off: tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.ultraThinMaterial))
+    }
+}
+#endif
+
+#if os(iOS)
+import SwiftUI
+import UIKit
+import Kingfisher
 
 /// One page in the reader strip. In vertical mode the strip STITCHES chapters
 /// (Suwatte-style): finishing a chapter scrolls seamlessly into the next, and
@@ -1297,16 +1316,4 @@ private struct DoubleTapToZoom: ViewModifier {
     }
 }
 
-// MARK: - Liquid Glass helper
-
-private extension View {
-    /// Liquid Glass on iOS 26+, frosted `.ultraThinMaterial` fallback below.
-    /// `tint` gives the glass a colored wash (used for the active auto-scroll
-    /// button); pass `nil` for plain glass.
-    @ViewBuilder
-    func readerGlass(_ shape: some Shape, tint: Color? = nil, enabled: Bool) -> some View {
-        mediaGlassChrome(shape, enabled: enabled, tint: tint,
-                         off: tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.ultraThinMaterial))
-    }
-}
 #endif
