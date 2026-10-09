@@ -68,6 +68,7 @@ struct JellyfinConnectView: View {
         .frame(maxWidth: 460)
         .sheet(isPresented: $showGuide) {
             JellyfinSetupGuide()
+                .macSheetFrame()
         }
     }
 
@@ -114,15 +115,25 @@ private struct JellyfinSetupGuide: View {
         let detail: String
     }
 
+    #if os(macOS)
+    private static let device = "Mac"
+    private static let action = "click"
+    private static let sameMachine = ", or http://localhost:8096 when it runs on this Mac"
+    #else
+    private static let device = "phone"
+    private static let action = "tap"
+    private static let sameMachine = ""
+    #endif
+
     private let steps: [Step] = [
         Step(id: 1, title: "Install Jellyfin on a computer",
-             detail: "Jellyfin is a free media server that runs on your Mac, PC or NAS — not on the phone. Download it from jellyfin.org/downloads, start it, and finish the setup wizard it opens in your browser. That's where you create the username and password you'll use here."),
+             detail: "Jellyfin is a free media server that runs on your Mac, PC or NAS. Download it from jellyfin.org/downloads, start it, and finish the setup wizard it opens in your browser. That's where you create the username and password you'll use here."),
         Step(id: 2, title: "Add your library",
              detail: "In the Jellyfin dashboard, open Libraries and add a folder of shows or movies. Name episodes like \"Show Name/Season 01/Show Name S01E01.mkv\" so Jellyfin can match them."),
         Step(id: 3, title: "Find the server address",
-             detail: "It's the computer's local IP address followed by :8096, for example http://192.168.1.10:8096. Your phone needs to be on the same Wi-Fi. To watch away from home you need Jellyfin's remote access set up, or a domain pointing at your server."),
+             detail: "It's the server computer's local IP address followed by :8096, for example http://192.168.1.10:8096\(Self.sameMachine). Your \(Self.device) needs to be on the same network. To watch away from home you need Jellyfin's remote access set up, or a domain pointing at your server."),
         Step(id: 4, title: "Connect",
-             detail: "Type that address and your Jellyfin username and password into this screen and tap Connect. Your libraries then show up in Shirox."),
+             detail: "Type that address and your Jellyfin username and password into this screen and \(Self.action) Connect. Your libraries then show up in Shirox."),
     ]
 
     var body: some View {
@@ -153,7 +164,7 @@ private struct JellyfinSetupGuide: View {
                     Label("Allow Shirox under Settings → Privacy & Security → Local Network.", systemImage: "wifi")
                     #endif
                     Label("Make sure the server is running and your computer's firewall allows port 8096.", systemImage: "shield")
-                    Label("Open the same address in Safari on your phone. If it doesn't load there, it's the network, not the app.", systemImage: "safari")
+                    Label("Open the same address in Safari on your \(Self.device). If it doesn't load there, it's the network, not the app.", systemImage: "safari")
                 }
                 .font(.subheadline)
 

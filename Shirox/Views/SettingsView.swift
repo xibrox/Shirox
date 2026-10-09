@@ -557,6 +557,7 @@ struct AccountsSettingsView: View {
                     overwritePlan = nil
                     previewRun = nil
                 }
+                .macSheetFrame()
             }
         }
     }

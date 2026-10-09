@@ -409,7 +409,8 @@ extension View {
             #elseif os(tvOS)
             return AnyView(self.presentationDetents(system))
             #else
-            return AnyView(self.presentationDetents(system))
+            // A Mac sheet has no detents, and a List or Form in one has no size of its own.
+            return AnyView(self.macSheetFrame())
             #endif
         } else {
             return AnyView(self)
