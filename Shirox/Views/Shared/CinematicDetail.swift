@@ -98,6 +98,10 @@ struct CinematicPage<Backdrop: View, Hero: View, Rows: View>: View {
                                 Color.clear.preference(key: CinematicHeroTopKey.self,
                                                        value: proxy.frame(in: .named("heroScroll")).minY)
                             })
+                            // Above the rows' blackout, whose fade reaches up behind the title
+                            // block: drawn after it, the fade lay over the genres, the synopsis
+                            // and the pager, and dimmed them.
+                            .zIndex(1)
                         // One stack, so the backing goes behind all the rows at once: on a Group
                         // it went behind each row, its fade drawn over the row before.
                         VStack(alignment: .leading, spacing: 30) { rows() }
