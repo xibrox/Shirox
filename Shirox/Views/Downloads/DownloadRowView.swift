@@ -44,7 +44,7 @@ struct DownloadRowView: View {
                 } else if item.state == .completed {
                     HStack(spacing: 4) {
                         Image(systemName: item.isHLS ? "folder.fill" : "play.circle.fill")
-                        Text(item.isHLS ? "Local HLS" : "MP4 Video")
+                        Text(item.isHLS ? "Local HLS" : "\((item.fileName as NSString?)?.pathExtension.uppercased() ?? "MP4") Video")
                     }
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.green.opacity(0.8))

@@ -490,6 +490,9 @@ struct DownloadsView: View {
                     }
                     .contextMenu {
                         FullTitleMenuItems(mediaGroup.mediaTitle)
+                        if let file = mediaGroup.items.lazy.compactMap({ dm.fileURL(for: $0) }).first {
+                            DownloadFolderMenuItem(file: file)
+                        }
                         Button(role: .destructive, action: deleteGroup) {
                             Label("Delete \(mediaGroup.items.count) Episode\(mediaGroup.items.count == 1 ? "" : "s")",
                                   systemImage: "trash")

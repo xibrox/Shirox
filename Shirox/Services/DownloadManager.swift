@@ -76,6 +76,11 @@ final class DownloadManager: NSObject, ObservableObject {
     /// Which start of an item's HLS task is current, so a cancelled run finishing late can't
     /// evict the entry of the run that replaced it.
     private var hlsTaskTokens: [UUID: UUID] = [:]
+    /// Downloads opened in the player since launch. An old HLS download being played is served
+    /// from its folder, so it isn't converted to a single file until a later launch.
+    private var playedThisSession: Set<UUID> = []
+    /// Downloads this run has started, which `reconnectPendingTasks` must leave alone.
+    private var startedThisLaunch: Set<UUID> = []
     #if os(iOS)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     #endif
@@ -98,6 +103,7 @@ final class DownloadManager: NSObject, ObservableObject {
         resumeInterruptedIfEnabled()
         processQueue()
         observeAppLifecycle()
+        convertOldDownloads()
     }
 
     /// Retries downloads a previous session left interrupted, when the user has opted in.
@@ -304,6 +310,7 @@ final class DownloadManager: NSObject, ObservableObject {
                     await MainActor.run {
                         guard let idx = self.items.firstIndex(where: { $0.id == itemID }) else { return }
                         self.items[idx].relativeSubtitlePath = defaultFile
+                        self.nameSubtitlesIfFinished(at: idx)
                         self.persist()
                     }
                 }
@@ -323,6 +330,7 @@ final class DownloadManager: NSObject, ObservableObject {
                     guard let idx = self.items.firstIndex(where: { $0.id == itemID }),
                           self.items[idx].subtitleTracks?.indices.contains(index) == true else { return }
                     self.items[idx].subtitleTracks?[index].relativePath = file
+                    self.nameSubtitlesIfFinished(at: idx)
                     self.persist()
                 }
             }
@@ -655,6 +663,7 @@ final class DownloadManager: NSObject, ObservableObject {
             try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(path))
         }
         try? FileManager.default.removeItem(at: resumeDataURL(for: item.id))
+        if let fileName = item.fileName, !item.isHLS { removeFolderIfEmpty(containing: fileName) }
     }
 
     /// Removes several downloads in one pass.
@@ -827,6 +836,7 @@ final class DownloadManager: NSObject, ObservableObject {
 
     func getStream(for item: DownloadItem) async -> StreamResult? {
         guard item.state == .completed, let fileName = item.fileName else { return nil }
+        playedThisSession.insert(item.id)
         let fileURL = downloadDir.appendingPathComponent(fileName)
         let checkPath = item.isHLS ? fileURL.deletingLastPathComponent().path : fileURL.path
         guard FileManager.default.fileExists(atPath: checkPath) else {
@@ -848,7 +858,7 @@ final class DownloadManager: NSObject, ObservableObject {
             Logger.shared.log("[Downloads] Routing HLS through proxy: \(playURL)", type: "Download")
         } else {
             playURL = fileURL
-            Logger.shared.log("[Downloads] Playing direct MP4: \(playURL)", type: "Download")
+            Logger.shared.log("[Downloads] Playing local file: \(playURL)", type: "Download")
         }
         let localSubtitle: String? = item.relativeSubtitlePath.flatMap { relPath in
             let url = downloadDir.appendingPathComponent(relPath)
@@ -888,7 +898,11 @@ final class DownloadManager: NSObject, ObservableObject {
         var tracks = items[idx].subtitleTracks ?? []
         tracks.append(DownloadedSubtitle(title: title, url: dest, headers: nil, relativePath: name))
         items[idx].subtitleTracks = tracks
+        nameSubtitlesIfFinished(at: idx)
         persist()
+        if let path = items[idx].subtitleTracks?.last?.relativePath {
+            return SubtitleTrack(title: title, url: downloadDir.appendingPathComponent(path), headers: [:])
+        }
         return SubtitleTrack(title: title, url: dest, headers: [:])
     }
 
@@ -935,8 +949,11 @@ final class DownloadManager: NSObject, ObservableObject {
         // HLS downloads run in the app, and die with it. They used to be told apart by their
         // finished file's name, which only exists once one completes, so one interrupted
         // half-way stayed "downloading" forever, at 0%, and held a download slot.
+        // Only what a previous run left: init has already started the queue, and a download it
+        // started has no system task yet, so it looked interrupted and was failed the moment the
+        // app opened — every queued download, and every one Auto-Resume Interrupted had retried.
         let autoResume = UserDefaults.standard.bool(forKey: "autoResumeDownloads")
-        for (idx, item) in items.enumerated() {
+        for (idx, item) in items.enumerated() where !startedThisLaunch.contains(item.id) {
             guard let (state, error) = Self.launchState(of: item, autoResume: autoResume) else { continue }
             items[idx].state = state
             items[idx].error = error
@@ -1046,6 +1063,7 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     private func startDownload(_ item: DownloadItem) {
+        startedThisLaunch.insert(item.id)
         // Mark downloading immediately so processQueue() doesn't re-fire while probing.
         updateState(item.id, .downloading)
         let id = item.id
@@ -1120,7 +1138,20 @@ final class DownloadManager: NSObject, ObservableObject {
                         Task { @MainActor in self?.updateProgress(id, p) }
                     }
                 )
-                updateCompletion(id, fileName: manifestPath)
+                // One video file in place of the folder of segments; the folder if that fails.
+                var fileName = manifestPath
+                if let remuxed = await remuxHLS(id: id, manifestPath: manifestPath) {
+                    let wanted = items.first(where: { $0.id == id })?.state == .downloading
+                    if wanted, let name = adoptFile(remuxed, for: id) {
+                        fileName = name
+                    } else {
+                        try? FileManager.default.removeItem(at: remuxed)
+                    }
+                }
+                // Paused or removed while the file was being put together.
+                if items.first(where: { $0.id == id })?.state == .downloading {
+                    updateCompletion(id, fileName: fileName)
+                }
             } catch where Task.isCancelled {
                 // Paused or cancelled by the user: `pause`/`remove` already set the item's
                 // state. Reporting the cancellation as an error flipped a paused download to
@@ -1314,6 +1345,266 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 }
 
+// MARK: - Finished files
+
+/// A finished download is one ordinary file named after the episode, in a folder for its show and
+/// source, with the show's poster and its subtitles beside it:
+///
+///     Frieren - Re ANIME/
+///       poster.jpg
+///       Frieren - E05 - Phantom Superstition.mp4
+///       Frieren - E05 - Phantom Superstition.English.vtt
+///
+/// so the Downloads folder reads well in the Files app and Finder, and other players (Infuse, VLC)
+/// pick up the artwork and subtitles. An HLS download used to stay a `<id>/` folder of playlists
+/// and hundreds of segments, and a direct one `<id>.mp4` whatever it really was.
+extension DownloadManager {
+
+    /// The name a download's files share, before their extensions. The episode's title is added
+    /// when the source gives a real one, not "Episode 5".
+    nonisolated static func fileStem(mediaTitle: String, episodeNumber: Int, episodeTitle: String? = nil) -> String {
+        let episode = "E" + (episodeNumber < 10 && episodeNumber >= 0 ? "0" : "") + String(episodeNumber)
+        let title = sanitizedFileName(mediaTitle)
+        var stem = title.isEmpty ? episode : "\(title) - \(episode)"
+        if let name = episodeTitle.map(sanitizedFileName), isRealEpisodeTitle(name, mediaTitle: title) {
+            stem += " - " + String(name.prefix(60)).trimmingCharacters(in: .whitespaces)
+        }
+        return stem
+    }
+
+    /// Whether an episode title says more than its number does.
+    nonisolated static func isRealEpisodeTitle(_ title: String, mediaTitle: String) -> Bool {
+        let lowered = title.lowercased()
+        guard !lowered.isEmpty, lowered != mediaTitle.lowercased() else { return false }
+        return lowered.range(of: #"^(episode|ep\.?|e)?\s*\d+(\.\d+)?$"#, options: .regularExpression) == nil
+    }
+
+    /// The folder a show's downloads from one source share: "Frieren - Re ANIME", or "Frieren"
+    /// when the source isn't known.
+    nonisolated static func folderName(mediaTitle: String, sourceName: String?) -> String {
+        let title = sanitizedFileName(mediaTitle)
+        let source = sourceName.map(sanitizedFileName) ?? ""
+        var name = title.isEmpty ? (source.isEmpty ? "Unknown" : source) : (source.isEmpty ? title : "\(title) - \(source)")
+        // The snapshot store's folder sits beside the shows' folders.
+        if name.caseInsensitiveCompare("Snapshots") == .orderedSame { name += " (Show)" }
+        return name
+    }
+
+    /// The folder (relative to the downloads folder) a download's files go in.
+    private func folder(for item: DownloadItem) -> String {
+        let source = item.moduleId.flatMap { id in ModuleManager.shared.modules.first { $0.id == id }?.sourceName }
+        return Self.folderName(mediaTitle: item.mediaTitle, sourceName: source)
+    }
+
+    /// `text` with what a file name can't hold taken out, and kept to a sensible length.
+    nonisolated static func sanitizedFileName(_ text: String) -> String {
+        let forbidden = CharacterSet(charactersIn: "/\\:*?\"<>|").union(.controlCharacters).union(.newlines)
+        let cleaned = text.unicodeScalars.map { forbidden.contains($0) ? " " : String($0) }.joined()
+            .split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+        return String(cleaned.prefix(100)).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The extension a direct download is saved with: the URL's when it names a video format,
+    /// else the one its Content-Type implies, else mp4.
+    nonisolated static func fileExtension(for response: URLResponse?, requestURL: URL?) -> String {
+        let known: Set<String> = ["mp4", "m4v", "mov", "mkv", "webm", "avi", "ts", "flv"]
+        for url in [response?.url, requestURL].compactMap({ $0 }) {
+            let ext = url.pathExtension.lowercased()
+            if known.contains(ext) { return ext }
+        }
+        switch response?.mimeType?.lowercased() {
+        case "video/x-matroska", "video/mkv": return "mkv"
+        case "video/webm": return "webm"
+        case "video/quicktime": return "mov"
+        case "video/mp2t": return "ts"
+        case "video/x-msvideo": return "avi"
+        case "video/x-flv": return "flv"
+        default: return "mp4"
+        }
+    }
+
+    /// `<stem>.<ext>`, or `<stem> (2).<ext>` and so on when that's taken by another file or download.
+    private func availableName(stem: String, ext: String, excluding id: UUID) -> String {
+        let claimed = Set(items.filter { $0.id != id }.compactMap { $0.fileName?.lowercased() })
+        var candidate = "\(stem).\(ext)"
+        var number = 2
+        while claimed.contains(candidate.lowercased())
+                || FileManager.default.fileExists(atPath: downloadDir.appendingPathComponent(candidate).path) {
+            candidate = "\(stem) (\(number)).\(ext)"
+            number += 1
+        }
+        return candidate
+    }
+
+    /// Remuxes a finished HLS download into one file beside its folder, `<id>.remux.<ext>`, and
+    /// returns it; nil when it can't be done (or there isn't room for a second copy), in which
+    /// case the folder stays and plays as before.
+    func remuxHLS(id: UUID, manifestPath: String) async -> URL? {
+        let manifest = downloadDir.appendingPathComponent(manifestPath)
+        let folder = manifest.deletingLastPathComponent()
+        let stem = downloadDir.appendingPathComponent("\(id.uuidString).remux")
+        let needed = Int64(Self.sizeOfDirectory(at: folder))
+        // The copy is written before the segments go: leave the device some room as well.
+        if let free = try? downloadDir.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            .volumeAvailableCapacityForImportantUsage, free < needed + 500_000_000 {
+            Logger.shared.log("[Downloads] Not enough space to make one file of \(id.uuidString) — keeping its segments", type: "Download")
+            return nil
+        }
+        let started = Date()
+        do {
+            let output = try await Task.detached(priority: .utility) {
+                try MediaRemuxer.remux(input: manifest, toStem: stem)
+            }.value
+            Logger.shared.log("[Downloads] Made \(output.lastPathComponent) from \(id.uuidString)'s segments in \(String(format: "%.1f", Date().timeIntervalSince(started)))s", type: "Download")
+            return output
+        } catch {
+            Logger.shared.log("[Downloads] Couldn't make one file of \(id.uuidString): \(error.localizedDescription) — keeping its segments", type: "Error")
+            return nil
+        }
+    }
+
+    /// Moves a finished download's file into its show's folder under the episode's name, moves its
+    /// subtitles beside it, and deletes the HLS folder it replaces. Returns the file's new path,
+    /// relative to the downloads folder; nil if it couldn't be moved. The caller stores the path
+    /// and persists.
+    func adoptFile(_ file: URL, for id: UUID) -> String? {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return nil }
+        let item = items[idx]
+        let folder = folder(for: item)
+        let stem = Self.fileStem(mediaTitle: item.mediaTitle, episodeNumber: item.episodeNumber,
+                                 episodeTitle: item.episodeTitle)
+        let ext = file.pathExtension.lowercased()
+        let previous = item.fileName
+        let name = availableName(stem: "\(folder)/\(stem)", ext: ext, excluding: id)
+        do {
+            try FileManager.default.createDirectory(at: downloadDir.appendingPathComponent(folder, isDirectory: true),
+                                                    withIntermediateDirectories: true)
+            try FileManager.default.moveItem(at: file, to: downloadDir.appendingPathComponent(name))
+        } catch {
+            Logger.shared.log("[Downloads] Couldn't name \(file.lastPathComponent) \(name): \(error.localizedDescription)", type: "Error")
+            return nil
+        }
+        try? FileManager.default.removeItem(at: downloadDir.appendingPathComponent(id.uuidString))
+        nameSubtitles(at: idx, stem: (name as NSString).deletingPathExtension)
+        addPoster(for: item, in: folder)
+        if let previous { removeFolderIfEmpty(containing: previous) }
+        return name
+    }
+
+    /// Puts the show's poster in its folder as `poster.jpg`, which the Files app, Infuse and Plex
+    /// show as the folder's artwork. A clone of the snapshot's copy, so it takes no extra space.
+    private func addPoster(for item: DownloadItem, in folder: String) {
+        let target = downloadDir.appendingPathComponent(folder).appendingPathComponent("poster.jpg")
+        guard !FileManager.default.fileExists(atPath: target.path),
+              let snapshot = DownloadedMediaSnapshotStore.shared.snapshot(mediaTitle: item.mediaTitle, moduleId: item.moduleId),
+              let poster = snapshot.posterFile else { return }
+        let source = DownloadedMediaSnapshotStore.shared.localFileURL(in: snapshot, relative: poster)
+        try? FileManager.default.copyItem(at: source, to: target)
+    }
+
+    /// Deletes the folder holding `path` once nothing but its poster is left in it. Only a show's
+    /// folder: a path at the top of the downloads folder, or in an HLS download's `<id>/`, is left.
+    func removeFolderIfEmpty(containing path: String) {
+        let folder = (path as NSString).deletingLastPathComponent
+        guard !folder.isEmpty, !folder.contains("/"), UUID(uuidString: folder) == nil else { return }
+        let url = downloadDir.appendingPathComponent(folder, isDirectory: true)
+        let leftovers: Set<String> = ["poster.jpg", ".DS_Store"]
+        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: url.path),
+              contents.allSatisfy(leftovers.contains) else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// The finished file behind a download, to share or show in Files; nil while it's still an HLS
+    /// folder or isn't on disk.
+    func fileURL(for item: DownloadItem) -> URL? {
+        guard item.state == .completed, let fileName = item.fileName, !item.isHLS else { return nil }
+        let url = downloadDir.appendingPathComponent(fileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// Subtitles fetched after the video finished get its name too.
+    func nameSubtitlesIfFinished(at idx: Int) {
+        let item = items[idx]
+        guard item.state == .completed, let fileName = item.fileName, !item.isHLS else { return }
+        nameSubtitles(at: idx, stem: (fileName as NSString).deletingPathExtension)
+    }
+
+    /// Renames a download's subtitle files after its video: the default `<stem>.<ext>`, the other
+    /// tracks `<stem>.<title>.<ext>` — the layout other players look for beside a video.
+    private func nameSubtitles(at idx: Int, stem: String) {
+        let id = items[idx].id
+        var renamed: [String: String] = [:]
+        func rename(_ path: String, label: String?) -> String {
+            if let done = renamed[path] { return done }
+            let ext = (path as NSString).pathExtension
+            let base = label.map { "\(stem).\($0)" } ?? stem
+            guard (path as NSString).deletingPathExtension != base else { return path }
+            let target = availableName(stem: base, ext: ext, excluding: id)
+            do {
+                try FileManager.default.moveItem(at: downloadDir.appendingPathComponent(path),
+                                                 to: downloadDir.appendingPathComponent(target))
+                renamed[path] = target
+                return target
+            } catch {
+                return path
+            }
+        }
+        if let path = items[idx].relativeSubtitlePath {
+            items[idx].relativeSubtitlePath = rename(path, label: nil)
+        }
+        for (index, track) in (items[idx].subtitleTracks ?? []).enumerated() {
+            guard let path = track.relativePath else { continue }
+            let title = Self.sanitizedFileName(track.title)
+            items[idx].subtitleTracks?[index].relativePath = rename(path, label: title.isEmpty ? "\(index + 1)" : title)
+        }
+    }
+
+    /// Downloads finished before this — HLS folders, `<id>.mp4` files, and files not yet in a
+    /// show's folder — are converted once, one at a time in the background. One whose remux fails
+    /// isn't tried again. Folders missing their poster get it, since it often arrives after the video.
+    private func convertOldDownloads() {
+        let failedKey = "downloadsNotRemuxed"
+        func isOld(_ item: DownloadItem) -> Bool {
+            guard item.state == .completed, let fileName = item.fileName else { return false }
+            return item.isHLS || !fileName.contains("/")
+        }
+        for item in items where item.state == .completed && !item.isHLS {
+            guard let fileName = item.fileName, fileName.contains("/") else { continue }
+            addPoster(for: item, in: (fileName as NSString).deletingLastPathComponent)
+        }
+        var failed = Set(UserDefaults.standard.stringArray(forKey: failedKey) ?? [])
+        let old = items.filter { isOld($0) && !failed.contains($0.id.uuidString) }.map(\.id)
+        guard !old.isEmpty else { return }
+        Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            Logger.shared.log("[Downloads] Converting \(old.count) older download(s) to single files", type: "Download")
+            for id in old {
+                guard let item = items.first(where: { $0.id == id }), isOld(item),
+                      !playedThisSession.contains(id), let fileName = item.fileName else { continue }
+                var newName: String?
+                if item.isHLS {
+                    guard let remuxed = await remuxHLS(id: id, manifestPath: fileName) else {
+                        failed.insert(id.uuidString)
+                        UserDefaults.standard.set(Array(failed), forKey: failedKey)
+                        continue
+                    }
+                    // Started playing, or removed, while it was being converted.
+                    if items.contains(where: { $0.id == id && $0.fileName == fileName }), !playedThisSession.contains(id) {
+                        newName = adoptFile(remuxed, for: id)
+                    }
+                    if newName == nil { try? FileManager.default.removeItem(at: remuxed) }
+                } else {
+                    newName = adoptFile(downloadDir.appendingPathComponent(fileName), for: id)
+                }
+                guard let newName, let idx = items.firstIndex(where: { $0.id == id }) else { continue }
+                items[idx].fileName = newName
+                persist()
+            }
+        }
+    }
+}
+
 extension DownloadManager: URLSessionDownloadDelegate {
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         Task { @MainActor in
@@ -1350,12 +1641,16 @@ extension DownloadManager: URLSessionDownloadDelegate {
             Task { @MainActor in self.updateError(id, err) }
             return
         }
-        let finalName = "\(id.uuidString).mp4"
+        // The file has to be moved before this returns; it gets the episode's name after.
+        let ext = Self.fileExtension(for: downloadTask.response, requestURL: downloadTask.originalRequest?.url)
+        let finalName = "\(id.uuidString).\(ext)"
         let destination = downloadDir.appendingPathComponent(finalName)
         try? FileManager.default.removeItem(at: destination)
         do {
             try FileManager.default.moveItem(at: location, to: destination)
-            Task { @MainActor in self.updateCompletion(id, fileName: finalName) }
+            Task { @MainActor in
+                self.updateCompletion(id, fileName: self.adoptFile(destination, for: id) ?? finalName)
+            }
         } catch {
             Task { @MainActor in self.updateError(id, error) }
         }

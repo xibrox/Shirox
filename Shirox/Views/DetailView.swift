@@ -2069,6 +2069,7 @@ struct DetailView: View {
                             onDeleteDownload: {
                                 DownloadManager.shared.remove(downloadItem)
                             },
+                            downloadedFile: DownloadManager.shared.fileURL(for: downloadItem),
                             isSelectionMode: isSelectionMode,
                             isSelected: isSel,
                             downloadState: .completed
@@ -2293,6 +2294,19 @@ private struct ModuleEpisodeRowContainer: View {
         #endif
     }
 
+    /// The episode's finished download file, for Share and Show in Files.
+    private var downloadedFile: URL? {
+        #if !os(tvOS)
+        guard let downloaded = downloadManager.downloadItem(
+            forEpisodeHref: episode.href, aniListID: aniListID,
+            moduleId: moduleId, mediaTitle: mediaTitle, episodeNumber: epNum
+        ) else { return nil }
+        return DownloadManager.shared.fileURL(for: downloaded)
+        #else
+        return nil
+        #endif
+    }
+
     private var deleteDownloadAction: (() -> Void)? {
         #if !os(tvOS)
         guard let downloaded = downloadManager.downloadItem(
@@ -2403,6 +2417,7 @@ private struct ModuleEpisodeRowContainer: View {
                     },
                     onDownload: onDownload,
                     onDeleteDownload: deleteDownloadAction,
+                    downloadedFile: downloadedFile,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
                     isSelected: isSelected,
@@ -2434,6 +2449,7 @@ private struct ModuleEpisodeRowContainer: View {
                     },
                     onDownload: onDownload,
                     onDeleteDownload: deleteDownloadAction,
+                    downloadedFile: downloadedFile,
                     onTryOtherStream: onTryOtherStream,
                     isSelectionMode: isSelectionMode,
                     isSelected: isSelected,

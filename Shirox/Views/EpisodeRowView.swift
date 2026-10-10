@@ -9,6 +9,8 @@ struct EpisodeRowView: View {
     var onResetProgress: (() -> Void)? = nil
     var onDownload: (() -> Void)? = nil
     var onDeleteDownload: (() -> Void)? = nil
+    /// The finished download's file, for Share and Show in Files.
+    var downloadedFile: URL? = nil
     var onTryOtherStream: (() -> Void)? = nil
     var isSelectionMode: Bool = false
     var isSelected: Bool = false
@@ -183,6 +185,12 @@ struct EpisodeRowView: View {
                     }
                     .disabled(downloadState == .completed || downloadState == .downloading || downloadState == .pending)
                 }
+                #if !os(tvOS)
+                if let downloadedFile {
+                    Divider()
+                    DownloadFileMenuItems(file: downloadedFile)
+                }
+                #endif
                 if let onDeleteDownload {
                     Divider()
                     Button(role: .destructive) { onDeleteDownload() } label: {
