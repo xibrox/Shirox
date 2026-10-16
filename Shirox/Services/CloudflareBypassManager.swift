@@ -126,9 +126,6 @@ final class CloudflareBypassManager: ObservableObject {
     /// plus the actual User-Agent the bypass WKWebView used when it solved the challenge.
     /// Used by fetchv2 to retry CF-protected requests with the correct session identity.
     func bypassSessionInfo(for host: String) async -> (cookieHeader: String, userAgent: String)? {
-        #if os(tvOS)
-        return nil
-        #else
         guard let webView = bypassWebViews[host] else { return nil }
 
         let allCookies: [HTTPCookie] = await withCheckedContinuation { cont in
@@ -147,7 +144,6 @@ final class CloudflareBypassManager: ObservableObject {
 
         guard !cookieHeader.isEmpty else { return nil }
         return (cookieHeader, ua)
-        #endif
     }
 
     /// Retries `url` directly (so URLSession can't strip the Cookie on a cross-domain redirect)
@@ -230,9 +226,6 @@ final class CloudflareBypassManager: ObservableObject {
     /// sets alongside the challenge. Returns true when we can't probe at all — an unverifiable
     /// cookie is still worth trying, and blocking on it would break hosts that work today.
     private func clearanceIsUsable(for url: URL, in webView: WKWebView) async -> Bool {
-        #if os(tvOS)
-        return true
-        #else
         let js = """
         const response = await fetch(target, { credentials: "include", cache: "no-store" });
         return JSON.stringify({
@@ -257,7 +250,6 @@ final class CloudflareBypassManager: ObservableObject {
         return Self.probeIndicatesClearance(
             ClearanceProbe(status: status, cfMitigated: json["mitigated"] as? String)
         )
-        #endif
     }
 
     /// Presents a WKWebView sheet so the user can complete the Turnstile challenge.
@@ -369,9 +361,6 @@ final class CloudflareBypassManager: ObservableObject {
     }
 
     private func allCookiesHeader(for host: String, in webView: WKWebView) async -> String {
-        #if os(tvOS)
-        return ""
-        #else
         return await withCheckedContinuation { continuation in
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
                 let hostCookies = cookies.filter {
@@ -382,13 +371,9 @@ final class CloudflareBypassManager: ObservableObject {
                 continuation.resume(returning: header)
             }
         }
-        #endif
     }
 
     private func cfClearanceCookie(for host: String, in webView: WKWebView) async -> String? {
-        #if os(tvOS)
-        return nil
-        #else
         return await withCheckedContinuation { continuation in
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
                 let hostCookies = cookies.filter {
@@ -403,6 +388,5 @@ final class CloudflareBypassManager: ObservableObject {
                 continuation.resume(returning: value)
             }
         }
-        #endif
     }
 }

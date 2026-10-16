@@ -317,7 +317,6 @@ final class ModuleJSRunner {
                 }
             }
 
-            #if !os(tvOS)
             if useWebView {
                 Task {
                     do {
@@ -339,7 +338,6 @@ final class ModuleJSRunner {
                 }
                 return
             }
-            #endif
 
             var request = URLRequest(url: url)
             request.httpMethod = method

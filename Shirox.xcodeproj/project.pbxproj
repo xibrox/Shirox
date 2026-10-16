@@ -4265,8 +4265,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/undeaDD/FakeWebKit";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.1;
 			};
 		};
 		1279E5DB2FCA3A1200C9BA56 /* XCRemoteSwiftPackageReference "google-cast-spm" */ = {

@@ -125,12 +125,7 @@ private struct _WebViewBridge: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {
         guard let html, !context.coordinator.hasLoaded else { return }
         context.coordinator.hasLoaded = true
-        #if os(tvOS)
-            // TODO: Update FakeWebkit to support baseurl type URL
-            uiView.loadHTMLString(html, baseURL: baseURL?.absoluteString)
-        #else
-            uiView.loadHTMLString(html, baseURL: baseURL)
-        #endif
+        uiView.loadHTMLString(html, baseURL: baseURL)
     }
 
     final class Coordinator { var hasLoaded = false }

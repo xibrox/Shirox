@@ -196,7 +196,6 @@ final class JSEngine: ObservableObject {
 
             let ctx = self.context
 
-            #if !os(tvOS)
             if useWebView {
                 Task {
                     do {
@@ -218,7 +217,6 @@ final class JSEngine: ObservableObject {
                 }
                 return
             }
-            #endif
 
             var request = URLRequest(url: url)
             request.httpMethod = method
@@ -800,7 +798,6 @@ public struct BrowserImpersonator: Sendable {
     }
 }
 
-#if !os(tvOS)
 @MainActor
 final class WebKitFetchEngine: NSObject, WKNavigationDelegate {
     static let shared = WebKitFetchEngine()
@@ -922,5 +919,4 @@ final class WebKitFetchEngine: NSObject, WKNavigationDelegate {
         return (resData, status, resHeaders, finalURL)
     }
 }
-#endif
 
