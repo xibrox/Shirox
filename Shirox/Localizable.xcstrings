@@ -68255,79 +68255,79 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query unter 1.1.1.1. Google: https://dns.google/dns-query unter 8.8.8.8. Ist der Server nicht erreichbar, lädt nichts; schalte dies dann aus."
+            "value" : "Quad9: https://dns.quad9.net/dns-query unter 9.9.9.9 | Cloudflare: https://cloudflare-dns.com/dns-query unter 1.1.1.1 | Google: https://dns.google/dns-query unter 8.8.8.8 - Ist der Server nicht erreichbar, lädt nichts; schalte dies dann aus."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query at 1.1.1.1. Google: https://dns.google/dns-query at 8.8.8.8. If the server can't be reached, nothing loads; turn this off to recover."
+            "value" : "Quad9: https://dns.quad9.net/dns-query at 9.9.9.9 | Cloudflare: https://cloudflare-dns.com/dns-query at 1.1.1.1 | Google: https://dns.google/dns-query at 8.8.8.8 - If the server can't be reached, nothing loads; turn this off to recover."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query en 1.1.1.1. Google: https://dns.google/dns-query en 8.8.8.8. Si no se puede conectar con el servidor, no se carga nada; desactívalo para recuperarte."
+            "value" : "Quad9: https://dns.quad9.net/dns-query en 9.9.9.9 | Cloudflare: https://cloudflare-dns.com/dns-query en 1.1.1.1 | Google: https://dns.google/dns-query en 8.8.8.8 - Si no se puede conectar con el servidor, no se carga nada; desactívalo para recuperarte."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare : https://cloudflare-dns.com/dns-query à 1.1.1.1. Google : https://dns.google/dns-query à 8.8.8.8. Si le serveur est injoignable, rien ne se charge ; désactivez cette option pour rétablir la situation."
+            "value" : "Quad9: https://dns.quad9.net/dns-query à 9.9.9.9. Cloudflare : https://cloudflare-dns.com/dns-query à 1.1.1.1. Google : https://dns.google/dns-query à 8.8.8.8 - Si le serveur est injoignable, rien ne se charge ; désactivez cette option pour rétablir la situation."
           }
         },
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query di 1.1.1.1. Google: https://dns.google/dns-query di 8.8.8.8. Jika server tidak dapat dijangkau, tidak ada yang termuat; matikan ini untuk memulihkan."
+            "value" : "Quad9: https://dns.quad9.net/dns-query di 9.9.9.9. Cloudflare: https://cloudflare-dns.com/dns-query di 1.1.1.1. Google: https://dns.google/dns-query di 8.8.8.8 - Jika server tidak dapat dijangkau, tidak ada yang termuat; matikan ini untuk memulihkan."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query su 1.1.1.1. Google: https://dns.google/dns-query su 8.8.8.8. Se il server non è raggiungibile, non si carica nulla; disattiva questa opzione per ripristinare."
+            "value" : "Quad9: https://dns.quad9.net/dns-query su 9.9.9.9. Cloudflare: https://cloudflare-dns.com/dns-query su 1.1.1.1. Google: https://dns.google/dns-query su 8.8.8.8 - Se il server non è raggiungibile, non si carica nulla; disattiva questa opzione per ripristinare."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query（1.1.1.1）。Google: https://dns.google/dns-query（8.8.8.8）。サーバに接続できない場合は何も読み込まれません。復旧するにはこれをオフにしてください。"
+            "value" : "Quad9: https://dns.quad9.net/dns-query（9.9.9.9）。Cloudflare: https://cloudflare-dns.com/dns-query（1.1.1.1）。Google: https://dns.google/dns-query（8.8.8.8）。サーバに接続できない場合は何も読み込まれません。復旧するにはこれをオフにしてください。"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query pod adresem 1.1.1.1. Google: https://dns.google/dns-query pod adresem 8.8.8.8. Jeśli serwer jest nieosiągalny, nic się nie wczyta; wyłącz tę opcję, aby to naprawić."
+            "value" : "Quad9: https://dns.quad9.net/dns-query pod adresem 9.9.9.9. Cloudflare: https://cloudflare-dns.com/dns-query pod adresem 1.1.1.1. Google: https://dns.google/dns-query pod adresem 8.8.8.8 - Jeśli serwer jest nieosiągalny, nic się nie wczyta; wyłącz tę opcję, aby to naprawić."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query em 1.1.1.1. Google: https://dns.google/dns-query em 8.8.8.8. Se o servidor não puder ser alcançado, nada carrega; desative isto para se recuperar."
+            "value" : "Quad9: https://dns.quad9.net/dns-query em 9.9.9.9. Cloudflare: https://cloudflare-dns.com/dns-query em 1.1.1.1. Google: https://dns.google/dns-query em 8.8.8.8 - Se o servidor não puder ser alcançado, nada carrega; desative isto para se recuperar."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query на 1.1.1.1. Google: https://dns.google/dns-query на 8.8.8.8. Если сервер недоступен, ничего не загрузится; выключите это, чтобы восстановить работу."
+            "value" : "Quad9: https://dns.quad9.net/dns-query на 9.9.9.9. Cloudflare: https://cloudflare-dns.com/dns-query на 1.1.1.1. Google: https://dns.google/dns-query на 8.8.8.8 - Если сервер недоступен, ничего не загрузится; выключите это, чтобы восстановить работу."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: 1.1.1.1 adresinde https://cloudflare-dns.com/dns-query. Google: 8.8.8.8 adresinde https://dns.google/dns-query. Sunucuya ulaşılamazsa hiçbir şey yüklenmez; düzeltmek için bunu kapatın."
+            "value" : "Quad9: 9.9.9.9 adresinde https://dns.quad9.net/dns-query. Cloudflare: 1.1.1.1 adresinde https://cloudflare-dns.com/dns-query. Google: 8.8.8.8 adresinde https://dns.google/dns-query. Sunucuya ulaşılamazsa hiçbir şey yüklenmez; düzeltmek için bunu kapatın."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare: https://cloudflare-dns.com/dns-query tại 1.1.1.1. Google: https://dns.google/dns-query tại 8.8.8.8. Nếu không thể kết nối đến máy chủ, sẽ không tải được gì; hãy tắt tùy chọn này để khôi phục."
+            "value" : "Quad9: https://dns.quad9.net/dns-query tại 9.9.9.9. Cloudflare: https://cloudflare-dns.com/dns-query tại 1.1.1.1. Google: https://dns.google/dns-query tại 8.8.8.8 - Nếu không thể kết nối đến máy chủ, sẽ không tải được gì; hãy tắt tùy chọn này để khôi phục."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cloudflare：https://cloudflare-dns.com/dns-query，位于 1.1.1.1。Google：https://dns.google/dns-query，位于 8.8.8.8。如果无法连接服务器，将无法载入任何内容；请关闭此选项以恢复。"
+            "value" : "Quad9：https://dns.quad9.net/dns-query，位于 9.9.9.9。Cloudflare：https://cloudflare-dns.com/dns-query，位于 1.1.1.1。Google：https://dns.google/dns-query，位于 8.8.8.8。如果无法连接服务器，将无法载入任何内容；请关闭此选项以恢复。"
           }
         }
       }
