@@ -68,9 +68,11 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
     // MARK: - What's shown
 
     /// Something playing: a show's episode, a movie, a video. `elapsed` sets the timer Discord
-    /// counts up from while it plays; paused, there's no timer.
+    /// counts up from while it plays, and with `duration` it shows a progress bar; paused,
+    /// there's neither. `rate` is the playback speed, so the bar ends when the episode does.
     func updateMedia(title: String, subtitle: String?, season: Int?, episode: Int?,
-                     coverURL: String?, isPlaying: Bool, elapsed: Double? = nil) {
+                     coverURL: String?, isPlaying: Bool, elapsed: Double? = nil,
+                     duration: Double? = nil, rate: Double = 1) {
         var lines: [String] = []
         if showsDetails {
             switch (season, episode) {
@@ -84,9 +86,15 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
             if let subtitle, !subtitle.isEmpty { lines.append(subtitle) }
         }
         if !isPlaying { lines.append(String(localized: "shared.discord_paused")) }
-        let start = isPlaying ? Date().addingTimeInterval(-(elapsed ?? 0)) : nil
+        let speed = rate > 0 ? rate : 1
+        let now = Date()
+        let start = isPlaying ? now.addingTimeInterval(-(elapsed ?? 0) / speed) : nil
+        var end: Date?
+        if isPlaying, let duration, duration > 0 {
+            end = now.addingTimeInterval(max(duration - (elapsed ?? 0), 0) / speed)
+        }
         show(Activity(type: .watching, details: title, state: lines.joined(separator: " · "),
-                      cover: coverURL, coverText: title, start: start))
+                      cover: coverURL, coverText: title, start: start, end: end))
     }
 
     /// A manga open in the reader, at a chapter.
@@ -97,7 +105,7 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
             if let chapter, !chapter.isEmpty { lines.append(chapter) }
         }
         show(Activity(type: .playing, details: String(localized: "shared.discord_reading \(title)"),
-                      state: lines.joined(separator: " · "), cover: coverURL, coverText: title, start: Date()))
+                      state: lines.joined(separator: " · "), cover: coverURL, coverText: title, start: Date(), end: nil))
     }
 
     /// A sample status with the Shirox icon, to try the setup without anything playing.
@@ -404,11 +412,26 @@ private struct Activity: Equatable {
     let cover: String?
     let coverText: String
     let start: Date?
+    /// When the progress bar is full; nil shows only the timer.
+    let end: Date?
 
-    /// The same thing shown: a timer a second further on isn't a change.
+    /// The same thing shown: a timer a second further on isn't a change. With a progress bar a
+    /// seek is; without one (the reader starts its timer anew on every page) only whether there
+    /// is a timer counts.
     func sameContent(as other: Activity) -> Bool {
-        type == other.type && details == other.details && state == other.state
-            && cover == other.cover && (start == nil) == (other.start == nil)
+        guard type == other.type, details == other.details, state == other.state, cover == other.cover,
+              (start == nil) == (other.start == nil) else { return false }
+        if end == nil, other.end == nil { return true }
+        return Self.close(start, other.start) && Self.close(end, other.end)
+    }
+
+    /// Both unset, or within a few seconds: the player's reports drift a little.
+    private static func close(_ lhs: Date?, _ rhs: Date?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil): return true
+        case let (lhs?, rhs?): return abs(lhs.timeIntervalSince(rhs)) < 5
+        default: return false
+        }
     }
 
     func json(applicationID: String, showsCover: Bool) -> [String: Any] {
@@ -422,7 +445,11 @@ private struct Activity: Equatable {
             "status_display_type": 2
         ]
         if !state.isEmpty { json["state"] = String(state.prefix(128)) }
-        if let start { json["timestamps"] = ["start": Int(start.timeIntervalSince1970 * 1_000)] }
+        if let start {
+            var timestamps = ["start": Int(start.timeIntervalSince1970 * 1_000)]
+            if let end { timestamps["end"] = Int(end.timeIntervalSince1970 * 1_000) }
+            json["timestamps"] = timestamps
+        }
         // Discord fetches outside images through its own proxy for headless sessions.
         if showsCover, let cover, cover.hasPrefix("https://") {
             json["assets"] = ["large_image": cover, "large_text": String(coverText.prefix(128))]

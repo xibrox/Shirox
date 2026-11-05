@@ -3012,9 +3012,12 @@ struct PlayerView: View {
 
         #if !os(tvOS)
         // The same place feeds Discord, for every player: AVPlayer, MPV and casting alike.
-        DiscordPresence.shared.updateMedia(title: mediaTitle, subtitle: epTitle, season: nil,
+        // Simkl plays know their season; an AniList entry is one season, named in its title.
+        DiscordPresence.shared.updateMedia(title: mediaTitle, subtitle: epTitle,
+                                           season: currentContext?.simklTitle?.season,
                                            episode: epNumber, coverURL: currentContext?.imageUrl,
-                                           isPlaying: isPlaying, elapsed: elapsed)
+                                           isPlaying: isPlaying, elapsed: elapsed,
+                                           duration: duration > 0 ? duration : nil, rate: rate)
         #endif
 
         let snapshot = NowPlayingSnapshot(
