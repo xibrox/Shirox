@@ -7,6 +7,12 @@ on:
    branches:
      - main
 
+# Two merges in a row used to build side by side and race for apps.json and the release.
+# Runs now wait for each other; a newer push replaces one that is still waiting.
+concurrency:
+ group: nightly
+ cancel-in-progress: false
+
 env:
  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
  # The release every build lands in. It was "beta", a pre-release named "First".
@@ -69,13 +75,23 @@ jobs:
        run: |
          IPA_SIZE=$(wc -c < build/Shirox.ipa | tr -d ' ')
          BUILD_DATE=$(date -u +%Y-%m-%d)
-         jq --argjson size "$IPA_SIZE" --arg date "$BUILD_DATE" \
-           '.apps[0].versions[0].size = $size | .apps[0].versions[0].date = $date' \
-           apps.json > apps.json.tmp && mv apps.json.tmp apps.json
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
-         git add apps.json
-         git diff --cached --quiet || (git commit -m "chore: update apps.json [skip ci]" && git push origin HEAD:main)
+         # main often moves while the IPA builds (two PRs merged a minute apart), so the
+         # edit is made on top of the newest main each try instead of the commit that was built.
+         for attempt in 1 2 3 4 5; do
+           git fetch origin main
+           git checkout -B apps-json-update origin/main
+           jq --argjson size "$IPA_SIZE" --arg date "$BUILD_DATE" \
+             '.apps[0].versions[0].size = $size | .apps[0].versions[0].date = $date' \
+             apps.json > apps.json.tmp && mv apps.json.tmp apps.json
+           git add apps.json
+           if git diff --cached --quiet; then exit 0; fi
+           git commit -m "chore: update apps.json [skip ci]"
+           if git push origin HEAD:main; then exit 0; fi
+           sleep $((attempt * 5))
+         done
+         exit 1
 
  build-catalyst:
    name: Build Mac Catalyst DMG
