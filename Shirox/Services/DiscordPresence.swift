@@ -97,14 +97,15 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
                       cover: coverURL, coverText: title, start: start, end: end))
     }
 
-    /// A manga open in the reader, at a chapter.
+    /// A manga open in the reader, at a chapter. Shown as Watching like the videos, so Shirox
+    /// keeps one icon in the member list (Playing would show a game controller).
     func updateManga(title: String, chapter: String?, volume: String?, coverURL: String?) {
         var lines: [String] = []
         if showsDetails {
             if let volume, !volume.isEmpty { lines.append(volume) }
             if let chapter, !chapter.isEmpty { lines.append(chapter) }
         }
-        show(Activity(type: .playing, details: String(localized: "shared.discord_reading \(title)"),
+        show(Activity(type: .watching, details: String(localized: "shared.discord_reading \(title)"),
                       state: lines.joined(separator: " · "), cover: coverURL, coverText: title, start: Date(), end: nil))
     }
 
@@ -402,7 +403,6 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
 /// One status, as Discord's activity object takes it.
 private struct Activity: Equatable {
     enum Kind: Int {
-        case playing = 0
         case watching = 3
     }
 
