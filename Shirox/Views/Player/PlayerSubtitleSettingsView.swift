@@ -109,7 +109,7 @@ struct PlayerSubtitleSettingsView: View {
                             Text("settings.points \(Int(settings.bottomPadding))")
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $settings.bottomPadding, in: 20...200, step: 5)
+                        Slider(value: $settings.bottomPadding, in: SubtitleSettingsManager.bottomPaddingRange, step: 5)
                     }
                     #endif
                 }

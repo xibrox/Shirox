@@ -851,12 +851,12 @@ struct PlayerSettingsView: View {
             Section("settings.skipping") {
                 Picker("settings.skip_duration", selection: $skipShort) {
                     ForEach(shortOptions, id: \.self) { s in
-                        Text("\(s)s").tag(s)
+                        Text("common.seconds_short \(s)").tag(s)
                     }
                 }
                 Picker("settings.long_skip_duration", selection: $skipLong) {
                     ForEach(longOptions, id: \.self) { s in
-                        Text("\(s)s").tag(s)
+                        Text("common.seconds_short \(s)").tag(s)
                     }
                 }
                 Toggle("settings.auto_skip_segments", isOn: $autoSkipSegments)
@@ -877,7 +877,7 @@ struct PlayerSettingsView: View {
                     HStack {
                         Text("settings.episode_progress_threshold")
                         Spacer()
-                        Text("\(Int(watchedPercentage))%")
+                        Text("common.percent \(Int(watchedPercentage))")
                             .font(.headline)
                             .monospacedDigit()
                     }
@@ -955,17 +955,17 @@ struct SubtitleSettingsPage: View {
                 if settings.backgroundEnabled {
                     ColorPicker("settings.color", selection: $settings.backgroundColor, supportsOpacity: false)
                     sliderRow(String(localized: "settings.opacity"), value: $settings.backgroundOpacity, in: 0.1...1, step: 0.05,
-                              text: "\(Int((settings.backgroundOpacity * 100).rounded()))%")
+                              text: String(localized: "common.percent \(Int((settings.backgroundOpacity * 100).rounded()))"))
                     sliderRow(String(localized: "settings.rounding"), value: $settings.backgroundCornerRadius, in: 0...20, step: 1,
-                              text: "\(Int(settings.backgroundCornerRadius))pt")
+                              text: String(localized: "settings.points \(Int(settings.backgroundCornerRadius))"))
                 }
                 #endif
             }
 
             #if !os(tvOS)
             Section {
-                sliderRow(String(localized: "settings.bottom_padding"), value: $settings.bottomPadding, in: 20...200, step: 5,
-                          text: "\(Int(settings.bottomPadding))pt")
+                sliderRow(String(localized: "settings.bottom_padding"), value: $settings.bottomPadding, in: SubtitleSettingsManager.bottomPaddingRange, step: 5,
+                          text: String(localized: "settings.points \(Int(settings.bottomPadding))"))
             } header: {
                 Text("settings.position")
             }
