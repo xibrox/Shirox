@@ -46,6 +46,10 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
     private var pending: Activity?
     private var sendTask: Task<Void, Never>?
     private var renewTimer: Timer?
+    /// The token refresh under way. Discord hands out a new refresh token with each one and
+    /// takes the old one only once, so a second refresh at the same time would fail and lose
+    /// the sign-in.
+    private var refreshTask: Task<String, Error>?
 
     private override init() {
         super.init()
@@ -112,6 +116,7 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
         isShowingTest = false
         pending = nil
         sendTask?.cancel()
+        sendTask = nil
         renewTimer?.invalidate()
         renewTimer = nil
         sent = nil
@@ -124,34 +129,55 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
         guard isEnabled, isSignedIn else { return }
         // A playing update restarts the timer every time; only a new title, line or state counts.
         if let sent, sent.sameContent(as: activity) { return }
+        // The player reports twice a second. Waiting again on each report never let the wait
+        // run out, so nothing was sent while something played: the same status keeps its wait.
+        if let pending, pending.sameContent(as: activity), sendTask != nil {
+            self.pending = activity
+            return
+        }
         pending = activity
         // Coalesced: a burst of changes (a new episode starting) goes out once.
         sendTask?.cancel()
         sendTask = Task {
             try? await Task.sleep(nanoseconds: 800_000_000)
-            guard !Task.isCancelled, let activity = self.pending else { return }
+            guard !Task.isCancelled else { return }
+            self.sendTask = nil
+            guard let activity = self.pending else { return }
             await self.send(activity)
         }
     }
 
     private func send(_ activity: Activity) async {
         do {
-            let token = try await validAccessToken()
-            var body: [String: Any] = ["activities": [activity.json(applicationID: applicationID,
-                                                                   showsCover: showsCover)]]
-            if let sessionToken { body["token"] = sessionToken }
-            let data = try await request("users/@me/headless-sessions", body: body, token: token)
-            if let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let session = reply["token"] as? String {
-                sessionToken = session
+            do {
+                try await post(activity)
+            } catch DiscordError.http(let status) where (400..<500).contains(status) {
+                // The session ran out (the app was away for more than its 20 minutes) or the
+                // token was turned down: start over with a fresh session and token once,
+                // rather than failing every update until the app is opened again.
+                sessionToken = nil
+                if status == 401 { invalidateAccessToken() }
+                try await post(activity)
             }
             sent = activity
-            pending = nil
+            if pending?.sameContent(as: activity) == true { pending = nil }
             lastError = nil
             scheduleRenewal()
         } catch {
             lastError = error.localizedDescription
             Logger.shared.log("[Discord] Presence not set: \(error.localizedDescription)", type: "Error")
+        }
+    }
+
+    private func post(_ activity: Activity) async throws {
+        let token = try await validAccessToken()
+        var body: [String: Any] = ["activities": [activity.json(applicationID: applicationID,
+                                                               showsCover: showsCover)]]
+        if let sessionToken { body["token"] = sessionToken }
+        let data = try await request("users/@me/headless-sessions", body: body, token: token)
+        if let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let session = reply["token"] as? String {
+            sessionToken = session
         }
     }
 
@@ -267,11 +293,22 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
         if let access = keychainRead(Self.accessTokenAccount), Date().timeIntervalSince1970 < expiry - 60 {
             return access
         }
+        if let refreshTask { return try await refreshTask.value }
         guard let refresh = keychainRead(Self.refreshTokenAccount) else { throw DiscordError.signedOut }
-        let tokens = try await tokenRequest([("client_id", applicationID), ("grant_type", "refresh_token"),
-                                             ("refresh_token", refresh)])
-        store(tokens)
-        return tokens.access
+        let task = Task { () throws -> String in
+            let tokens = try await self.tokenRequest([("client_id", self.applicationID),
+                                                      ("grant_type", "refresh_token"), ("refresh_token", refresh)])
+            self.store(tokens)
+            return tokens.access
+        }
+        refreshTask = task
+        defer { refreshTask = nil }
+        return try await task.value
+    }
+
+    /// The access token was turned down before it ran out: the next request refreshes it.
+    private func invalidateAccessToken() {
+        defaults.set(0, forKey: Self.expiryKey)
     }
 
     private func store(_ tokens: Tokens) {
@@ -292,8 +329,13 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = json["access_token"] as? String,
               let refresh = json["refresh_token"] as? String else {
-            // A refresh token Discord no longer takes: signed out for good.
-            if status == 400 || status == 401 { keychainDelete(Self.refreshTokenAccount) }
+            // A refresh token Discord no longer takes: signed out for good, and Settings says so.
+            // Only the one that was sent, though: one stored since is still good.
+            let sent = form.first { $0.0 == "refresh_token" }?.1
+            if status == 400 || status == 401, let sent, sent == keychainRead(Self.refreshTokenAccount) {
+                keychainDelete(Self.refreshTokenAccount)
+                objectWillChange.send()
+            }
             throw DiscordError.http(status)
         }
         return Tokens(access: access, refresh: refresh, expiresIn: (json["expires_in"] as? Double) ?? 604_800)
