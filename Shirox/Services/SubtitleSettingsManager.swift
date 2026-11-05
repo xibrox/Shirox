@@ -78,6 +78,10 @@ final class SubtitleSettingsManager: ObservableObject {
         didSet { UserDefaults.standard.set(bottomPadding, forKey: Keys.bottomPadding) }
     }
 
+    /// How high the subtitles can go. Watching in portrait the picture sits in the middle of the
+    /// screen, and 200 pt still left them in the black bar under it.
+    static let bottomPaddingRange: ClosedRange<Double> = 20...400
+
     @Published var delaySeconds: Double {
         didSet { UserDefaults.standard.set(delaySeconds, forKey: Keys.delay) }
     }

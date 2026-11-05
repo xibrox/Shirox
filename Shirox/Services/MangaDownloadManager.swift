@@ -103,8 +103,10 @@ final class MangaDownloadManager: ObservableObject {
     func download(chapter: MangaChapter, context: MangaDownloadContext) {
         if items.contains(where: { $0.chapterHref == chapter.href }) {
             let existing = items.first { $0.chapterHref == chapter.href }
-            let status = existing?.state == .completed ? "already downloaded" : "already in queue"
-            ToastManager.shared.show(message: String(localized: "shared.title_is_status \(chapter.displayName) \(status)"), type: .warning)
+            let message = existing?.state == .completed
+                ? String(localized: "shared.chapter_already_downloaded \(chapter.displayName)")
+                : String(localized: "shared.chapter_already_in_queue \(chapter.displayName)")
+            ToastManager.shared.show(message: message, type: .warning)
             return
         }
         items.append(makeItem(chapter: chapter, context: context))

@@ -36,7 +36,7 @@ library with tracking (AniList, MyAnimeList, Simkl), Jellyfin, and playback/read
   `"Watch" + " Movie"`): write one key per whole sentence so it can be translated.
 - Counts use plural variations in the catalog. A ternary between two keys needs
   `LocalizedStringKey(…)` or `String(localized:)` on each side, or SwiftUI shows the key itself.
-- 13 languages ship: en, de, es, pt-BR, fr, it, id, tr, vi, pl, ru, zh-Hans, ja. A new key needs all
+- 14 languages ship: en, de, es, pt-BR, fr, it, id, tr, vi, pl, ru, zh-Hans, ja, th. A new key needs all
   of them (German uses informal "du"). No right-to-left languages yet.
 - Tooling, all in `scripts/i18n/i18n.py` (its header explains each): `check` (no hardcoded text,
   every key has English), `extract`, `sync`, `dedupe`, `rename`, `import LANG FILE`, `loose`.

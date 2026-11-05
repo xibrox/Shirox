@@ -221,8 +221,10 @@ final class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDeleg
         requestNotificationPermissionIfNeeded()
         // Prevent duplicates
         if let existing = items.first(where: { $0.episodeNumber == context.episodeNumber && $0.episodeHref == episodeHref && $0.streamTitle == context.streamTitle }) {
-            let status = existing.state == .completed ? "already downloaded" : "already in queue"
-            ToastManager.shared.show(message: String(localized: "shared.episode_is_status \(context.mediaTitle) \(context.episodeNumber) \(status)"), type: .warning)
+            let message = existing.state == .completed
+                ? String(localized: "shared.episode_already_downloaded \(context.mediaTitle) \(context.episodeNumber)")
+                : String(localized: "shared.episode_already_in_queue \(context.mediaTitle) \(context.episodeNumber)")
+            ToastManager.shared.show(message: message, type: .warning)
             return
         }
         

@@ -46,6 +46,10 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
     private var pending: Activity?
     private var sendTask: Task<Void, Never>?
     private var renewTimer: Timer?
+    /// The token refresh under way. Discord hands out a new refresh token with each one and
+    /// takes the old one only once, so a second refresh at the same time would fail and lose
+    /// the sign-in.
+    private var refreshTask: Task<String, Error>?
 
     private override init() {
         super.init()
@@ -64,9 +68,11 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
     // MARK: - What's shown
 
     /// Something playing: a show's episode, a movie, a video. `elapsed` sets the timer Discord
-    /// counts up from while it plays; paused, there's no timer.
+    /// counts up from while it plays, and with `duration` it shows a progress bar; paused,
+    /// there's neither. `rate` is the playback speed, so the bar ends when the episode does.
     func updateMedia(title: String, subtitle: String?, season: Int?, episode: Int?,
-                     coverURL: String?, isPlaying: Bool, elapsed: Double? = nil) {
+                     coverURL: String?, isPlaying: Bool, elapsed: Double? = nil,
+                     duration: Double? = nil, rate: Double = 1) {
         var lines: [String] = []
         if showsDetails {
             switch (season, episode) {
@@ -80,20 +86,27 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
             if let subtitle, !subtitle.isEmpty { lines.append(subtitle) }
         }
         if !isPlaying { lines.append(String(localized: "shared.discord_paused")) }
-        let start = isPlaying ? Date().addingTimeInterval(-(elapsed ?? 0)) : nil
+        let speed = rate > 0 ? rate : 1
+        let now = Date()
+        let start = isPlaying ? now.addingTimeInterval(-(elapsed ?? 0) / speed) : nil
+        var end: Date?
+        if isPlaying, let duration, duration > 0 {
+            end = now.addingTimeInterval(max(duration - (elapsed ?? 0), 0) / speed)
+        }
         show(Activity(type: .watching, details: title, state: lines.joined(separator: " · "),
-                      cover: coverURL, coverText: title, start: start))
+                      cover: coverURL, coverText: title, start: start, end: end))
     }
 
-    /// A manga open in the reader, at a chapter.
+    /// A manga open in the reader, at a chapter. Shown as Watching like the videos, so Shirox
+    /// keeps one icon in the member list (Playing would show a game controller).
     func updateManga(title: String, chapter: String?, volume: String?, coverURL: String?) {
         var lines: [String] = []
         if showsDetails {
             if let volume, !volume.isEmpty { lines.append(volume) }
             if let chapter, !chapter.isEmpty { lines.append(chapter) }
         }
-        show(Activity(type: .playing, details: String(localized: "shared.discord_reading \(title)"),
-                      state: lines.joined(separator: " · "), cover: coverURL, coverText: title, start: Date()))
+        show(Activity(type: .watching, details: String(localized: "shared.discord_reading \(title)"),
+                      state: lines.joined(separator: " · "), cover: coverURL, coverText: title, start: Date(), end: nil))
     }
 
     /// A sample status with the Shirox icon, to try the setup without anything playing.
@@ -112,6 +125,7 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
         isShowingTest = false
         pending = nil
         sendTask?.cancel()
+        sendTask = nil
         renewTimer?.invalidate()
         renewTimer = nil
         sent = nil
@@ -124,34 +138,55 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
         guard isEnabled, isSignedIn else { return }
         // A playing update restarts the timer every time; only a new title, line or state counts.
         if let sent, sent.sameContent(as: activity) { return }
+        // The player reports twice a second. Waiting again on each report never let the wait
+        // run out, so nothing was sent while something played: the same status keeps its wait.
+        if let pending, pending.sameContent(as: activity), sendTask != nil {
+            self.pending = activity
+            return
+        }
         pending = activity
         // Coalesced: a burst of changes (a new episode starting) goes out once.
         sendTask?.cancel()
         sendTask = Task {
             try? await Task.sleep(nanoseconds: 800_000_000)
-            guard !Task.isCancelled, let activity = self.pending else { return }
+            guard !Task.isCancelled else { return }
+            self.sendTask = nil
+            guard let activity = self.pending else { return }
             await self.send(activity)
         }
     }
 
     private func send(_ activity: Activity) async {
         do {
-            let token = try await validAccessToken()
-            var body: [String: Any] = ["activities": [activity.json(applicationID: applicationID,
-                                                                   showsCover: showsCover)]]
-            if let sessionToken { body["token"] = sessionToken }
-            let data = try await request("users/@me/headless-sessions", body: body, token: token)
-            if let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let session = reply["token"] as? String {
-                sessionToken = session
+            do {
+                try await post(activity)
+            } catch DiscordError.http(let status) where (400..<500).contains(status) {
+                // The session ran out (the app was away for more than its 20 minutes) or the
+                // token was turned down: start over with a fresh session and token once,
+                // rather than failing every update until the app is opened again.
+                sessionToken = nil
+                if status == 401 { invalidateAccessToken() }
+                try await post(activity)
             }
             sent = activity
-            pending = nil
+            if pending?.sameContent(as: activity) == true { pending = nil }
             lastError = nil
             scheduleRenewal()
         } catch {
             lastError = error.localizedDescription
             Logger.shared.log("[Discord] Presence not set: \(error.localizedDescription)", type: "Error")
+        }
+    }
+
+    private func post(_ activity: Activity) async throws {
+        let token = try await validAccessToken()
+        var body: [String: Any] = ["activities": [activity.json(applicationID: applicationID,
+                                                               showsCover: showsCover)]]
+        if let sessionToken { body["token"] = sessionToken }
+        let data = try await request("users/@me/headless-sessions", body: body, token: token)
+        if let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let session = reply["token"] as? String {
+            sessionToken = session
         }
     }
 
@@ -267,11 +302,22 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
         if let access = keychainRead(Self.accessTokenAccount), Date().timeIntervalSince1970 < expiry - 60 {
             return access
         }
+        if let refreshTask { return try await refreshTask.value }
         guard let refresh = keychainRead(Self.refreshTokenAccount) else { throw DiscordError.signedOut }
-        let tokens = try await tokenRequest([("client_id", applicationID), ("grant_type", "refresh_token"),
-                                             ("refresh_token", refresh)])
-        store(tokens)
-        return tokens.access
+        let task = Task { () throws -> String in
+            let tokens = try await self.tokenRequest([("client_id", self.applicationID),
+                                                      ("grant_type", "refresh_token"), ("refresh_token", refresh)])
+            self.store(tokens)
+            return tokens.access
+        }
+        refreshTask = task
+        defer { refreshTask = nil }
+        return try await task.value
+    }
+
+    /// The access token was turned down before it ran out: the next request refreshes it.
+    private func invalidateAccessToken() {
+        defaults.set(0, forKey: Self.expiryKey)
     }
 
     private func store(_ tokens: Tokens) {
@@ -292,8 +338,13 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = json["access_token"] as? String,
               let refresh = json["refresh_token"] as? String else {
-            // A refresh token Discord no longer takes: signed out for good.
-            if status == 400 || status == 401 { keychainDelete(Self.refreshTokenAccount) }
+            // A refresh token Discord no longer takes: signed out for good, and Settings says so.
+            // Only the one that was sent, though: one stored since is still good.
+            let sent = form.first { $0.0 == "refresh_token" }?.1
+            if status == 400 || status == 401, let sent, sent == keychainRead(Self.refreshTokenAccount) {
+                keychainDelete(Self.refreshTokenAccount)
+                objectWillChange.send()
+            }
             throw DiscordError.http(status)
         }
         return Tokens(access: access, refresh: refresh, expiresIn: (json["expires_in"] as? Double) ?? 604_800)
@@ -352,7 +403,6 @@ final class DiscordPresence: NSObject, ObservableObject, ASWebAuthenticationPres
 /// One status, as Discord's activity object takes it.
 private struct Activity: Equatable {
     enum Kind: Int {
-        case playing = 0
         case watching = 3
     }
 
@@ -362,11 +412,26 @@ private struct Activity: Equatable {
     let cover: String?
     let coverText: String
     let start: Date?
+    /// When the progress bar is full; nil shows only the timer.
+    let end: Date?
 
-    /// The same thing shown: a timer a second further on isn't a change.
+    /// The same thing shown: a timer a second further on isn't a change. With a progress bar a
+    /// seek is; without one (the reader starts its timer anew on every page) only whether there
+    /// is a timer counts.
     func sameContent(as other: Activity) -> Bool {
-        type == other.type && details == other.details && state == other.state
-            && cover == other.cover && (start == nil) == (other.start == nil)
+        guard type == other.type, details == other.details, state == other.state, cover == other.cover,
+              (start == nil) == (other.start == nil) else { return false }
+        if end == nil, other.end == nil { return true }
+        return Self.close(start, other.start) && Self.close(end, other.end)
+    }
+
+    /// Both unset, or within a few seconds: the player's reports drift a little.
+    private static func close(_ lhs: Date?, _ rhs: Date?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil): return true
+        case let (lhs?, rhs?): return abs(lhs.timeIntervalSince(rhs)) < 5
+        default: return false
+        }
     }
 
     func json(applicationID: String, showsCover: Bool) -> [String: Any] {
@@ -380,7 +445,11 @@ private struct Activity: Equatable {
             "status_display_type": 2
         ]
         if !state.isEmpty { json["state"] = String(state.prefix(128)) }
-        if let start { json["timestamps"] = ["start": Int(start.timeIntervalSince1970 * 1_000)] }
+        if let start {
+            var timestamps = ["start": Int(start.timeIntervalSince1970 * 1_000)]
+            if let end { timestamps["end"] = Int(end.timeIntervalSince1970 * 1_000) }
+            json["timestamps"] = timestamps
+        }
         // Discord fetches outside images through its own proxy for headless sessions.
         if showsCover, let cover, cover.hasPrefix("https://") {
             json["assets"] = ["large_image": cover, "large_text": String(coverText.prefix(128))]

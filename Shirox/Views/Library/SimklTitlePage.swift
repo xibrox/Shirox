@@ -11,6 +11,9 @@ struct SimklTitlePage: View {
     let seedPosterURL: String?
 
     @ObservedObject private var continueWatching = ContinueWatchingManager.shared
+    #if !os(tvOS)
+    @ObservedObject private var downloads = DownloadManager.shared
+    #endif
     @State private var details: SimklTitleDetails?
     @State private var detailsFailed = false
     @State private var episodes: [SimklEpisode] = []
@@ -107,7 +110,7 @@ struct SimklTitlePage: View {
                 onDismiss: { picker = nil },
                 onStreamsLoaded: { streams, selected, showHref, count, episodeHref in
                     streamsLoaded(streams, selected: selected, request: request.play,
-                                  href: showHref, episodeHref: episodeHref, count: count)
+                                  href: showHref, episodeHref: episodeHref, count: count, download: request.download)
                 }
             )
             .environmentObject(ModuleManager.shared)
@@ -118,9 +121,14 @@ struct SimklTitlePage: View {
                 streams: choice.play.streams,
                 onDismiss: { self.choice = nil },
                 onSelect: { stream in
-                    pending = PendingPlay(stream: stream, streams: choice.play.streams, request: choice.play.request,
-                                          href: choice.play.href, episodeHref: choice.play.episodeHref,
-                                          count: choice.play.count)
+                    let play = PendingPlay(stream: stream, streams: choice.play.streams, request: choice.play.request,
+                                           href: choice.play.href, episodeHref: choice.play.episodeHref,
+                                           count: choice.play.count)
+                    if choice.download {
+                        download(play)
+                    } else {
+                        pending = play
+                    }
                     self.choice = nil
                 })
         }
@@ -380,7 +388,10 @@ struct SimklTitlePage: View {
                                     progress: progress(for: ref),
                                     onTap: { play(ref) },
                                     onMarkWatched: { Task { await mark(ref, watched: true) } },
-                                    onMarkUnwatched: { Task { await mark(ref, watched: false) } })
+                                    onMarkUnwatched: { Task { await mark(ref, watched: false) } },
+                                    onResetProgress: resetProgress(for: ref),
+                                    onDownload: downloadAction(for: ref),
+                                    downloadState: downloadState(for: ref))
                                 .opacity(episode.aired ? 1 : 0.5)
                             }
                         }
@@ -420,12 +431,64 @@ struct SimklTitlePage: View {
     /// Watched on Simkl shows as complete; otherwise how far Continue Watching got.
     private func progress(for ref: SimklEpisodeRef) -> Double? {
         if watched.contains(ref) { return 1 }
-        let item = continueWatching.items.first { item in
+        guard let item = continueWatchingItem(for: ref), item.totalSeconds > 0 else { return nil }
+        return min(item.watchedSeconds / item.totalSeconds, 1)
+    }
+
+    private func continueWatchingItem(for ref: SimklEpisodeRef) -> ContinueWatchingItem? {
+        continueWatching.items.first { item in
             guard item.simklTitle?.simklID == simklID, let season = item.simklTitle?.season else { return false }
             return SimklPlayNumbering.episode(season: season, number: item.episodeNumber, in: episodes) == ref
         }
-        guard let item, item.totalSeconds > 0 else { return nil }
-        return min(item.watchedSeconds / item.totalSeconds, 1)
+    }
+
+    /// Forgets how far the episode got here. A watched mark on Simkl stays; Mark as Unwatched
+    /// clears that one.
+    private func resetProgress(for ref: SimklEpisodeRef) -> (() -> Void)? {
+        guard let item = continueWatchingItem(for: ref) else { return nil }
+        return { continueWatching.remove(item) }
+    }
+
+    // MARK: - Downloading
+
+    /// Downloads go through the same module picker as playing; tvOS has no downloads.
+    private func downloadAction(for ref: SimklEpisodeRef) -> (() -> Void)? {
+        #if os(tvOS)
+        return nil
+        #else
+        return { picker = playRequest(for: ref, download: true) }
+        #endif
+    }
+
+    /// A Simkl title has no AniList id, so its downloads are found by the title they were
+    /// saved under (the season's search title) and the season's own episode number.
+    private func downloadState(for ref: SimklEpisodeRef) -> DownloadState? {
+        #if os(tvOS)
+        return nil
+        #else
+        let searchTitle = SimklPlayNumbering.searchTitle(title, season: ref.season)
+        return downloads.items.first {
+            $0.aniListID == nil && $0.mediaTitle == searchTitle && $0.episodeNumber == ref.episode
+        }?.state
+        #endif
+    }
+
+    private func download(_ play: PendingPlay) {
+        #if !os(tvOS)
+        let request = play.request
+        let context = DownloadContext(
+            mediaTitle: request.mediaTitle,
+            episodeNumber: request.number,
+            episodeTitle: nil,
+            imageUrl: request.imageURL,
+            aniListID: nil,
+            moduleId: ModuleManager.shared.activeModule?.id,
+            detailHref: play.href,
+            episodeHref: play.episodeHref ?? "",
+            streamTitle: play.stream.title,
+            totalEpisodes: request.totalEpisodes)
+        DownloadManager.shared.download(stream: play.stream, episodeHref: play.episodeHref ?? "", context: context)
+        #endif
     }
 
     // MARK: - Playing
@@ -433,7 +496,9 @@ struct SimklTitlePage: View {
     private struct PlayRequest: Identifiable {
         let play: SimklPlayback.Request
         let searchTitle: String
-        var id: String { "\(play.ref.simklID)-\(play.ref.season ?? 0)-\(play.number)" }
+        /// The streams found are downloaded instead of played.
+        var download = false
+        var id: String { "\(play.ref.simklID)-\(play.ref.season ?? 0)-\(play.number)-\(download)" }
     }
 
     private struct PendingPlay {
@@ -448,6 +513,7 @@ struct SimklTitlePage: View {
     private struct StreamChoice: Identifiable {
         let id = UUID()
         let play: PendingPlay
+        var download = false
     }
 
     /// Opens the module picker for a movie, or for an episode by its season's own number.
@@ -462,8 +528,12 @@ struct SimklTitlePage: View {
             return
         }
         guard let episode else { return }
+        picker = playRequest(for: episode)
+    }
+
+    private func playRequest(for episode: SimklEpisodeRef, download: Bool = false) -> PlayRequest {
         let searchTitle = SimklPlayNumbering.searchTitle(title, season: episode.season)
-        picker = PlayRequest(
+        return PlayRequest(
             play: SimklPlayback.Request(
                 ref: SimklPlayRef(simklID: simklID, kind: kind, season: episode.season), number: episode.episode,
                 mediaTitle: searchTitle, imageURL: posterURL ?? "",
@@ -471,22 +541,30 @@ struct SimklTitlePage: View {
                 totalEpisodes: SimklPlayNumbering.seasonCount(episode.season, in: episodes),
                 isAiring: details?.status == "airing",
                 seasonNumbering: SimklPlayNumbering.numbering(for: episode.season, in: episodes)),
-            searchTitle: searchTitle)
+            searchTitle: searchTitle,
+            download: download)
     }
 
     /// As AniListDetailViewModel.onStreamsLoaded: one stream (or one picked) plays once the picker
     /// has gone; several open the stream choice.
     private func streamsLoaded(_ streams: [StreamResult], selected: StreamResult?, request: SimklPlayback.Request,
-                               href: String?, episodeHref: String?, count: Int?) {
+                               href: String?, episodeHref: String?, count: Int?, download: Bool) {
         let sorted = streams.sorted { $0.title < $1.title }
+        guard !sorted.isEmpty else { picker = nil; return }
         guard let first = selected ?? (sorted.count == 1 ? sorted.first : nil) else {
             choice = StreamChoice(play: PendingPlay(stream: sorted[0], streams: sorted, request: request,
-                                                    href: href, episodeHref: episodeHref, count: count))
+                                                    href: href, episodeHref: episodeHref, count: count),
+                                  download: download)
             picker = nil
             return
         }
-        pending = PendingPlay(stream: first, streams: sorted, request: request, href: href,
-                              episodeHref: episodeHref, count: count)
+        let play = PendingPlay(stream: first, streams: sorted, request: request, href: href,
+                               episodeHref: episodeHref, count: count)
+        if download {
+            self.download(play)
+        } else {
+            pending = play
+        }
         picker = nil
     }
 

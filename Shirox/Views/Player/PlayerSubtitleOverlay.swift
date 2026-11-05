@@ -6,10 +6,17 @@ struct PlayerSubtitleOverlay: View {
     let showControls: Bool
     @ObservedObject var settings: SubtitleSettingsManager
 
-    private var activeCue: SubtitleCue? {
+    /// Every cue showing now, one under the other. Cues overlap: a sign ("Map of Island") stays
+    /// up for many seconds while the dialogue under it changes, and showing only the first
+    /// cue hid all of that dialogue.
+    private var activeText: String? {
         guard !cues.isEmpty else { return nil }
         let adjustedTime = currentTime + settings.delaySeconds
-        return cues.first { ($0.start...$0.end).contains(adjustedTime) }
+        var lines: [String] = []
+        for cue in cues where (cue.start...cue.end).contains(adjustedTime) && !lines.contains(cue.text) {
+            lines.append(cue.text)
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 
     // Safe area bottom inset (home indicator height on modern iPhones).
@@ -54,8 +61,8 @@ struct PlayerSubtitleOverlay: View {
         VStack {
             Spacer()
 
-            if settings.enabled, let cue = activeCue {
-                Text(cue.text)
+            if settings.enabled, let text = activeText {
+                Text(text)
                     .font(settings.font(size: settings.fontSize))
                     .foregroundStyle(settings.foregroundColor)
                     // 4-directional outline

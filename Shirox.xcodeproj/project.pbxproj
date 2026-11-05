@@ -2711,6 +2711,7 @@
 				pl,
 				"pt-BR",
 				ru,
+				th,
 				tr,
 				vi,
 				"zh-Hans",

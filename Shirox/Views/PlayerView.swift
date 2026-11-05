@@ -822,7 +822,10 @@ struct PlayerView: View {
                 showsStyledNote: subtitleRoute == .assOverlay || subtitleRoute == .mpvScript
                     || shownEmbeddedSubtitle != nil
             )
-            .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
+            .id(subtitleTracks?.count ?? 0)
+            // The player keeps a neutral tint for its own controls; its sheets take the app's.
+            .appTint()
+            .adaptivePresentationDetents([.medium, .large])
         }
         #if !os(tvOS)
         .fileImporter(isPresented: $showSubtitleImporter,
@@ -862,6 +865,7 @@ struct PlayerView: View {
             PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
                 swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams, episodeHref: nextEpisodeHref)
             }
+            .appTint()
             .adaptivePresentationDetents([.height(nextEpisodePickerHeight)])
         })
         .sheet(isPresented: $showSequelPicker, onDismiss: {
@@ -871,6 +875,7 @@ struct PlayerView: View {
             PlayerSequelPickerSheet(results: sequelResults) { selected in
                 advanceToSequel(selected)
             }
+            .appTint()
             .adaptivePresentationDetents([.medium])
         })
         .playerKeyboardShortcuts(
@@ -3007,9 +3012,12 @@ struct PlayerView: View {
 
         #if !os(tvOS)
         // The same place feeds Discord, for every player: AVPlayer, MPV and casting alike.
-        DiscordPresence.shared.updateMedia(title: mediaTitle, subtitle: epTitle, season: nil,
+        // Simkl plays know their season; an AniList entry is one season, named in its title.
+        DiscordPresence.shared.updateMedia(title: mediaTitle, subtitle: epTitle,
+                                           season: currentContext?.simklTitle?.season,
                                            episode: epNumber, coverURL: currentContext?.imageUrl,
-                                           isPlaying: isPlaying, elapsed: elapsed)
+                                           isPlaying: isPlaying, elapsed: elapsed,
+                                           duration: duration > 0 ? duration : nil, rate: rate)
         #endif
 
         let snapshot = NowPlayingSnapshot(
