@@ -822,7 +822,10 @@ struct PlayerView: View {
                 showsStyledNote: subtitleRoute == .assOverlay || subtitleRoute == .mpvScript
                     || shownEmbeddedSubtitle != nil
             )
-            .id(subtitleTracks?.count ?? 0)            .adaptivePresentationDetents([.medium, .large])
+            .id(subtitleTracks?.count ?? 0)
+            // The player keeps a neutral tint for its own controls; its sheets take the app's.
+            .appTint()
+            .adaptivePresentationDetents([.medium, .large])
         }
         #if !os(tvOS)
         .fileImporter(isPresented: $showSubtitleImporter,
@@ -862,6 +865,7 @@ struct PlayerView: View {
             PlayerNextEpisodePicker(streams: nextEpisodeStreams) { selected in
                 swapStream(selected, episodeNumber: nextEpisodeNumber, allStreams: nextEpisodeStreams, episodeHref: nextEpisodeHref)
             }
+            .appTint()
             .adaptivePresentationDetents([.height(nextEpisodePickerHeight)])
         })
         .sheet(isPresented: $showSequelPicker, onDismiss: {
@@ -871,6 +875,7 @@ struct PlayerView: View {
             PlayerSequelPickerSheet(results: sequelResults) { selected in
                 advanceToSequel(selected)
             }
+            .appTint()
             .adaptivePresentationDetents([.medium])
         })
         .playerKeyboardShortcuts(
