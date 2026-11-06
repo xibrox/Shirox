@@ -77,6 +77,7 @@ final class IconPackStore: ObservableObject {
     /// Packs Shirox suggests, published with the app's source.
     static let suggested: [(name: String, url: String)] = [
         ("Font Awesome", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/fontawesome/pack.json"),
+        ("Heroicons", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/heroicons/pack.json"),
         ("Iconoir", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/iconoir/pack.json"),
         ("Lucide", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/lucide/pack.json")
     ]
