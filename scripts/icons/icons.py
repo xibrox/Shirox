@@ -5,21 +5,20 @@
                                                # system's SF Symbols list); bumps its version when
                                                # the set of icons changes
     python3 -I scripts/icons/icons.py check    # fails if the code uses a symbol icons.json lacks
-    python3 -I scripts/icons/icons.py packs    # checks every pack in iconpacks/ against icons.json
-    python3 -I scripts/icons/icons.py build PACK [VERSION]  # svg/*.svg -> icons/*.pdf, rewrites
-                                               # pack.json for the current icons version
 
 An icon is any string literal in the Swift sources that names a real SF Symbol, wherever it sits:
 `Image(systemName:)`, `Label(…, systemImage:)`, an enum's `icon` property, either side of a
 ternary. Names put together at runtime ("\\(name).fill") can't be found this way; write the
 full names out as literals instead.
 
-A pack is a folder with a pack.json and one vector PDF per icon (iOS and macOS draw PDFs
-natively; the SVGs in svg/ are the source, turned into PDFs by `build` with rsvg-convert):
+The packs themselves live in the website repo (github.com/shiroxapp/shiroxapp.github.io, under
+static/iconpacks/), published at https://shiroxapp.github.io/iconpacks/<pack>/pack.json. Its
+`bun run iconpacks check` and `bun run iconpacks build <pack>` read this icons.json from GitHub,
+so a version bump here shows up there as packs that need updating. The pack format:
 
     { "name": "Font Awesome", "author": "Fonticons, Inc.", "license": "CC BY 4.0",
       "website": "https://fontawesome.com",
-      "url": "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/fontawesome/pack.json",
+      "url": "https://shiroxapp.github.io/iconpacks/fontawesome/pack.json",
       "iconsVersion": 3, "packVersion": 2,
       "icons": { "house.fill": "icons/house.fill.pdf", … } }
 
@@ -29,8 +28,6 @@ app downloads a pack from that address and checks it there for updates (a higher
 it matches the version it ships with, so a pack missing new icons is never half applied; bump
 `packVersion` with every change to a pack so installed copies update.
 """
-import shutil
-import subprocess
 import glob
 import json
 import os
@@ -41,8 +38,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 SOURCES = os.path.join(ROOT, "Shirox")
-PACKS = os.path.join(ROOT, "iconpacks")
-MANIFEST = os.path.join(PACKS, "icons.json")
+MANIFEST = os.path.join(ROOT, "iconpacks", "icons.json")
 SF_SYMBOLS = "/System/Library/CoreServices/CoreGlyphs.bundle/Contents/Resources/name_availability.plist"
 
 LITERAL = re.compile(r'"([a-z0-9]+(?:\.[a-z0-9]+)*)"')
@@ -151,60 +147,6 @@ def cmd_check(_):
     print(f"icons: all {len(listed)} icons are listed (version {manifest['version']})")
 
 
-def cmd_packs(_):
-    manifest = load_json(MANIFEST, {"version": 0, "icons": []})
-    failed = False
-    for path in sorted(glob.glob(os.path.join(PACKS, "*", "pack.json"))):
-        pack = load_json(path, {})
-        folder = os.path.dirname(path)
-        name = os.path.relpath(folder, PACKS)
-        problems = []
-        if pack.get("iconsVersion") != manifest["version"]:
-            problems.append(f"made for icons version {pack.get('iconsVersion')}, "
-                            f"the app is on {manifest['version']}")
-        icons = pack.get("icons", {})
-        problems += [f"no icon for {n}" for n in manifest["icons"] if n not in icons]
-        problems += [f"{n}: {f} is missing" for n, f in icons.items()
-                     if not os.path.exists(os.path.join(folder, f))]
-        if not pack.get("url", "").startswith("https://"):
-            problems.append("no https url")
-        print(f"{name}: {'ok' if not problems else str(len(problems)) + ' problems'}")
-        for problem in problems[:20]:
-            print(f"  {problem}")
-        failed |= bool(problems)
-    sys.exit(1 if failed else 0)
-
-
-def cmd_build(args):
-    """Turns a pack's svg/<icon>.svg files into icons/<icon>.pdf and points pack.json at them,
-    for the current icons version. A higher packVersion can be passed; otherwise it goes up
-    by one whenever the pack changes."""
-    if not args:
-        sys.exit("build: name the pack folder, e.g. fontawesome")
-    folder = os.path.join(PACKS, args[0])
-    manifest = load_json(MANIFEST, {"version": 0, "icons": []})
-    pack = load_json(os.path.join(folder, "pack.json"), None)
-    if pack is None:
-        sys.exit(f"{folder}/pack.json is missing")
-    missing = [n for n in manifest["icons"] if not os.path.exists(os.path.join(folder, "svg", n + ".svg"))]
-    if missing:
-        sys.exit("no SVG for: " + ", ".join(missing))
-    if not shutil.which("rsvg-convert"):
-        sys.exit("build needs rsvg-convert (brew install librsvg)")
-    out = os.path.join(folder, "icons")
-    shutil.rmtree(out, ignore_errors=True)
-    os.makedirs(out)
-    for name in manifest["icons"]:
-        subprocess.run(["rsvg-convert", "-f", "pdf", "-o", os.path.join(out, name + ".pdf"),
-                        os.path.join(folder, "svg", name + ".svg")], check=True)
-    icons = {n: f"icons/{n}.pdf" for n in manifest["icons"]}
-    changed = icons != pack.get("icons") or pack.get("iconsVersion") != manifest["version"]
-    version = int(args[1]) if len(args) > 1 else pack.get("packVersion", 0) + (1 if changed else 0)
-    pack.update({"iconsVersion": manifest["version"], "packVersion": version, "icons": icons})
-    write_json(os.path.join(folder, "pack.json"), pack)
-    print(f"{args[0]}: {len(icons)} icons, pack version {version}, icons version {manifest['version']}")
-
-
 def write_swift_manifest(manifest):
     """The version the app checks packs against, compiled in."""
     path = os.path.join(SOURCES, "Services", "IconManifest.swift")
@@ -218,7 +160,7 @@ def write_swift_manifest(manifest):
         f.write("}\n")
 
 
-COMMANDS = {"update": cmd_update, "check": cmd_check, "packs": cmd_packs, "build": cmd_build}
+COMMANDS = {"update": cmd_update, "check": cmd_check}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:

@@ -74,10 +74,12 @@ final class IconPackStore: ObservableObject {
     /// icon is looked up when its view is made.
     @Published private(set) var revision = 0
 
-    /// Packs Shirox suggests, published with the app's source.
+    /// Packs Shirox suggests, published on the website (shiroxapp.github.io/iconpacks).
     static let suggested: [(name: String, url: String)] = [
-        ("Font Awesome", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/fontawesome/pack.json"),
-        ("Iconoir", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/iconoir/pack.json")
+        ("Font Awesome", "https://shiroxapp.github.io/iconpacks/fontawesome/pack.json"),
+        ("Heroicons", "https://shiroxapp.github.io/iconpacks/heroicons/pack.json"),
+        ("Iconoir", "https://shiroxapp.github.io/iconpacks/iconoir/pack.json"),
+        ("Lucide", "https://shiroxapp.github.io/iconpacks/lucide/pack.json")
     ]
 
     private let root: URL
