@@ -26,7 +26,9 @@ so a version bump here shows up there as packs that need updating. The pack form
 app downloads a pack from that address and checks it there for updates (a higher packVersion).
 `iconsVersion` is the icons.json version the pack was made for. The app loads a pack only when
 it matches the version it ships with, so a pack missing new icons is never half applied; bump
-`packVersion` with every change to a pack so installed copies update.
+`packVersion` with every change to a pack so installed copies update. Icons are tinted like
+symbols; a pack drawn in colour sets `"multicolor": true` to keep its own colours (builds from
+before that flag show such a pack as tinted shapes).
 """
 import glob
 import json
