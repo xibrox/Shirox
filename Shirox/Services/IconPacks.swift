@@ -24,6 +24,9 @@ struct IconPack: Codable, Equatable {
     var iconsVersion: Int
     var packVersion: Int
     var icons: [String: String]
+    /// The icons keep their own colours instead of taking the tint, for packs drawn in colour
+    /// (`"multicolor": true` in pack.json). Absent in most packs: those are tinted shapes.
+    var multicolor: Bool?
 
     /// Made for the icons this build uses: anything else isn't loaded at all.
     var fitsThisBuild: Bool { iconsVersion == IconManifest.version }
@@ -74,17 +77,29 @@ final class IconPackStore: ObservableObject {
     /// icon is looked up when its view is made.
     @Published private(set) var revision = 0
 
-    /// Packs Shirox suggests, published with the app's source.
-    static let suggested: [(name: String, url: String)] = [
-        ("Font Awesome", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/fontawesome/pack.json"),
-        ("Iconoir", "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/iconoir/pack.json")
-    ]
+    /// The official packs are listed on the website, each with the link to add it here.
+    static let websiteAddress = "shiroxapp.github.io/iconpacks"
+    static var websiteURL: URL? { URL(string: "https://\(websiteAddress)/") }
+
+    /// Where the packs were published before they moved to the website, with the same
+    /// folders under it. Nightly and TestFlight builds installed packs from there.
+    private static let legacyPrefix = "https://raw.githubusercontent.com/xibrox/Shirox/main/iconpacks/"
+
+    /// A pack url from the old address, moved to the same pack on the website; any other url
+    /// as it is. Applied to installed packs, the saved choice and links pasted in, so packs
+    /// from before the move keep updating instead of checking a folder that is gone.
+    static func migrated(_ url: String) -> String {
+        guard url.hasPrefix(legacyPrefix) else { return url }
+        return "https://\(websiteAddress)/" + url.dropFirst(legacyPrefix.count)
+    }
 
     private let root: URL
 
     private init() {
         root = AppDirectories.applicationSupport.appendingPathComponent("IconPacks", isDirectory: true)
-        selectedURL = UserDefaults.standard.string(forKey: Self.selectedKey) ?? ""
+        let stored = UserDefaults.standard.string(forKey: Self.selectedKey) ?? ""
+        selectedURL = Self.migrated(stored)
+        if selectedURL != stored { UserDefaults.standard.set(selectedURL, forKey: Self.selectedKey) }
         reload()
     }
 
@@ -98,7 +113,7 @@ final class IconPackStore: ObservableObject {
 
     /// Downloads the pack published at `link`, or the newer version of one already here.
     func install(from link: String) async throws {
-        guard let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)),
+        guard let url = URL(string: Self.migrated(link.trimmingCharacters(in: .whitespacesAndNewlines))),
               url.scheme == "https" else { throw IconPackError.notHTTPS }
         let pack = try await Self.fetchPack(at: url)
         guard pack.fitsThisBuild else { throw IconPackError.wrongVersion(pack.iconsVersion) }
@@ -148,8 +163,16 @@ final class IconPackStore: ObservableObject {
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let folders = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
         installed = folders.compactMap { folder in
-            guard let data = try? Data(contentsOf: folder.appendingPathComponent("pack.json")),
-                  let pack = try? JSONDecoder().decode(IconPack.self, from: data) else { return nil }
+            let file = folder.appendingPathComponent("pack.json")
+            guard let data = try? Data(contentsOf: file),
+                  var pack = try? JSONDecoder().decode(IconPack.self, from: data) else { return nil }
+            // Installed from the old address: point it at the website, on disk too. The icons
+            // are local files and stay as they are.
+            let url = Self.migrated(pack.url)
+            if url != pack.url {
+                pack.url = url
+                try? JSONEncoder().encode(pack).write(to: file)
+            }
             return InstalledIconPack(pack: pack, folder: folder)
         }
         .sorted { $0.pack.name.localizedCaseInsensitiveCompare($1.pack.name) == .orderedAscending }
@@ -233,8 +256,9 @@ final class IconPackRenderer: @unchecked Sendable {
         images = [:]
     }
 
-    /// The pack's icon for an SF Symbol name at a size in points, as a template image to tint;
-    /// nil without a pack, or when the pack has no such icon.
+    /// The pack's icon for an SF Symbol name at a size in points: a template image to tint, or
+    /// for a multicolor pack one drawn in its own colours; nil without a pack, or when the pack
+    /// has no such icon.
     func image(_ name: String, pointSize: CGFloat) -> PlatformIconImage? {
         lock.lock(); defer { lock.unlock() }
         guard let pack, let path = pack.pack.icons[name] else { return nil }
@@ -249,13 +273,14 @@ final class IconPackRenderer: @unchecked Sendable {
             document = loaded
         }
         guard let page = document.page(at: 1) else { return nil }
-        let image = Self.render(page, pointSize: pointSize)
+        let image = Self.render(page, pointSize: pointSize, template: pack.pack.multicolor != true)
         images[key] = image
         return image
     }
 
-    /// The page fitted into a square of `pointSize`, kept in proportion.
-    private static func render(_ page: CGPDFPage, pointSize: CGFloat) -> PlatformIconImage {
+    /// The page fitted into a square of `pointSize`, kept in proportion; a template image unless
+    /// the pack keeps its colours.
+    private static func render(_ page: CGPDFPage, pointSize: CGFloat, template: Bool) -> PlatformIconImage {
         let box = page.getBoxRect(.mediaBox)
         let fit = min(pointSize / max(box.width, 1), pointSize / max(box.height, 1))
         let size = CGSize(width: box.width * fit, height: box.height * fit)
@@ -273,14 +298,14 @@ final class IconPackRenderer: @unchecked Sendable {
             renderer.cgContext.scaleBy(x: 1, y: -1)
             draw(renderer.cgContext)
         }
-        return image.withRenderingMode(.alwaysTemplate)
+        return image.withRenderingMode(template ? .alwaysTemplate : .alwaysOriginal)
         #else
         let image = NSImage(size: size, flipped: false) { _ in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             draw(context)
             return true
         }
-        image.isTemplate = true
+        image.isTemplate = template
         return image
         #endif
     }
@@ -289,16 +314,22 @@ final class IconPackRenderer: @unchecked Sendable {
 // MARK: - Views
 
 extension Image {
+    /// A pack's icon as SwiftUI draws it: tinted like a symbol, or in its own colours when the
+    /// renderer made it that way for a multicolor pack.
+    init(packIcon image: PlatformIconImage) {
+        #if canImport(UIKit)
+        self = Image(uiImage: image).renderingMode(image.renderingMode == .alwaysOriginal ? .original : .template)
+        #else
+        self = Image(nsImage: image).renderingMode(image.isTemplate ? .template : .original)
+        #endif
+    }
+
     /// An icon by its SF Symbol name: the pack's when one is in use, the symbol otherwise.
     /// For places that need an `Image`: tab bars, menus, labels. A pack's icon is drawn at
     /// `pointSize` there, since an image from a file doesn't follow the font as a symbol does.
     init(icon name: String, pointSize: CGFloat = 20) {
         if let image = IconPackRenderer.shared.image(name, pointSize: pointSize) {
-            #if canImport(UIKit)
-            self = Image(uiImage: image).renderingMode(.template)
-            #else
-            self = Image(nsImage: image).renderingMode(.template)
-            #endif
+            self = Image(packIcon: image)
         } else {
             self.init(systemName: name)
         }
@@ -319,11 +350,7 @@ struct IconView: View {
             Image(systemName: name)
                 .hidden()
                 .overlay {
-                    #if canImport(UIKit)
-                    Image(uiImage: image).renderingMode(.template).resizable().scaledToFit()
-                    #else
-                    Image(nsImage: image).renderingMode(.template).resizable().scaledToFit()
-                    #endif
+                    Image(packIcon: image).resizable().scaledToFit()
                 }
                 .accessibilityElement(children: .ignore)
         } else {
