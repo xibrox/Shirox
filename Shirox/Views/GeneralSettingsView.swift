@@ -263,24 +263,29 @@ struct IconPacksSettingsView: View {
                 Text("settings.icon_packs_note")
             }
 
-            let suggestions = IconPackStore.suggested.filter { s in !store.installed.contains { $0.pack.url == s.url } }
-            if !suggestions.isEmpty {
-                Section {
-                    ForEach(suggestions, id: \.url) { suggestion in
-                        Button {
-                            add(suggestion.url)
-                        } label: {
-                            HStack {
-                                Text(suggestion.name).foregroundStyle(.primary)
-                                Spacer()
-                                if busy == suggestion.url { ProgressView() } else { Image(icon: "arrow.down.circle") }
-                            }
-                        }
-                        .disabled(busy != nil)
-                    }
-                } header: {
-                    Text("settings.suggested_icon_packs")
+            // The official packs are on the website, which always lists the current ones;
+            // a pack is added from there by its link. tvOS can't open web pages, so it
+            // shows the address instead.
+            Section {
+                #if os(tvOS)
+                LabeledContent("settings.official_icon_packs") {
+                    Text(verbatim: IconPackStore.websiteAddress)
                 }
+                #else
+                if let websiteURL = IconPackStore.websiteURL {
+                    Link(destination: websiteURL) {
+                        HStack {
+                            Text("settings.official_icon_packs")
+                            Spacer()
+                            IconView("arrow.up.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                #endif
+            } footer: {
+                Text("settings.official_icon_packs_note")
             }
 
             Section {

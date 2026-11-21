@@ -53,8 +53,10 @@ library with tracking (AniList, MyAnimeList, Simkl), Jellyfin, and playback/read
   list sees them.
 - `scripts/icons/icons.py update` regenerates `iconpacks/icons.json` (and `IconManifest.swift`);
   its version goes up whenever the set of icons changes. A pack loads only for the version it was
-  made for. After a change, update the packs in `iconpacks/` (their `svg/` sources), run
-  `icons.py build <pack>`, and check them with `icons.py packs`.
+  made for. The packs live in the website repo (shiroxapp/shiroxapp.github.io, `static/iconpacks/`,
+  published at `https://shiroxapp.github.io/iconpacks/<pack>/pack.json`): after a version bump,
+  update their `svg/` sources there and run `bun run iconpacks build <pack>` and
+  `bun run iconpacks check`.
 - Pack format and update flow are described at the top of `scripts/icons/icons.py`.
 
 ## Settings, accounts, backups
